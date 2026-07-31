@@ -1,4 +1,7 @@
+"use client";
+
 import { Mark } from "@/components/brand";
+import { Numeral, useInView } from "@/components/reveal";
 
 type Item = {
   n: string;
@@ -36,9 +39,18 @@ const ITEMS: Item[] = [
   },
 ];
 
+/* ── การ์ดสามใบไล่กันขึ้นมา แทนที่จะโผล่พร้อมกันเสร็จแล้ว ──
+
+   นี่คือพระเอกของหน้าแรก และมันเคยนิ่งสนิททั้งที่สิ่งที่มันเล่าคือ
+   "สามการตัดสินใจก่อนเก้าโมง" — ลำดับคือสาระ ไม่ใช่การตกแต่ง
+
+   ในหน้าแรกมันอยู่คู่กับ SignalField ที่เคลื่อนไหวอยู่แล้ว จังหวะจึง
+   สั้นกว่า (compact) เพื่อไม่ให้สองอย่างแย่งสายตากัน */
 export function BriefMock({ compact = false }: { compact?: boolean }) {
+  const { ref, seen } = useInView<HTMLDivElement>();
+  const step = compact ? 110 : 170;
   return (
-    <div className="specimen relative w-full p-1.5 backdrop-blur-md">
+    <div ref={ref} className="specimen relative w-full p-1.5 backdrop-blur-md">
       <div className="bg-paper">
         {/* head */}
         <div className="flex items-center justify-between gap-4 border-b border-line px-5 py-4 md:px-7">
@@ -51,17 +63,19 @@ export function BriefMock({ compact = false }: { compact?: boolean }) {
 
         {/* items */}
         <ul>
-          {ITEMS.map((it) => (
+          {ITEMS.map((it, i) => (
             <li
               key={it.n}
-              className="group border-b border-line px-5 py-6 transition-colors duration-300 last:border-b-0 hover:bg-white md:px-7"
+              className="spec-row group border-b border-line px-5 py-6 transition-colors duration-300 last:border-b-0 hover:bg-white md:px-7"
+              data-in={seen}
+              style={{ transitionDelay: `${i * step}ms` }}
             >
               <div className="flex items-start justify-between gap-5">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                     <span className="marker-num">{it.n}</span>
                     <span className="t-numeral text-[1.65rem] text-ink">
-                      {it.who}
+                      <Numeral value={it.who} />
                     </span>
                     <span className="t-small text-ink-4">customers</span>
                     <span className="t-label rounded-full border border-line px-2.5 py-1 text-ink-4">
@@ -74,7 +88,7 @@ export function BriefMock({ compact = false }: { compact?: boolean }) {
                 <div className="shrink-0 text-right">
                   <p className="t-label text-ink-4">expected value</p>
                   <p className="t-numeral mt-2.5 text-[1.35rem] text-signal">
-                    {it.value}
+                    <Numeral value={it.value} />
                   </p>
                 </div>
               </div>

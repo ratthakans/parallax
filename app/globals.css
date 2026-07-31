@@ -1021,12 +1021,23 @@
   transition: width 1s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/* background-color อยู่ในรายการด้วย ไม่ได้ใส่เผื่อ
+
+   .spec-row ไม่ได้อยู่ใน @layer ส่วน transition-colors ของ Tailwind อยู่ใน
+   @layer utilities และกฎที่ไม่มี layer ชนะเสมอ — พอใส่ .spec-row ลงบน
+   <li> ของ BriefMock ที่มี hover:bg-white อยู่แล้ว transition ของ Tailwind
+   ถูกทับทั้งชุด (วัดได้: transitionProperty เหลือ "opacity, transform")
+   พื้นหลังตอน hover จึงกระโดดแทนที่จะไล่สี
+
+   เป็นอาการเดียวกับที่เคยทำให้ป้ายเตือนทั้งคอนโซลกลายเป็นสีเทา
+   ต่างกันแค่รอบนี้ CSS ที่ทับคือของที่ผมเพิ่งเขียนเอง */
 .spec-row {
   opacity: 0;
   transform: translateY(10px);
   transition:
     opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1),
-    transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+    transform 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.3s ease;
 }
 
 .spec-row[data-in="true"] {
