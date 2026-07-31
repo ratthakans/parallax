@@ -112,7 +112,7 @@ export default function LearningPage() {
         <Field variant="deep" />
         <div className="shell">
           <Reveal>
-            <Label tone="light">
+            <Label onDark>
               The way out
             </Label>
           </Reveal>

@@ -198,7 +198,7 @@ export default function CustomersPage() {
           <div className="grid gap-14 lg:grid-cols-2 lg:gap-20">
             <Reveal>
               <div>
-                <Label tone="light">
+                <Label onDark>
                   How we enter the market
                 </Label>
                 <h2 className="t-h2 balance mt-9 text-frost">
@@ -216,7 +216,7 @@ export default function CustomersPage() {
               work, so every shop gets the same beginner-grade result
                 </More>
                 <div className="border-t border-cyan/12 pt-8">
-                  <Quote tone="light">
+                  <Quote onDark>
                     We turn down deals outside the cycle we are working, even ones that would
               pay — because they make the result worse for the customers we have.
                   </Quote>

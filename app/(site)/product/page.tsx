@@ -148,7 +148,7 @@ export default function ProductPage() {
           <div className="grid gap-16 lg:grid-cols-[0.78fr_1.22fr] lg:gap-20">
             <Reveal>
               <div>
-                <Label tone="light">
+                <Label onDark>
                   The product surface
                 </Label>
                 <h2 className="t-h1 balance mt-9 text-frost">Morning Brief</h2>

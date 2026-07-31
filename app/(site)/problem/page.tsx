@@ -106,7 +106,7 @@ export default function ProblemPage() {
       <Section tone="dark" className="overflow-hidden">
         <div className="shell">
           <Reveal>
-            <Label tone="light">
+            <Label onDark>
               The confirmed numbers
             </Label>
           </Reveal>
@@ -123,11 +123,11 @@ export default function ProblemPage() {
                 market — and almost every shop treats it as sales history.
               </p>
               <div className="flex flex-col gap-8">
-                <Quote tone="light">
+                <Quote onDark>
                   A sales report tells you what yesterday earned. No report tells you who
                 will not return tomorrow.
                 </Quote>
-                <Note tone="light">
+                <Note onDark>
                   Source — Department of Business Development, first half of 2026
                 </Note>
               </div>

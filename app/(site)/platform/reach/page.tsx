@@ -134,7 +134,7 @@ export default function ReachPage() {
           <div className="grid gap-14 lg:grid-cols-[0.9fr_1.1fr] lg:gap-20">
             <Reveal>
               <div>
-                <Label tone="light">
+                <Label onDark>
                   Where we stand on data
                 </Label>
                 <h2 className="t-h2 balance mt-9 text-frost">
@@ -146,7 +146,7 @@ export default function ReachPage() {
               and let the platform do what it is good at
                 </More>
                 <div className="mt-10">
-                  <ArrowLink href="/trust" tone="light">
+                  <ArrowLink href="/trust" onDark>
                     Consent and PDPA
                   </ArrowLink>
                 </div>

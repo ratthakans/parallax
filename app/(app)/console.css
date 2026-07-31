@@ -495,6 +495,41 @@
     overflow-x: auto;
   }
 
+  /* ── แถบปฐมนิเทศของคอนโซลสาธารณะ ──────────────────────────
+     บรรทัดเดียว เส้นบาง ไม่มีพื้นทึบ — ต้องอ่านออกแต่ต้องไม่แย่งสายตา
+     ไปจากสามการตัดสินใจซึ่งเป็นสิ่งเดียวที่หน้านี้ต้องการให้ทำ */
+  .c-demobar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.55rem 0.85rem;
+    margin-block-end: 1.75rem;
+    padding-block-end: 0.9rem;
+    border-block-end: 1px solid var(--c-line);
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.04em;
+    color: var(--c-text-3);
+  }
+
+  .c-demobar strong {
+    font-weight: 500;
+    color: var(--c-cyan);
+  }
+
+  .c-demobar__sep {
+    width: 1px;
+    height: 0.75rem;
+    background: var(--c-line-2);
+  }
+
+  /* ทางกลับต้องมี — คนที่กดเข้ามาจากหน้าเว็บไม่มีเมนูของเว็บให้กดกลับ */
+  .c-demobar__back {
+    margin-inline-start: auto;
+    color: var(--c-cyan);
+    white-space: nowrap;
+  }
+
   /* ── โครงกระดูกระหว่างโหลด ── */
 
   .c-skel {

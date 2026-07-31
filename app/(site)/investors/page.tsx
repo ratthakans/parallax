@@ -265,7 +265,7 @@ export default function InvestorsPage() {
         <Field variant="deep" />
         <div className="shell">
           <Reveal>
-            <Label n="03" tone="light">
+            <Label n="03" onDark>
               If no POS vendor ever signs
             </Label>
           </Reveal>
@@ -290,7 +290,7 @@ export default function InvestorsPage() {
 
           <Reveal delay={160}>
             <div className="mt-12">
-              <Note tone="light">
+              <Note onDark>
                 All three trade far fewer accounts for several times the ARPA.
                 The SOM looks different — fewer accounts, not necessarily a smaller number.
               </Note>
@@ -424,7 +424,7 @@ export default function InvestorsPage() {
       <Section tone="dark" className="overflow-hidden">
         <div className="shell">
           <Reveal>
-            <Label n="07" tone="light">
+            <Label n="07" onDark>
               Risks and mitigations
             </Label>
           </Reveal>

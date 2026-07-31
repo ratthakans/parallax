@@ -403,7 +403,10 @@ export default function PricingPage() {
       <Section tone="dark">
         <div className="shell">
           <Reveal>
-            <Label tone="dark">
+            {/* แถบนี้เป็น surface-dark — ป้ายต้องใช้โทนสำหรับพื้นเข้ม
+                เดิมเขียน tone="dark" เพราะอ่านว่า "แถบนี้เข้ม" แต่ tone
+                หมายถึงสีตัวอักษร ป้ายจึงเป็น ink-4 บนพื้น abyss = 3.84:1 */}
+            <Label onDark>
               What it takes to break even
             </Label>
           </Reveal>

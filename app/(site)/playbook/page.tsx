@@ -202,7 +202,7 @@ export default function PlaybookPage() {
         <div className="shell">
           <Reveal>
             <div className="max-w-3xl">
-              <Label tone="light">
+              <Label onDark>
                 A prototype running on real data
               </Label>
               <h2 className="t-h2 balance mt-9 text-frost">
@@ -242,7 +242,7 @@ export default function PlaybookPage() {
 
           <Reveal delay={160}>
             <div className="mt-16 border-t border-cyan/15 pt-10">
-              <Note tone="light">
+              <Note onDark>
                 The demo runs on a sample dataset. The numbers show the mechanism, not a
               measured result from live use — measured results come from the pilots,
               and always ship with a confidence interval.

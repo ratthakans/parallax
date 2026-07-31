@@ -178,7 +178,7 @@ export default function PlatformPage() {
         <Field variant="deep" />
         <div className="shell">
           <Reveal>
-            <Label tone="light">
+            <Label onDark>
               Two sides, and the layer that measures them
             </Label>
           </Reveal>

@@ -150,7 +150,7 @@ export default function ProofPage() {
           <div className="grid gap-14 lg:grid-cols-[1fr_1fr] lg:gap-20">
             <Reveal>
               <div>
-                <Label tone="light">
+                <Label onDark>
                   ROI Tracker
                 </Label>
                 <h2 className="t-h2 balance mt-9 text-frost">

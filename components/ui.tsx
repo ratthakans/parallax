@@ -65,14 +65,14 @@ export function SignalField({
 export function SysBar({
   left,
   right,
-  tone = "light",
+  onDark = false,
 }: {
   left: string;
   right: string;
-  tone?: "light" | "dark";
+  onDark?: boolean;
 }) {
   return (
-    <div className={`sysbar ${tone === "dark" ? "sysbar--dark" : ""}`}>
+    <div className={`sysbar ${onDark ? "sysbar--dark" : ""}`}>
       <span>{left}</span>
       <span className="sysbar__rule" aria-hidden />
       <span>{right}</span>
@@ -96,16 +96,16 @@ export function SignalCard({
   title,
   body,
   status,
-  tone = "light",
+  onDark = false,
 }: {
   index: string;
   title: ReactNode;
   body: string;
   status?: string;
-  tone?: "light" | "dark";
+  onDark?: boolean;
 }) {
   return (
-    <div className={`sigcard ${tone === "dark" ? "sigcard--dark" : ""}`}>
+    <div className={`sigcard ${onDark ? "sigcard--dark" : ""}`}>
       <span className="t-label sigcard__index">{index}</span>
       <h3 className="t-h3 sigcard__title">{title}</h3>
       <p className="t-small t-thai sigcard__body">{body}</p>
@@ -125,31 +125,45 @@ export function SignalCard({
 
 /* ── section furniture ───────────────────────────────────── */
 
+/* ── onDark แทน tone ──────────────────────────────────────────
+
+   เดิมคอมโพเนนต์กลุ่มนี้รับ prop ชื่อ tone ที่หมายถึง "สีของตัวอักษร"
+   (tone="dark" = ตัวอักษรสีเข้ม สำหรับพื้นสว่าง) แต่ <Section tone="dark">
+   หมายถึง "พื้นเข้ม" — คำเดียวกัน ความหมายตรงข้าม
+
+   แล้วมันก็หลุดจริง: /pricing มี <Label tone="dark"> อยู่กลางแถบ
+   surface-dark เพราะคนเขียนอ่านว่า "แถบนี้เข้ม" ผลคือป้ายสี ink-4
+   บนพื้น abyss ได้ 3.84:1 ต่ำกว่าเกณฑ์ และมองแทบไม่เห็น
+
+   onDark เป็น boolean ที่บรรยาย "พื้นที่มันวางอยู่" ตรงกับ Section
+   และเมื่อไม่มี tone ให้ส่งอีกแล้ว TypeScript จะจับความผิดพลาดแบบเดิม
+   ให้ตั้งแต่ตอน typecheck ไม่ใช่ปล่อยให้ไปโผล่บนหน้าจอ */
+
 export function Label({
   children,
   n,
-  tone = "dark",
+  onDark = false,
   className = "",
 }: {
   children: ReactNode;
   n?: string;
-  tone?: "dark" | "light";
+  onDark?: boolean;
   className?: string;
 }) {
   return (
     <p
       className={`t-label flex items-center gap-3 ${
-        tone === "light" ? "text-cyan/60" : "text-ink-4"
+        onDark ? "text-cyan/60" : "text-ink-4"
       } ${className}`}
     >
       {n && (
         <>
-          <span className={tone === "light" ? "text-frost/52" : "text-ink-4/70"}>
+          <span className={onDark ? "text-frost/52" : "text-ink-4/70"}>
             {n}
           </span>
           <span
             className={`label-rule h-px w-6 ${
-              tone === "light" ? "bg-frost/25" : "bg-line"
+              onDark ? "bg-frost/25" : "bg-line"
             }`}
           />
         </>
@@ -301,23 +315,23 @@ export function Metric({
 export function Quote({
   children,
   cite,
-  tone = "dark",
+  onDark = false,
 }: {
   children: ReactNode;
   cite?: string;
-  tone?: "dark" | "light";
+  onDark?: boolean;
 }) {
   return (
     <figure className="relative">
       <div
         className={`absolute top-1 left-0 h-full w-px ${
-          tone === "light" ? "bg-frost/20" : "bg-signal/30"
+          onDark ? "bg-frost/20" : "bg-signal/30"
         }`}
         aria-hidden
       />
       <blockquote
         className={`t-h3 pretty pl-7 font-light ${
-          tone === "light" ? "text-frost/85" : "text-ink"
+          onDark ? "text-frost/85" : "text-ink"
         }`}
       >
         {children}
@@ -325,7 +339,7 @@ export function Quote({
       {cite && (
         <figcaption
           className={`t-label mt-5 pl-7 ${
-            tone === "light" ? "text-frost/48" : "text-ink-4"
+            onDark ? "text-frost/48" : "text-ink-4"
           }`}
         >
           {cite}
@@ -337,15 +351,15 @@ export function Quote({
 
 export function Note({
   children,
-  tone = "dark",
+  onDark = false,
 }: {
   children: ReactNode;
-  tone?: "dark" | "light";
+  onDark?: boolean;
 }) {
   return (
     <p
       className={`t-small t-thai border-l pl-5 ${
-        tone === "light"
+        onDark
           ? "border-frost/20 text-frost/58"
           : "border-line text-ink-3"
       }`}
@@ -437,19 +451,19 @@ export function Steps({
 export function ArrowLink({
   href,
   children,
-  tone = "dark",
+  onDark = false,
   className = "",
 }: {
   href: string;
   children: ReactNode;
-  tone?: "dark" | "light";
+  onDark?: boolean;
   className?: string;
 }) {
   return (
     <Link
       href={href}
       className={`group inline-flex items-center gap-2 text-[0.9rem] font-medium ${
-        tone === "light" ? "text-cyan" : "text-signal"
+        onDark ? "text-cyan" : "text-signal"
       } ${className}`}
     >
       <span className="ulink">{children}</span>
@@ -529,14 +543,14 @@ export function NextUp({
 export function More({
   children,
   label = "Why",
-  tone = "dark",
+  onDark = false,
 }: {
   children: ReactNode;
   label?: string;
-  tone?: "dark" | "light";
+  onDark?: boolean;
 }) {
   return (
-    <details className={`more ${tone === "light" ? "more-light" : ""}`}>
+    <details className={`more ${onDark ? "more-light" : ""}`}>
       <summary>
         <span className="more-label">{label}</span>
         <span className="more-sign" aria-hidden />

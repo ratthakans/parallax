@@ -121,7 +121,7 @@ export default function HomePage() {
             <div>
               <Reveal>
                 <SysBar
-                  tone="dark"
+                  onDark
                   left="sys / agentic revenue os"
                   right="status / signals live"
                 />
@@ -185,11 +185,11 @@ export default function HomePage() {
                   <Link href="/app" className="btn btn-frost">
                     Open the live console
                   </Link>
-                  <ArrowLink href="/contact" tone="light">
+                  <ArrowLink href="/contact" onDark>
                     Start a pilot
                   </ArrowLink>
                 </div>
-                <p className="t-small mt-6 max-w-md text-frost/45">
+                <p className="t-small mt-6 max-w-md text-frost/55">
                   Four businesses, real calculations, no signup. Day one runs on
                   the POS export you already have.
                 </p>
@@ -314,7 +314,7 @@ export default function HomePage() {
           <div className="grid gap-14 lg:grid-cols-[0.9fr_1.1fr] lg:gap-20">
             <Reveal dir="left">
               <div className="lg:sticky lg:top-28">
-                <Label tone="light">Why agentic, why now</Label>
+                <Label onDark>Why agentic, why now</Label>
                 {/* จังหวะยาว — ตัดสร้อยสองจังหวะที่ใช้ซ้ำทั้งหน้า */}
                 <h2 className="t-h2 balance mt-8 text-frost">
                   A rule written last quarter is a photograph of a customer who
@@ -334,7 +334,7 @@ export default function HomePage() {
               {LIVE.map((x) => (
                 <SignalCard
                   key={x.index}
-                  tone="dark"
+                  onDark
                   index={x.index}
                   title={x.title}
                   body={x.body}
@@ -371,7 +371,7 @@ export default function HomePage() {
         <Field variant="deep" />
         <div className="shell">
           <Reveal>
-            <Label tone="light">Proof layer</Label>
+            <Label onDark>Proof layer</Label>
           </Reveal>
           <Reveal delay={80}>
             <h2 className="t-h1 balance mt-8 max-w-3xl text-frost">
@@ -418,7 +418,7 @@ export default function HomePage() {
 
           <Reveal delay={220}>
             <div className="mt-10">
-              <ArrowLink href="/platform/proof" tone="light">
+              <ArrowLink href="/platform/proof" onDark>
                 How the measurement works
               </ArrowLink>
             </div>

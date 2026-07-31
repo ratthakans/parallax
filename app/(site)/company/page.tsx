@@ -254,7 +254,7 @@ export default function CompanyPage() {
         <Field variant="deep" />
         <div className="shell">
           <Reveal>
-            <Label tone="light">
+            <Label onDark>
               Roadmap
             </Label>
           </Reveal>

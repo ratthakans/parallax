@@ -119,7 +119,7 @@ export default function KeepPage() {
           <div className="grid gap-16 lg:grid-cols-[0.75fr_1.25fr] lg:gap-20">
             <Reveal>
               <div>
-                <Label tone="light">
+                <Label onDark>
                   What the owner actually sees
                 </Label>
                 <h2 className="t-h2 balance mt-9 text-frost">
@@ -131,7 +131,7 @@ export default function KeepPage() {
                 what, and what it is expected to return.
                 </p>
                 <div className="mt-12">
-                  <Quote tone="light">
+                  <Quote onDark>
                     165 existing customers are about to go quiet this month
                   </Quote>
                 </div>
