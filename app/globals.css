@@ -258,16 +258,33 @@
 
    ตารางนี้ทำให้แถบเข้มทุกแถบมาจากวัสดุชุดเดียวกัน ต่างกันแค่ความหนาแน่น
    ไม่เคลื่อนไหว ต่างจากของ hero ที่ไถลขึ้น — hero คือที่เดียวที่ควรขยับ */
-.field--deep::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image:
-    linear-gradient(rgba(98, 231, 255, 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(98, 231, 255, 0.045) 1px, transparent 1px);
-  background-size: 100% 52px, 52px 100%;
-  mask-image: radial-gradient(ellipse at 50% 40%, #000 8%, transparent 72%);
+/* ── กฎในไฟล์นี้อยู่ใน @layer components ──
+
+   เดิมกฎธรรมดาทั้งร้อยข้อในไฟล์นี้ไม่ได้อยู่ใน layer ใดเลย ส่วน utility
+   ของ Tailwind อยู่ใน @layer utilities และ CSS ที่ไม่มี layer ชนะเสมอ
+   ไม่ว่า specificity จะเป็นเท่าไร — utility ที่เขียนกำกับใน JSX จึงแพ้
+   คลาสคอมโพเนนต์เงียบ ๆ
+
+   เกิดขึ้นจริงแล้ว: .spec-row ทับ transition-colors ของ <li> ใน BriefMock
+   ทำให้ hover ไม่ไล่สีอีกต่อไป (วัดได้ transitionProperty เหลือ
+   "opacity, transform") และเป็นอาการเดียวกับที่เคยทำให้ป้ายเตือน
+   ทั้งคอนโซลเรนเดอร์เป็นสีเทา
+
+   @utility · @keyframes · @theme · @layer base ยังอยู่นอก layer ตามเดิม
+   เพราะ @utility เป็น directive ของ Tailwind ที่ต้องอยู่ระดับบนสุด */
+
+@layer components {
+  .field--deep::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      linear-gradient(rgba(98, 231, 255, 0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(98, 231, 255, 0.045) 1px, transparent 1px);
+    background-size: 100% 52px, 52px 100%;
+    mask-image: radial-gradient(ellipse at 50% 40%, #000 8%, transparent 72%);
+  }
 }
 
 /* ── ชิ้นตัวอย่าง ─────────────────────────────────────────
@@ -277,115 +294,117 @@
    เปลี่ยนเป็นเส้นขอบโทนเดียวกับ field บวกเรืองแสงจาง ๆ รอบนอก
    ให้มันอ่านว่าถูกแสงจากพื้นผิวส่อง ไม่ใช่วางทับ — และกลายเป็น
    "ชิ้นตัวอย่างใต้กล้อง" ซึ่งตรงกับคำว่า instrument มากกว่า */
-.specimen {
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(158, 230, 255, 0.55);
-  box-shadow:
-    0 0 0 1px rgba(3, 7, 17, 0.28),
-    0 0 60px -12px rgba(98, 231, 255, 0.45);
-}
+@layer components {
+  .specimen {
+    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid rgba(158, 230, 255, 0.55);
+    box-shadow:
+      0 0 0 1px rgba(3, 7, 17, 0.28),
+      0 0 60px -12px rgba(98, 231, 255, 0.45);
+  }
 
-/* ── system atoms (deck language) ────────────────────────── */
+  /* ── system atoms (deck language) ────────────────────────── */
 
-.sysbar {
-  display: flex;
-  align-items: center;
-  gap: 0.85rem;
-  font-family: var(--font-mono);
-  font-size: 0.64rem;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--color-ink-4);
-}
+  .sysbar {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    font-family: var(--font-mono);
+    font-size: 0.64rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--color-ink-4);
+  }
 
-.sysbar--dark {
-  color: rgba(234, 243, 255, 0.5);
-}
+  .sysbar--dark {
+    color: rgba(234, 243, 255, 0.5);
+  }
 
-.sysbar__rule {
-  flex: 1;
-  height: 1px;
-  max-width: 7rem;
-  background: currentColor;
-  opacity: 0.35;
-}
+  .sysbar__rule {
+    flex: 1;
+    height: 1px;
+    max-width: 7rem;
+    background: currentColor;
+    opacity: 0.35;
+  }
 
-.cmd {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.42rem 0.85rem;
-  border: 1px solid rgba(234, 243, 255, 0.22);
-  font-family: var(--font-mono);
-  font-size: 0.66rem;
-  letter-spacing: 0.17em;
-  text-transform: uppercase;
-  color: rgba(234, 243, 255, 0.72);
-  transition:
-    border-color 0.35s ease,
-    color 0.35s ease;
-}
+  .cmd {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.42rem 0.85rem;
+    border: 1px solid rgba(234, 243, 255, 0.22);
+    font-family: var(--font-mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.17em;
+    text-transform: uppercase;
+    color: rgba(234, 243, 255, 0.72);
+    transition:
+      border-color 0.35s ease,
+      color 0.35s ease;
+  }
 
-.cmd--hot {
-  border-color: color-mix(in oklab, var(--color-sky) 62%, transparent);
-  color: var(--color-cyan);
-  box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-sky) 18%, transparent) inset;
-}
+  .cmd--hot {
+    border-color: color-mix(in oklab, var(--color-sky) 62%, transparent);
+    color: var(--color-cyan);
+    box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-sky) 18%, transparent) inset;
+  }
 
-/* การ์ดสัญญาณ — เส้นบนเรืองขึ้นตอนชี้ ไม่ใช่กล่องนิ่ง */
-.sigcard {
-  position: relative;
-  padding-top: 1.75rem;
-  border-top: 1px solid var(--color-line);
-}
+  /* การ์ดสัญญาณ — เส้นบนเรืองขึ้นตอนชี้ ไม่ใช่กล่องนิ่ง */
+  .sigcard {
+    position: relative;
+    padding-top: 1.75rem;
+    border-top: 1px solid var(--color-line);
+  }
 
-.sigcard::after {
-  content: "";
-  position: absolute;
-  inset: -1px 0 auto 0;
-  height: 1px;
-  background: linear-gradient(90deg, var(--color-signal), var(--color-sky));
-  transform: scaleX(0);
-  transform-origin: 0 50%;
-  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
-}
+  .sigcard::after {
+    content: "";
+    position: absolute;
+    inset: -1px 0 auto 0;
+    height: 1px;
+    background: linear-gradient(90deg, var(--color-signal), var(--color-sky));
+    transform: scaleX(0);
+    transform-origin: 0 50%;
+    transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  }
 
-.sigcard:hover::after {
-  transform: scaleX(1);
-}
+  .sigcard:hover::after {
+    transform: scaleX(1);
+  }
 
-.sigcard__index {
-  color: var(--color-ink-4);
-}
+  .sigcard__index {
+    color: var(--color-ink-4);
+  }
 
-.sigcard__title {
-  margin-top: 1rem;
-  color: var(--color-ink);
-}
+  .sigcard__title {
+    margin-top: 1rem;
+    color: var(--color-ink);
+  }
 
-.sigcard__body {
-  margin-top: 1rem;
-  color: var(--color-ink-3);
-}
+  .sigcard__body {
+    margin-top: 1rem;
+    color: var(--color-ink-3);
+  }
 
-.sigcard__status {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  margin-top: 1.35rem;
-  font-family: var(--font-mono);
-  font-size: 0.62rem;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--color-signal);
-}
+  .sigcard__status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin-top: 1.35rem;
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--color-signal);
+  }
 
-/* จุดที่เต้นเบา ๆ — สัญญาณว่าค่านี้ยังขยับอยู่ */
-.sigcard__status > i {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: currentColor;
-  animation: pulse-dot 2.4s ease-in-out infinite;
+  /* จุดที่เต้นเบา ๆ — สัญญาณว่าค่านี้ยังขยับอยู่ */
+  .sigcard__status > i {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: pulse-dot 2.4s ease-in-out infinite;
+  }
 }
 
 @keyframes pulse-dot {
@@ -400,24 +419,26 @@
   }
 }
 
-.sigcard--dark {
-  border-top-color: rgba(158, 230, 255, 0.2);
-}
+@layer components {
+  .sigcard--dark {
+    border-top-color: rgba(158, 230, 255, 0.2);
+  }
 
-.sigcard--dark .sigcard__index {
-  color: rgba(234, 243, 255, 0.42);
-}
+  .sigcard--dark .sigcard__index {
+    color: rgba(234, 243, 255, 0.42);
+  }
 
-.sigcard--dark .sigcard__title {
-  color: var(--color-frost);
-}
+  .sigcard--dark .sigcard__title {
+    color: var(--color-frost);
+  }
 
-.sigcard--dark .sigcard__body {
-  color: rgba(234, 243, 255, 0.62);
-}
+  .sigcard--dark .sigcard__body {
+    color: rgba(234, 243, 255, 0.62);
+  }
 
-.sigcard--dark .sigcard__status {
-  color: var(--color-cyan);
+  .sigcard--dark .sigcard__status {
+    color: var(--color-cyan);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -436,23 +457,25 @@
    ไม่บังคับ layout ใหม่แม้แต่เฟรมเดียว
    ───────────────────────────────────────────────────────── */
 
-.signal {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  overflow: hidden;
-  pointer-events: none;
-  background: #030711;
-}
+@layer components {
+  .signal {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    overflow: hidden;
+    pointer-events: none;
+    background: #030711;
+  }
 
-/* ชั้นภาพ — ภาพเดียวกับหน้าปกเด็ค */
-.signal__plate {
-  position: absolute;
-  inset: -6%;
-  background-size: cover;
-  background-position: 58% 45%;
-  opacity: 0.92;
-  animation: plate-drift 34s ease-in-out infinite alternate;
+  /* ชั้นภาพ — ภาพเดียวกับหน้าปกเด็ค */
+  .signal__plate {
+    position: absolute;
+    inset: -6%;
+    background-size: cover;
+    background-position: 58% 45%;
+    opacity: 0.92;
+    animation: plate-drift 34s ease-in-out infinite alternate;
+  }
 }
 
 @keyframes plate-drift {
@@ -465,25 +488,27 @@
 }
 
 /* mesh สองก้อนหมุนสวนทาง — ให้สีเปลี่ยนตลอดโดยไม่มีขอบให้จับได้ */
-.signal__mesh {
-  position: absolute;
-  inset: -30%;
-  mix-blend-mode: screen;
-  filter: blur(48px);
-}
+@layer components {
+  .signal__mesh {
+    position: absolute;
+    inset: -30%;
+    mix-blend-mode: screen;
+    filter: blur(48px);
+  }
 
-.signal__mesh:nth-of-type(1) {
-  background:
-    radial-gradient(circle at 28% 34%, rgba(7, 93, 255, 0.62), transparent 46%),
-    radial-gradient(circle at 72% 62%, rgba(98, 231, 255, 0.42), transparent 44%);
-  animation: mesh-a 22s linear infinite;
-}
+  .signal__mesh:nth-of-type(1) {
+    background:
+      radial-gradient(circle at 28% 34%, rgba(7, 93, 255, 0.62), transparent 46%),
+      radial-gradient(circle at 72% 62%, rgba(98, 231, 255, 0.42), transparent 44%);
+    animation: mesh-a 22s linear infinite;
+  }
 
-.signal__mesh:nth-of-type(2) {
-  background:
-    radial-gradient(circle at 64% 28%, rgba(98, 231, 255, 0.34), transparent 42%),
-    radial-gradient(circle at 34% 74%, rgba(7, 93, 255, 0.48), transparent 48%);
-  animation: mesh-b 29s linear infinite;
+  .signal__mesh:nth-of-type(2) {
+    background:
+      radial-gradient(circle at 64% 28%, rgba(98, 231, 255, 0.34), transparent 42%),
+      radial-gradient(circle at 34% 74%, rgba(7, 93, 255, 0.48), transparent 48%);
+    animation: mesh-b 29s linear infinite;
+  }
 }
 
 @keyframes mesh-a {
@@ -511,15 +536,17 @@
 }
 
 /* ตารางที่ไถลขึ้น — สัญญาณว่านี่เป็นระบบ ไม่ใช่ภาพนิ่ง */
-.signal__grid {
-  position: absolute;
-  inset: -10% 0 -10% 0;
-  background-image:
-    linear-gradient(rgba(98, 231, 255, 0.075) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(98, 231, 255, 0.055) 1px, transparent 1px);
-  background-size: 100% 46px, 46px 100%;
-  mask-image: radial-gradient(ellipse at 50% 55%, #000 12%, transparent 78%);
-  animation: grid-rise 7s linear infinite;
+@layer components {
+  .signal__grid {
+    position: absolute;
+    inset: -10% 0 -10% 0;
+    background-image:
+      linear-gradient(rgba(98, 231, 255, 0.075) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(98, 231, 255, 0.055) 1px, transparent 1px);
+    background-size: 100% 46px, 46px 100%;
+    mask-image: radial-gradient(ellipse at 50% 55%, #000 12%, transparent 78%);
+    animation: grid-rise 7s linear infinite;
+  }
 }
 
 @keyframes grid-rise {
@@ -532,19 +559,21 @@
 }
 
 /* ลำแสงกวาด — เกิดนาน ๆ ครั้ง จึงยังรู้สึกเป็นเหตุการณ์ ไม่ใช่ลูป */
-.signal__sweep {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    104deg,
-    transparent 34%,
-    rgba(198, 240, 255, 0.16) 48%,
-    rgba(255, 255, 255, 0.2) 50%,
-    rgba(198, 240, 255, 0.14) 52%,
-    transparent 66%
-  );
-  transform: translate3d(-115%, 0, 0);
-  animation: sweep 9s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+@layer components {
+  .signal__sweep {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      104deg,
+      transparent 34%,
+      rgba(198, 240, 255, 0.16) 48%,
+      rgba(255, 255, 255, 0.2) 50%,
+      rgba(198, 240, 255, 0.14) 52%,
+      transparent 66%
+    );
+    transform: translate3d(-115%, 0, 0);
+    animation: sweep 9s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+  }
 }
 
 @keyframes sweep {
@@ -558,13 +587,15 @@
 }
 
 /* ไล่มืดที่ขอบล่างและซ้าย ให้ตัวหนังสือขาวอ่านออกทุกจุด */
-.signal__scrim {
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(180deg, rgba(3, 7, 17, 0.62) 0%, transparent 34%),
-    linear-gradient(90deg, rgba(3, 7, 17, 0.8) 0%, rgba(3, 7, 17, 0.12) 52%, transparent 74%),
-    linear-gradient(0deg, rgba(3, 7, 17, 0.78) 0%, transparent 46%);
+@layer components {
+  .signal__scrim {
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(180deg, rgba(3, 7, 17, 0.62) 0%, transparent 34%),
+      linear-gradient(90deg, rgba(3, 7, 17, 0.8) 0%, rgba(3, 7, 17, 0.12) 52%, transparent 74%),
+      linear-gradient(0deg, rgba(3, 7, 17, 0.78) 0%, transparent 46%);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -582,29 +613,31 @@
 
 /* ── the gradient field (CI) ─────────────────────────────── */
 
-.field {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  z-index: -1;
-  pointer-events: none;
-}
+@layer components {
+  .field {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    z-index: -1;
+    pointer-events: none;
+  }
 
-/* ตัวครอบรับ animation ส่วน <i> รับ gradient กับ blur แยกกัน
-   compositor จะได้ใช้ blur ที่ raster ไว้แล้วซ้ำ แทนที่จะเบลอใหม่ทุกเฟรม */
-.field__blob {
-  position: absolute;
-  border-radius: 50%;
-  will-change: transform;
-}
+  /* ตัวครอบรับ animation ส่วน <i> รับ gradient กับ blur แยกกัน
+     compositor จะได้ใช้ blur ที่ raster ไว้แล้วซ้ำ แทนที่จะเบลอใหม่ทุกเฟรม */
+  .field__blob {
+    position: absolute;
+    border-radius: 50%;
+    will-change: transform;
+  }
 
-.field__blob > i {
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: var(--g);
-  filter: blur(64px);
-  transform: translateZ(0);
+  .field__blob > i {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: var(--g);
+    filter: blur(64px);
+    transform: translateZ(0);
+  }
 }
 
 @media (width >= 48rem) {
@@ -616,151 +649,153 @@
 /* ── aurora — พื้นสว่าง สำหรับ hero
    ขาวฝั่งซ้ายที่วางตัวหนังสือ → ฟ้าอ่อน → ฟ้าอิ่ม → navy ที่มุมขวาล่าง ── */
 
-.field--aurora {
-  background: linear-gradient(160deg, #ffffff 0%, #f4faff 42%, #e6f4ff 100%);
-}
+@layer components {
+  .field--aurora {
+    background: linear-gradient(160deg, #ffffff 0%, #f4faff 42%, #e6f4ff 100%);
+  }
 
-.field--aurora .field__blob:nth-child(1) {
-  width: 86vmax;
-  height: 86vmax;
-  max-width: 1240px;
-  max-height: 1240px;
-  right: -16%;
-  top: -22%;
-  --g: radial-gradient(
-    circle at 50% 50%,
-    rgba(53, 200, 255, 0.92) 0%,
-    rgba(77, 155, 255, 0.62) 34%,
-    rgba(226, 241, 255, 0) 70%
-  );
-  animation: drift-a 28s ease-in-out infinite;
-}
+  .field--aurora .field__blob:nth-child(1) {
+    width: 86vmax;
+    height: 86vmax;
+    max-width: 1240px;
+    max-height: 1240px;
+    right: -16%;
+    top: -22%;
+    --g: radial-gradient(
+      circle at 50% 50%,
+      rgba(53, 200, 255, 0.92) 0%,
+      rgba(77, 155, 255, 0.62) 34%,
+      rgba(226, 241, 255, 0) 70%
+    );
+    animation: drift-a 28s ease-in-out infinite;
+  }
 
-.field--aurora .field__blob:nth-child(2) {
-  width: 68vmax;
-  height: 68vmax;
-  max-width: 980px;
-  max-height: 980px;
-  right: -6%;
-  bottom: -38%;
-  --g: radial-gradient(
-    circle at 50% 50%,
-    rgba(0, 71, 255, 0.9) 0%,
-    rgba(0, 29, 107, 0.72) 36%,
-    rgba(0, 17, 61, 0) 72%
-  );
-  animation: drift-c 34s ease-in-out infinite;
-}
+  .field--aurora .field__blob:nth-child(2) {
+    width: 68vmax;
+    height: 68vmax;
+    max-width: 980px;
+    max-height: 980px;
+    right: -6%;
+    bottom: -38%;
+    --g: radial-gradient(
+      circle at 50% 50%,
+      rgba(0, 71, 255, 0.9) 0%,
+      rgba(0, 29, 107, 0.72) 36%,
+      rgba(0, 17, 61, 0) 72%
+    );
+    animation: drift-c 34s ease-in-out infinite;
+  }
 
-.field--aurora .field__blob:nth-child(3) {
-  width: 46vmax;
-  height: 46vmax;
-  max-width: 640px;
-  max-height: 640px;
-  right: 24%;
-  top: 8%;
-  --g: radial-gradient(
-    circle at 50% 50%,
-    rgba(255, 255, 255, 0.96) 0%,
-    rgba(226, 241, 255, 0.5) 42%,
-    rgba(226, 241, 255, 0) 72%
-  );
-  animation: drift-b 24s ease-in-out infinite;
-}
+  .field--aurora .field__blob:nth-child(3) {
+    width: 46vmax;
+    height: 46vmax;
+    max-width: 640px;
+    max-height: 640px;
+    right: 24%;
+    top: 8%;
+    --g: radial-gradient(
+      circle at 50% 50%,
+      rgba(255, 255, 255, 0.96) 0%,
+      rgba(226, 241, 255, 0.5) 42%,
+      rgba(226, 241, 255, 0) 72%
+    );
+    animation: drift-b 24s ease-in-out infinite;
+  }
 
-/* คืนพื้นที่ขาวให้ฝั่งซ้ายบน เพื่อให้หัวเรื่อง navy อ่านง่ายเสมอ */
-.field--aurora::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    104deg,
-    rgba(255, 255, 255, 0.97) 0%,
-    rgba(255, 255, 255, 0.86) 26%,
-    rgba(255, 255, 255, 0.34) 50%,
-    rgba(255, 255, 255, 0) 70%
-  );
-}
+  /* คืนพื้นที่ขาวให้ฝั่งซ้ายบน เพื่อให้หัวเรื่อง navy อ่านง่ายเสมอ */
+  .field--aurora::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      104deg,
+      rgba(255, 255, 255, 0.97) 0%,
+      rgba(255, 255, 255, 0.86) 26%,
+      rgba(255, 255, 255, 0.34) 50%,
+      rgba(255, 255, 255, 0) 70%
+    );
+  }
 
-/* ── wash — พื้นสว่างแบบเบา สำหรับ section ทั่วไป ── */
+  /* ── wash — พื้นสว่างแบบเบา สำหรับ section ทั่วไป ── */
 
-.field--wash .field__blob:nth-child(1) {
-  width: 66vmax;
-  height: 66vmax;
-  max-width: 880px;
-  max-height: 880px;
-  left: -14%;
-  top: -34%;
-  --g: radial-gradient(
-    circle at 50% 50%,
-    rgba(53, 200, 255, 0.42) 0%,
-    rgba(77, 155, 255, 0.2) 44%,
-    rgba(255, 255, 255, 0) 72%
-  );
-  animation: drift-a 30s ease-in-out infinite;
-}
+  .field--wash .field__blob:nth-child(1) {
+    width: 66vmax;
+    height: 66vmax;
+    max-width: 880px;
+    max-height: 880px;
+    left: -14%;
+    top: -34%;
+    --g: radial-gradient(
+      circle at 50% 50%,
+      rgba(53, 200, 255, 0.42) 0%,
+      rgba(77, 155, 255, 0.2) 44%,
+      rgba(255, 255, 255, 0) 72%
+    );
+    animation: drift-a 30s ease-in-out infinite;
+  }
 
-.field--wash .field__blob:nth-child(2) {
-  width: 58vmax;
-  height: 58vmax;
-  max-width: 760px;
-  max-height: 760px;
-  right: -12%;
-  bottom: -32%;
-  --g: radial-gradient(
-    circle at 50% 50%,
-    rgba(0, 71, 255, 0.22) 0%,
-    rgba(158, 230, 255, 0.24) 46%,
-    rgba(255, 255, 255, 0) 74%
-  );
-  animation: drift-c 36s ease-in-out infinite;
-}
+  .field--wash .field__blob:nth-child(2) {
+    width: 58vmax;
+    height: 58vmax;
+    max-width: 760px;
+    max-height: 760px;
+    right: -12%;
+    bottom: -32%;
+    --g: radial-gradient(
+      circle at 50% 50%,
+      rgba(0, 71, 255, 0.22) 0%,
+      rgba(158, 230, 255, 0.24) 46%,
+      rgba(255, 255, 255, 0) 74%
+    );
+    animation: drift-c 36s ease-in-out infinite;
+  }
 
-/* ── deep — accent เข้ม น้ำเงินอิ่ม ไม่ใช่ดำ ── */
+  /* ── deep — accent เข้ม น้ำเงินอิ่ม ไม่ใช่ดำ ── */
 
-.field--deep .field__blob:nth-child(1) {
-  width: 76vmax;
-  height: 76vmax;
-  max-width: 1020px;
-  max-height: 1020px;
-  right: -18%;
-  top: -26%;
-  --g: radial-gradient(
-    circle at 50% 50%,
-    rgba(53, 200, 255, 0.72) 0%,
-    rgba(0, 71, 255, 0.62) 36%,
-    rgba(0, 17, 61, 0) 72%
-  );
-  animation: drift-b 30s ease-in-out infinite;
-}
+  .field--deep .field__blob:nth-child(1) {
+    width: 76vmax;
+    height: 76vmax;
+    max-width: 1020px;
+    max-height: 1020px;
+    right: -18%;
+    top: -26%;
+    --g: radial-gradient(
+      circle at 50% 50%,
+      rgba(53, 200, 255, 0.72) 0%,
+      rgba(0, 71, 255, 0.62) 36%,
+      rgba(0, 17, 61, 0) 72%
+    );
+    animation: drift-b 30s ease-in-out infinite;
+  }
 
-.field--deep .field__blob:nth-child(2) {
-  width: 44vmax;
-  height: 44vmax;
-  max-width: 560px;
-  max-height: 560px;
-  left: -10%;
-  bottom: -28%;
-  --g: radial-gradient(
-    circle at 50% 50%,
-    rgba(0, 71, 255, 0.5) 0%,
-    rgba(0, 29, 107, 0) 68%
-  );
-  animation: drift-a 38s ease-in-out infinite reverse;
-}
+  .field--deep .field__blob:nth-child(2) {
+    width: 44vmax;
+    height: 44vmax;
+    max-width: 560px;
+    max-height: 560px;
+    left: -10%;
+    bottom: -28%;
+    --g: radial-gradient(
+      circle at 50% 50%,
+      rgba(0, 71, 255, 0.5) 0%,
+      rgba(0, 29, 107, 0) 68%
+    );
+    animation: drift-a 38s ease-in-out infinite reverse;
+  }
 
-/* คุมฝั่งซ้ายให้เข้มไว้ ตัวหนังสือ frost จะได้คอนทราสต์เต็ม */
-.field--deep::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    100deg,
-    rgba(0, 17, 61, 0.92) 0%,
-    rgba(0, 17, 61, 0.72) 32%,
-    rgba(0, 17, 61, 0.16) 62%,
-    rgba(0, 17, 61, 0) 82%
-  );
+  /* คุมฝั่งซ้ายให้เข้มไว้ ตัวหนังสือ frost จะได้คอนทราสต์เต็ม */
+  .field--deep::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      100deg,
+      rgba(0, 17, 61, 0.92) 0%,
+      rgba(0, 17, 61, 0.72) 32%,
+      rgba(0, 17, 61, 0.16) 62%,
+      rgba(0, 17, 61, 0) 82%
+    );
+  }
 }
 
 @keyframes drift-a {
@@ -801,24 +836,26 @@
 
 /* ── grain — เกรนชัดแบบงานพิมพ์ ไม่ใช่แค่พอมองเห็น ───────── */
 
-.grain {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
-}
+@layer components {
+  .grain {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
 
-/* บนพื้นสว่าง เกรนควรเห็นบนพื้นที่มีสี ไม่ใช่ทำให้พื้นขาวหม่น
-   soft-light จึงเกาะเฉพาะบริเวณที่มีสี และปล่อยพื้นขาวไว้ */
-.grain--light {
-  opacity: 0.55;
-  mix-blend-mode: soft-light;
-}
+  /* บนพื้นสว่าง เกรนควรเห็นบนพื้นที่มีสี ไม่ใช่ทำให้พื้นขาวหม่น
+     soft-light จึงเกาะเฉพาะบริเวณที่มีสี และปล่อยพื้นขาวไว้ */
+  .grain--light {
+    opacity: 0.55;
+    mix-blend-mode: soft-light;
+  }
 
-.grain--dark {
-  opacity: 0.34;
-  mix-blend-mode: overlay;
+  .grain--dark {
+    opacity: 0.34;
+    mix-blend-mode: overlay;
+  }
 }
 
 /* ── components ──────────────────────────────────────────── */
@@ -850,16 +887,18 @@
     transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.panel:hover {
-  border-color: color-mix(in oklab, var(--color-signal) 38%, transparent);
-  box-shadow: 0 26px 56px -30px rgba(0, 71, 255, 0.46);
-  transform: translateY(-3px);
-}
+@layer components {
+  .panel:hover {
+    border-color: color-mix(in oklab, var(--color-signal) 38%, transparent);
+    box-shadow: 0 26px 56px -30px rgba(0, 71, 255, 0.46);
+    transform: translateY(-3px);
+  }
 
-.panel-dark:hover {
-  border-color: rgba(158, 230, 255, 0.38);
-  background: rgba(226, 241, 255, 0.1);
-  transform: translateY(-3px);
+  .panel-dark:hover {
+    border-color: rgba(158, 230, 255, 0.38);
+    background: rgba(226, 241, 255, 0.1);
+    transform: translateY(-3px);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -873,12 +912,14 @@
 
 /* แถวตัวเลขสี่ช่องเหมือน anatomy row ทุกประการ จึงต้องล้อมด้วยวิธีเดียวกัน
    — ตารางเส้นผม ไม่ใช่ขอบซ้ายทีละช่องแบบเดิม */
-.metricband {
-  display: grid;
-  gap: 1px;
-  background: var(--color-line);
-  border-block: 1px solid var(--color-line);
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+@layer components {
+  .metricband {
+    display: grid;
+    gap: 1px;
+    background: var(--color-line);
+    border-block: 1px solid var(--color-line);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (width >= 48rem) {
@@ -887,10 +928,12 @@
   }
 }
 
-.metricband > * {
-  padding: clamp(2rem, 3.4vw, 3.2rem) clamp(1rem, 2vw, 2rem);
-  text-align: center;
-  background: var(--color-paper);
+@layer components {
+  .metricband > * {
+    padding: clamp(2rem, 3.4vw, 3.2rem) clamp(1rem, 2vw, 2rem);
+    text-align: center;
+    background: var(--color-paper);
+  }
 }
 
 
@@ -902,28 +945,30 @@
 }
 
 /* link with the parallax underline */
-.ulink {
-  position: relative;
-  display: inline-block;
-  padding-bottom: 2px;
-}
+@layer components {
+  .ulink {
+    position: relative;
+    display: inline-block;
+    padding-bottom: 2px;
+  }
 
-.ulink::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  width: 100%;
-  height: 1px;
-  background: currentColor;
-  opacity: 0.3;
-  transform-origin: right;
-  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
-}
+  .ulink::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    height: 1px;
+    background: currentColor;
+    opacity: 0.3;
+    transform-origin: right;
+    transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  }
 
-.ulink:hover::after {
-  opacity: 1;
-  transform: scaleX(1.02);
+  .ulink:hover::after {
+    opacity: 1;
+    transform: scaleX(1.02);
+  }
 }
 
 /* buttons */
@@ -946,8 +991,10 @@
     transform 0.3s ease;
 }
 
-.btn:active {
-  transform: translateY(1px);
+@layer components {
+  .btn:active {
+    transform: translateY(1px);
+  }
 }
 
 @utility btn-primary {
@@ -956,9 +1003,11 @@
   border: 1px solid var(--color-signal);
 }
 
-.btn-primary:hover {
-  background: var(--color-signal-2);
-  border-color: var(--color-signal-2);
+@layer components {
+  .btn-primary:hover {
+    background: var(--color-signal-2);
+    border-color: var(--color-signal-2);
+  }
 }
 
 @utility btn-ghost {
@@ -967,8 +1016,10 @@
   border: 1px solid var(--color-line);
 }
 
-.btn-ghost:hover {
-  border-color: var(--color-ink-3);
+@layer components {
+  .btn-ghost:hover {
+    border-color: var(--color-ink-3);
+  }
 }
 
 @utility btn-frost {
@@ -977,9 +1028,11 @@
   border: 1px solid #fff;
 }
 
-.btn-frost:hover {
-  background: var(--color-ice);
-  border-color: var(--color-ice);
+@layer components {
+  .btn-frost:hover {
+    background: var(--color-ice);
+    border-color: var(--color-ice);
+  }
 }
 
 @utility btn-outline-frost {
@@ -988,20 +1041,22 @@
   border: 1px solid rgba(234, 243, 255, 0.34);
 }
 
-.btn-outline-frost:hover {
-  border-color: rgba(234, 243, 255, 0.85);
-}
+@layer components {
+  .btn-outline-frost:hover {
+    border-color: rgba(234, 243, 255, 0.85);
+  }
 
-/* ── reveal on scroll ────────────────────────────────────── */
+  /* ── reveal on scroll ────────────────────────────────────── */
 
-.reveal {
-  opacity: 0;
-  transform: translateY(18px);
-  transition:
-    opacity 0.85s cubic-bezier(0.22, 1, 0.36, 1),
-    transform 0.85s cubic-bezier(0.22, 1, 0.36, 1),
-    filter 0.85s cubic-bezier(0.22, 1, 0.36, 1);
-  filter: blur(4px);
+  .reveal {
+    opacity: 0;
+    transform: translateY(18px);
+    transition:
+      opacity 0.85s cubic-bezier(0.22, 1, 0.36, 1),
+      transform 0.85s cubic-bezier(0.22, 1, 0.36, 1),
+      filter 0.85s cubic-bezier(0.22, 1, 0.36, 1);
+    filter: blur(4px);
+  }
 }
 
 /* ทิศทางเข้าให้ตรงกับตำแหน่งบนหน้า — คอลัมน์ซ้ายเข้าจากซ้าย
@@ -1014,11 +1069,13 @@
 
    ต่างจาก .reveal ตรงที่นี่คือการเคลื่อนไหวที่ "มีความหมาย" ไม่ใช่
    การเฟดเข้าเฉย ๆ — ความยาวของแถบคือตัวเลข ไม่ใช่การตกแต่ง */
-.spec-bar {
-  display: block;
-  height: 100%;
-  width: 0;
-  transition: width 1s cubic-bezier(0.22, 1, 0.36, 1);
+@layer components {
+  .spec-bar {
+    display: block;
+    height: 100%;
+    width: 0;
+    transition: width 1s cubic-bezier(0.22, 1, 0.36, 1);
+  }
 }
 
 /* background-color อยู่ในรายการด้วย ไม่ได้ใส่เผื่อ
@@ -1031,18 +1088,20 @@
 
    เป็นอาการเดียวกับที่เคยทำให้ป้ายเตือนทั้งคอนโซลกลายเป็นสีเทา
    ต่างกันแค่รอบนี้ CSS ที่ทับคือของที่ผมเพิ่งเขียนเอง */
-.spec-row {
-  opacity: 0;
-  transform: translateY(10px);
-  transition:
-    opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1),
-    transform 0.6s cubic-bezier(0.22, 1, 0.36, 1),
-    background-color 0.3s ease;
-}
+@layer components {
+  .spec-row {
+    opacity: 0;
+    transform: translateY(10px);
+    transition:
+      opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+      transform 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+      background-color 0.3s ease;
+  }
 
-.spec-row[data-in="true"] {
-  opacity: 1;
-  transform: none;
+  .spec-row[data-in="true"] {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1056,55 +1115,57 @@
   }
 }
 
-.reveal-l {
-  transform: translate3d(-26px, 0, 0);
-}
+@layer components {
+  .reveal-l {
+    transform: translate3d(-26px, 0, 0);
+  }
 
-.reveal-r {
-  transform: translate3d(26px, 0, 0);
-}
+  .reveal-r {
+    transform: translate3d(26px, 0, 0);
+  }
 
-.reveal-s {
-  transform: scale(0.965);
-}
+  .reveal-s {
+    transform: scale(0.965);
+  }
 
-.reveal-f {
-  transform: none;
-}
+  .reveal-f {
+    transform: none;
+  }
 
-.reveal.is-in {
-  opacity: 1;
-  transform: none;
-  filter: none;
-}
+  .reveal.is-in {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
 
-/* หัวเรื่องเข้ามาทีละบรรทัดจากใต้เส้นบรรทัดของตัวเอง */
-.line-mask {
-  display: block;
-  overflow: hidden;
-  /* กันตัวอักษรไทยที่มีวรรณยุกต์สูงและสระล่างถูกตัดขอบ */
-  padding-block: 0.12em;
-  margin-block: -0.12em;
-}
+  /* หัวเรื่องเข้ามาทีละบรรทัดจากใต้เส้นบรรทัดของตัวเอง */
+  .line-mask {
+    display: block;
+    overflow: hidden;
+    /* กันตัวอักษรไทยที่มีวรรณยุกต์สูงและสระล่างถูกตัดขอบ */
+    padding-block: 0.12em;
+    margin-block: -0.12em;
+  }
 
-.line-inner {
-  display: block;
-  transform: translateY(105%);
-  opacity: 0;
-  transition:
-    transform 0.95s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.7s ease;
-}
+  .line-inner {
+    display: block;
+    transform: translateY(105%);
+    opacity: 0;
+    transition:
+      transform 0.95s cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 0.7s ease;
+  }
 
-.line-inner.is-in {
-  transform: none;
-  opacity: 1;
-}
+  .line-inner.is-in {
+    transform: none;
+    opacity: 1;
+  }
 
-/* ตัวเลขที่ไล่ขึ้นต้องไม่ทำให้บรรทัดขยับตอนจำนวนหลักเปลี่ยน */
-.numeral {
-  font-variant-numeric: tabular-nums;
-  display: inline-block;
+  /* ตัวเลขที่ไล่ขึ้นต้องไม่ทำให้บรรทัดขยับตอนจำนวนหลักเปลี่ยน */
+  .numeral {
+    font-variant-numeric: tabular-nums;
+    display: inline-block;
+  }
 }
 
 /* สั่งพิมพ์ต้องได้เนื้อหาครบ — สถานะตั้งต้นของ reveal คือ opacity 0
@@ -1135,15 +1196,19 @@
 
 /* ขีดคั่นหลังเลขหัวข้อยืดออกจากซ้าย — สัญญาณเล็กว่าหัวข้อนี้เพิ่งเข้ามา
    อยู่ใน Label จึงได้ผลกับทุกหัวข้อบนเว็บโดยไม่ต้องแก้หน้าไหน */
-.label-rule {
-  transform: scaleX(0);
-  transform-origin: 0 50%;
-  transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.15s;
+@layer components {
+  .label-rule {
+    transform: scaleX(0);
+    transform-origin: 0 50%;
+    transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.15s;
+  }
 }
 
 .is-in .label-rule,
-.reveal.is-in .label-rule {
-  transform: scaleX(1);
+@layer components {
+  .reveal.is-in .label-rule {
+    transform: scaleX(1);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1155,80 +1220,84 @@
 
 /* ── รายละเอียดที่พับเก็บไว้ ──────────────────────────────── */
 
-.more {
-  margin-top: 1.5rem;
-}
+@layer components {
+  .more {
+    margin-top: 1.5rem;
+  }
 
-.more > summary {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.6rem;
-  cursor: pointer;
-  list-style: none;
-  user-select: none;
-  color: var(--color-ink-4);
-  transition: color 0.3s ease;
-}
+  .more > summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+    color: var(--color-ink-4);
+    transition: color 0.3s ease;
+  }
 
-.more > summary::-webkit-details-marker {
-  display: none;
-}
+  .more > summary::-webkit-details-marker {
+    display: none;
+  }
 
-.more > summary:hover {
-  color: var(--color-signal);
-}
+  .more > summary:hover {
+    color: var(--color-signal);
+  }
 
-.more-label {
-  font-family: var(--font-mono);
-  font-size: 0.66rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
+  .more-label {
+    font-family: var(--font-mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
 
-/* เครื่องหมายบวกที่หมุนเป็นลบตอนเปิด — บอกสถานะโดยไม่ต้องมีคำ */
-.more-sign {
-  position: relative;
-  width: 0.62rem;
-  height: 0.62rem;
+  /* เครื่องหมายบวกที่หมุนเป็นลบตอนเปิด — บอกสถานะโดยไม่ต้องมีคำ */
+  .more-sign {
+    position: relative;
+    width: 0.62rem;
+    height: 0.62rem;
+  }
 }
 
 .more-sign::before,
-.more-sign::after {
-  content: "";
-  position: absolute;
-  inset: 50% 0 auto 0;
-  height: 1px;
-  background: currentColor;
-  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
-}
+@layer components {
+  .more-sign::after {
+    content: "";
+    position: absolute;
+    inset: 50% 0 auto 0;
+    height: 1px;
+    background: currentColor;
+    transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  }
 
-.more-sign::after {
-  transform: rotate(90deg);
-}
+  .more-sign::after {
+    transform: rotate(90deg);
+  }
 
-.more[open] .more-sign::after {
-  transform: rotate(180deg);
-}
+  .more[open] .more-sign::after {
+    transform: rotate(180deg);
+  }
 
-.more-body {
-  padding-top: 0.9rem;
-  max-width: 42rem;
-  color: var(--color-ink-3);
-  font-size: 0.86rem;
-  line-height: 1.85;
-  text-wrap: pretty;
-}
+  .more-body {
+    padding-top: 0.9rem;
+    max-width: 42rem;
+    color: var(--color-ink-3);
+    font-size: 0.86rem;
+    line-height: 1.85;
+    text-wrap: pretty;
+  }
 
-.more-light > summary {
-  color: rgba(234, 243, 255, 0.5);
-}
+  .more-light > summary {
+    color: rgba(234, 243, 255, 0.5);
+  }
 
-.more-light > summary:hover {
-  color: var(--color-cyan);
-}
+  .more-light > summary:hover {
+    color: var(--color-cyan);
+  }
 
-.more-light .more-body {
-  color: rgba(234, 243, 255, 0.62);
+  .more-light .more-body {
+    color: rgba(234, 243, 255, 0.62);
+  }
 }
 
 /* เนื้อหาที่พับไว้เลื่อนขึ้นมาตอนเปิด ไม่ใช่กระตุกโผล่
@@ -1259,23 +1328,25 @@
 
 /* ── แถบความคืบหน้าการอ่าน ───────────────────────────────── */
 
-.readbar {
-  position: fixed;
-  inset: 0 0 auto 0;
-  z-index: 60;
-  height: 2px;
-  pointer-events: none;
-}
+@layer components {
+  .readbar {
+    position: fixed;
+    inset: 0 0 auto 0;
+    z-index: 60;
+    height: 2px;
+    pointer-events: none;
+  }
 
-.readbar > span {
-  display: block;
-  height: 100%;
-  transform-origin: 0 50%;
-  background: linear-gradient(
-    90deg,
-    var(--color-signal),
-    color-mix(in oklab, var(--color-signal) 45%, #21d4fd)
-  );
+  .readbar > span {
+    display: block;
+    height: 100%;
+    transform-origin: 0 50%;
+    background: linear-gradient(
+      90deg,
+      var(--color-signal),
+      color-mix(in oklab, var(--color-signal) 45%, #21d4fd)
+    );
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1299,49 +1370,51 @@
 
 /* ── tables ──────────────────────────────────────────────── */
 
-.dtable {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.94rem;
-}
+@layer components {
+  .dtable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.94rem;
+  }
 
-.dtable th {
-  text-align: left;
-  font-family: var(--font-mono);
-  font-size: 0.66rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  font-weight: 500;
-  color: var(--color-ink-4);
-  padding: 0 1rem 0.85rem 0;
-  border-bottom: 1px solid var(--color-line);
-  white-space: nowrap;
-}
+  .dtable th {
+    text-align: left;
+    font-family: var(--font-mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-weight: 500;
+    color: var(--color-ink-4);
+    padding: 0 1rem 0.85rem 0;
+    border-bottom: 1px solid var(--color-line);
+    white-space: nowrap;
+  }
 
-.dtable td {
-  padding: 1.05rem 1rem 1.05rem 0;
-  border-bottom: 1px solid var(--color-line);
-  vertical-align: top;
-  line-height: 1.6;
-}
+  .dtable td {
+    padding: 1.05rem 1rem 1.05rem 0;
+    border-bottom: 1px solid var(--color-line);
+    vertical-align: top;
+    line-height: 1.6;
+  }
 
-.dtable tr:last-child td {
-  border-bottom: none;
-}
+  .dtable tr:last-child td {
+    border-bottom: none;
+  }
 
-.dtable--dark th {
-  color: rgba(234, 243, 255, 0.5);
-  border-bottom-color: rgba(158, 230, 255, 0.2);
-}
+  .dtable--dark th {
+    color: rgba(234, 243, 255, 0.5);
+    border-bottom-color: rgba(158, 230, 255, 0.2);
+  }
 
-.dtable--dark td {
-  border-bottom-color: rgba(158, 230, 255, 0.13);
-}
+  .dtable--dark td {
+    border-bottom-color: rgba(158, 230, 255, 0.13);
+  }
 
-.scroll-x {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
+  .scroll-x {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
 }
 
 /* ── misc ────────────────────────────────────────────────── */
@@ -1358,37 +1431,39 @@
   border: 0;
 }
 
-.marker-num {
-  font-family: var(--font-mono);
-  font-size: 0.66rem;
-  letter-spacing: 0.12em;
-  color: var(--color-ink-4);
-  transition: color 0.35s ease;
-}
+@layer components {
+  .marker-num {
+    font-family: var(--font-mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.12em;
+    color: var(--color-ink-4);
+    transition: color 0.35s ease;
+  }
 
-.group:hover .marker-num {
-  color: var(--color-signal);
-}
+  .group:hover .marker-num {
+    color: var(--color-signal);
+  }
 
-/* ── แถวตารางตอบสนองการชี้ ─────────────────────────────────
-   ตารางเปรียบเทียบราคาอ่านข้ามคอลัมน์ การไฮไลต์แถวช่วยไม่ให้หลุดบรรทัด */
-.dtable tbody tr {
-  transition: background 0.25s ease;
-}
+  /* ── แถวตารางตอบสนองการชี้ ─────────────────────────────────
+     ตารางเปรียบเทียบราคาอ่านข้ามคอลัมน์ การไฮไลต์แถวช่วยไม่ให้หลุดบรรทัด */
+  .dtable tbody tr {
+    transition: background 0.25s ease;
+  }
 
-.dtable tbody tr:hover {
-  background: color-mix(in oklab, var(--color-signal) 4%, transparent);
-}
+  .dtable tbody tr:hover {
+    background: color-mix(in oklab, var(--color-signal) 4%, transparent);
+  }
 
-.balance {
-  text-wrap: balance;
-}
+  .balance {
+    text-wrap: balance;
+  }
 
-.pretty {
-  text-wrap: pretty;
-}
+  .pretty {
+    text-wrap: pretty;
+  }
 
-/* ย่อหน้าเนื้อความที่ไม่ได้กำหนดความกว้างเอง ไม่ควรยาวเกินสายตา */
-.measure {
-  max-width: 68ch;
+  /* ย่อหน้าเนื้อความที่ไม่ได้กำหนดความกว้างเอง ไม่ควรยาวเกินสายตา */
+  .measure {
+    max-width: 68ch;
+  }
 }

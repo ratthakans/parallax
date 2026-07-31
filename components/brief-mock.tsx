@@ -66,7 +66,7 @@ export function BriefMock({ compact = false }: { compact?: boolean }) {
           {ITEMS.map((it, i) => (
             <li
               key={it.n}
-              className="spec-row group border-b border-line px-5 py-6 transition-colors duration-300 last:border-b-0 hover:bg-white md:px-7"
+              className="spec-row group border-b border-line px-5 py-6 last:border-b-0 hover:bg-white md:px-7"
               data-in={seen}
               style={{ transitionDelay: `${i * step}ms` }}
             >
