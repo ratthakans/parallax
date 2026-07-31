@@ -3,7 +3,7 @@ import Link from "next/link";
 import {
   ArrowLink,
   CTA,
-  Card,
+  Panel,
   Field,
   Label,
   More,
@@ -17,7 +17,7 @@ import { Reveal } from "@/components/reveal";
 import { BriefMock } from "@/components/brief-mock";
 
 export const metadata: Metadata = {
-  title: "Product",
+  title: "What you get",
   description:
     "The Morning Brief is the product — three moves, ten seconds, every morning. Everything else is the engine that gives it something to say.",
 };
@@ -100,7 +100,7 @@ export default function ProductPage() {
   return (
     <>
       <PageHero
-        label="Product"
+        label="What you get"
         title="The product is one screen. Everything else is the engine that gives it something to say."
         lead="KEEP and REACH are internal names. What the owner opens every morning is the Brief — and they never need to know what sits underneath it."
       />
@@ -262,10 +262,10 @@ export default function ProductPage() {
               },
             ].map((x, i) => (
               <Reveal key={x.t} delay={i * 80}>
-                <Card className="h-full">
+                <Panel className="h-full">
                   <p className="t-label text-signal">{x.t}</p>
                   <More label="detail">{x.d}</More>
-                </Card>
+                </Panel>
               </Reveal>
             ))}
           </div>
@@ -283,6 +283,7 @@ export default function ProductPage() {
 
       <NextUp
         items={[
+          { href: "/platform", label: "Platform", title: "The five layers behind that one screen" },
           { href: "/pricing", label: "Pricing", title: "Four tiers and what each includes" },
           { href: "/playbook", label: "Validation", title: "The result on real data" },
           { href: "/app", label: "Console", title: "Open the console" },

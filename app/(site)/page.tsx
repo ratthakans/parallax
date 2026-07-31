@@ -11,8 +11,8 @@ import {
   Section,
   SignalCard,
   SignalField,
-  Stat,
-  StatBand,
+  Metric,
+  MetricBand,
   SysBar,
 } from "@/components/ui";
 import { LineReveal, Numeral, Reveal, Stagger } from "@/components/reveal";
@@ -157,8 +157,11 @@ export default function HomePage() {
                   <Link href="/contact" className="btn btn-frost">
                     Start a pilot
                   </Link>
-                  <ArrowLink href="/platform" tone="light">
-                    How the engine works
+                  {/* ชี้ไป /product ไม่ใช่ /platform — คนที่เพิ่งอ่านพาดหัวจบ
+                      ยังถามว่า "แล้วฉันได้อะไร" ไม่ใช่ "สถาปัตยกรรมเป็นยังไง"
+                      /product เป็นประตูบานแรกและส่งต่อไป /platform เองอยู่แล้ว */}
+                  <ArrowLink href="/product" tone="light">
+                    See what you get
                   </ArrowLink>
                 </div>
                 <p className="t-small mt-6 text-frost/45">
@@ -209,7 +212,7 @@ export default function HomePage() {
       <section className="surface-paper relative">
         <div className="shell">
           <Reveal>
-            <StatBand
+            <MetricBand
               items={[
                 {
                   value: "7,024",
@@ -266,6 +269,13 @@ export default function HomePage() {
           <Reveal delay={180}>
             <div className="mt-14 max-w-3xl">
               <Quote>Miss the signal today. Pay to reacquire it tomorrow.</Quote>
+              {/* ทางเข้าเดียวของ /problem จากเนื้อหา — หน้านั้นขยายสามข้อ
+                  ข้างบนนี้ให้เต็ม และเดิมเข้าถึงไม่ได้เลยนอกจากพิมพ์ URL */}
+              <div className="mt-9">
+                <ArrowLink href="/problem">
+                  The three ways a standing business loses
+                </ArrowLink>
+              </div>
             </div>
           </Reveal>
         </div>
@@ -427,7 +437,7 @@ export default function HomePage() {
                   ["119", "High-value return", undefined],
                 ].map(([v, l, sub]) => (
                   <div key={l} className="bg-paper p-7">
-                    <Stat value={v!} label={l!} sub={sub} />
+                    <Metric value={v!} label={l!} sub={sub} />
                   </div>
                 ))}
               </div>

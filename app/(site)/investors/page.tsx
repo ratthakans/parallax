@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import {
   CTA,
-  Card,
+  Panel,
   Field,
   Label,
   More,
@@ -10,12 +10,25 @@ import {
   PageHero,
   Quote,
   Section,
-  Stat,
+  Metric,
 } from "@/components/ui";
 import { Reveal } from "@/components/reveal";
 
 export const metadata: Metadata = {
   title: "Investors",
+  /* ── ไม่ให้ Google เก็บ ──
+
+     หน้านี้มี Per-account economics · Market size · The moat ·
+     The central assumption · Business Model Canvas ครบ และเดิมอยู่ใน
+     sitemap ให้เก็บได้ตามปกติ แปลว่าคู่แข่งกับลูกค้าอ่านโครงสร้างต้นทุน
+     และแผน GTM ได้ทั้งหมดโดยไม่ต้องขอ
+
+     เปิดสาธารณะเป็นทางเลือกที่ถูกได้ (โปร่งใส ดึงนักลงทุน) แต่ต้องเป็น
+     การตัดสินใจ ไม่ใช่ค่าตั้งต้น — และการปิดกลับง่ายกว่าการถอนสิ่งที่
+     ถูกเก็บดัชนีไปแล้วมาก จึงปิดไว้ก่อน หน้ายังเปิดอ่านได้ตามปกติ
+     สำหรับคนที่ได้รับลิงก์ ถ้าจะเปิดให้เก็บ ลบบล็อกนี้ แล้วใส่กลับใน
+     app/sitemap.ts กับ app/robots.ts */
+  robots: { index: false, follow: false },
   description:
     "A three-phase GTM, two market-size scenarios, per-account economics, the business model canvas, and the risk the whole company rests on.",
 };
@@ -324,22 +337,22 @@ export default function InvestorsPage() {
 
           <Reveal delay={200}>
             <div className="mt-12 grid gap-8 lg:grid-cols-2">
-              <Card>
+              <Panel>
                 <p className="t-label text-signal">how to use these</p>
                 <p className="t-body t-thai pretty mt-5 text-ink-2">
                   Lead with the conservative case and hold the base case for when someone
                 asks where the upside is. That buys back more credibility than a
                 slightly larger number ever does.
                 </p>
-              </Card>
-              <Card className="border-t-2 border-t-ink-4">
+              </Panel>
+              <Panel className="border-t-2 border-t-ink-4">
                 <p className="t-label text-ink-4">true in both scenarios</p>
                 <p className="t-body t-thai pretty mt-5 text-ink-2">
                   About 190 net new paying accounts a month, every month for 24 months —
                 achievable only if phase three closes, or by switching to the fallback,
                 which trades account count for higher ARPA.
                 </p>
-              </Card>
+              </Panel>
             </div>
           </Reveal>
         </div>
@@ -466,10 +479,10 @@ export default function InvestorsPage() {
           </Reveal>
 
           <div className="mt-16 grid grid-cols-2 gap-x-8 gap-y-12 border-t border-line pt-12 md:grid-cols-4">
-            <Stat value="1" label="Identity graph built from real use" sub="Sharper the longer it runs" />
-            <Stat value="2" label="Cycle-level signatures trained across the cohort" sub="Requires critical mass first" />
-            <Stat value="200" label="The 200th account beats the 10th" sub="From day one" />
-            <Stat value="0" label="Shortcuts money can buy" sub="For a later entrant" />
+            <Metric value="1" label="Identity graph built from real use" sub="Sharper the longer it runs" />
+            <Metric value="2" label="Cycle-level signatures trained across the cohort" sub="Requires critical mass first" />
+            <Metric value="200" label="The 200th account beats the 10th" sub="From day one" />
+            <Metric value="0" label="Shortcuts money can buy" sub="For a later entrant" />
           </div>
         </div>
       </Section>

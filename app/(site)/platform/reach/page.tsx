@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import {
   ArrowLink,
   CTA,
-  Card,
+  Panel,
   Field,
   Label,
   More,
@@ -83,7 +83,7 @@ export default function ReachPage() {
 
           <div className="mt-14 grid gap-8 lg:grid-cols-2">
             <Reveal delay={60}>
-              <Card className="h-full border-t-2 border-t-ink-4">
+              <Panel className="h-full border-t-2 border-t-ink-4">
                 <p className="t-label text-ink-4">what most people pick</p>
                 <h3 className="t-h3 mt-4 text-ink">Highest lifetime spend</h3>
                 <p className="t-body t-thai pretty mt-5 text-ink-3">
@@ -91,10 +91,10 @@ export default function ReachPage() {
                 you get back are discount-waiters too. Cost per lead may look fine;
                 cost per returning customer gets worse.
                 </p>
-              </Card>
+              </Panel>
             </Reveal>
             <Reveal delay={130}>
-              <Card className="h-full border-t-2 border-t-signal">
+              <Panel className="h-full border-t-2 border-t-signal">
                 <p className="t-label text-signal">what reach picks</p>
                 <h3 className="t-h3 mt-4 text-ink">
                   Customers who return at full price
@@ -104,7 +104,7 @@ export default function ReachPage() {
                 alive. Expand from them and you get people likely to return the same
                 way — which is the number we measure.
                 </p>
-              </Card>
+              </Panel>
             </Reveal>
           </div>
 
@@ -185,6 +185,7 @@ export default function ReachPage() {
 
       <NextUp
         items={[
+          { href: "/pricing", label: "Pricing", title: "What it costs to reach like this" },
           { href: "/platform/keep", label: "The other side", title: "Keep" },
           {
             href: "/platform/learning",

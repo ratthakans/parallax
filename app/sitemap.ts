@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
+import { siteUrl } from "@/lib/site-url";
 
-const BASE = "https://parallax.co.th";
+const BASE = siteUrl();
 
 const ROUTES: { path: string; priority: number }[] = [
   { path: "/", priority: 1 },
@@ -15,7 +16,6 @@ const ROUTES: { path: string; priority: number }[] = [
   { path: "/playbook", priority: 0.8 },
   { path: "/pricing", priority: 0.9 },
   { path: "/company", priority: 0.7 },
-  { path: "/investors", priority: 0.7 },
   { path: "/trust", priority: 0.6 },
   { path: "/contact", priority: 0.7 },
 ];

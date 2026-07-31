@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import {
   CTA,
-  Card,
+  Panel,
   Label,
   NextUp,
   Note,
@@ -163,10 +163,10 @@ export default function KeepPage() {
               },
             ].map((x, i) => (
               <Reveal key={x.t} delay={i * 80}>
-                <Card className="h-full">
+                <Panel className="h-full">
                   <h3 className="t-h3 text-ink">{x.t}</h3>
                   <p className="t-small t-thai mt-5 text-ink-3">{x.d}</p>
-                </Card>
+                </Panel>
               </Reveal>
             ))}
           </div>

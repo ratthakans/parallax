@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import {
   CTA,
-  Card,
+  Panel,
   Field,
   Label,
   More,
@@ -173,7 +173,7 @@ export default function CustomersPage() {
             <Reveal delay={120}>
               <div className="grid gap-6">
                 {CRITERIA.map((c, i) => (
-                  <Card key={c.t}>
+                  <Panel key={c.t}>
                     <div className="flex gap-6">
                       <span className="t-numeral t-h3 text-ink-4">
                         0{i + 1}
@@ -183,7 +183,7 @@ export default function CustomersPage() {
                         <p className="t-small t-thai mt-3 text-ink-3">{c.d}</p>
                       </div>
                     </div>
-                  </Card>
+                  </Panel>
                 ))}
               </div>
             </Reveal>

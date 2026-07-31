@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import {
   CTA,
-  Card,
+  Panel,
   Label,
   More,
   NextUp,
@@ -471,11 +471,11 @@ export default function PricingPage() {
               },
             ].map((x, i) => (
               <Reveal key={x.t} delay={i * 80}>
-                <Card className="h-full">
+                <Panel className="h-full">
                   <span className="marker-num">0{i + 1}</span>
                   <h3 className="t-h3 mt-4 text-ink">{x.t}</h3>
                   <p className="t-small t-thai mt-5 text-ink-3">{x.d}</p>
-                </Card>
+                </Panel>
               </Reveal>
             ))}
           </div>

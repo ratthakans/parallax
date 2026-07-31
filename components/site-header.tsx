@@ -183,7 +183,10 @@ export function SiteHeader() {
             }`}
           >
             <div className="shell py-8">
-              <div className="grid gap-px bg-line md:grid-cols-3 lg:grid-cols-5">
+              {/* สามคอลัมน์ ไม่ใช่ห้า — กลุ่มในเมนูมีลูก 6 · 3 · 3
+                  จึงลงเป็น 2 แถว · 1 แถว · 1 แถว พอดีทุกกลุ่ม
+                  กริดห้าคอลัมน์ทำให้กลุ่มที่มีหกใบเหลือเศษใบเดียวห้อยอยู่ */}
+              <div className="grid gap-px bg-line sm:grid-cols-2 lg:grid-cols-3">
                 {item.children!.map((c) => (
                   <Link
                     key={c.href}

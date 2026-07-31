@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Label, PageHero, Section, Note, Card } from "@/components/ui";
+import { Label, PageHero, Section, Note, Panel } from "@/components/ui";
 import { Reveal } from "@/components/reveal";
 import { ContactForm } from "@/components/contact-form";
 
@@ -57,7 +57,7 @@ export default function ContactPage() {
               <div className="flex flex-col gap-6">
                 <Label>Or email us directly</Label>
                 {CHANNELS.map((c) => (
-                  <Card key={c.t}>
+                  <Panel key={c.t}>
                     <h2 className="t-h3 text-ink">{c.t}</h2>
                     <p className="t-small t-thai mt-4 text-ink-3">{c.d}</p>
                     <a
@@ -66,7 +66,7 @@ export default function ContactPage() {
                     >
                       {c.mail}
                     </a>
-                  </Card>
+                  </Panel>
                 ))}
                 <Note>
                   PARALLAX · Bangkok, Thailand ·

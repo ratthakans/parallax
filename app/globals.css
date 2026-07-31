@@ -827,7 +827,7 @@
    ตัวเลขเป็น tabular บาง อัตลักษณ์ทั้งชุดคือโต๊ะเขียนแบบ มุม 2/3/4px
    ที่เคยกระจายอยู่คือนิสัยของ SaaS template ที่หลุดเข้ามา
    กติกาเดียว: เหลี่ยม = โครงสร้าง · pill = การกระทำและสถานะ */
-@utility card {
+@utility panel {
   position: relative;
   border: 1px solid var(--color-line);
   background: #fff;
@@ -838,7 +838,7 @@
     transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-@utility card-dark {
+@utility panel-dark {
   position: relative;
   border: 1px solid rgba(158, 230, 255, 0.2);
   background: rgba(226, 241, 255, 0.06);
@@ -850,21 +850,21 @@
     transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.card:hover {
+.panel:hover {
   border-color: color-mix(in oklab, var(--color-signal) 38%, transparent);
   box-shadow: 0 26px 56px -30px rgba(0, 71, 255, 0.46);
   transform: translateY(-3px);
 }
 
-.card-dark:hover {
+.panel-dark:hover {
   border-color: rgba(158, 230, 255, 0.38);
   background: rgba(226, 241, 255, 0.1);
   transform: translateY(-3px);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .card:hover,
-  .card-dark:hover {
+  .panel:hover,
+  .panel-dark:hover {
     transform: none;
   }
 }
@@ -873,7 +873,7 @@
 
 /* แถวตัวเลขสี่ช่องเหมือน anatomy row ทุกประการ จึงต้องล้อมด้วยวิธีเดียวกัน
    — ตารางเส้นผม ไม่ใช่ขอบซ้ายทีละช่องแบบเดิม */
-.statband {
+.metricband {
   display: grid;
   gap: 1px;
   background: var(--color-line);
@@ -882,12 +882,12 @@
 }
 
 @media (width >= 48rem) {
-  .statband {
+  .metricband {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 
-.statband > * {
+.metricband > * {
   padding: clamp(2rem, 3.4vw, 3.2rem) clamp(1rem, 2vw, 2rem);
   text-align: center;
   background: var(--color-paper);
@@ -896,7 +896,7 @@
 
 
 @media (width >= 48rem) {
-  .statband > *:nth-child(n + 3) {
+  .metricband > *:nth-child(n + 3) {
     border-top: 0;
   }
 }

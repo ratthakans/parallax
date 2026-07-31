@@ -61,7 +61,7 @@ export function EngineLoop() {
           <div key={n.name} className="contents">
             <Link
               href={n.href}
-              className="card-dark group flex flex-col justify-between p-7 md:p-8"
+              className="panel-dark group flex flex-col justify-between p-7 md:p-8"
             >
               <div>
                 <div className="flex items-baseline justify-between gap-3">

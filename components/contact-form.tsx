@@ -54,7 +54,7 @@ export function ContactForm() {
 
   if (state === "done") {
     return (
-      <div className="card border-t-2 border-t-signal p-9 md:p-11">
+      <div className="panel border-t-2 border-t-signal p-9 md:p-11">
         <p className="t-label text-signal">received</p>
         <h3 className="t-h2 mt-6 text-ink">Thank you</h3>
         <p className="t-body t-thai pretty mt-6 text-ink-3">

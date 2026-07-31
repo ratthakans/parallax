@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import {
   CTA,
-  Card,
+  Panel,
   Field,
   Label,
   Mark,
@@ -174,7 +174,7 @@ export default function CompanyPage() {
           <div className="mt-14 grid gap-8 lg:grid-cols-2">
             {VOICE.map((v, i) => (
               <Reveal key={v.side} delay={i * 100}>
-                <Card className="h-full">
+                <Panel className="h-full">
                   <h3 className="t-h3 text-ink">{v.side}</h3>
                   <dl className="mt-8 flex flex-col gap-6">
                     <div>
@@ -192,7 +192,7 @@ export default function CompanyPage() {
                       <dd className="t-body t-thai mt-2.5 text-ink-3">{v.ban}</dd>
                     </div>
                   </dl>
-                </Card>
+                </Panel>
               </Reveal>
             ))}
           </div>
@@ -345,7 +345,7 @@ export default function CompanyPage() {
             </Reveal>
 
             <Reveal delay={120}>
-              <Card className="h-full">
+              <Panel className="h-full">
                 <p className="t-label text-ink-4">
                   The second market opens when all four are true
                 </p>
@@ -367,7 +367,7 @@ export default function CompanyPage() {
                 <p className="t-small t-thai mt-10 border-t border-line pt-6 text-ink-3">
                   Fewer than four means we do not open — however attractive the invitation
                 </p>
-              </Card>
+              </Panel>
             </Reveal>
           </div>
 

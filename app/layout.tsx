@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { siteUrl } from "@/lib/site-url";
 import { IBM_Plex_Sans_Thai, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -17,7 +18,7 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://parallax.co.th"),
+  metadataBase: new URL(siteUrl()),
   title: {
     default: "PARALLAX — Agentic Lead Generation & CRM Platform",
     template: "%s · PARALLAX",

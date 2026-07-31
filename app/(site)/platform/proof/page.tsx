@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import {
   CTA,
-  Card,
+  Panel,
   Field,
   Label,
   More,
@@ -161,7 +161,7 @@ export default function ProofPage() {
             </Reveal>
 
             <Reveal delay={140}>
-              <div className="card-dark p-8">
+              <div className="panel-dark p-8">
                 <div className="flex items-baseline justify-between gap-4">
                   <p className="t-label text-frost/52">90-day rolling difference</p>
                   <p className="t-label text-cyan/60">holdout 15%</p>
@@ -211,7 +211,7 @@ export default function ProofPage() {
 
           <div className="mt-14 grid gap-8 lg:grid-cols-2">
             <Reveal delay={60}>
-              <Card className="h-full border-t-2 border-t-ink-4">
+              <Panel className="h-full border-t-2 border-t-ink-4">
                 <p className="t-label text-ink-4">what most tools report</p>
                 <h3 className="t-h3 mt-4 text-ink">
                   Total revenue from the group that got the message
@@ -221,10 +221,10 @@ export default function ProofPage() {
                 was going to buy anyway. Asked what you would have earned by sending
                 nothing, it has no answer.
                 </p>
-              </Card>
+              </Panel>
             </Reveal>
             <Reveal delay={130}>
-              <Card className="h-full border-t-2 border-t-signal">
+              <Panel className="h-full border-t-2 border-t-signal">
                 <p className="t-label text-signal">what parallax reports</p>
                 <h3 className="t-h3 mt-4 text-ink">
                   The difference against a group that got nothing
@@ -233,7 +233,7 @@ export default function ProofPage() {
                   Far smaller, and the only number that holds up under questioning — the
                 only one a budget decision can actually rest on.
                 </p>
-              </Card>
+              </Panel>
             </Reveal>
           </div>
 
@@ -250,6 +250,7 @@ export default function ProofPage() {
 
       <NextUp
         items={[
+          { href: "/pricing", label: "Pricing", title: "What it costs to measure like this" },
           { href: "/platform/keep", label: "Platform", title: "Keep" },
           { href: "/platform/reach", label: "Platform", title: "Reach" },
           {

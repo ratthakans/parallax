@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import {
   CTA,
-  Card,
+  Panel,
   Label,
   NextUp,
   Note,
@@ -163,10 +163,10 @@ export default function TrustPage() {
                     d: "Customer data is processed and stored in region, with a record of which sub-processors touched what.",
                   },
                 ].map((x) => (
-                  <Card key={x.t}>
+                  <Panel key={x.t}>
                     <h3 className="t-h3 text-ink">{x.t}</h3>
                     <p className="t-small t-thai mt-4 text-ink-3">{x.d}</p>
-                  </Card>
+                  </Panel>
                 ))}
               </div>
             </Reveal>

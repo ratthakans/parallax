@@ -254,7 +254,7 @@ export function PageHero({
       {meta && (
         <section className="surface-paper relative">
           <div className="shell">
-            <StatBand items={meta.map((m) => ({ value: m.v, label: m.k }))} />
+            <MetricBand items={meta.map((m) => ({ value: m.v, label: m.k }))} />
           </div>
         </section>
       )}
@@ -264,13 +264,13 @@ export function PageHero({
 
 /* ── Stripe-style stat band — hairline grid, oversized figures ─ */
 
-export function StatBand({
+export function MetricBand({
   items,
 }: {
   items: { value: string; label: string; sub?: string }[];
 }) {
   return (
-    <dl className="statband">
+    <dl className="metricband">
       {items.map((s) => (
         <div key={s.label}>
           <dt className="sr-only">{s.label}</dt>
@@ -293,7 +293,7 @@ export function StatBand({
 
 /* ── content atoms ───────────────────────────────────────── */
 
-export function Stat({
+export function Metric({
   value,
   label,
   sub,
@@ -390,7 +390,7 @@ export function Note({
   );
 }
 
-export function Card({
+export function Panel({
   children,
   className = "",
   tone = "dark",
@@ -401,7 +401,7 @@ export function Card({
 }) {
   return (
     <div
-      className={`${tone === "light" ? "card-dark" : "card"} p-7 md:p-8 ${className}`}
+      className={`${tone === "light" ? "panel-dark" : "panel"} p-7 md:p-8 ${className}`}
     >
       {children}
     </div>

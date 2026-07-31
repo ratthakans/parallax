@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import {
   CTA,
-  Card,
+  Panel,
   Field,
   Label,
   More,
@@ -10,7 +10,7 @@ import {
   PageHero,
   Quote,
   Section,
-  Stat,
+  Metric,
 } from "@/components/ui";
 import { Reveal } from "@/components/reveal";
 
@@ -130,7 +130,7 @@ export default function LearningPage() {
 
           <div className="mt-16 grid gap-8 lg:grid-cols-2">
             <Reveal delay={80}>
-              <div className="card-dark h-full p-8 md:p-10">
+              <div className="panel-dark h-full p-8 md:p-10">
                 <p className="t-label text-cyan/70">what crosses accounts</p>
                 <ul className="mt-8 flex flex-col gap-5">
                   {SHARED.map((s) => (
@@ -153,7 +153,7 @@ export default function LearningPage() {
             </Reveal>
 
             <Reveal delay={150}>
-              <div className="card-dark h-full p-8 md:p-10">
+              <div className="panel-dark h-full p-8 md:p-10">
                 <p className="t-label text-frost/58">what never crosses</p>
                 <ul className="mt-8 flex flex-col gap-5">
                   {NEVER.map((s) => (
@@ -192,10 +192,10 @@ export default function LearningPage() {
 
           <Reveal delay={140}>
             <div className="mt-16 grid grid-cols-2 gap-x-8 gap-y-12 border-t border-line pt-12 md:grid-cols-4">
-              <Stat value="200" label="The 200th account" sub="Outperforms the 10th" />
-              <Stat value="40" label="Accounts per cycle" sub="Where signatures become measurable" />
-              <Stat value="0" label="Individual rows crossing accounts" sub="By construction, not by policy" />
-              <Stat value="1" label="Cycle entered at a time" sub="Before opening the next" />
+              <Metric value="200" label="The 200th account" sub="Outperforms the 10th" />
+              <Metric value="40" label="Accounts per cycle" sub="Where signatures become measurable" />
+              <Metric value="0" label="Individual rows crossing accounts" sub="By construction, not by policy" />
+              <Metric value="1" label="Cycle entered at a time" sub="Before opening the next" />
             </div>
           </Reveal>
 
@@ -215,11 +215,11 @@ export default function LearningPage() {
                   d: "An account in the wrong cycle adds no value to the system — only support cost and diluted focus.",
                 },
               ].map((x, i) => (
-                <Card key={x.t} className="h-full">
+                <Panel key={x.t} className="h-full">
                   <span className="marker-num">0{i + 1}</span>
                   <h3 className="t-h3 mt-4 text-ink">{x.t}</h3>
                   <p className="t-small t-thai mt-5 text-ink-3">{x.d}</p>
-                </Card>
+                </Panel>
               ))}
             </div>
           </Reveal>

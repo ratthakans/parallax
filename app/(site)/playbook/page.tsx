@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import {
   CTA,
-  Card,
+  Panel,
   Field,
   Label,
   More,
@@ -10,7 +10,7 @@ import {
   PageHero,
   Quote,
   Section,
-  Stat,
+  Metric,
 } from "@/components/ui";
 import { Reveal } from "@/components/reveal";
 
@@ -117,8 +117,8 @@ export default function PlaybookPage() {
                 </div>
 
                 <div className="mt-12 grid grid-cols-2 gap-8 border-t border-line pt-10">
-                  <Stat value="41%" label="Revenue from the top 2% of members" />
-                  <Stat value="78%" label="Share of the base given an action" sub="967 of 1,240" />
+                  <Metric value="41%" label="Revenue from the top 2% of members" />
+                  <Metric value="78%" label="Share of the base given an action" sub="967 of 1,240" />
                 </div>
               </div>
             </Reveal>
@@ -169,7 +169,7 @@ export default function PlaybookPage() {
 
           <Reveal delay={200}>
             <div className="mt-14 grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
-              <Card>
+              <Panel>
                 <p className="t-label text-ink-4">how one cohort is valued</p>
                 <p className="t-h2 t-numeral mt-6 text-signal">
                   281 × ฿2,800 = ฿786,800
@@ -178,14 +178,14 @@ export default function PlaybookPage() {
                   The champion cohort multiplied by its own average basket, for one campaign
                 cycle. That is the size of the opportunity, not a guaranteed result.
                 </p>
-              </Card>
-              <Card className="border-t-2 border-t-signal">
+              </Panel>
+              <Panel className="border-t-2 border-t-signal">
                 <p className="t-label text-signal">the limit of this example</p>
                 <More label="detail">At 281 people this cohort falls below the 300–1,000
               band, so it must be pooled over 90 days rather than measured per
               campaign. The system will not show a per-send difference at this size
                 </More>
-              </Card>
+              </Panel>
             </div>
           </Reveal>
         </div>
@@ -269,11 +269,11 @@ export default function PlaybookPage() {
               },
             ].map((x, i) => (
               <Reveal key={x.t} delay={i * 80}>
-                <Card className="h-full">
+                <Panel className="h-full">
                   <span className="marker-num">0{i + 1}</span>
                   <h3 className="t-h3 mt-4 text-ink">{x.t}</h3>
                   <p className="t-small t-thai mt-5 text-ink-3">{x.d}</p>
-                </Card>
+                </Panel>
               </Reveal>
             ))}
           </div>
@@ -292,6 +292,7 @@ export default function PlaybookPage() {
 
       <NextUp
         items={[
+          { href: "/pricing", label: "Pricing", title: "The tier that fits a base this size" },
           { href: "/customers", label: "Customers", title: "Cycles we take" },
           { href: "/platform/keep", label: "Platform", title: "How Keep works" },
           { href: "/contact", label: "Start", title: "Get this for your shop" },

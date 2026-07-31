@@ -3,7 +3,7 @@ import Link from "next/link";
 import {
   ArrowLink,
   CTA,
-  Card,
+  Panel,
   Field,
   Label,
   More,
@@ -129,18 +129,18 @@ export default function PlatformPage() {
 
           <div className="mt-16 grid gap-8 lg:grid-cols-3">
             <Reveal delay={60}>
-              <Card className="h-full">
+              <Panel className="h-full">
                 <span className="marker-num">axis 1</span>
                 <h3 className="t-h3 mt-4 text-ink">Behaviour</h3>
                 <p className="t-body t-thai pretty mt-5 text-ink-3">
                   How often they buy, how far past their own normal cycle they have
                 drifted, when they buy, and which offers move them.
                 </p>
-              </Card>
+              </Panel>
             </Reveal>
 
             <Reveal delay={130}>
-              <Card className="h-full">
+              <Panel className="h-full">
                 <span className="marker-num">axis 2</span>
                 <h3 className="t-h3 mt-4 text-ink">
                   Price tier and discount sensitivity
@@ -150,18 +150,18 @@ export default function PlatformPage() {
                 What is in reach is the price tier this customer buys at — full price,
                 or waiting for the discount.
                 </p>
-              </Card>
+              </Panel>
             </Reveal>
 
             <Reveal delay={200}>
-              <Card className="h-full">
+              <Panel className="h-full">
                 <span className="marker-num">axis 3</span>
                 <h3 className="t-h3 mt-4 text-ink">Expiry</h3>
                 <p className="t-body t-thai pretty mt-5 text-ink-3">
                   Stock nearing its date, dead inventory, memberships close to renewal,
                 a course down to its last session.
                 </p>
-              </Card>
+              </Panel>
             </Reveal>
           </div>
 
@@ -357,6 +357,7 @@ export default function PlatformPage() {
 
       <NextUp
         items={[
+          { href: "/pricing", label: "Pricing", title: "What each layer costs to run" },
           { href: "/platform/keep", label: "Layer 3 · left", title: "Keep" },
           { href: "/platform/reach", label: "Layer 3 · right", title: "Reach" },
           { href: "/platform/proof", label: "Layer 5", title: "Proof" },
