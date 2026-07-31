@@ -13,6 +13,7 @@ import {
   Metric,
 } from "@/components/ui";
 import { Reveal } from "@/components/reveal";
+import { PriorLadder } from "@/components/specimen";
 
 export const metadata: Metadata = {
   title: "Shared intelligence",
@@ -188,6 +189,14 @@ export default function LearningPage() {
             <h2 className="t-h2 balance mt-9 max-w-3xl text-ink">
               The more accounts in a cycle, the better every new account in that cycle starts
             </h2>
+          </Reveal>
+
+          {/* หน้านี้อธิบายว่าบัญชีที่ 200 เริ่มเก่งกว่าบัญชีที่ 10
+              ด้วยคำพูดล้วน — วาดให้เห็นว่าเก่งกว่าเท่าไร */}
+          <Reveal delay={130}>
+            <div className="mt-14 max-w-2xl">
+              <PriorLadder />
+            </div>
           </Reveal>
 
           <Reveal delay={140}>

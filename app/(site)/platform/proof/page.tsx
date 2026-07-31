@@ -12,6 +12,7 @@ import {
   Section,
 } from "@/components/ui";
 import { Reveal } from "@/components/reveal";
+import { HoldoutSplit, VerdictTable } from "@/components/specimen";
 
 export const metadata: Metadata = {
   title: "Proof — measurement that survives the question",
@@ -95,6 +96,12 @@ export default function ProofPage() {
             <h2 className="t-h2 balance mt-9 max-w-3xl text-ink">
               The method is chosen by the size of the treated group
             </h2>
+          </Reveal>
+
+          <Reveal delay={130}>
+            <div className="mt-14 max-w-3xl">
+              <HoldoutSplit />
+            </div>
           </Reveal>
 
           <Reveal delay={140}>
@@ -199,6 +206,27 @@ export default function ProofPage() {
               </div>
             </Reveal>
           </div>
+        </div>
+      </Section>
+
+      {/* ── ตารางคำตัดสินจริงจากคอนโซล ──
+          หน้านี้เถียงเรื่องการวัดผลมาสิบย่อหน้าโดยไม่เคยวาดการวัดผลให้ดู
+          แถวที่โน้มน้าวที่สุดคือแถว T+7 ที่สรุปไม่ได้ */}
+      <Section tone="paper">
+        <div className="shell">
+          <Reveal>
+            <Label>What it actually prints</Label>
+          </Reveal>
+          <Reveal delay={70}>
+            <h2 className="t-h2 balance mt-9 max-w-3xl text-ink">
+              Including the row that says it does not know yet
+            </h2>
+          </Reveal>
+          <Reveal delay={140}>
+            <div className="mt-14">
+              <VerdictTable />
+            </div>
+          </Reveal>
         </div>
       </Section>
 

@@ -14,6 +14,7 @@ import {
   Steps,
 } from "@/components/ui";
 import { Reveal } from "@/components/reveal";
+import { AudienceFunnel } from "@/components/specimen";
 
 export const metadata: Metadata = {
   title: "Reach — your best customers train the next audience",
@@ -64,6 +65,13 @@ export default function ReachPage() {
           <Reveal delay={80}>
             <div className="mt-12">
               <Steps items={STEPS} />
+            </div>
+          </Reveal>
+
+          {/* ทุกขั้นคือการลบออก ไม่ใช่การเพิ่มเข้า — เห็นเป็นภาพชัดกว่าอ่าน */}
+          <Reveal delay={150}>
+            <div className="mt-14 max-w-2xl">
+              <AudienceFunnel />
             </div>
           </Reveal>
         </div>
