@@ -1,4 +1,4 @@
-import { aiConfigured } from "@/lib/ai";
+import { aiConfigured } from "@/lib/engine/ai";
 import { PageHead, Panel } from "@/components/console/ui";
 import { Importer } from "@/components/console/importer";
 

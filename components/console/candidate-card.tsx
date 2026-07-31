@@ -1,11 +1,11 @@
-import type { Candidate } from "@/lib/types";
-import { previewCopy, vocabFor } from "@/lib/dispatch";
-import { profileFor } from "@/lib/tenants";
-import { explainPlay } from "@/lib/ai";
+import type { Candidate } from "@/lib/shared/types";
+import { previewCopy, vocabFor } from "@/lib/engine/dispatch";
+import { profileFor } from "@/lib/shared/tenants";
+import { explainPlay } from "@/lib/engine/ai";
 import { approveAction } from "@/app/(app)/actions";
 import { ActionForm } from "./action-form";
-import { reachBlockedReason } from "@/lib/billing";
-import { CYCLE_LABEL } from "@/lib/types";
+import { reachBlockedReason } from "@/lib/engine/billing";
+import { CYCLE_LABEL } from "@/lib/shared/types";
 import {
   AiBadge,
   EnginePill,

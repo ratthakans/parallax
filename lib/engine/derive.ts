@@ -1,5 +1,5 @@
-import { db } from "./db";
-import type { CustomerFeature, DiscountAffinity, GroupRole, ReachableBy } from "./types";
+import { db } from "@/lib/engine/db";
+import type { CustomerFeature, DiscountAffinity, GroupRole, ReachableBy } from "@/lib/shared/types";
 
 /* ── DERIVE ────────────────────────────────────────────────────
    คำนวณ feature รายคนล่วงหน้า (Play Engine §5)

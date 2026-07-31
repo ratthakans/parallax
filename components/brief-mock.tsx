@@ -1,4 +1,4 @@
-import { Mark } from "./ui";
+import { Mark } from "@/components/brand";
 
 type Item = {
   n: string;

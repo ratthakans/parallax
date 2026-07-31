@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { siteUrl } from "@/lib/site-url";
+import { siteUrl } from "@/lib/shared/site-url";
 import { IBM_Plex_Sans_Thai, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 

@@ -1,4 +1,4 @@
-import { db, logActivity } from "./db";
+import { db, logActivity } from "@/lib/engine/db";
 import {
   MESSAGE_COST_BAHT,
   PLANS,
@@ -6,7 +6,7 @@ import {
   priceForMessages,
   type Plan,
   type PlanId,
-} from "./plans";
+} from "@/lib/shared/plans";
 
 /* ── ค่าใช้จ่ายและเพดานของแผน ──────────────────────────────────
    ชั้นนี้ต่อ lib/plans.ts (ข้อมูลล้วน) เข้ากับฐานข้อมูล และเป็นที่เดียว

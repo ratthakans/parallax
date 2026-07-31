@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Mark } from "./ui";
+import { Mark } from "@/components/brand";
 
 const COLS: { title: string; links: { href: string; label: string }[] }[] = [
   {

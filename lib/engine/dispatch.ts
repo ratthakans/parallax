@@ -1,11 +1,11 @@
 import { createHash, randomUUID } from "node:crypto";
-import { db, logActivity } from "./db";
-import { effectiveGuards, getTenant, getTenantPlays, pickMeasurement } from "./match";
-import { writeCopy, writeCopyFallback, type AiSource, type CopySet, type VocabCtx } from "./ai";
-import { profileFor } from "./tenants";
-import { MESSAGE_COST_BAHT } from "./plans";
-import { reachBlockedReason } from "./billing";
-import type { Candidate, Play } from "./types";
+import { db, logActivity } from "@/lib/engine/db";
+import { effectiveGuards, getTenant, getTenantPlays, pickMeasurement } from "@/lib/engine/match";
+import { writeCopy, writeCopyFallback, type AiSource, type CopySet, type VocabCtx } from "@/lib/engine/ai";
+import { profileFor } from "@/lib/shared/tenants";
+import { MESSAGE_COST_BAHT } from "@/lib/shared/plans";
+import { reachBlockedReason } from "@/lib/engine/billing";
+import type { Candidate, Play } from "@/lib/shared/types";
 
 /* ── DISPATCH ──────────────────────────────────────────────────
    สี่อย่างในไฟล์นี้ไม่มีหน้าจอ และลูกค้าไม่มีวันเห็น —
@@ -39,7 +39,7 @@ export function armFor(
    รายบุคคลตอนส่ง ดู lib/ai.ts — ถ้าไม่มี API key จะใช้สูตรสำเร็จ
    ที่ deterministic แทน โดยรูปทรงของสัญญาไม่เปลี่ยน */
 
-export type { CopySet } from "./ai";
+export type { CopySet } from "@/lib/engine/ai";
 
 /** ใช้ตอนแสดงตัวอย่างในหน้าจอ — ไม่เรียก AI เพื่อไม่ให้เสียเงินตอนเลื่อนดู */
 export function vocabFor(tenantId: string): VocabCtx {

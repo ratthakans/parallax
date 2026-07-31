@@ -1,13 +1,13 @@
 import "./isolate.mts";
 
-import { ensureReady } from "@/lib/bootstrap";
-import { db } from "@/lib/db";
-import { loadFeatures } from "@/lib/derive";
-import { runMatch, topThree } from "@/lib/match";
-import { roiSummary } from "@/lib/proof";
-import { TENANT_PROFILES } from "@/lib/tenants";
-import { CYCLE_LABEL } from "@/lib/types";
-import { ALL_PLAYS } from "@/lib/plays";
+import { ensureReady } from "@/lib/engine/bootstrap";
+import { db } from "@/lib/engine/db";
+import { loadFeatures } from "@/lib/engine/derive";
+import { runMatch, topThree } from "@/lib/engine/match";
+import { roiSummary } from "@/lib/engine/proof";
+import { TENANT_PROFILES } from "@/lib/shared/tenants";
+import { CYCLE_LABEL } from "@/lib/shared/types";
+import { ALL_PLAYS } from "@/lib/shared/plays";
 const ALLP = ALL_PLAYS.length;
 
 await ensureReady();

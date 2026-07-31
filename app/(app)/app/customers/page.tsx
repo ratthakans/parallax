@@ -1,7 +1,7 @@
-import { loadFeatures } from "@/lib/derive";
-import { getActiveTenantId } from "@/lib/active-tenant";
-import { profileFor } from "@/lib/tenants";
-import type { DiscountAffinity, ReachableBy } from "@/lib/types";
+import { loadFeatures } from "@/lib/engine/derive";
+import { getActiveTenantId } from "@/lib/shared/active-tenant";
+import { profileFor } from "@/lib/shared/tenants";
+import type { DiscountAffinity, ReachableBy } from "@/lib/shared/types";
 import { Metric, PageHead, Panel, baht, num, pct } from "@/components/console/ui";
 import { deriveAction } from "../../actions";
 import { ActionForm } from "@/components/console/action-form";

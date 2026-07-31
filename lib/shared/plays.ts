@@ -1,4 +1,4 @@
-import type { Play } from "./types";
+import type { Play } from "@/lib/shared/types";
 
 /* ── คลัง Play ตั้งต้น ─────────────────────────────────────────
    15 KEEP + 8 REACH · Play Engine §2 · §3 · ภาคผนวก

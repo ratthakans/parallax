@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { db } from "@/lib/db";
-import { playById } from "@/lib/plays";
-import { getActiveTenantId } from "@/lib/active-tenant";
-import type { Verdict } from "@/lib/types";
+import { db } from "@/lib/engine/db";
+import { playById } from "@/lib/shared/plays";
+import { getActiveTenantId } from "@/lib/shared/active-tenant";
+import type { Verdict } from "@/lib/shared/types";
 import {
   Empty,
   MEASUREMENT_LABEL,

@@ -1,5 +1,5 @@
-import type { PlanId } from "./plans";
-import type { CycleShape, GroupRole } from "./types";
+import type { PlanId } from "@/lib/shared/plans";
+import type { CycleShape, GroupRole } from "@/lib/shared/types";
 
 /* ── ทะเบียนบัญชีตัวอย่าง ──────────────────────────────────────
    เพิ่มธุรกิจใหม่ = เพิ่มแถวในไฟล์นี้ ไม่ต้องแก้ตัวสร้างข้อมูล

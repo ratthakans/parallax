@@ -1,7 +1,7 @@
-import { db } from "./db";
-import { loadFeatures, type StoredFeature } from "./derive";
-import { ALL_PLAYS } from "./plays";
-import type { Candidate, MeasurementMode, Play, Selector } from "./types";
+import { db } from "@/lib/engine/db";
+import { loadFeatures, type StoredFeature } from "@/lib/engine/derive";
+import { ALL_PLAYS } from "@/lib/shared/plays";
+import type { Candidate, MeasurementMode, Play, Selector } from "@/lib/shared/types";
 
 /* ── MATCH ─────────────────────────────────────────────────────
    รัน selector ของทุก play ทั้งสองฝั่ง แล้วจัดอันดับ
@@ -15,7 +15,7 @@ import type { Candidate, MeasurementMode, Play, Selector } from "./types";
 /* ราคาต่อข้อความอยู่ที่ lib/plans.ts ที่เดียว — เดิมเลข 0.75 ถูกพิมพ์ซ้ำ
    ในสามไฟล์ (ที่นี่ · dispatch · คำอธิบายใน proof) ราคาที่เขียนไว้สามที่
    คือราคาที่จะไม่ตรงกันเองหลังการปรับครั้งแรก */
-import { MEDIA_COST_PER_PERSON, MESSAGE_COST_BAHT as MESSAGE_COST } from "./plans";
+import { MEDIA_COST_PER_PERSON, MESSAGE_COST_BAHT as MESSAGE_COST } from "@/lib/shared/plans";
 
 export type TenantSettings = {
   id: string;

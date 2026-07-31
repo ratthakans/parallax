@@ -1,18 +1,18 @@
 import { createHash } from "node:crypto";
-import { db, logActivity } from "./db";
-import { deriveFeatures } from "./derive";
-import { guessProductRoles } from "./ai";
-import { contactCapBlockedReason } from "./billing";
+import { db, logActivity } from "@/lib/engine/db";
+import { deriveFeatures } from "@/lib/engine/derive";
+import { guessProductRoles } from "@/lib/engine/ai";
+import { contactCapBlockedReason } from "@/lib/engine/billing";
 import {
   missingRequired,
   type ColumnMapping,
   type ImportField,
   type ImportPreview,
   type ImportResult,
-} from "./ingest-types";
-import type { GroupRole } from "./types";
+} from "@/lib/shared/ingest-types";
+import type { GroupRole } from "@/lib/shared/types";
 
-export * from "./ingest-types";
+export * from "@/lib/shared/ingest-types";
 
 /* ── INGEST ────────────────────────────────────────────────────
    ลากไฟล์วาง → schema กลาง (Play Engine §5 ขั้นที่ 1)

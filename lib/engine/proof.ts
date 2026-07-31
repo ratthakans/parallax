@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
-import { db, logActivity } from "./db";
-import { playById } from "./plays";
-import type { Verdict } from "./types";
+import { db, logActivity } from "@/lib/engine/db";
+import { playById } from "@/lib/shared/plays";
+import type { Verdict } from "@/lib/shared/types";
 
 /* ── PROOF ─────────────────────────────────────────────────────
    กลุ่มที่ส่งกับกลุ่มที่กันไว้ คือสองมุมที่ทำให้คำนวณระยะได้

@@ -24,7 +24,7 @@ import {
   capLabel,
   perMessage,
   type Plan,
-} from "@/lib/plans";
+} from "@/lib/shared/plans";
 
 /* ทุกตัวเลขในหน้านี้มาจาก lib/plans.ts ซึ่งเป็นไฟล์เดียวกับที่ชั้น
    dispatch และหน้า /app/billing บังคับใช้ — ตารางราคาที่พิมพ์มือคือ

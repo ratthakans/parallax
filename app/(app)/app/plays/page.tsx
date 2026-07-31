@@ -1,8 +1,8 @@
-import { db } from "@/lib/db";
-import { effectiveGuards, getTenantPlays, runMatch } from "@/lib/match";
-import { getActiveTenantId } from "@/lib/active-tenant";
-import { profileFor } from "@/lib/tenants";
-import { CYCLE_LABEL } from "@/lib/types";
+import { db } from "@/lib/engine/db";
+import { effectiveGuards, getTenantPlays, runMatch } from "@/lib/engine/match";
+import { getActiveTenantId } from "@/lib/shared/active-tenant";
+import { profileFor } from "@/lib/shared/tenants";
+import { CYCLE_LABEL } from "@/lib/shared/types";
 import {
   EnginePill,
   MEASUREMENT_LABEL,

@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
+import { Mark } from "@/components/brand";
 import {
   CTA,
   Panel,
   Field,
   Label,
-  Mark,
   More,
   NextUp,
   Note,

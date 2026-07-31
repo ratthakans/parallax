@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { Mark } from "@/components/ui";
+import { Mark } from "@/components/brand";
 
 /* คำเรียกคนในฐานต่างกันทุกบัญชี เมนูจึงรับมาเป็น prop
    ไม่ใช่เขียน "ฐานลูกค้า" ตายตัว — หน้าจอของพรรคต้องอ่านว่า ทะเบียนสมาชิก

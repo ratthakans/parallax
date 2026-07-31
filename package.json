@@ -10,6 +10,8 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
+    "boundaries": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/boundaries.mts",
+    "check": "npm run typecheck && npm run boundaries",
     "verify": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/verify.mts",
     "verify:caps": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/verify2.mts",
     "verify:tenants": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/tenants.mts",

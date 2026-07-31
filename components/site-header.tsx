@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { NAV } from "./nav";
-import { Wordmark } from "./ui";
+import { Wordmark } from "@/components/brand";
 
 export function SiteHeader() {
   const [scrolled, setScrolled] = useState(false);

@@ -3,21 +3,21 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
-import { db, logActivity } from "@/lib/db";
-import { deriveFeatures } from "@/lib/derive";
-import { approveCampaign, sendCampaign } from "@/lib/dispatch";
-import { runMatch, getTenant } from "@/lib/match";
-import { measureCampaign } from "@/lib/proof";
-import { seed } from "@/lib/seed";
-import { resetReady } from "@/lib/bootstrap";
-import { travelForward } from "@/lib/demo";
-import { clearAiCache } from "@/lib/ai";
-import { isKnownTenant } from "@/lib/tenants";
-import { buyCredits, changePlan, reachBlockedReason } from "@/lib/billing";
-import { CREDIT_PACKS, PLANS, isPlanId } from "@/lib/plans";
-import { getActiveTenantId, TENANT_COOKIE } from "@/lib/active-tenant";
-import { messageOf, type ActionState } from "@/lib/action-state";
-import { num } from "@/lib/format";
+import { db, logActivity } from "@/lib/engine/db";
+import { deriveFeatures } from "@/lib/engine/derive";
+import { approveCampaign, sendCampaign } from "@/lib/engine/dispatch";
+import { runMatch, getTenant } from "@/lib/engine/match";
+import { measureCampaign } from "@/lib/engine/proof";
+import { seed } from "@/lib/engine/seed";
+import { resetReady } from "@/lib/engine/bootstrap";
+import { travelForward } from "@/lib/engine/demo";
+import { clearAiCache } from "@/lib/engine/ai";
+import { isKnownTenant } from "@/lib/shared/tenants";
+import { buyCredits, changePlan, reachBlockedReason } from "@/lib/engine/billing";
+import { CREDIT_PACKS, PLANS, isPlanId } from "@/lib/shared/plans";
+import { getActiveTenantId, TENANT_COOKIE } from "@/lib/shared/active-tenant";
+import { messageOf, type ActionState } from "@/lib/shared/action-state";
+import { num } from "@/lib/shared/format";
 
 /* ── Server Actions ────────────────────────────────────────────
    Console นี้ยังไม่มีระบบล็อกอิน — บัญชีที่เปิดอยู่มาจาก cookie
@@ -29,7 +29,7 @@ import { num } from "@/lib/format";
    ได้ แต่ยังไม่ใช่การแยกผู้เช่า ต้องเปลี่ยนเป็นตรวจกับ session จริง
 
    ทุก action คืน ActionState แทนการ throw สำหรับความล้มเหลวที่คาดไว้
-   เหตุผลอยู่ใน lib/action-state.ts
+   เหตุผลอยู่ใน lib/shared/action-state.ts
    ───────────────────────────────────────────────────────────── */
 
 const ACTOR = "owner";

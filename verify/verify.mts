@@ -1,11 +1,11 @@
 import "./isolate.mts";
 
-import { runMatch } from "@/lib/match";
-import { approveCampaign, sendCampaign, armFor } from "@/lib/dispatch";
-import { measureCampaign, roiSummary } from "@/lib/proof";
-import { db } from "@/lib/db";
-import { TENANT_ID } from "@/lib/seed";
-import { ensureReady } from "@/lib/bootstrap";
+import { runMatch } from "@/lib/engine/match";
+import { approveCampaign, sendCampaign, armFor } from "@/lib/engine/dispatch";
+import { measureCampaign, roiSummary } from "@/lib/engine/proof";
+import { db } from "@/lib/engine/db";
+import { TENANT_ID } from "@/lib/engine/seed";
+import { ensureReady } from "@/lib/engine/bootstrap";
 
 await ensureReady();
 const T = TENANT_ID;

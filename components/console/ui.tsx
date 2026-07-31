@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { Verdict } from "@/lib/types";
+import type { Verdict } from "@/lib/shared/types";
 
 export function Panel({
   children,
@@ -162,4 +162,4 @@ export function Empty({ children }: { children: ReactNode }) {
   );
 }
 
-export { baht, num, pct } from "@/lib/format";
+export { baht, num, pct } from "@/lib/shared/format";

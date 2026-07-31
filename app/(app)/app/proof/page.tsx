@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { db } from "@/lib/db";
-import { playById } from "@/lib/plays";
-import { roiSummary } from "@/lib/proof";
-import { getActiveTenantId } from "@/lib/active-tenant";
-import { profileFor } from "@/lib/tenants";
-import type { Verdict } from "@/lib/types";
+import { db } from "@/lib/engine/db";
+import { playById } from "@/lib/shared/plays";
+import { roiSummary } from "@/lib/engine/proof";
+import { getActiveTenantId } from "@/lib/shared/active-tenant";
+import { profileFor } from "@/lib/shared/tenants";
+import type { Verdict } from "@/lib/shared/types";
 import {
   Empty,
   Metric,
@@ -15,7 +15,7 @@ import {
   num,
   pct,
 } from "@/components/console/ui";
-import { ciLabel } from "@/lib/format";
+import { ciLabel } from "@/lib/shared/format";
 import { measureAllAction } from "../../actions";
 import { ActionForm } from "@/components/console/action-form";
 

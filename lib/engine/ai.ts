@@ -1,15 +1,15 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { createHash } from "node:crypto";
-import { db } from "./db";
-import type { Play } from "./types";
+import { db } from "@/lib/engine/db";
+import type { Play } from "@/lib/shared/types";
 import {
   IMPORT_FIELDS,
   type ColumnMapping,
   type ImportField,
-} from "./ingest-types";
+} from "@/lib/shared/ingest-types";
 
-export { IMPORT_FIELDS, FIELD_LABEL } from "./ingest-types";
-export type { ColumnMapping, ImportField } from "./ingest-types";
+export { IMPORT_FIELDS, FIELD_LABEL } from "@/lib/shared/ingest-types";
+export type { ColumnMapping, ImportField } from "@/lib/shared/ingest-types";
 
 /* ── ชั้น AI ────────────────────────────────────────────────────
    AI อยู่ตรงไหน — ตาม Play Engine §8

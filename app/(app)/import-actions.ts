@@ -1,15 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { mapColumns, type AiSource } from "@/lib/ai";
-import { buildPreview, commitImport, parseCsv } from "@/lib/ingest";
+import { mapColumns, type AiSource } from "@/lib/engine/ai";
+import { buildPreview, commitImport, parseCsv } from "@/lib/engine/ingest";
 import type {
   ColumnMapping,
   ImportField,
   ImportPreview,
   ImportResult,
-} from "@/lib/ingest-types";
-import { getActiveTenantId } from "@/lib/active-tenant";
+} from "@/lib/shared/ingest-types";
+import { getActiveTenantId } from "@/lib/shared/active-tenant";
 
 /* ── Server Actions ของหน้านำเข้าข้อมูล ─────────────────────────
    แยกไฟล์จาก actions.ts เพราะรับ payload ใหญ่ (เนื้อไฟล์ CSV)

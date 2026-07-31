@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
-import { db, logActivity } from "./db";
-import { playById } from "./plays";
-import { measureCampaign } from "./proof";
+import { db, logActivity } from "@/lib/engine/db";
+import { playById } from "@/lib/shared/plays";
+import { measureCampaign } from "@/lib/engine/proof";
 
 /* ── ตัวควบคุมสำหรับเดโม ──────────────────────────────────────
    ปัญหาของการเดโมระบบวัดผล: แคมเปญที่อนุมัติเมื่อสิบวินาทีก่อน

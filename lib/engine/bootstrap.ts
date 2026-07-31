@@ -1,8 +1,8 @@
-import { seedCampaignHistory } from "./demo";
-import { db } from "./db";
-import { deriveFeatures, featuresComputedAt } from "./derive";
-import { isTenantSeeded, seed } from "./seed";
-import { TENANT_PROFILES } from "./tenants";
+import { seedCampaignHistory } from "@/lib/engine/demo";
+import { db } from "@/lib/engine/db";
+import { deriveFeatures, featuresComputedAt } from "@/lib/engine/derive";
+import { isTenantSeeded, seed } from "@/lib/engine/seed";
+import { TENANT_PROFILES } from "@/lib/shared/tenants";
 
 /* เปิดครั้งแรกให้มีของให้ดูทันที — seed ชุดตัวอย่างแล้วคำนวณ feature
    ในระบบจริงขั้น DERIVE เป็น cron รายคืน ไม่ใช่ทำตอนเปิดหน้า

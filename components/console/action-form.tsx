@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState, type ReactNode } from "react";
-import type { ActionState } from "@/lib/action-state";
+import type { ActionState } from "@/lib/shared/action-state";
 
 /* ── ฟอร์มเดียวที่ทุกปุ่มในคอนโซลใช้ ────────────────────────────
 

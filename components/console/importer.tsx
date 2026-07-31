@@ -4,8 +4,8 @@ import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { analyseCsv, commitCsv, repreview } from "@/app/(app)/import-actions";
 import type { AnalyseResult } from "@/app/(app)/import-actions";
-import type { ColumnMapping, ImportField, ImportPreview } from "@/lib/ingest-types";
-import { FIELD_LABEL, IMPORT_FIELDS } from "@/lib/ingest-types";
+import type { ColumnMapping, ImportField, ImportPreview } from "@/lib/shared/ingest-types";
+import { FIELD_LABEL, IMPORT_FIELDS } from "@/lib/shared/ingest-types";
 import { Panel, num } from "./ui";
 
 /* ลากไฟล์วาง → AI แม็ปคอลัมน์ → ยืนยัน → เห็น insight

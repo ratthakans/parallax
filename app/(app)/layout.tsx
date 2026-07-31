@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import "./console.css";
 import { ConsoleNav } from "@/components/console/nav";
-import { ensureReady } from "@/lib/bootstrap";
-import { getTenant } from "@/lib/match";
-import { getActiveTenantId } from "@/lib/active-tenant";
-import { planById } from "@/lib/plans";
-import { TENANT_PROFILES, profileFor } from "@/lib/tenants";
-import { featuresComputedAt } from "@/lib/derive";
+import { ensureReady } from "@/lib/engine/bootstrap";
+import { getTenant } from "@/lib/engine/match";
+import { getActiveTenantId } from "@/lib/shared/active-tenant";
+import { planById } from "@/lib/shared/plans";
+import { TENANT_PROFILES, profileFor } from "@/lib/shared/tenants";
+import { featuresComputedAt } from "@/lib/engine/derive";
 import { switchTenantAction } from "./actions";
 
 export const metadata: Metadata = {

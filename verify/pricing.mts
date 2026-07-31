@@ -1,11 +1,11 @@
 import "./isolate.mts";
 
-import { db } from "@/lib/db";
-import { ensureReady } from "@/lib/bootstrap";
-import { runMatch } from "@/lib/match";
-import { roiSummary } from "@/lib/proof";
-import { approveCampaign, sendCampaign } from "@/lib/dispatch";
-import { TENANT_PROFILES } from "@/lib/tenants";
+import { db } from "@/lib/engine/db";
+import { ensureReady } from "@/lib/engine/bootstrap";
+import { runMatch } from "@/lib/engine/match";
+import { roiSummary } from "@/lib/engine/proof";
+import { approveCampaign, sendCampaign } from "@/lib/engine/dispatch";
+import { TENANT_PROFILES } from "@/lib/shared/tenants";
 import {
   billingPeriod,
   buyCredits,
@@ -15,7 +15,7 @@ import {
   planForBaseSize,
   reachBlockedReason,
   usageFor,
-} from "@/lib/billing";
+} from "@/lib/engine/billing";
 import {
   CREDIT_PACKS,
   MESSAGE_COST_BAHT,
@@ -23,7 +23,7 @@ import {
   PLAN_ORDER,
   perMessage,
   priceForMessages,
-} from "@/lib/plans";
+} from "@/lib/shared/plans";
 
 /* ── ชุดตรวจชั้นราคา ──────────────────────────────────────────
    เพดานทุกข้อที่หน้า /pricing ประกาศ ต้องมีบรรทัดที่นี่ที่พิสูจน์ว่า

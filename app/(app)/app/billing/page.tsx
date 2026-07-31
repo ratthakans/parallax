@@ -1,11 +1,11 @@
 import Link from "next/link";
-import { getActiveTenantId } from "@/lib/active-tenant";
-import { profileFor } from "@/lib/tenants";
+import { getActiveTenantId } from "@/lib/shared/active-tenant";
+import { profileFor } from "@/lib/shared/tenants";
 import {
   recentCampaignCosts,
   planForBaseSize,
   usageFor,
-} from "@/lib/billing";
+} from "@/lib/engine/billing";
 import {
   CAP_ROWS,
   CREDIT_PACKS,
@@ -16,9 +16,9 @@ import {
   annualDiscountPct,
   capLabel,
   perMessage,
-} from "@/lib/plans";
-import { roiSummary } from "@/lib/proof";
-import { playById } from "@/lib/plays";
+} from "@/lib/shared/plans";
+import { roiSummary } from "@/lib/engine/proof";
+import { playById } from "@/lib/shared/plays";
 import { Empty, Metric, PageHead, Panel, baht, num } from "@/components/console/ui";
 import { buyCreditsAction, changePlanAction } from "../../actions";
 import { ActionForm } from "@/components/console/action-form";

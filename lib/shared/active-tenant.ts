@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { DEFAULT_TENANT_ID, isKnownTenant, profileFor } from "./tenants";
+import { DEFAULT_TENANT_ID, isKnownTenant, profileFor } from "@/lib/shared/tenants";
 
 /* ── บัญชีที่กำลังเปิดอยู่ ──────────────────────────────────────
    เก็บใน cookie เพราะ Console ยังไม่มีระบบล็อกอิน

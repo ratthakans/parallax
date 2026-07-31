@@ -1,16 +1,16 @@
 import Link from "next/link";
-import { db } from "@/lib/db";
-import { runMatch, topThree, getTenant } from "@/lib/match";
-import { roiSummary } from "@/lib/proof";
-import { summariseBrief } from "@/lib/ai";
-import { vocabFor } from "@/lib/dispatch";
-import { getActiveTenantId } from "@/lib/active-tenant";
-import { profileFor } from "@/lib/tenants";
-import { CYCLE_LABEL } from "@/lib/types";
-import { loadFeatures } from "@/lib/derive";
+import { db } from "@/lib/engine/db";
+import { runMatch, topThree, getTenant } from "@/lib/engine/match";
+import { roiSummary } from "@/lib/engine/proof";
+import { summariseBrief } from "@/lib/engine/ai";
+import { vocabFor } from "@/lib/engine/dispatch";
+import { getActiveTenantId } from "@/lib/shared/active-tenant";
+import { profileFor } from "@/lib/shared/tenants";
+import { CYCLE_LABEL } from "@/lib/shared/types";
+import { loadFeatures } from "@/lib/engine/derive";
 import { CandidateCard } from "@/components/console/candidate-card";
 import { ActionForm } from "@/components/console/action-form";
-import { reachBlockedReason } from "@/lib/billing";
+import { reachBlockedReason } from "@/lib/engine/billing";
 import {
   AiBadge,
   Empty,

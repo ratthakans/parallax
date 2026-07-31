@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { siteUrl } from "@/lib/site-url";
+import { siteUrl } from "@/lib/shared/site-url";
 
 const BASE = siteUrl();
 

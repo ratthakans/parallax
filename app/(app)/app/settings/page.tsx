@@ -1,12 +1,12 @@
-import { db } from "@/lib/db";
-import { aiCacheStats, aiConfigured } from "@/lib/ai";
-import { getTenant } from "@/lib/match";
-import { demoState } from "@/lib/demo";
-import { getActiveTenantId } from "@/lib/active-tenant";
-import { profileFor } from "@/lib/tenants";
-import { ALL_PLAYS } from "@/lib/plays";
-import { runMatch } from "@/lib/match";
-import { CYCLE_LABEL } from "@/lib/types";
+import { db } from "@/lib/engine/db";
+import { aiCacheStats, aiConfigured } from "@/lib/engine/ai";
+import { getTenant } from "@/lib/engine/match";
+import { demoState } from "@/lib/engine/demo";
+import { getActiveTenantId } from "@/lib/shared/active-tenant";
+import { profileFor } from "@/lib/shared/tenants";
+import { ALL_PLAYS } from "@/lib/shared/plays";
+import { runMatch } from "@/lib/engine/match";
+import { CYCLE_LABEL } from "@/lib/shared/types";
 import { Metric, PageHead, Panel, num } from "@/components/console/ui";
 import {
   clearAiCacheAction,

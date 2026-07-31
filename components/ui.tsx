@@ -123,41 +123,6 @@ export function SignalCard({
 /* two sight lines from two positions converging on one point —
    the only way to know distance instead of just position */
 
-export function Mark({ className = "" }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      className={className}
-      aria-hidden
-      strokeLinecap="round"
-    >
-      <path d="M3 19.5 L12 4.5 L21 19.5" stroke="currentColor" strokeWidth="1.1" />
-      <path d="M3 19.5 L21 19.5" stroke="currentColor" strokeWidth="1.1" opacity="0.35" />
-      <circle cx="12" cy="4.5" r="1.9" fill="currentColor" />
-    </svg>
-  );
-}
-
-export function Wordmark({
-  className = "",
-  href = "/",
-}: {
-  className?: string;
-  href?: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`group inline-flex items-center gap-2.5 ${className}`}
-      aria-label="PARALLAX — home"
-    >
-      <Mark className="h-5 w-5 shrink-0 transition-transform duration-500 group-hover:-translate-y-0.5" />
-      <span className="text-[0.95rem] font-medium tracking-[0.24em]">PARALLAX</span>
-    </Link>
-  );
-}
-
 /* ── section furniture ───────────────────────────────────── */
 
 export function Label({

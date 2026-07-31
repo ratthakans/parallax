@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { db } from "@/lib/db";
-import { playById } from "@/lib/plays";
-import { loadAttributions } from "@/lib/proof";
-import { armFor, renderForCustomer } from "@/lib/dispatch";
-import { getActiveTenantId } from "@/lib/active-tenant";
-import { profileFor } from "@/lib/tenants";
-import type { Verdict } from "@/lib/types";
+import { db } from "@/lib/engine/db";
+import { playById } from "@/lib/shared/plays";
+import { loadAttributions } from "@/lib/engine/proof";
+import { armFor, renderForCustomer } from "@/lib/engine/dispatch";
+import { getActiveTenantId } from "@/lib/shared/active-tenant";
+import { profileFor } from "@/lib/shared/tenants";
+import type { Verdict } from "@/lib/shared/types";
 import {
   MEASUREMENT_LABEL,
   Meter,
@@ -18,7 +18,7 @@ import {
   num,
   pct,
 } from "@/components/console/ui";
-import { ciLabel } from "@/lib/format";
+import { ciLabel } from "@/lib/shared/format";
 import { measureAction, sendAction } from "../../../actions";
 import { ActionForm } from "@/components/console/action-form";
 

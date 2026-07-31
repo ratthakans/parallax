@@ -1,12 +1,12 @@
-import { db } from "./db";
-import { ALL_PLAYS } from "./plays";
+import { db } from "@/lib/engine/db";
+import { ALL_PLAYS } from "@/lib/shared/plays";
 import {
   DEFAULT_TENANT_ID,
   TENANT_PROFILES,
   type CatalogueItem,
   type TenantProfile,
-} from "./tenants";
-import { PLANS, priceForMessages } from "./plans";
+} from "@/lib/shared/tenants";
+import { PLANS, priceForMessages } from "@/lib/shared/plans";
 
 /* ── ชุดข้อมูลตัวอย่าง ─────────────────────────────────────────
    ตัวสร้างเดียวใช้ได้ทุกธุรกิจ — รูปร่างของฐานมาจากโปรไฟล์ใน
