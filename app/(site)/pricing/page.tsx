@@ -12,6 +12,7 @@ import {
   Section,
 } from "@/components/ui";
 import { Numeral, Reveal, Stagger } from "@/components/reveal";
+import { PricingLd } from "@/components/json-ld";
 import {
   CAP_ROWS,
   CREDIT_PACKS,
@@ -100,6 +101,14 @@ const NOT_READY = [
 export default function PricingPage() {
   return (
     <>
+      {/* ราคาในรูปแบบที่เครื่องอ่านได้ — ดึงจาก PLANS ตัวเดียวกับที่หน้านี้แสดง */}
+      <PricingLd
+        offers={PLAN_ORDER.map((id) => ({
+          name: PLANS[id].name,
+          monthlyBaht: PLANS[id].monthlyBaht,
+          from: PLANS[id].priceSuffix === "and up",
+        }))}
+      />
       <PageHero
         label="Pricing"
         title="Priced on identities you can reach. Not on seats."
