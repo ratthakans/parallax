@@ -134,9 +134,28 @@ export default function HomePage() {
                 </h1>
               </Reveal>
 
+              {/* ── ประโยคที่ต้องอ่านได้ในสิบวินาที ──
+
+                  ประโยคนี้เคยอยู่แต่ใน meta description ซึ่งไม่มีใครเห็น
+                  ส่วนบนหน้าจอมีสามชื่อที่ไม่ตรงกัน — title บอกว่า
+                  "Agentic Lead Generation & CRM Platform" · description
+                  บอกว่า "agentic revenue OS" · H1 ไม่พูดทั้งสองอย่าง
+                  คนแปลกหน้าจึงเล่าต่อไม่ได้ว่านี่คืออะไร
+
+                  ตอนนี้เหลือชื่อหมวดเดียว (agentic revenue OS ใน SysBar
+                  ข้างบนกับใน description) และคำสัญญาเดียวคือบรรทัดนี้ */}
               <Reveal delay={210}>
-                <p className="t-lead pretty mt-8 max-w-md text-frost/70">
-                  Three decisions before 9AM. Every one measured against what
+                <p className="t-lead pretty mt-8 max-w-lg text-frost/78">
+                  Everyone measures cost per lead.{" "}
+                  <span className="text-frost">
+                    We measure cost per returning customer.
+                  </span>
+                </p>
+              </Reveal>
+
+              <Reveal delay={250}>
+                <p className="t-small pretty mt-4 max-w-md text-frost/55">
+                  Three decisions before 9AM, each one measured against what
                   would have happened anyway.
                 </p>
               </Reveal>
@@ -149,23 +168,30 @@ export default function HomePage() {
                 </div>
               </Reveal>
 
-              {/* ── ปุ่มเดียวที่เป็นหลัก ──
+              {/* ── ปุ่มเดียวที่เป็นหลัก และตอนนี้มันคือคอนโซล ──
+
                   เดิมหน้านี้มี CTA เก้าปุ่มหกข้อความ ถามหกอย่างพร้อมกัน
-                  จึงไม่ได้ถามอะไรเลย ที่เหลือลดเป็นลิงก์ข้อความ */}
+                  จึงไม่ได้ถามอะไรเลย ที่เหลือลดเป็นลิงก์ข้อความ
+
+                  ปุ่มหลักเคยเป็น "Start a pilot" ซึ่งเหมาะกับตอนมีลูกค้าแล้ว
+                  ตอนนี้ยังไม่มีสักราย ทุกคนที่มาถึงจึงมาแบบเย็นสนิทและยัง
+                  ไม่มีเหตุผลจะคุยกับเรา แต่มีเหตุผลจะลอง
+
+                  และคอนโซลคือสิ่งเดียวบนเว็บนี้ที่ไม่ใช่คำพูด — ที่เหลือ
+                  ทั้งหมดคือการอ้าง กดเข้าไปแล้วเห็นของทำงานจริงมีน้ำหนัก
+                  กว่าอีกสามหมื่นคำที่เขียนไว้ */}
               <Reveal delay={350}>
                 <div className="mt-10 flex flex-wrap items-center gap-x-7 gap-y-4">
-                  <Link href="/contact" className="btn btn-frost">
-                    Start a pilot
+                  <Link href="/app" className="btn btn-frost">
+                    Open the live console
                   </Link>
-                  {/* ชี้ไป /product ไม่ใช่ /platform — คนที่เพิ่งอ่านพาดหัวจบ
-                      ยังถามว่า "แล้วฉันได้อะไร" ไม่ใช่ "สถาปัตยกรรมเป็นยังไง"
-                      /product เป็นประตูบานแรกและส่งต่อไป /platform เองอยู่แล้ว */}
-                  <ArrowLink href="/product" tone="light">
-                    See what you get
+                  <ArrowLink href="/contact" tone="light">
+                    Start a pilot
                   </ArrowLink>
                 </div>
-                <p className="t-small mt-6 text-frost/45">
-                  Day one runs on the POS export you already have.
+                <p className="t-small mt-6 max-w-md text-frost/45">
+                  Four businesses, real calculations, no signup. Day one runs on
+                  the POS export you already have.
                 </p>
               </Reveal>
             </div>

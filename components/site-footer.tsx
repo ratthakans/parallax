@@ -58,7 +58,7 @@ export function SiteFooter() {
               Two views give you distance.
             </p>
             <p className="t-label mt-10 text-frost/58">
-              Agentic Lead Generation &amp; CRM Platform
+              Agentic revenue OS
             </p>
           </div>
 

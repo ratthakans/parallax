@@ -18,6 +18,10 @@ import { CREDIT_PACKS, PLANS, isPlanId } from "@/lib/shared/plans";
 import { getActiveTenantId, TENANT_COOKIE } from "@/lib/shared/active-tenant";
 import { messageOf, type ActionState } from "@/lib/shared/action-state";
 import { num } from "@/lib/shared/format";
+import {
+  DEMO_TOOLS_OFF_REASON,
+  demoToolsEnabled,
+} from "@/lib/shared/demo-tools";
 
 /* ── Server Actions ────────────────────────────────────────────
    Console นี้ยังไม่มีระบบล็อกอิน — บัญชีที่เปิดอยู่มาจาก cookie
@@ -343,6 +347,9 @@ export async function reseedAction(
   formData: FormData,
 ): Promise<ActionState> {
   const tenantId = await currentTenant(formData);
+  /* ตรวจที่นี่ ไม่ใช่แค่ซ่อนปุ่ม — การซ่อนปุ่มไม่ใช่การป้องกัน
+     Server Action ยิงตรงได้โดยไม่ผ่านหน้าจอ */
+  if (!demoToolsEnabled()) return { error: DEMO_TOOLS_OFF_REASON };
   // เฉพาะบัญชีที่เปิดอยู่ — ไม่ล้างอีกสามบัญชีที่ผู้ใช้ไม่ได้สั่ง
   seed({ force: true, only: tenantId });
   deriveFeatures(tenantId);
@@ -356,6 +363,7 @@ export async function travelAction(
   formData: FormData,
 ): Promise<ActionState> {
   const tenantId = await currentTenant(formData);
+  if (!demoToolsEnabled()) return { error: DEMO_TOOLS_OFF_REASON };
   const raw = Number(formData.get("days") ?? 0);
   const days = Number.isFinite(raw) ? Math.min(365, Math.max(1, Math.floor(raw))) : 30;
   const res = travelForward(tenantId, days);

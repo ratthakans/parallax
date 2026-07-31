@@ -15,6 +15,7 @@ import {
   updateLimitsAction,
 } from "../../actions";
 import { ActionForm } from "@/components/console/action-form";
+import { demoToolsEnabled } from "@/lib/shared/demo-tools";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +44,7 @@ const AI_NEVER = [
 ];
 
 export default async function SettingsPage() {
+  const demoTools = demoToolsEnabled();
   const tenantId = await getActiveTenantId();
   const profile = profileFor(tenantId);
   const v = profile.vocab;
@@ -270,6 +272,15 @@ export default async function SettingsPage() {
           is edited.
         </p>
 
+        {/* บอกเหตุผลตรงที่ปุ่มอยู่ ไม่ใช่ปล่อยให้กดแล้วงงว่าทำไมไม่ทำงาน */}
+        {!demoTools && (
+          <p className="c-msg c-msg-err mt-5">
+            Turned off on the public console — otherwise any visitor could wipe or
+            time-shift the dataset the next person is looking at. Set{" "}
+            <span className="c-mono">PARALLAX_DEMO_TOOLS=1</span> to enable them.
+          </p>
+        )}
+
         <div className="mt-6 grid gap-4 sm:grid-cols-3">
           {[7, 30, 90].map((d) => (
             <ActionForm
@@ -278,6 +289,7 @@ export default async function SettingsPage() {
               fields={{ tenantId, days: d }}
               label={`Travel forward ${d} days`}
               pendingLabel="Shifting and re-measuring…"
+              disabled={!demoTools}
               full
             />
           ))}
@@ -323,6 +335,7 @@ export default async function SettingsPage() {
           pendingLabel="Rebuilding…"
           variant="danger"
           size="sm"
+          disabled={!demoTools}
           className="mt-7 border-t border-[var(--c-line)] pt-5"
           note={
             <p className="c-thai max-w-2xl text-[0.76rem] text-[var(--c-text-4)]">

@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "PARALLAX — Agentic Lead Generation & CRM Platform";
+export const alt = "PARALLAX — We measure cost per returning customer";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -113,7 +113,7 @@ export default function OpengraphImage() {
               color: "#0047ff",
             }}
           >
-            Agentic Lead Generation &amp; CRM Platform
+            We measure cost per returning customer
           </div>
         </div>
       </div>

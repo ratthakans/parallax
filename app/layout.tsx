@@ -20,7 +20,7 @@ const plexMono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl()),
   title: {
-    default: "PARALLAX — Agentic Lead Generation & CRM Platform",
+    default: "PARALLAX — We measure cost per returning customer",
     template: "%s · PARALLAX",
   },
   description:
@@ -40,7 +40,7 @@ export const metadata: Metadata = {
     type: "website",
     locale: "th_TH",
     siteName: "PARALLAX",
-    title: "PARALLAX — Agentic Lead Generation & CRM Platform",
+    title: "PARALLAX — We measure cost per returning customer",
     description:
       "Everyone measures cost per lead. We measure cost per returning customer.",
   },

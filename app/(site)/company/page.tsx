@@ -134,7 +134,7 @@ export default function CompanyPage() {
                 <div>
                   <p className="t-label text-ink-4">category — locked for two years</p>
                   <p className="t-h2 mt-6 text-ink">
-                    Agentic Lead Generation &amp; CRM Platform
+                    Agentic revenue OS
                   </p>
                   <More label="detail">“Agentic” becomes a commodity word within eighteen
                 months — every CRM will have it on their homepage by 2027. So we use it
