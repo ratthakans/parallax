@@ -67,6 +67,15 @@ export default function KeepPage() {
           <Reveal>
             <Label>Five steps</Label>
           </Reveal>
+          {/* ── ส่วนนี้เคยข้ามจาก h1 ไป h3 ──
+              Steps ตั้งชื่อขั้นตอนเป็น h3 แต่ section ไม่มี h2 ของตัวเอง
+              เก็บหัวเรื่องไว้เพื่อให้โปรแกรมอ่านหน้าจอกระโดดหาได้ แล้วเติม
+              ขั้นที่หายไปแทนการลดระดับ */}
+          <Reveal delay={40}>
+            <h2 className="t-h2 balance mt-9 max-w-3xl text-ink">
+              From a file you already export to a message someone actually wanted
+            </h2>
+          </Reveal>
           <Reveal delay={80}>
             <div className="mt-12">
               <Steps items={STEPS} />

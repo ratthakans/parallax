@@ -1103,6 +1103,132 @@
    เป็นอาการเดียวกับที่เคยทำให้ป้ายเตือนทั้งคอนโซลกลายเป็นสีเทา
    ต่างกันแค่รอบนี้ CSS ที่ทับคือของที่ผมเพิ่งเขียนเอง */
 @layer components {
+  /* ── เส้นเวลาของรูปทรงวงจร ─────────────────────────────────
+     แกนลากจากซ้ายไปขวา แล้วเหตุการณ์โผล่ตามลำดับเวลา — การเคลื่อนไหว
+     คือ "เวลาเดินหน้า" ซึ่งเป็นเนื้อหาของภาพนี้ ไม่ใช่การตกแต่ง */
+
+  .cyc-row {
+    opacity: 0;
+    transform: translateY(8px);
+    transition:
+      opacity 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+      transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .cyc-row[data-in="true"] {
+    opacity: 1;
+    transform: none;
+  }
+
+  .cyc-axis,
+  .cyc-span,
+  .cyc-drift {
+    transition: width 0.85s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  /* ช่วงที่เงียบผิดจังหวะ — เส้นประ เพราะมันคือ "ไม่มีอะไรเกิดขึ้น" */
+  .cyc-drift {
+    height: 1px;
+    background-image: linear-gradient(
+      90deg,
+      var(--color-ink-4) 0 4px,
+      transparent 4px 9px
+    );
+    background-size: 9px 1px;
+  }
+
+  .cyc-mark {
+    top: 1.75rem;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+
+  .cyc-mark[data-in="true"] {
+    opacity: 1;
+  }
+
+  /* การซื้อที่เกิดขึ้นแล้ว — สี่เหลี่ยมทึบ ตามภาษามุมฉากของแบรนด์ */
+  .cyc-mark--event::before {
+    content: "";
+    position: absolute;
+    inset-block-start: -3px;
+    inset-inline-start: -3px;
+    width: 7px;
+    height: 7px;
+    background: var(--color-ink-2);
+  }
+
+  /* ร่องรอยความสนใจ — ขีดบาง ยังไม่ใช่การซื้อ */
+  .cyc-mark--trace::before {
+    content: "";
+    position: absolute;
+    inset-block-start: -5px;
+    inset-inline-start: 0;
+    width: 1px;
+    height: 10px;
+    background: var(--color-ink-4);
+  }
+
+  /* จุดที่ระบบลงมือ — สิ่งเดียวบนเส้นที่เป็นของ PARALLAX จึงเป็นสีแบรนด์ */
+  .cyc-mark--act::before {
+    content: "";
+    position: absolute;
+    inset-block-start: -7px;
+    inset-inline-start: -4px;
+    width: 9px;
+    height: 9px;
+    background: var(--color-signal);
+    transform: rotate(45deg);
+  }
+
+  /* เส้นตาย — ขีดตั้งเต็มความสูง อ่านว่า "ถึงตรงนี้แล้วจบ" */
+  .cyc-mark--deadline::before {
+    content: "";
+    position: absolute;
+    inset-block-start: -9px;
+    inset-inline-start: 0;
+    width: 1px;
+    height: 18px;
+    background: var(--color-ink-2);
+  }
+
+  .cyc-mark__label {
+    position: absolute;
+    top: 0.85rem;
+    inset-inline-start: -0.25rem;
+    white-space: nowrap;
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--color-ink-4);
+  }
+
+  .cyc-mark--act .cyc-mark__label {
+    color: var(--color-signal);
+  }
+
+  /* ป้ายที่อยู่ครึ่งขวาของแกนจัดชิดขวา ไม่งั้นล้นขอบ
+     ตัวชี้ขาดมาจาก data-align ที่คอมโพเนนต์คำนวณจากตำแหน่งจริง */
+  .cyc-mark[data-align="end"] .cyc-mark__label {
+    inset-inline-start: auto;
+    inset-inline-end: -0.25rem;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cyc-row,
+    .cyc-mark {
+      opacity: 1;
+      transform: none;
+      transition: none;
+    }
+    .cyc-axis,
+    .cyc-span,
+    .cyc-drift {
+      transition: none;
+    }
+  }
+
   /* ── รางของห้าชั้น กับจุดบนราง ──────────────────────────────
      รางยาวลงทีละส่วนแทนที่จะโผล่มาเต็มความยาว เพราะสิ่งที่มันเล่าคือ
      ไฟล์หนึ่งไฟล์เดินผ่านห้าชั้น — ทิศทางคือสาระ ไม่ใช่การตกแต่ง */

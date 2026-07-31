@@ -87,6 +87,16 @@ export default function PlatformPage() {
             <Label>Architecture</Label>
           </Reveal>
 
+          {/* ── ส่วนนี้เคยข้ามจาก h1 ไป h3 ──
+              LayerStack ตั้งชื่อชั้นเป็น h3 แต่ section ไม่มี h2 ของตัวเอง
+              โครงหัวเรื่องจึงขาดขั้นกลาง — โปรแกรมอ่านหน้าจอไล่ระดับไม่ได้
+              และประโยคนี้ควรมีอยู่แล้วเพื่อบอกว่ากำลังจะดูอะไร */}
+          <Reveal delay={40}>
+            <h2 className="t-h2 balance mt-9 max-w-3xl text-ink">
+              One file enters at the top and leaves as something you can defend
+            </h2>
+          </Reveal>
+
           {/* ── เดิมเป็นห้าแถวสูงเท่ากันเป๊ะ พร้อมบานพับที่ปิดอยู่ทั้งห้า ──
               หัวเรื่องพูดว่า "ชั้น" แต่หน้าจอแสดง "รายการ" — และประโยค
               ที่ตอบข้อกังวลของคนซื้อถูกซ่อนไว้ข้างในทุกอัน */}

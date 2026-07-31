@@ -18,10 +18,12 @@ import {
 import { ciLabel } from "@/lib/shared/format";
 import { measureAllAction } from "../../actions";
 import { ActionForm } from "@/components/console/action-form";
+import { demoToolsEnabled } from "@/lib/shared/demo-tools";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProofPage() {
+  const demoTools = demoToolsEnabled();
   const tenantId = await getActiveTenantId();
   const profile = profileFor(tenantId);
   const v = profile.vocab;
@@ -71,6 +73,25 @@ export default async function ProofPage() {
           />
         }
       />
+
+      {/* ── หน้านี้คือหน้าที่คนจะแคปไปแชร์ ──
+
+          ตัวเลขบนนี้เป็นบาทกับเปอร์เซ็นต์ที่อ่านเหมือนผลจริงของธุรกิจจริง
+          แถบบอกว่าเป็นเดโมอยู่บนสุดของคอลัมน์ก็จริง แต่ภาพที่ครอปเฉพาะ
+          ตัวเลขจะไม่มีมันติดไปด้วย — คำกำกับต้องอยู่ติดกับตัวเลขเอง
+
+          ขึ้นเฉพาะบนคอนโซลสาธารณะ ตอนพัฒนาไม่ต้องมี */}
+      {!demoTools && (
+        <Panel flat className="mb-6 border-l-2 border-[var(--c-warn)] p-5">
+          <p className="c-label text-[var(--c-warn)]">synthetic dataset</p>
+          <p className="c-thai mt-2.5 max-w-3xl text-[0.84rem] leading-relaxed text-[var(--c-text-2)]">
+            Every figure below is computed for real by the engine — the holdout,
+            the difference, the confidence interval — but from a generated dataset,
+            not a live customer. No business has been measured with this yet, and we
+            will not claim a lift until one has.
+          </p>
+        </Panel>
+      )}
 
       {profile.measurementCaveat && (
         <Panel flat className="mb-6 p-5">

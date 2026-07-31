@@ -276,25 +276,25 @@ export function Metric({
   value,
   label,
   sub,
-  tone = "dark",
+  onDark = false,
 }: {
   value: string;
   label: string;
   sub?: string;
-  tone?: "dark" | "light";
+  onDark?: boolean;
 }) {
   return (
     <div>
       <p
         className={`t-numeral-xl ${
-          tone === "light" ? "text-cyan" : "text-ink"
+          onDark ? "text-cyan" : "text-ink"
         }`}
       >
         <Numeral value={value} />
       </p>
       <p
         className={`t-small t-thai mt-4 ${
-          tone === "light" ? "text-frost/70" : "text-ink-2"
+          onDark ? "text-frost/70" : "text-ink-2"
         }`}
       >
         {label}
@@ -302,7 +302,7 @@ export function Metric({
       {sub && (
         <p
           className={`t-small mt-1 ${
-            tone === "light" ? "text-frost/52" : "text-ink-4"
+            onDark ? "text-frost/52" : "text-ink-4"
           }`}
         >
           {sub}
@@ -372,15 +372,15 @@ export function Note({
 export function Panel({
   children,
   className = "",
-  tone = "dark",
+  onDark = false,
 }: {
   children: ReactNode;
   className?: string;
-  tone?: "dark" | "light";
+  onDark?: boolean;
 }) {
   return (
     <div
-      className={`${tone === "light" ? "panel-dark" : "panel"} p-7 md:p-8 ${className}`}
+      className={`${onDark ? "panel-dark" : "panel"} p-7 md:p-8 ${className}`}
     >
       {children}
     </div>
@@ -391,12 +391,12 @@ export function Panel({
 
 export function Steps({
   items,
-  tone = "dark",
+  onDark = false,
 }: {
   items: { t: string; d: string; extra?: string }[];
-  tone?: "dark" | "light";
+  onDark?: boolean;
 }) {
-  const light = tone === "light";
+  const light = onDark;
   return (
     <ol className="flex flex-col">
       {items.map((s, i) => (

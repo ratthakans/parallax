@@ -12,6 +12,7 @@ import {
   Section,
 } from "@/components/ui";
 import { Reveal } from "@/components/reveal";
+import { CycleTimeline } from "@/components/cycle-timeline";
 
 export const metadata: Metadata = {
   title: "Cycles we take",
@@ -110,6 +111,16 @@ export default function CustomersPage() {
         <div className="shell">
           <Reveal>
             <Label>Four shapes</Label>
+          </Reveal>
+
+          {/* ── สี่รูปทรงบนแกนเดียวกัน ──
+              หน้านี้เถียงว่าให้คัดด้วยรูปทรงของวงจร ไม่ใช่ป้ายอุตสาหกรรม
+              แล้วอธิบายทั้งสี่ด้วยคำล้วน — วาดบนแกนร่วมแล้วอ่านออกทันที
+              ว่าต่างกันตรงไหน ก่อนจะลงไปอ่านรายละเอียดทีละรูปทรง */}
+          <Reveal delay={70}>
+            <div className="mt-12">
+              <CycleTimeline />
+            </div>
           </Reveal>
 
           <div className="mt-14 flex flex-col">
