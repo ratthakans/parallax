@@ -34,7 +34,7 @@ function useReducedMotion(): boolean {
 }
 
 /** เห็นแล้วหรือยัง — ใช้ร่วมกันทุกตัวในไฟล์นี้ */
-function useInView<T extends HTMLElement>(rootMargin = "0px 0px -12% 0px") {
+export function useInView<T extends HTMLElement>(rootMargin = "0px 0px -12% 0px") {
   const ref = useRef<T>(null);
   const [seen, setSeen] = useState(false);
 

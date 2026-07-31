@@ -1006,6 +1006,45 @@
 
 /* ทิศทางเข้าให้ตรงกับตำแหน่งบนหน้า — คอลัมน์ซ้ายเข้าจากซ้าย
    ทำให้การเคลื่อนไหวรู้สึกเป็นการจัดวาง ไม่ใช่เอฟเฟกต์ที่แปะทับ */
+/* ── แถบที่โตขึ้นตอนเลื่อนถึง ──────────────────────────────────
+
+   ตัวอย่างหน้าจอคอนโซลเคยเป็นภาพนิ่งสนิท ทั้งที่สิ่งที่มันเล่าคือ
+   ของที่เคลื่อนไหว: สัดส่วนสองกลุ่ม · การคัดกรองทีละขั้น · ค่าที่ไต่ขึ้น
+   เมื่อบัญชีสะสมมากขึ้น แถบที่โตให้ดูทำงานแทนคำอธิบายได้ทั้งประโยค
+
+   ต่างจาก .reveal ตรงที่นี่คือการเคลื่อนไหวที่ "มีความหมาย" ไม่ใช่
+   การเฟดเข้าเฉย ๆ — ความยาวของแถบคือตัวเลข ไม่ใช่การตกแต่ง */
+.spec-bar {
+  display: block;
+  height: 100%;
+  width: 0;
+  transition: width 1s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.spec-row {
+  opacity: 0;
+  transform: translateY(10px);
+  transition:
+    opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.spec-row[data-in="true"] {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spec-bar {
+    transition: none;
+  }
+  .spec-row {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
 .reveal-l {
   transform: translate3d(-26px, 0, 0);
 }

@@ -12,7 +12,7 @@ import {
   Section,
   Metric,
 } from "@/components/ui";
-import { Reveal } from "@/components/reveal";
+import { LineReveal, Reveal } from "@/components/reveal";
 import { PriorLadder } from "@/components/specimen";
 
 export const metadata: Metadata = {
@@ -187,7 +187,7 @@ export default function LearningPage() {
           </Reveal>
           <Reveal delay={70}>
             <h2 className="t-h2 balance mt-9 max-w-3xl text-ink">
-              The more accounts in a cycle, the better every new account in that cycle starts
+              <LineReveal text="The more accounts in a cycle, the better every new account in that cycle starts" />
             </h2>
           </Reveal>
 

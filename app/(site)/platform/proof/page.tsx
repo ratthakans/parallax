@@ -11,7 +11,7 @@ import {
   Quote,
   Section,
 } from "@/components/ui";
-import { Reveal } from "@/components/reveal";
+import { LineReveal, Reveal } from "@/components/reveal";
 import { HoldoutSplit, VerdictTable } from "@/components/specimen";
 
 export const metadata: Metadata = {
@@ -219,7 +219,7 @@ export default function ProofPage() {
           </Reveal>
           <Reveal delay={70}>
             <h2 className="t-h2 balance mt-9 max-w-3xl text-ink">
-              Including the row that says it does not know yet
+              <LineReveal text="Including the row that says it does not know yet" />
             </h2>
           </Reveal>
           <Reveal delay={140}>

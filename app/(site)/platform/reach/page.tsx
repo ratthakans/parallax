@@ -13,7 +13,7 @@ import {
   Section,
   Steps,
 } from "@/components/ui";
-import { Reveal } from "@/components/reveal";
+import { LineReveal, Reveal } from "@/components/reveal";
 import { AudienceFunnel } from "@/components/specimen";
 
 export const metadata: Metadata = {
@@ -85,7 +85,7 @@ export default function ReachPage() {
           </Reveal>
           <Reveal delay={70}>
             <h2 className="t-h2 balance mt-9 max-w-3xl text-ink">
-              Pick the wrong seed and every baht spent afterwards is wrong with it
+              <LineReveal text="Pick the wrong seed and every baht spent afterwards is wrong with it" />
             </h2>
           </Reveal>
 

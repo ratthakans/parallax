@@ -13,7 +13,7 @@ import {
   Quote,
   Section,
 } from "@/components/ui";
-import { Reveal } from "@/components/reveal";
+import { LineReveal, Reveal } from "@/components/reveal";
 import { EngineLoop } from "@/components/engine-loop";
 
 export const metadata: Metadata = {
@@ -123,7 +123,7 @@ export default function PlatformPage() {
           </Reveal>
           <Reveal delay={70}>
             <h2 className="t-h2 balance mt-9 max-w-3xl text-ink">
-              Where the three axes intersect is a campaign
+              <LineReveal text="Where the three axes intersect is a campaign" />
             </h2>
           </Reveal>
 
