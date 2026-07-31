@@ -1089,6 +1089,37 @@
    เป็นอาการเดียวกับที่เคยทำให้ป้ายเตือนทั้งคอนโซลกลายเป็นสีเทา
    ต่างกันแค่รอบนี้ CSS ที่ทับคือของที่ผมเพิ่งเขียนเอง */
 @layer components {
+  /* ── รางของห้าชั้น กับจุดบนราง ──────────────────────────────
+     รางยาวลงทีละส่วนแทนที่จะโผล่มาเต็มความยาว เพราะสิ่งที่มันเล่าคือ
+     ไฟล์หนึ่งไฟล์เดินผ่านห้าชั้น — ทิศทางคือสาระ ไม่ใช่การตกแต่ง */
+  .stack-rail {
+    transition: height 1.1s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .stack-node {
+    opacity: 0;
+    transform: translateY(8px);
+    transition:
+      opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+      transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .stack-node[data-in="true"] {
+    opacity: 1;
+    transform: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .stack-rail {
+      transition: none;
+    }
+    .stack-node {
+      opacity: 1;
+      transform: none;
+      transition: none;
+    }
+  }
+
   .spec-row {
     opacity: 0;
     transform: translateY(10px);

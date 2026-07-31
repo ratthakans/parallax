@@ -15,6 +15,7 @@ import {
 } from "@/components/ui";
 import { LineReveal, Reveal } from "@/components/reveal";
 import { EngineLoop } from "@/components/engine-loop";
+import { LayerStack, type LayerRow } from "@/components/layer-stack";
 
 export const metadata: Metadata = {
   title: "The five layers",
@@ -22,10 +23,12 @@ export const metadata: Metadata = {
     "Ingest → Identity → Understanding → Act → Proof. Five layers that carry a raw POS export to a difference you can defend.",
 };
 
-const LAYERS = [
+const LAYERS: LayerRow[] = [
   {
     n: "layer 1",
     name: "Ingest",
+    tag: "day one",
+    weight: "engine",
     one: "Drag a file · mail it in · connect an API",
     body: "Almost every POS exports CSV. That is an API already open that nobody can close. The system reads the headers, infers the meaning, and cleans the rows itself.",
     kicker: "A direct API is an upgrade, never a precondition.",
@@ -33,6 +36,8 @@ const LAYERS = [
   {
     n: "layer 2",
     name: "Identity",
+    tag: "hard to copy",
+    weight: "moat",
     one: "Every source collapsed to one person, plus a consent ledger",
     body: "A POS receipt, a marketplace order, a LINE follower, a form submission — the same people, and no system knows it. We resolve them on phone, email, member ID and purchase pattern.",
     kicker: "The hardest layer to build and to copy — the graph sharpens with use, and cannot be bought.",
@@ -40,6 +45,8 @@ const LAYERS = [
   {
     n: "layer 3",
     name: "Understanding",
+    tag: "the engine",
+    weight: "engine",
     one: "Behaviour × price tier × expiry",
     body: "Three axes whose intersection is a campaign — how often they buy against their own cycle, whether they pay full price or wait for a discount, and what is about to expire.",
     kicker: "It forks in two — KEEP works the base, REACH finds the next one.",
@@ -47,6 +54,8 @@ const LAYERS = [
   {
     n: "layer 4",
     name: "Act",
+    tag: "what you touch",
+    weight: "surface",
     one: "Draft → approve → send → log",
     body: "Copy arrives drafted with a choice of tone, sends over LINE individually or as a group, and every send is logged so the next layer can measure it.",
     kicker: "The default mode is human approval, not autopilot.",
@@ -54,6 +63,8 @@ const LAYERS = [
   {
     n: "layer 5",
     name: "Proof",
+    tag: "why they stay",
+    weight: "moat",
     one: "Holdout · the difference · cost per outcome",
     body: "Measure what you would have earned by sending nothing, then report only the difference. The method follows the cohort size.",
     kicker: "The layer that makes churn hard, because it answers what competitors cannot.",
@@ -76,33 +87,14 @@ export default function PlatformPage() {
             <Label>Architecture</Label>
           </Reveal>
 
-          <div className="mt-14 flex flex-col">
-            {LAYERS.map((l, i) => (
-              <Reveal key={l.n} delay={i * 60}>
-                <article
-                  className={`grid gap-6 border-t py-12 lg:grid-cols-[10rem_1fr_1.2fr] lg:gap-12 ${
-                    i === LAYERS.length - 1
-                      ? "border-b border-b-line border-t-line"
-                      : "border-line"
-                  }`}
-                >
-                  <div>
-                    <span className="marker-num">{l.n}</span>
-                    <h2 className="t-h3 mt-3 text-ink">{l.name}</h2>
-                  </div>
-                  <p className="t-body t-thai text-signal">{l.one}</p>
-                  <div>
-                    <More label="what this layer does">
-                      {l.body}
-                      <span className="mt-4 block text-[var(--color-ink-4)]">
-                        {l.kicker}
-                      </span>
-                    </More>
-                  </div>
-                </article>
-              </Reveal>
-            ))}
-          </div>
+          {/* ── เดิมเป็นห้าแถวสูงเท่ากันเป๊ะ พร้อมบานพับที่ปิดอยู่ทั้งห้า ──
+              หัวเรื่องพูดว่า "ชั้น" แต่หน้าจอแสดง "รายการ" — และประโยค
+              ที่ตอบข้อกังวลของคนซื้อถูกซ่อนไว้ข้างในทุกอัน */}
+          <Reveal delay={60}>
+            <div className="mt-14">
+              <LayerStack layers={LAYERS} />
+            </div>
+          </Reveal>
 
           <Reveal delay={120}>
             <div className="mt-12">
