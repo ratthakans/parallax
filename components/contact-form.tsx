@@ -45,9 +45,10 @@ export function ContactForm() {
       setMessage(json.error ?? "Could not send. Please try again.");
       setState("error");
     } catch {
-      setMessage(
-        "Connection failed. Please email us directly at hello@parallax.co.th",
-      );
+      /* ไม่ชี้ไปอีเมลที่ยังยืนยันไม่ได้ว่ารับจริง — parallax.co.th ยังไม่
+         resolve การบอกให้คนที่เพิ่งส่งไม่สำเร็จไปเมลที่จะเด้งกลับ
+         คือความล้มเหลวซ้อนความล้มเหลว */
+      setMessage("Connection failed. Please try again in a moment.");
       setState("error");
     }
   }
@@ -58,11 +59,7 @@ export function ContactForm() {
         <p className="t-label text-signal">received</p>
         <h3 className="t-h2 mt-6 text-ink">Thank you</h3>
         <p className="t-body t-thai pretty mt-6 text-ink-3">
-          We reply within two business days. If it is more urgent than that, email
-              us directly at{" "}
-          <a href="mailto:hello@parallax.co.th" className="ulink text-signal">
-            hello@parallax.co.th
-          </a>
+          We reply within two business days.
         </p>
       </div>
     );
