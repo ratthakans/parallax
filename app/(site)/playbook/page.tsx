@@ -13,6 +13,7 @@ import {
   Metric,
 } from "@/components/ui";
 import { Reveal } from "@/components/reveal";
+import { CohortSplit, FunnelBar } from "@/components/specimen";
 
 export const metadata: Metadata = {
   title: "Playbook — MST Golf",
@@ -95,7 +96,7 @@ export default function PlaybookPage() {
             <Reveal delay={120}>
               <div>
                 <div className="flex flex-col gap-7">
-                  {FUNNEL.map((f) => (
+                  {FUNNEL.map((f, i) => (
                     <div key={f.k}>
                       <div className="flex items-baseline justify-between gap-4">
                         <span className="t-body t-thai text-ink-2">{f.k}</span>
@@ -103,14 +104,11 @@ export default function PlaybookPage() {
                           {f.v}
                         </span>
                       </div>
-                      <div
-                        className="mt-3 h-px w-full bg-line"
-                        aria-hidden
-                      >
-                        <div
-                          className="h-px bg-signal"
-                          style={{ width: `${f.pct}%` }}
-                        />
+                      {/* เดิมเป็นเส้นหนา 1px นิ่ง ๆ ซึ่งแทบมองไม่เห็นว่าเป็นแถบ
+                          ตัวเลขสามชั้นนี้คือการหดลงของฐาน จึงควรได้ความหนา
+                          พอที่จะอ่านออก และควรโตให้ดู */}
+                      <div className="mt-3 h-1 w-full bg-line" aria-hidden>
+                        <FunnelBar pct={f.pct} delay={i * 160} />
                       </div>
                     </div>
                   ))}
@@ -164,6 +162,13 @@ export default function PlaybookPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </Reveal>
+
+          {/* "967 จาก 1,240" เป็นตัวเลขในหัวเรื่องมาตลอด — วาดให้เห็น */}
+          <Reveal delay={170}>
+            <div className="mt-14 max-w-3xl">
+              <CohortSplit />
             </div>
           </Reveal>
 

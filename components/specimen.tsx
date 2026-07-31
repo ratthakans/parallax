@@ -295,3 +295,102 @@ export function AudienceFunnel() {
     </div>
   );
 }
+
+/* ── ฐานสมาชิกแตกออกเป็นกลุ่มไหนบ้าง ─────────────────────────
+
+   หน้า Playbook พูดว่า "967 จาก 1,240 ได้รับการกระทำ" ไว้ในหัวเรื่อง
+   แล้วปล่อยให้เป็นตัวเลขลอย ๆ ทั้งที่มันคือข้อพิสูจน์ทั้งหมดของหน้านั้น —
+   เครื่องยนต์ไม่ได้เลือกเฉพาะกลุ่มที่ง่าย แต่หาอะไรทำได้กับเกือบทั้งฐาน
+
+   แถบเดียวที่แบ่งตามสัดส่วนจริงบอกเรื่องนี้ได้ในครั้งเดียว และส่วนที่
+   เหลือ 273 คนที่ "ไม่มีอะไรให้ทำรอบนี้" ต้องอยู่ในภาพด้วย ไม่ใช่ตัดทิ้ง
+   ระบบที่อ้างว่าทำได้ทุกคนคือระบบที่ไม่ได้คัดอะไรเลย */
+const COHORTS = [
+  { k: "Champions", n: 281, tone: "bg-signal" },
+  { k: "Silent past six months", n: 165, tone: "bg-signal-2" },
+  { k: "Gold, drifting", n: 119, tone: "bg-azure" },
+  { k: "Bought the driver, not the balls", n: 98, tone: "bg-sky" },
+  { k: "Fitted, hasn’t bought", n: 65, tone: "bg-cyan" },
+  { k: "Other cohorts", n: 239, tone: "bg-ink-4" },
+  { k: "No action this cycle", n: 273, tone: "bg-line-2", muted: true },
+];
+
+export function CohortSplit() {
+  const { ref, seen } = useInView<HTMLDivElement>();
+  const total = COHORTS.reduce((s, c) => s + c.n, 0);
+  const actioned = total - COHORTS[COHORTS.length - 1].n;
+
+  return (
+    <div ref={ref}>
+      <Chrome
+        label="one file in · every cohort out"
+        right={`${total.toLocaleString("en-US")} members`}
+      >
+        <div className="px-5 py-6">
+          {/* แถบสัดส่วนเดียว — แต่ละช่วงโตตามลำดับจากใหญ่ไปเล็ก */}
+          <div className="flex h-2.5 w-full bg-line">
+            {COHORTS.map((c, i) => (
+              <Bar
+                key={c.k}
+                pct={(c.n / total) * 100}
+                seen={seen}
+                delay={i * 130}
+                className={c.tone}
+              />
+            ))}
+          </div>
+
+          <div className="mt-6 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <span className="t-numeral text-[1.9rem] text-signal">
+              <Numeral value={actioned.toLocaleString("en-US")} />
+            </span>
+            <span className="t-small t-thai text-ink-3">
+              of {total.toLocaleString("en-US")} members were given something to do —
+              78% of the base, from one CSV export
+            </span>
+          </div>
+
+          <ul className="mt-7 flex flex-col gap-px bg-line">
+            {COHORTS.map((c) => (
+              <li
+                key={c.k}
+                className="flex items-center gap-3 bg-paper py-2.5"
+              >
+                <span className={`h-2.5 w-2.5 shrink-0 ${c.tone}`} aria-hidden />
+                <span
+                  className={`t-small t-thai min-w-0 flex-1 truncate ${
+                    c.muted ? "text-ink-4" : "text-ink-2"
+                  }`}
+                >
+                  {c.k}
+                </span>
+                <span
+                  className={`t-numeral shrink-0 text-[0.95rem] ${
+                    c.muted ? "text-ink-4" : "text-ink"
+                  }`}
+                >
+                  {c.n}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </Chrome>
+      <Caption>
+        The last row is the honest one. 273 members had nothing worth sending this
+        cycle, and the engine said so rather than inventing a campaign for them.
+      </Caption>
+    </div>
+  );
+}
+
+/* แถบเดี่ยวที่โตให้ดู — ใช้ในกราฟกรวยของหน้า Playbook ซึ่งอยู่ในส่วน
+   ที่เป็น server component จึงต้องมีตัวห่อฝั่ง client ให้มัน */
+export function FunnelBar({ pct, delay = 0 }: { pct: number; delay?: number }) {
+  const { ref, seen } = useInView<HTMLSpanElement>();
+  return (
+    <span ref={ref} className="block h-full w-full">
+      <Bar pct={pct} seen={seen} delay={delay} />
+    </span>
+  );
+}
