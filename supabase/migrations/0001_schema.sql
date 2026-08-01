@@ -291,9 +291,14 @@ create table if not exists play_performance (
 );
 
 -- แคชข้อความที่โมเดลเขียน — คีย์เป็น hash ของอินพุต ไม่ผูกกับบัญชี
+-- ⚠ คอลัมน์ที่นี่ต้องตรงกับที่ lib/engine/ai.ts เขียนจริง
+-- เคยเป็น value jsonb ซึ่งไม่ตรงกับโค้ดที่เขียน payload/model และ jsonb
+-- ก็ไม่มีในฝั่ง sqlite ด้วย การเขียนแคชบน Postgres จึงพังทั้งหมดโดยเงียบ ๆ
+-- (ตกไปเส้น fallback ทุกครั้ง ซึ่งดูเหมือนทำงานปกติ)
 create table if not exists ai_cache (
   key        text primary key,
   kind       text not null,
-  value      jsonb not null,
+  payload    text not null,
+  model      text not null,
   created_at text not null
 );

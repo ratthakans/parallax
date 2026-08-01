@@ -50,7 +50,7 @@ export default async function SettingsPage() {
   const v = profile.vocab;
   const tenant = getTenant(tenantId);
   const ai = aiConfigured();
-  const cache = aiCacheStats();
+  const cache = await aiCacheStats();
   const demo = demoState(tenantId);
   const playCount = runMatch(tenantId).candidates.length;
 

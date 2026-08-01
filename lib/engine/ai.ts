@@ -1,6 +1,6 @@
+import { all, exec, get, run, usingPostgres } from "@/lib/engine/sql";
 import Anthropic from "@anthropic-ai/sdk";
 import { createHash } from "node:crypto";
-import { db } from "@/lib/engine/db";
 import type { Play } from "@/lib/shared/types";
 import {
   IMPORT_FIELDS,
@@ -52,8 +52,26 @@ function client(): Anthropic {
    ตารางเดียวเก็บผลของทุกงาน AI คีย์คือ hash ของ (kind + input)
    ───────────────────────────────────────────────────────────── */
 
-function ensureCache() {
-  db().exec(`
+/* ── ใครเป็นเจ้าของตาราง ai_cache ──────────────────────────────
+
+   ฝั่ง Postgres เป็นของ supabase/migrations/0001_schema.sql
+   ฝั่ง sqlite สร้างที่นี่ เพราะไม่มีตัวรัน migration บนเครื่องพัฒนา
+
+   ── บทเรียนจากการย้ายไฟล์แรก ──
+
+   ตอนแรกที่นี่สั่ง CREATE TABLE IF NOT EXISTS ทั้งสองตัวขับ แล้วบน
+   Postgres มันเงียบ ๆ ไม่ทำอะไรเพราะตารางมีอยู่แล้วจาก migration —
+   แต่ migration ประกาศคอลัมน์ไว้เป็น value jsonb ส่วนโค้ดเขียน
+   payload กับ model การเขียนแคชจึงพังทุกครั้ง
+
+   และมันพังแบบมองไม่เห็น เพราะ ask() จับ error แล้วตกไปเส้น fallback
+   ซึ่งหน้าตาเหมือนทำงานปกติทุกประการ — แค่ไม่มีอะไรถูก cache อีกเลย
+   และทุกคำขอเสียเงินเรียก API ใหม่
+
+   เมื่อสองแหล่งสคีมาแตกกัน ผู้แพ้คือฝั่งที่ไม่ได้ประกาศ ไม่ใช่ฝั่งที่ผิด */
+async function ensureCache() {
+  if (usingPostgres()) return;
+  await exec(`
     CREATE TABLE IF NOT EXISTS ai_cache (
       key TEXT PRIMARY KEY,
       kind TEXT NOT NULL,
@@ -71,35 +89,43 @@ function cacheKey(kind: string, input: unknown): string {
     .slice(0, 32);
 }
 
-function readCache<T>(key: string): T | null {
-  ensureCache();
-  const row = db()
-    .prepare("SELECT payload FROM ai_cache WHERE key = ?")
-    .get(key) as { payload: string } | undefined;
+async function readCache<T>(key: string): Promise<T | null> {
+  await ensureCache();
+  const row = await get<{ payload: string }>(
+    "SELECT payload FROM ai_cache WHERE key = ?",
+    key,
+  );
   return row ? (JSON.parse(row.payload) as T) : null;
 }
 
-function writeCache(key: string, kind: string, value: unknown) {
-  ensureCache();
-  db()
-    .prepare(
-      `INSERT INTO ai_cache (key, kind, payload, model, created_at)
-       VALUES (?,?,?,?,?)
-       ON CONFLICT(key) DO UPDATE SET payload = excluded.payload`,
-    )
-    .run(key, kind, JSON.stringify(value), MODEL, new Date().toISOString());
+async function writeCache(key: string, kind: string, value: unknown) {
+  await ensureCache();
+  await run(
+    `INSERT INTO ai_cache (key, kind, payload, model, created_at)
+     VALUES (?,?,?,?,?)
+     ON CONFLICT(key) DO UPDATE SET payload = excluded.payload`,
+    key,
+    kind,
+    JSON.stringify(value),
+    MODEL,
+    new Date().toISOString(),
+  );
 }
 
-export function aiCacheStats(): { kind: string; n: number }[] {
-  ensureCache();
-  return db()
-    .prepare("SELECT kind, COUNT(*) AS n FROM ai_cache GROUP BY kind")
-    .all() as { kind: string; n: number }[];
+export async function aiCacheStats(): Promise<{ kind: string; n: number }[]> {
+  await ensureCache();
+  /* COUNT(*) กลับมาเป็น bigint จากไดรเวอร์ Postgres ซึ่ง JSON.stringify
+     ทำเป็นสตริง ส่วน sqlite ให้ number มาตรง ๆ — Number() ทำให้ทั้งสอง
+     ตัวขับคืนชนิดเดียวกัน ไม่งั้นหน้า settings จะแสดง "12" บ้าง 12 บ้าง */
+  const rows = await all<{ kind: string; n: number | string }>(
+    "SELECT kind, COUNT(*) AS n FROM ai_cache GROUP BY kind",
+  );
+  return rows.map((r) => ({ kind: r.kind, n: Number(r.n) }));
 }
 
-export function clearAiCache() {
-  ensureCache();
-  db().exec("DELETE FROM ai_cache");
+export async function clearAiCache() {
+  await ensureCache();
+  await exec("DELETE FROM ai_cache");
 }
 
 /* ── ตัวเรียกกลาง ─────────────────────────────────────────────
@@ -120,7 +146,7 @@ type AskOptions<T> = {
 
 async function ask<T>(opts: AskOptions<T>): Promise<AiResult<T>> {
   const key = cacheKey(opts.kind, opts.input);
-  const cached = readCache<T>(key);
+  const cached = await readCache<T>(key);
   if (cached) return { value: cached, source: "cache" };
 
   if (!aiConfigured()) {
@@ -158,7 +184,7 @@ async function ask<T>(opts: AskOptions<T>): Promise<AiResult<T>> {
       .map((b) => b.text)
       .join("");
     const value = JSON.parse(text) as T;
-    writeCache(key, opts.kind, value);
+    await writeCache(key, opts.kind, value);
     return { value, source: "ai" };
   } catch (err) {
     let note = "The AI call failed — using templates";
