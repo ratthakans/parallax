@@ -240,3 +240,44 @@ export async function resetConnection() {
 }
 
 export const usingPostgres = () => Boolean(process.env.DATABASE_URL);
+
+/* ── ตัวช่วยระดับโมดูล ────────────────────────────────────────
+
+   ถ้าทุกจุดเรียกต้องเขียน (await sql()).all(...) เอง โค้ดจะยาวขึ้นทั้งไฟล์
+   โดยไม่ได้อะไรกลับมา สี่ตัวนี้ห่อการรอคอนเนกชันไว้ข้างใน จุดเรียกจึงสั้น
+   กว่าของเดิมด้วยซ้ำ:
+
+     เดิม  db().prepare(Q).all(a, b) as Row[]
+     ใหม่  await all<Row>(Q, a, b)
+
+   generic ทำให้ไม่ต้อง cast ด้วย as ซึ่งเป็นจุดที่ชนิดข้อมูลเคยหลุดออก
+   จากความจริงได้เงียบ ๆ
+
+   ⚠ ยังไม่มีใครเรียกสี่ตัวนี้ — มันคือหน้าตาที่ lib/engine จะย้ายมาใช้
+   ตอนเลิกใช้ db() แบบ sync ดูบันทึกการย้ายใน docs/postgres-migration.md */
+
+export async function all<T>(text: string, ...params: Param[]): Promise<T[]> {
+  return (await sql()).all<T>(text, ...params);
+}
+
+export async function get<T>(
+  text: string,
+  ...params: Param[]
+): Promise<T | undefined> {
+  return (await sql()).get<T>(text, ...params);
+}
+
+export async function run(
+  text: string,
+  ...params: Param[]
+): Promise<{ changes: number }> {
+  return (await sql()).run(text, ...params);
+}
+
+export async function exec(text: string): Promise<void> {
+  return (await sql()).exec(text);
+}
+
+export async function tx<T>(fn: (t: Sql) => Promise<T>): Promise<T> {
+  return (await sql()).tx(fn);
+}
