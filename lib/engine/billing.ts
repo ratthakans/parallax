@@ -172,10 +172,89 @@ export function usageFor(tenantId: string, now = new Date()): Usage {
 /* ── เพดานที่บังคับใช้จริง ─────────────────────────────────────── */
 
 /** เหตุผลที่แผนนี้ยังส่งไม่ได้ — null คือส่งได้ */
-export function reachBlockedReason(tenantId: string): string | null {
+/* ── โควตาทดลองที่ยังเหลือ ────────────────────────────────────
+   หน้าบรีฟต้องบอก "คุณมีสิทธิ์ส่งหนึ่งครั้ง" ไม่ใช่ "แผนนี้ส่งไม่ได้"
+   ข้อความที่สองเป็นความจริงเก่าที่หยุดเป็นความจริงตอนเปิดโควตานี้ */
+export function reachTrialState(
+  tenantId: string,
+): { campaignsLeft: number; audienceCap: number } | null {
+  const cap = planFor(tenantId).caps.reach;
+  if (cap.kind !== "trial") return null;
+  const used = (
+    db()
+      .prepare(
+        "SELECT COUNT(*) AS n FROM campaigns WHERE tenant_id = ? AND dry_run = 0",
+      )
+      .get(tenantId) as { n: number }
+  ).n;
+  return {
+    campaignsLeft: Math.max(0, cap.campaigns - used),
+    audienceCap: cap.audience,
+  };
+}
+
+export function reachBlockedReason(
+  tenantId: string,
+  opts: { audience?: number } = {},
+): string | null {
   const plan = planFor(tenantId);
-  if (plan.caps.reach.kind === "yes") return null;
+  const cap = plan.caps.reach;
+  if (cap.kind === "yes") return null;
+
+  /* ── โควตาทดลองต้องนับของจริง ไม่ใช่เชื่อหน้าจอ ──
+
+     ป้าย "1 campaign · 200 people" บนตารางราคาไม่ได้กันอะไรเลยด้วยตัวมันเอง
+     ตัวที่กันคือตรงนี้ และมันต้องนับจากฐานข้อมูล เพราะใครก็ยิง Server Action
+     ตรงมาได้โดยไม่ผ่านหน้าจอ
+
+     นับเฉพาะแคมเปญที่ส่งจริง (dry_run = 0) — การซ้อมส่งไม่ควรกินโควตา
+     เพราะไม่มีข้อความออกไปหาใครและไม่มีอะไรให้วัด */
+  if (cap.kind === "trial") {
+    const used = (
+      db()
+        .prepare(
+          "SELECT COUNT(*) AS n FROM campaigns WHERE tenant_id = ? AND dry_run = 0",
+        )
+        .get(tenantId) as { n: number }
+    ).n;
+
+    if (used >= cap.campaigns) {
+      return (
+        `${plan.name} includes ${cap.campaigns} live campaign and you have used it — ` +
+        `upgrade to ${PLANS.growth.name} to keep sending.`
+      );
+    }
+
+    if (opts.audience != null && opts.audience > cap.audience) {
+      return (
+        `${plan.name} sends to ${cap.audience.toLocaleString("en-US")} people at most — ` +
+        `this cohort is ${opts.audience.toLocaleString("en-US")}. ` +
+        `Narrow it, or upgrade to ${PLANS.growth.name} to send to all of them.`
+      );
+    }
+
+    return null;
+  }
+
   return `${plan.name} can read the data but cannot send yet — upgrade to ${PLANS.growth.name} to unlock Reach.`;
+}
+
+/* ── Proof ────────────────────────────────────────────────────
+
+   ตารางราคาประกาศว่า Pilot ได้ proof = "—" แต่หน้า /app/proof คำนวณ
+   ให้เต็มทุกแผน: lift · ช่วงความเชื่อมั่น · ต้นทุนต่อลูกค้าที่กลับมา
+   ประกาศไว้อย่างหนึ่ง ส่งมอบอีกอย่างหนึ่ง
+
+   ทิศทางเข้าข้างลูกค้า (ได้เกินที่จ่าย) จึงเป็นรูรั่วรายได้ ไม่ใช่รูรั่ว
+   ความน่าเชื่อถือ — แต่บนเว็บที่ทั้งหน้าเถียงเรื่อง "พูดให้ตรงกับที่วัดได้"
+   ตารางราคาที่ไม่ตรงกับของจริงคือความไม่สอดคล้องที่แพงที่สุดที่จะมี */
+export function proofBlockedReason(tenantId: string): string | null {
+  const plan = planFor(tenantId);
+  if (plan.caps.proof.kind === "yes") return null;
+  return (
+    `${plan.name} does not include measured proof — the holdout comparison and ` +
+    `confidence intervals unlock on ${PLANS.growth.name}.`
+  );
 }
 
 /** เหตุผลที่นำเข้าข้อมูลชุดนี้ไม่ได้ — null คือนำเข้าได้ */

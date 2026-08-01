@@ -12,6 +12,7 @@ import {
   Section,
 } from "@/components/ui";
 import { Numeral, Reveal, Stagger } from "@/components/reveal";
+import { CostEstimator } from "@/components/cost-estimator";
 import { PricingLd } from "@/components/json-ld";
 import {
   CAP_ROWS,
@@ -269,6 +270,16 @@ export default function PricingPage() {
                 Credits never expire and no billing cycle resets them · Reach media spend
                 goes straight to the ad platform, never through us
               </Note>
+            </div>
+          </Reveal>
+
+          {/* ── คูณให้ดู ──
+              ราคาทุกตัวถูกประกาศครบอยู่แล้วข้างบน แต่คนซื้อต้องประกอบเอง
+              ข้ามสองระบบ (ขั้นบันไดตามคน · แพ็กตามข้อความ) ซึ่งเป็นคำถาม
+              เดียวที่เจ้าของร้านถามจริง — เดือนหน้าจ่ายเท่าไร */}
+          <Reveal delay={120}>
+            <div className="mt-16">
+              <CostEstimator />
             </div>
           </Reveal>
         </div>

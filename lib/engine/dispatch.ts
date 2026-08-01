@@ -107,7 +107,9 @@ export async function approveCampaign(
   /* เพดานของแผนต้องบังคับที่นี่ ไม่ใช่ที่หน้าจอ — หน้าจอที่ซ่อนปุ่มไว้
      ไม่ได้ป้องกันการยิง Server Action ตรง ๆ และ Free tier ที่ส่งได้
      คือรายได้ที่หายไปเงียบ ๆ ไม่ใช่แค่ UI ที่ไม่ตรง */
-  const planBlock = reachBlockedReason(input.tenantId);
+  const planBlock = reachBlockedReason(input.tenantId, {
+    audience: candidate.audience.length,
+  });
   if (planBlock) throw new Error(planBlock);
 
   const cfg = getTenantPlays(input.tenantId).get(candidate.play.id);

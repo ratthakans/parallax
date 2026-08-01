@@ -24,6 +24,18 @@ export type Cap =
   | { kind: "read" }
   /** มีในแผนนี้ตามสัญญา แต่ยังไม่ได้ทำ — ต้องเขียนว่า "กำลังพัฒนา" ทุกที่ */
   | { kind: "roadmap" }
+  /* ── ลองของจริงแบบมีเพดาน ──────────────────────────────────
+
+     เดิม Pilot ได้ reach = NO คือดูได้อย่างเดียว แต่คุณค่าทั้งหมดของ
+     ผลิตภัณฑ์อยู่ที่ "ส่งแล้ววัด" ร้านเล็กจึงต้องกระโดดจาก "ยังไม่เชื่อ"
+     ไป ฿1,900/เดือน ในก้าวเดียว โดยไม่เคยเห็นตัวเลขของฐานตัวเองสักตัว
+
+     หนึ่งแคมเปญ 200 คน พร้อม holdout จริง — เล็กพอที่จะไม่กินรายได้
+     และใหญ่พอที่จะเห็นผลของฐานตัวเอง ซึ่งเป็นสิ่งเดียวที่ปิดการขายได้จริง
+
+     200 ไม่ได้เลือกมาลอย ๆ: ต่ำกว่านี้ช่วงความเชื่อมั่นจะกว้างจนสรุป
+     อะไรไม่ได้ แล้วการทดลองจะสอนสิ่งที่ผิดเกี่ยวกับผลิตภัณฑ์ */
+  | { kind: "trial"; campaigns: number; audience: number }
   | { kind: "text"; value: string };
 
 export type Plan = {
@@ -60,6 +72,7 @@ export type Plan = {
 const YES: Cap = { kind: "yes" };
 const NO: Cap = { kind: "no" };
 const ROADMAP: Cap = { kind: "roadmap" };
+const PILOT_REACH: Cap = { kind: "trial", campaigns: 1, audience: 200 };
 
 export const PLANS: Record<PlanId, Plan> = {
   free: {
@@ -72,7 +85,7 @@ export const PLANS: Record<PlanId, Plan> = {
     caps: {
       dragDrop: YES,
       keep: { kind: "read" },
-      reach: NO,
+      reach: PILOT_REACH,
       proof: NO,
       api: NO,
       autopilot: NO,
@@ -218,6 +231,8 @@ export function capLabel(c: Cap): string {
       return "Read only";
     case "roadmap":
       return "In build";
+    case "trial":
+      return `${c.campaigns} campaign · ${c.audience.toLocaleString("en-US")} people`;
     case "text":
       return c.value;
   }

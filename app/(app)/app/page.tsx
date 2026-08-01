@@ -10,7 +10,7 @@ import { CYCLE_LABEL } from "@/lib/shared/types";
 import { loadFeatures } from "@/lib/engine/derive";
 import { CandidateCard } from "@/components/console/candidate-card";
 import { ActionForm } from "@/components/console/action-form";
-import { reachBlockedReason } from "@/lib/engine/billing";
+import { reachBlockedReason, reachTrialState } from "@/lib/engine/billing";
 import {
   AiBadge,
   Empty,
@@ -32,6 +32,7 @@ export default async function BriefPage() {
   const tenant = getTenant(tenantId);
   const { candidates, weeklyCap } = runMatch(tenantId);
   const planBlock = reachBlockedReason(tenantId);
+  const trial = reachTrialState(tenantId);
   const three = topThree(candidates);
   const features = loadFeatures(tenantId);
   const roi = roiSummary(tenantId);
@@ -99,6 +100,20 @@ export default async function BriefPage() {
 
       {/* ── แผนที่ยังส่งไม่ได้ ต้องบอกก่อนอ่านสามใบ ──
           ไม่ใช่ปล่อยให้อ่านจบแล้วกดปุ่มแล้วเจอ error ตอนนั้น */}
+      {/* ── แผนทดลองที่ยังมีสิทธิ์เหลือ ──
+          เป็นโควตา ไม่ใช่กำแพง — บอกว่ามีอะไรให้ใช้ ไม่ใช่บอกว่าอะไรถูกห้าม */}
+      {!planBlock && trial && trial.campaignsLeft > 0 && (
+        <Panel flat className="mb-6 border-l-2 border-[var(--c-accent)] p-5">
+          <p className="c-label text-[var(--c-accent)]">included in this plan</p>
+          <p className="c-thai mt-2.5 max-w-2xl text-[0.84rem] leading-relaxed text-[var(--c-text-2)]">
+            {trial.campaignsLeft} live campaign, up to{" "}
+            {trial.audienceCap.toLocaleString("en-US")} people, with a real held-back
+            group. Approve one below and you will be measuring your own base — not a
+            projection of it.
+          </p>
+        </Panel>
+      )}
+
       {planBlock && (
         <Panel flat className="mb-6 border-l-2 border-[var(--c-warn)] p-5">
           <div className="flex flex-wrap items-start justify-between gap-4">

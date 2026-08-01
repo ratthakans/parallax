@@ -291,13 +291,77 @@ export function mapColumnsHeuristic(headers: string[]): ColumnMapping {
   };
 }
 
+/* ── ปิดหน้าค่าตัวอย่างก่อนส่งออกนอกเครื่อง ────────────────────
+
+   ก่อนหน้านี้ mapColumns ส่งสามแถวแรกของ CSV ดิบเข้า prompt ตรง ๆ
+   ไฟล์ export จาก POS มีชื่อลูกค้ากับเบอร์โทรอยู่ในนั้น — ข้อมูลส่วนบุคคล
+   ของลูกค้าของลูกค้าเรา ออกไปหาบริการภายนอกโดยไม่มีใครขออนุญาต
+   บนผลิตภัณฑ์ที่หน้า /trust ขายเรื่อง PDPA โดยเฉพาะ
+
+   ยังไม่เคยเกิดขึ้นจริงเพราะเครื่องนี้ไม่เคยมี ANTHROPIC_API_KEY
+   ทุกครั้งที่ผ่านมาจึงวิ่งเส้น fallback — แต่มันจะเปิดทันทีที่ตั้งคีย์
+
+   ── ทำไมยังแม็ปได้แม่นเท่าเดิม ──
+
+   สิ่งที่ระบบต้องดูจากค่าตัวอย่างคือ *รูปทรง* ไม่ใช่ *เนื้อ*: คอลัมน์นี้
+   เป็นวันที่รูปแบบไหน · ตัวเลขนี้เป็นยอดสุทธิหรือราคาต่อหน่วย · ช่องนี้
+   ว่างบ่อยไหม ทั้งหมดนั้นอ่านได้จากรูปทรง
+
+   ตัวเลขกับวันที่จึงส่งไปทั้งค่า (ไม่ระบุตัวบุคคล และเป็นสัญญาณที่
+   system prompt บอกเองว่าต้องใช้แยกคอลัมน์เงิน) ส่วนข้อความอิสระ —
+   ชื่อ ที่อยู่ อีเมล — เหลือแต่โครง และเบอร์โทรเหลือแค่สองหลักแรก
+   ซึ่งพอให้รู้ว่าเป็นเบอร์มือถือไทย โดยไม่ชี้ไปที่ใคร */
+
+const DATE_LIKE = /^\s*\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}([ T]\d{1,2}:\d{2}(:\d{2})?)?\s*$/;
+const NUMBER_LIKE = /^\s*[-+]?[฿$€]?\s*\d[\d,\s]*(\.\d+)?\s*%?\s*$/;
+/* ── เบอร์โทรต้องตรวจ *ก่อน* จำนวน ──
+   "0812345678" เข้าเกณฑ์ NUMBER_LIKE ทุกประการ (ตัวเลขล้วน ไม่มีวรรคตอน)
+   ถ้าตรวจจำนวนก่อน เบอร์มือถือที่พิมพ์ติดกันจะหลุดออกไปทั้งเบอร์ —
+   ซึ่งเป็นเคสที่การปิดหน้านี้มีไว้ป้องกันโดยตรง
+
+   เกณฑ์: ตัวเลขอย่างน้อยเก้าหลัก และขึ้นต้นด้วย 0 หรือ + หรือมีวรรคตอนคั่น
+   ยอดเงินไทยแทบไม่มีเก้าหลักติดกันโดยไม่มีคอมมา และไม่ขึ้นต้นด้วยศูนย์ */
+const PHONE_LIKE = /^\s*\+?[\d\s()-]{8,}\s*$/;
+
+function looksLikePhone(v: string): boolean {
+  if (!PHONE_LIKE.test(v)) return false;
+  const digits = v.replace(/\D/g, "");
+  if (digits.length < 9) return false;
+  return /^[0+]/.test(v.trim()) || /[\s()-]/.test(v.trim());
+}
+
+export function maskCell(v: string): string {
+  if (v === "") return "";
+  if (v.length > 64) v = v.slice(0, 64);
+
+  /* วันที่ — ส่งทั้งค่า รูปแบบวันที่คือสัญญาณที่ต้องอ่านให้ออก */
+  if (DATE_LIKE.test(v)) return v;
+
+  /* เบอร์โทร — ต้องมาก่อนจำนวน เหลือสองหลักแรกพอให้รู้ว่าเป็นมือถือไทย */
+  if (looksLikePhone(v)) {
+    const d = v.replace(/\D/g, "");
+    return d.slice(0, 2) + "X".repeat(d.length - 2);
+  }
+
+  /* จำนวนเงิน — ส่งทั้งค่า system prompt ต้องใช้แยกยอดสุทธิจากราคาต่อหน่วย */
+  if (NUMBER_LIKE.test(v)) return v;
+
+  /* ข้อความอิสระ — เหลือแต่โครง วรรคตอนคงไว้เพราะบอกรูปแบบได้
+     (เช่น มี @ คืออีเมล มี / คือรหัสอ้างอิง) */
+  return v.replace(/[^\s@/\-_.,:#()]/gu, (ch) =>
+    /\d/.test(ch) ? "9" : /[\u0E00-\u0E7F]/.test(ch) ? "ก" : "x",
+  );
+}
+
 export async function mapColumns(
   headers: string[],
   sampleRows: string[][],
 ): Promise<AiResult<ColumnMapping>> {
+  const masked = sampleRows.slice(0, 3).map((r) => r.map(maskCell));
+
   return ask<ColumnMapping>({
     kind: "map_columns",
-    input: { headers, sample: sampleRows.slice(0, 3) },
+    input: { headers, sample: masked },
     schema: MAPPING_SCHEMA,
     maxTokens: 2000,
     system:
@@ -313,11 +377,10 @@ export async function mapColumns(
       "Each field maps to at most one column.",
     prompt: `Headers: ${JSON.stringify(headers)}
 
-First three sample rows:
-${sampleRows
-  .slice(0, 3)
-  .map((r) => JSON.stringify(r))
-  .join("\n")}
+First three sample rows. Letters and digits in free text have been replaced
+with placeholders to keep customer data out of this request — read them for
+shape, not meaning. Dates and amounts are unaltered.
+${masked.map((r) => JSON.stringify(r)).join("\n")}
 
 Map every column and give a short reason in English.`,
     fallback: () => mapColumnsHeuristic(headers),

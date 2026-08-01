@@ -16,9 +16,11 @@ import {
   pct,
 } from "@/components/console/ui";
 import { ciLabel } from "@/lib/shared/format";
+import { PLANS } from "@/lib/shared/plans";
 import { measureAllAction } from "../../actions";
 import { ActionForm } from "@/components/console/action-form";
 import { demoToolsEnabled } from "@/lib/shared/demo-tools";
+import { proofBlockedReason } from "@/lib/engine/billing";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +29,7 @@ export default async function ProofPage() {
   const tenantId = await getActiveTenantId();
   const profile = profileFor(tenantId);
   const v = profile.vocab;
+  const proofBlocked = proofBlockedReason(tenantId);
   const roi = roiSummary(tenantId);
 
   const rows = db()
@@ -74,6 +77,37 @@ export default async function ProofPage() {
         }
       />
 
+      {/* ── แผนที่ไม่รวม Proof เห็นเหตุผล ไม่ใช่เห็นตัวเลข ──
+          เดิมหน้านี้คำนวณให้ทุกแผนเท่ากันหมด ทั้งที่ตารางราคาเขียนว่า
+          Pilot ไม่ได้ — ประกาศอย่างหนึ่ง ส่งมอบอีกอย่างหนึ่ง
+
+          ที่แสดงแทนคือสิ่งที่จะได้เมื่ออัปเกรด ไม่ใช่กำแพงเปล่า ๆ */}
+      {proofBlocked ? (
+        <Panel flat className="border-l-2 border-[var(--c-warn)] p-6 md:p-7">
+          <p className="c-label text-[var(--c-warn)]">not on this plan</p>
+          <h2 className="c-h2 mt-3 text-[var(--c-text)]">
+            Measured proof unlocks on {PLANS.growth.name}
+          </h2>
+          <p className="c-thai mt-3 max-w-2xl text-[0.88rem] leading-relaxed text-[var(--c-text-2)]">
+            {proofBlocked}
+          </p>
+          <p className="c-thai mt-4 max-w-2xl text-[0.84rem] leading-relaxed text-[var(--c-text-3)]">
+            What you get: every campaign holds a group back and compares the two, so
+            the figure you read is what the message caused — not revenue that would
+            have arrived anyway. When the difference cannot be told apart from noise,
+            this page says so instead of rounding it up.
+          </p>
+          <div className="mt-6 flex flex-wrap gap-2.5">
+            <Link href="/app/billing" className="c-btn c-btn-primary">
+              See plans
+            </Link>
+            <Link href="/app" className="c-btn c-btn-ghost">
+              Back to the brief
+            </Link>
+          </div>
+        </Panel>
+      ) : (
+      <>
       {/* ── หน้านี้คือหน้าที่คนจะแคปไปแชร์ ──
 
           ตัวเลขบนนี้เป็นบาทกับเปอร์เซ็นต์ที่อ่านเหมือนผลจริงของธุรกิจจริง
@@ -315,6 +349,8 @@ export default async function ProofPage() {
             </table>
           </div>
         </Panel>
+      )}
+      </>
       )}
     </>
   );
