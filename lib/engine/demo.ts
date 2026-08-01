@@ -215,8 +215,8 @@ export function injectCampaignEffect(tenantId: string) {
     "SELECT COUNT(*) AS n FROM campaign_audience WHERE campaign_id = ? AND arm = 'treated'",
   );
   const insTxn = d.prepare(
-    `INSERT INTO transactions (id, customer_id, occurred_at, total, discount_total, channel)
-     VALUES (?,?,?,?,?,?)`,
+    `INSERT INTO transactions (tenant_id, id, customer_id, occurred_at, total, discount_total, channel)
+       VALUES (?,?,?,?,?,?,?)`,
   );
 
   let added = 0;
@@ -247,6 +247,7 @@ export function injectCampaignEffect(tenantId: string) {
         const dayOffset = 1 + (h.readUInt16BE(2) % 75); // ซื้อภายใน 76 วันแรก
         const valueMul = 0.55 + (h.readUInt16BE(4) / 65535) * 0.9;
         insTxn.run(
+          tenantId,
           randomUUID(),
           r.id,
           new Date(start + dayOffset * 86400000).toISOString(),

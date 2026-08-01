@@ -84,3 +84,12 @@ jobs:
 
       - name: Pricing
         run: npm run verify:pricing
+
+      # ── สคีมาสองฝั่งตรงกันไหม ──
+      # ต้องมี DATABASE_URL ถึงจะเทียบได้ ไม่มีก็ข้ามโดยไม่ล้มเหลว เพราะ PR
+      # จากคนนอกไม่ควรต้องมีรหัสฐานข้อมูล แต่บน push เข้า main ที่ตั้ง secret
+      # ไว้แล้ว มันจะจับความต่างที่เคยหลุดไปถึง production มาสองครั้ง
+      - name: Schema parity
+        run: npm run verify:schema
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}

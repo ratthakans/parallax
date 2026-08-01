@@ -75,7 +75,20 @@ const rel = (f: string) => relative(ROOT, f);
   const bad: string[] = [];
   for (const f of files) {
     const r = rel(f);
-    if (r === "lib/engine/db.ts" || r === "lib/engine/sql.ts") continue;
+    /* db.ts กับ sql.ts เป็นเจ้าของไดรเวอร์ตามนิยามของกฎข้อนี้
+
+       schema-parity เป็นข้อยกเว้นเดียว และเป็นข้อยกเว้นที่จำเป็น:
+       หน้าที่ของมันคือเทียบสคีมาสองฝั่ง จึงต้องเปิดทั้งสองตัวขับพร้อมกัน
+       ผ่าน adapter ไม่ได้ เพราะ adapter เลือกตัวขับให้ตัวเดียวเสมอ
+
+       มันเป็นสคริปต์ตรวจ ไม่ใช่โค้ดที่ผู้ใช้เรียก จึงไม่ทำให้เหตุผลของ
+       กฎข้อนี้ (จุดเปลี่ยนฐานข้อมูลต้องมีที่เดียว) เสียไป */
+    if (
+      r === "lib/engine/db.ts" ||
+      r === "lib/engine/sql.ts" ||
+      r === "verify/schema-parity.mts"
+    )
+      continue;
     if (importsOf(read(f)).some((i) => i === "node:sqlite" || i === "postgres")) {
       bad.push(r);
     }

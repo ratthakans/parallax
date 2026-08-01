@@ -374,24 +374,24 @@ export async function commitImport(
        ON CONFLICT(id) DO UPDATE SET name = excluded.name`,
     );
     const insIdentity = d.prepare(
-      `INSERT INTO identities (customer_id, type, value_hash) VALUES (?,?,?)
+      `INSERT INTO identities (tenant_id, customer_id, type, value_hash) VALUES (?,?,?,?)
        ON CONFLICT(customer_id, type) DO NOTHING`,
     );
     const insConsent = d.prepare(
-      `INSERT INTO consents (customer_id, purpose, granted_at, revoked_at, source)
-       VALUES (?,?,?,?,?) ON CONFLICT(customer_id, purpose) DO NOTHING`,
+      `INSERT INTO consents (tenant_id, customer_id, purpose, granted_at, revoked_at, source)
+       VALUES (?,?,?,?,?,?) ON CONFLICT(customer_id, purpose) DO NOTHING`,
     );
     const insProduct = d.prepare(
       `INSERT INTO products (id, tenant_id, name, category, group_role, list_price)
        VALUES (?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET group_role = excluded.group_role`,
     );
     const insTxn = d.prepare(
-      `INSERT INTO transactions (id, customer_id, occurred_at, total, discount_total, channel)
-       VALUES (?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING`,
+      `INSERT INTO transactions (tenant_id, id, customer_id, occurred_at, total, discount_total, channel)
+       VALUES (?,?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING`,
     );
     const insLine = d.prepare(
-      `INSERT INTO line_items (txn_id, product_id, qty, unit_price, unit_list_price)
-       VALUES (?,?,?,?,?)`,
+      `INSERT INTO line_items (tenant_id, txn_id, product_id, qty, unit_price, unit_list_price)
+       VALUES (?,?,?,?,?,?)`,
     );
 
     const idFor = (s: string) =>
@@ -421,15 +421,14 @@ export async function commitImport(
           when,
         );
         // ตัวระบุถูก hash ก่อนเก็บ — ไม่มีเบอร์หรืออีเมลดิบในระบบ
-        insIdentity.run(
-          cid,
+        insIdentity.run(tenantId, cid,
           ref.type,
           createHash("sha256").update(ref.value).digest("hex"),
         );
         /* ไฟล์ POS ไม่มีข้อมูลความยินยอม จึงตั้งเป็น "ยังไม่ยินยอม"
            คนกลุ่มนี้จะไม่ถูกส่งและไม่ถูกส่งออกจนกว่าร้านจะเก็บ
            ความยินยอมจริง — ปลอดภัยกว่าการเดาว่ายินยอม */
-        insConsent.run(cid, "marketing", null, null, "csv_import");
+        insConsent.run(tenantId, cid, "marketing", null, null, "csv_import");
       }
 
       const pname = at(row, "product_name").trim();
@@ -451,8 +450,7 @@ export async function commitImport(
       }
 
       const txnId = `t-${idFor(`${cid}:${when}:${++txnSeq}`)}`;
-      insTxn.run(
-        txnId,
+      insTxn.run(tenantId, txnId,
         cid,
         when,
         money.total,
@@ -461,7 +459,7 @@ export async function commitImport(
       );
       transactions++;
       // unit_price ต้องเป็นราคาต่อหน่วย ไม่ใช่ยอดรวมของแถว
-      if (pid) insLine.run(txnId, pid, money.qty, money.unitNet, money.listUnit);
+      if (pid) insLine.run(tenantId, txnId, pid, money.qty, money.unitNet, money.listUnit);
     }
 
     d.exec("COMMIT");

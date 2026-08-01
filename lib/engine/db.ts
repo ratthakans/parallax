@@ -84,8 +84,38 @@ function migrate(d: DatabaseSync) {
     CREATE INDEX IF NOT EXISTS ix_customers_tenant ON customers(tenant_id);
 
     -- ตัวระบุถูก hash ก่อนเก็บ ไม่มีเบอร์หรืออีเมลดิบในระบบ
+    /* ── ใครเข้าถึงบัญชีไหนได้ ──
+       ฝั่ง Postgres นี่คือตารางที่ RLS ทั้งหมดตั้งอยู่บน (app.user_tenants())
+       ฝั่ง sqlite ยังไม่มีใครอ่าน แต่ต้องมีอยู่ให้สคีมาสองฝั่งตรงกัน
+       ไม่งั้นความต่างจะกลับมาเป็นเรื่องที่ค่อยไปเจอตอนสลับตัวขับ
+
+       ชื่อ tenant_users ไม่ใช่ memberships เพราะ memberships ถูกใช้ไปแล้ว
+       กับสมาชิกภาพของลูกค้าร้าน ซึ่งเป็นคนละเรื่องกันคนละชั้น */
+    /* ── แคชผลของงาน AI ──
+       lib/engine/ai.ts สร้างตารางนี้เองด้วย (ensureCache) เพราะเรียกได้
+       ก่อนที่ใครจะแตะ db() แต่ต้องประกาศที่นี่ด้วย ไม่งั้นสคีมา sqlite
+       ที่ประกาศไว้จะไม่ครบ และตัวตรวจความตรงกันจะเห็นเป็นช่องว่างจริง
+
+       DDL เหมือนกันทั้งสองที่และ idempotent จึงชนกันไม่ได้ */
+    CREATE TABLE IF NOT EXISTS ai_cache (
+      key TEXT PRIMARY KEY,
+      kind TEXT NOT NULL,
+      payload TEXT NOT NULL,
+      model TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS tenant_users (
+      tenant_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'member',
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (tenant_id, user_id)
+    );
+
     CREATE TABLE IF NOT EXISTS identities (
       customer_id TEXT NOT NULL,
+      tenant_id TEXT NOT NULL,
       type TEXT NOT NULL,
       value_hash TEXT NOT NULL,
       PRIMARY KEY (customer_id, type)
@@ -104,6 +134,7 @@ function migrate(d: DatabaseSync) {
 
     CREATE TABLE IF NOT EXISTS transactions (
       id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
       customer_id TEXT NOT NULL,
       occurred_at TEXT NOT NULL,
       total REAL NOT NULL,
@@ -114,6 +145,7 @@ function migrate(d: DatabaseSync) {
 
     CREATE TABLE IF NOT EXISTS line_items (
       txn_id TEXT NOT NULL,
+      tenant_id TEXT NOT NULL,
       product_id TEXT NOT NULL,
       qty INTEGER NOT NULL,
       unit_price REAL NOT NULL,
@@ -123,6 +155,7 @@ function migrate(d: DatabaseSync) {
 
     CREATE TABLE IF NOT EXISTS memberships (
       customer_id TEXT NOT NULL,
+      tenant_id TEXT NOT NULL,
       kind TEXT NOT NULL,
       started_at TEXT NOT NULL,
       expires_at TEXT
@@ -130,6 +163,7 @@ function migrate(d: DatabaseSync) {
 
     CREATE TABLE IF NOT EXISTS consents (
       customer_id TEXT NOT NULL,
+      tenant_id TEXT NOT NULL,
       purpose TEXT NOT NULL,
       granted_at TEXT,
       revoked_at TEXT,
@@ -139,6 +173,7 @@ function migrate(d: DatabaseSync) {
 
     CREATE TABLE IF NOT EXISTS events (
       customer_id TEXT NOT NULL,
+      tenant_id TEXT NOT NULL,
       type TEXT NOT NULL,
       occurred_at TEXT NOT NULL,
       meta TEXT
@@ -187,6 +222,7 @@ function migrate(d: DatabaseSync) {
     -- audience ถูกแช่แข็งตอนอนุมัติ (H1) — ห้ามคำนวณใหม่ตอนส่ง
     CREATE TABLE IF NOT EXISTS campaign_audience (
       campaign_id TEXT NOT NULL,
+      tenant_id TEXT NOT NULL,
       customer_id TEXT NOT NULL,
       arm TEXT NOT NULL,
       PRIMARY KEY (campaign_id, customer_id)
@@ -195,6 +231,7 @@ function migrate(d: DatabaseSync) {
     -- idempotency key ระดับ (campaign_id, customer_id) — retry ไม่ส่งซ้ำ (F12)
     CREATE TABLE IF NOT EXISTS messages (
       campaign_id TEXT NOT NULL,
+      tenant_id TEXT NOT NULL,
       customer_id TEXT NOT NULL,
       channel TEXT NOT NULL,
       status TEXT NOT NULL,
@@ -205,6 +242,7 @@ function migrate(d: DatabaseSync) {
 
     CREATE TABLE IF NOT EXISTS attributions (
       campaign_id TEXT NOT NULL,
+      tenant_id TEXT NOT NULL,
       horizon_days INTEGER NOT NULL,
       rph_treated REAL NOT NULL,
       rph_holdout REAL NOT NULL,

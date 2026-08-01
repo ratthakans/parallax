@@ -182,9 +182,10 @@ export async function approveCampaign(
     );
 
     const insAudience = d.prepare(
-      "INSERT INTO campaign_audience (campaign_id, customer_id, arm) VALUES (?,?,?)",
+      "INSERT INTO campaign_audience (tenant_id, campaign_id, customer_id, arm) VALUES (?,?,?,?)",
     );
-    for (const a of arms) insAudience.run(campaignId, a.cid, a.arm);
+    for (const a of arms)
+        insAudience.run(input.tenantId, campaignId, a.cid, a.arm);
 
     d.exec("COMMIT");
   } catch (err) {
@@ -305,8 +306,8 @@ export function sendCampaign(
   /* F12 — idempotency key คือ PRIMARY KEY (campaign_id, customer_id)
      เรียกซ้ำกี่ครั้งก็ส่งคนละหนึ่งข้อความเท่านั้น */
   const insMessage = d.prepare(
-    `INSERT INTO messages (campaign_id, customer_id, channel, status, cost, sent_at)
-     VALUES (?,?,?,?,?,?)
+    `INSERT INTO messages (tenant_id, campaign_id, customer_id, channel, status, cost, sent_at)
+       VALUES (?,?,?,?,?,?,?)
      ON CONFLICT(campaign_id, customer_id) DO NOTHING`,
   );
 
@@ -332,6 +333,7 @@ export function sendCampaign(
         continue;
       }
       const res = insMessage.run(
+        camp.tenant_id,
         campaignId,
         t.customer_id,
         "line",

@@ -225,9 +225,9 @@ export function measureCampaign(
 
   const ins = d.prepare(
     `INSERT INTO attributions
-      (campaign_id, horizon_days, rph_treated, rph_holdout, lift_abs, lift_pct,
+      (tenant_id, campaign_id, horizon_days, rph_treated, rph_holdout, lift_abs, lift_pct,
        ci_low, ci_high, verdict, measured_at, matured)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
      ON CONFLICT(campaign_id, horizon_days) DO UPDATE SET
        rph_treated = excluded.rph_treated, rph_holdout = excluded.rph_holdout,
        lift_abs = excluded.lift_abs, lift_pct = excluded.lift_pct,
@@ -339,6 +339,7 @@ export function measureCampaign(
       matured: matured ? 1 : 0,
     };
     ins.run(
+      camp.tenant_id,
       row.campaign_id, row.horizon_days, row.rph_treated, row.rph_holdout,
       row.lift_abs, row.lift_pct, row.ci_low, row.ci_high, row.verdict,
       row.measured_at, row.matured,
