@@ -1,5 +1,5 @@
+import { all } from "@/lib/engine/sql";
 import Link from "next/link";
-import { db } from "@/lib/engine/db";
 import { playById } from "@/lib/shared/plays";
 import { roiSummary } from "@/lib/engine/proof";
 import { getActiveTenantId } from "@/lib/shared/active-tenant";
@@ -29,20 +29,10 @@ export default async function ProofPage() {
   const tenantId = await getActiveTenantId();
   const profile = profileFor(tenantId);
   const v = profile.vocab;
-  const proofBlocked = proofBlockedReason(tenantId);
-  const roi = roiSummary(tenantId);
+  const proofBlocked = await proofBlockedReason(tenantId);
+  const roi = await roiSummary(tenantId);
 
-  const rows = db()
-    .prepare(
-      `SELECT c.id, c.play_id, c.treated_size, c.holdout_size, c.approved_at,
-              a.horizon_days, a.rph_treated, a.rph_holdout, a.lift_abs, a.lift_pct,
-              a.ci_low, a.ci_high, a.verdict, a.matured
-       FROM attributions a
-       JOIN campaigns c ON c.id = a.campaign_id
-       WHERE c.tenant_id = ? AND c.dry_run = 0
-       ORDER BY c.approved_at DESC, a.horizon_days`,
-    )
-    .all(tenantId) as {
+  const rows = await all<{
     id: string;
     play_id: string;
     treated_size: number;
@@ -57,7 +47,13 @@ export default async function ProofPage() {
     ci_high: number;
     verdict: Verdict;
     matured: number;
-  }[];
+  }>(`SELECT c.id, c.play_id, c.treated_size, c.holdout_size, c.approved_at,
+              a.horizon_days, a.rph_treated, a.rph_holdout, a.lift_abs, a.lift_pct,
+              a.ci_low, a.ci_high, a.verdict, a.matured
+       FROM attributions a
+       JOIN campaigns c ON c.id = a.campaign_id
+       WHERE c.tenant_id = ? AND c.dry_run = 0
+       ORDER BY c.approved_at DESC, a.horizon_days`, tenantId);
 
   const total = Object.values(roi.verdictMix).reduce((a, b) => a + b, 0);
 

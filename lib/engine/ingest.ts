@@ -1,5 +1,6 @@
+import { tx } from "@/lib/engine/sql";
+import { logActivity } from "@/lib/engine/db";
 import { createHash } from "node:crypto";
-import { db, logActivity } from "@/lib/engine/db";
 import { deriveFeatures } from "@/lib/engine/derive";
 import { guessProductRoles } from "@/lib/engine/ai";
 import { contactCapBlockedReason } from "@/lib/engine/billing";
@@ -295,7 +296,7 @@ export async function commitImport(
      เพราะร้านยังแก้ไฟล์หรืออัปเกรดได้ก่อนที่ข้อมูลจะเข้าไปครึ่งทาง
 
      replace = true คือแทนที่ทั้งฐาน ไม่ใช่เพิ่มเข้าไป จึงนับจากศูนย์ */
-  const capBlock = contactCapBlockedReason(
+  const capBlock = await contactCapBlockedReason(
     tenantId,
     preview.customers,
     { replacing: opts.replace },
@@ -329,9 +330,7 @@ export async function commitImport(
     roleGuess.value.products.map((p) => [p.name, p.role]),
   );
 
-  const d = db();
-  d.exec("BEGIN");
-  try {
+  return tx(async (q) => {
     if (opts.replace) {
       /* ── ต้องลบเฉพาะบัญชีนี้ ──
 
@@ -345,54 +344,45 @@ export async function commitImport(
          ตารางที่ไม่มี tenant_id เข้าถึงผ่าน subquery ของ campaigns
          หรือ customers ของบัญชีนี้เท่านั้น */
       for (const t of ["campaign_audience", "messages", "attributions"]) {
-        d.prepare(
+        await q.run(
           `DELETE FROM ${t} WHERE campaign_id IN
              (SELECT id FROM campaigns WHERE tenant_id = ?)`,
-        ).run(tenantId);
+          tenantId,
+        );
       }
-      d.prepare(
+      await q.run(
         `DELETE FROM line_items WHERE txn_id IN (
            SELECT tx.id FROM transactions tx
            JOIN customers c ON c.id = tx.customer_id
            WHERE c.tenant_id = ?)`,
-      ).run(tenantId);
+        tenantId,
+      );
       for (const t of [
         "events", "consents", "memberships", "identities", "transactions",
       ]) {
-        d.prepare(
+        await q.run(
           `DELETE FROM ${t} WHERE customer_id IN
              (SELECT id FROM customers WHERE tenant_id = ?)`,
-        ).run(tenantId);
+          tenantId,
+        );
       }
       for (const t of ["campaigns", "customer_features", "customers", "products"]) {
-        d.prepare(`DELETE FROM ${t} WHERE tenant_id = ?`).run(tenantId);
+        await q.run(`DELETE FROM ${t} WHERE tenant_id = ?`, tenantId);
       }
     }
 
-    const insCustomer = d.prepare(
-      `INSERT INTO customers (id, tenant_id, name, created_at) VALUES (?,?,?,?)
-       ON CONFLICT(id) DO UPDATE SET name = excluded.name`,
-    );
-    const insIdentity = d.prepare(
-      `INSERT INTO identities (tenant_id, customer_id, type, value_hash) VALUES (?,?,?,?)
-       ON CONFLICT(customer_id, type) DO NOTHING`,
-    );
-    const insConsent = d.prepare(
-      `INSERT INTO consents (tenant_id, customer_id, purpose, granted_at, revoked_at, source)
-       VALUES (?,?,?,?,?,?) ON CONFLICT(customer_id, purpose) DO NOTHING`,
-    );
-    const insProduct = d.prepare(
-      `INSERT INTO products (id, tenant_id, name, category, group_role, list_price)
-       VALUES (?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET group_role = excluded.group_role`,
-    );
-    const insTxn = d.prepare(
-      `INSERT INTO transactions (tenant_id, id, customer_id, occurred_at, total, discount_total, channel)
-       VALUES (?,?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING`,
-    );
-    const insLine = d.prepare(
-      `INSERT INTO line_items (tenant_id, txn_id, product_id, qty, unit_price, unit_list_price)
-       VALUES (?,?,?,?,?,?)`,
-    );
+    const insCustomerQ = `INSERT INTO customers (id, tenant_id, name, created_at) VALUES (?,?,?,?)
+       ON CONFLICT(id) DO UPDATE SET name = excluded.name`;
+    const insIdentityQ = `INSERT INTO identities (tenant_id, customer_id, type, value_hash) VALUES (?,?,?,?)
+       ON CONFLICT(customer_id, type) DO NOTHING`;
+    const insConsentQ = `INSERT INTO consents (tenant_id, customer_id, purpose, granted_at, revoked_at, source)
+       VALUES (?,?,?,?,?,?) ON CONFLICT(customer_id, purpose) DO NOTHING`;
+    const insProductQ = `INSERT INTO products (id, tenant_id, name, category, group_role, list_price)
+       VALUES (?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET group_role = excluded.group_role`;
+    const insTxnQ = `INSERT INTO transactions (tenant_id, id, customer_id, occurred_at, total, discount_total, channel)
+       VALUES (?,?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING`;
+    const insLineQ = `INSERT INTO line_items (tenant_id, txn_id, product_id, qty, unit_price, unit_list_price)
+       VALUES (?,?,?,?,?,?)`;
 
     const idFor = (s: string) =>
       createHash("sha256").update(s).digest("hex").slice(0, 20);
@@ -414,21 +404,21 @@ export async function commitImport(
       if (!seenCustomers.has(cid)) {
         seenCustomers.add(cid);
         customers++;
-        insCustomer.run(
+        await q.run(insCustomerQ, 
           cid,
           tenantId,
           at(row, "customer_name").trim() || "ลูกค้าไม่ระบุชื่อ",
           when,
         );
         // ตัวระบุถูก hash ก่อนเก็บ — ไม่มีเบอร์หรืออีเมลดิบในระบบ
-        insIdentity.run(tenantId, cid,
+        await q.run(insIdentityQ, tenantId, cid,
           ref.type,
           createHash("sha256").update(ref.value).digest("hex"),
         );
         /* ไฟล์ POS ไม่มีข้อมูลความยินยอม จึงตั้งเป็น "ยังไม่ยินยอม"
            คนกลุ่มนี้จะไม่ถูกส่งและไม่ถูกส่งออกจนกว่าร้านจะเก็บ
            ความยินยอมจริง — ปลอดภัยกว่าการเดาว่ายินยอม */
-        insConsent.run(tenantId, cid, "marketing", null, null, "csv_import");
+        await q.run(insConsentQ, tenantId, cid, "marketing", null, null, "csv_import");
       }
 
       const pname = at(row, "product_name").trim();
@@ -438,7 +428,7 @@ export async function commitImport(
         if (!seenProducts.has(pid)) {
           seenProducts.add(pid);
           const meta = preview.products.find((p) => p.name === pname);
-          insProduct.run(
+          await q.run(insProductQ, 
             pid,
             tenantId,
             pname,
@@ -450,7 +440,7 @@ export async function commitImport(
       }
 
       const txnId = `t-${idFor(`${cid}:${when}:${++txnSeq}`)}`;
-      insTxn.run(tenantId, txnId,
+      await q.run(insTxnQ, tenantId, txnId,
         cid,
         when,
         money.total,
@@ -459,11 +449,10 @@ export async function commitImport(
       );
       transactions++;
       // unit_price ต้องเป็นราคาต่อหน่วย ไม่ใช่ยอดรวมของแถว
-      if (pid) insLine.run(tenantId, txnId, pid, money.qty, money.unitNet, money.listUnit);
+      if (pid) await q.run(insLineQ, tenantId, txnId, pid, money.qty, money.unitNet, money.listUnit);
     }
 
-    d.exec("COMMIT");
-    logActivity(
+    await logActivity(
       tenantId,
       "owner",
       "import_csv",
@@ -480,8 +469,5 @@ export async function commitImport(
       rejected: preview.rejected.length,
       roleSource: roleGuess.source,
     };
-  } catch (err) {
-    d.exec("ROLLBACK");
-    throw err;
-  }
+  });
 }

@@ -1,5 +1,6 @@
+import { ensureSchema } from "@/lib/engine/db";
+import { get } from "@/lib/engine/sql";
 import { seedCampaignHistory } from "@/lib/engine/demo";
-import { db } from "@/lib/engine/db";
 import { deriveFeatures, featuresComputedAt } from "@/lib/engine/derive";
 import { isTenantSeeded, seed } from "@/lib/engine/seed";
 import { TENANT_PROFILES } from "@/lib/shared/tenants";
@@ -19,8 +20,14 @@ let readying: Promise<void> | null = null;
 export function ensureReady(): Promise<void> {
   if (ready) return Promise.resolve();
   readying ??= (async () => {
-    const missing = TENANT_PROFILES.filter((t) => !isTenantSeeded(t.id));
-    if (missing.length) seed();
+    /* ตารางต้องมีก่อนทุกอย่าง — เดิม db() สร้างให้เองตอนเปิดคอนเนกชัน
+       ตอนนี้ไม่มี db() แล้ว จึงต้องเรียกให้ชัด */
+    await ensureSchema();
+
+    const seeded = await Promise.all(
+      TENANT_PROFILES.map((t) => isTenantSeeded(t.id)),
+    );
+    if (seeded.some((s) => !s)) await seed();
     for (const t of TENANT_PROFILES) {
       if (!(await featuresComputedAt(t.id))) await deriveFeatures(t.id);
       await seedCampaignHistory(t.id);
@@ -36,32 +43,29 @@ export function resetReady() {
   ready = false;
 }
 
-export function tenantStats(tenantId: string) {
-  const d = db();
-  const one = <T>(sql: string, ...args: (string | number)[]) =>
-    d.prepare(sql).get(...args) as T;
+export async function tenantStats(tenantId: string) {
+  /* ทุกคำถามที่นี่คือ COUNT(*) ซึ่ง Postgres คืนเป็น bigint และ sqlite
+     คืนเป็น number — ตัวช่วยตัวเดียวจึงแปลงให้เป็นตัวเลขทุกครั้ง
+     แทนที่จะให้แต่ละจุดจำเอง */
+  const count = async (sql: string, ...args: (string | number)[]) =>
+    Number((await get<{ n: number | string }>(sql, ...args))?.n ?? 0);
 
-  const base = one<{ n: number }>(
+  const customers = await count(
     "SELECT COUNT(*) AS n FROM customers WHERE tenant_id = ?",
     tenantId,
   );
-  const campaigns = one<{ n: number }>(
+  const campaigns = await count(
     "SELECT COUNT(*) AS n FROM campaigns WHERE tenant_id = ? AND dry_run = 0",
     tenantId,
   );
-  const measuring = one<{ n: number }>(
+  const measuring = await count(
     "SELECT COUNT(*) AS n FROM campaigns WHERE tenant_id = ? AND dry_run = 0 AND status = 'measuring'",
     tenantId,
   );
-  const sent = one<{ n: number }>(
+  const sent = await count(
     `SELECT COUNT(*) AS n FROM messages m
      JOIN campaigns c ON c.id = m.campaign_id WHERE c.tenant_id = ?`,
     tenantId,
   );
-  return {
-    customers: base.n,
-    campaigns: campaigns.n,
-    measuring: measuring.n,
-    messagesSent: sent.n,
-  };
+  return { customers, campaigns, measuring, messagesSent: sent };
 }

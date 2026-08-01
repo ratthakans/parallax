@@ -25,7 +25,7 @@ export default async function ImportPage() {
   const tenantId = await getActiveTenantId();
   const profile = profileFor(tenantId);
   const v = profile.vocab;
-  const u = usageFor(tenantId);
+  const u = await usageFor(tenantId);
   const ai = aiConfigured();
 
   const headroom =

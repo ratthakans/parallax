@@ -1,9 +1,9 @@
+import { all, get, run } from "@/lib/engine/sql";
 import "./isolate.mts";
 
 import { runMatch } from "@/lib/engine/match";
 import { approveCampaign, sendCampaign } from "@/lib/engine/dispatch";
 import { measureCampaign } from "@/lib/engine/proof";
-import { db } from "@/lib/engine/db";
 import { TENANT_ID } from "@/lib/engine/seed";
 import { ensureReady } from "@/lib/engine/bootstrap";
 
@@ -22,7 +22,7 @@ const ok = (c: boolean, m: string) => out.push(`${c ? "PASS" : "FAIL"}  ${m}`);
      qs > qe ? (hour >= qs || hour < qe) : (hour >= qs && hour < qe)
    ตั้ง qs = qe = 0 จะเข้ากิ่งหลังเสมอ แล้วได้ hour >= 0 && hour < 0
    ซึ่งเป็นเท็จทุกชั่วโมง — ปิดได้จริงโดยไม่ขึ้นกับนาฬิกา */
-db().prepare("UPDATE tenants SET quiet_hours_start=0, quiet_hours_end=0 WHERE id=?").run(T);
+await run("UPDATE tenants SET quiet_hours_start=0, quiet_hours_end=0 WHERE id=?", T);
 
 // ── อนุมัติหลายแคมเปญเพื่อให้เพดานความถี่ได้ทำงาน (cap = 2/สัปดาห์) ──
 const approved: string[] = [];
@@ -38,10 +38,10 @@ ok(approved.length >= 3, `อนุมัติได้ ${approved.length} แ�
 
 // ── F12 idempotency บนแคมเปญแรก ──
 const first = approved[0];
-const treated = (db().prepare("SELECT treated_size t FROM campaigns WHERE id=?").get(first) as {t:number}).t;
+const treated = (await get<{t:number}>("SELECT treated_size t FROM campaigns WHERE id=?", first))!.t;
 const s1 = await sendCampaign(first);
 const s2 = await sendCampaign(first);
-const msgs = (db().prepare("SELECT COUNT(*) n FROM messages WHERE campaign_id=?").get(first) as {n:number}).n;
+const msgs = (await get<{n:number}>("SELECT COUNT(*) n FROM messages WHERE campaign_id=?", first))!.n;
 ok(!s1.skippedQuietHours, "F10 ออกจากช่วงห้ามส่งแล้ว ส่งได้");
 ok(s1.sent === treated, `F12 ครั้งแรกส่ง ${s1.sent} = treated ${treated}`);
 ok(s2.sent === 0, `F12 เรียกซ้ำส่งเพิ่ม ${s2.sent} แถว`);
@@ -58,28 +58,28 @@ out.push("  เหตุผลที่ตัดออก: " + [...new Set(capMs
 // เพดานเป็น "ต่อสัปดาห์" จึงต้องนับในหน้าต่าง 7 วันเท่านั้น
 // ประวัติที่ seed ไว้มีอายุ 95-215 วัน การนับตลอดชีพจะฟ้องผิด
 const since7 = new Date(Date.now() - 7*86400000).toISOString();
-const worst = db().prepare(`SELECT ca.customer_id, COUNT(*) n
+const worst = await get<{customer_id:string;n:number}>(`SELECT ca.customer_id, COUNT(*) n
   FROM campaign_audience ca JOIN campaigns c ON c.id=ca.campaign_id
   WHERE c.tenant_id=? AND c.dry_run=0 AND ca.arm='treated' AND c.approved_at >= ?
-  GROUP BY ca.customer_id ORDER BY n DESC LIMIT 1`).get(T, since7) as {customer_id:string;n:number}|undefined;
+  GROUP BY ca.customer_id ORDER BY n DESC LIMIT 1`, T, since7);
 ok((worst?.n ?? 0) <= 2, `F9 คนที่ถูกติดต่อมากสุดได้ ${worst?.n ?? 0} ครั้ง ครั้งใน 7 วัน ไม่เกินเพดาน 2`);
 
 // ── กลุ่มที่เปิดค้างไม่ถูกดึงซ้ำ ──
-const overlap = db().prepare(`SELECT COUNT(*) n FROM (
+const overlap = (await get<{n:number}>(`SELECT COUNT(*) n FROM (
   SELECT ca.customer_id FROM campaign_audience ca JOIN campaigns c ON c.id=ca.campaign_id
-  WHERE c.tenant_id=? AND c.status='measuring' GROUP BY ca.customer_id HAVING COUNT(DISTINCT c.id) > 2)`).get(T) as {n:number};
+  WHERE c.tenant_id=? AND c.status='measuring' GROUP BY ca.customer_id HAVING COUNT(DISTINCT c.id) > 2)`, T))!;
 ok(overlap.n === 0, `ไม่มีใครอยู่ในแคมเปญที่กำลังวัดเกิน 2 ตัวพร้อมกัน (พบ ${overlap.n})`);
 
 // ── verdict ──
-for (const id of approved) measureCampaign(id);
-const verdicts = db().prepare(`SELECT verdict, COUNT(*) n FROM attributions a
-  JOIN campaigns c ON c.id=a.campaign_id WHERE c.tenant_id=? GROUP BY verdict`).all(T) as {verdict:string;n:number}[];
+for (const id of approved) await measureCampaign(id);
+const verdicts = await all<{verdict:string;n:number}>(`SELECT verdict, COUNT(*) n FROM attributions a
+  JOIN campaigns c ON c.id=a.campaign_id WHERE c.tenant_id=? GROUP BY verdict`, T);
 out.push(`  verdict: ${verdicts.map(v=>`${v.verdict}=${v.n}`).join(" ")}`);
 ok(verdicts.every(v=>["positive","no_effect","insufficient_data"].includes(v.verdict)), "H5 verdict อยู่ในสามค่าเท่านั้น");
 
 /* ── เครดิตข้อความห้ามติดลบ ──
    เพดานที่ไม่บังคับใช้ไม่ใช่เพดาน เครดิตเป็นทรัพยากรที่จ่ายเงินซื้อ */
-const neg = db().prepare("SELECT id, message_credits c FROM tenants WHERE message_credits < 0").all() as {id:string;c:number}[];
+const neg = await all<{id:string;c:number}>("SELECT id, message_credits c FROM tenants WHERE message_credits < 0");
 ok(neg.length === 0, `เครดิตไม่ติดลบทุกบัญชี${neg.length ? " — " + neg.map(t=>`${t.id}=${t.c}`).join(", ") : ""}`);
 
 console.log(out.join("\n"));

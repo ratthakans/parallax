@@ -1,6 +1,4 @@
-import { DatabaseSync } from "node:sqlite";
-import { mkdirSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { all, exec, run, usingPostgres } from "@/lib/engine/sql";
 
 /* ── ชั้นเก็บข้อมูล ────────────────────────────────────────────
    schema ตรงตาม Play Engine §5 · §6 · §7
@@ -25,27 +23,17 @@ import { dirname, join } from "node:path";
 
    ก่อนรับข้อมูลลูกค้าจริง ต้องเปลี่ยนชั้นนี้เป็นฐานข้อมูลที่มีสถานะจริง
    ทุกการเข้าถึงผ่านไฟล์นี้เท่านั้น จุดที่ต้องแก้จึงอยู่ที่เดียว */
-const DB_PATH =
-  process.env.PARALLAX_DB_PATH ??
-  (process.env.VERCEL
-    ? "/tmp/parallax/parallax.db"
-    : join(process.cwd(), ".data/parallax.db"));
+/* ── สคีมาฝั่ง sqlite ──────────────────────────────────────────
 
-let _db: DatabaseSync | null = null;
+   เดิม db() สร้างตารางให้เองตอนเปิดคอนเนกชันครั้งแรก พอ db() หายไป
+   จึงไม่มีอะไรสร้างตารางอีกเลย และทุกคำสั่งได้ "no such table"
 
-export function db(): DatabaseSync {
-  if (_db) return _db;
-  mkdirSync(dirname(DB_PATH), { recursive: true });
-  const d = new DatabaseSync(DB_PATH);
-  d.exec("PRAGMA journal_mode = WAL");
-  d.exec("PRAGMA foreign_keys = ON");
-  migrate(d);
-  _db = d;
-  return d;
-}
+   ตอนนี้ ensureReady() เรียกที่นี่ก่อนแตะข้อมูลใด ๆ
+   ฝั่ง Postgres สคีมาเป็นของ supabase/migrations/ จึงข้าม */
+export async function ensureSchema(): Promise<void> {
+  if (usingPostgres()) return;
 
-function migrate(d: DatabaseSync) {
-  d.exec(`
+  await exec(`
     CREATE TABLE IF NOT EXISTS tenants (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -294,30 +282,48 @@ function migrate(d: DatabaseSync) {
 
   /* คอลัมน์ที่เพิ่มทีหลัง — CREATE TABLE IF NOT EXISTS ไม่เพิ่มให้ฐานที่มีอยู่แล้ว
      จึงต้องเติมเอง sqlite ไม่มี ADD COLUMN IF NOT EXISTS ต้องอ่านรายชื่อก่อน */
-  const columnsOf = (table: string) =>
+  /* คอลัมน์ที่เพิ่มทีหลังของฐานที่มีอยู่ก่อนแล้ว — PRAGMA เป็นของ sqlite
+     ล้วน และไปถึงที่นี่ได้เฉพาะตอนไม่ได้ใช้ Postgres */
+  const columnsOf = async (table: string) =>
     new Set(
-      (d.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map(
+      (await all<{ name: string }>(`PRAGMA table_info(${table})`)).map(
         (c) => c.name,
       ),
     );
 
-  if (!columnsOf("attributions").has("matured")) {
-    d.exec("ALTER TABLE attributions ADD COLUMN matured INTEGER NOT NULL DEFAULT 0");
+  if (!(await columnsOf("attributions")).has("matured")) {
+    await exec(
+      "ALTER TABLE attributions ADD COLUMN matured INTEGER NOT NULL DEFAULT 0",
+    );
   }
-  if (!columnsOf("tenants").has("billing_day")) {
-    d.exec("ALTER TABLE tenants ADD COLUMN billing_day INTEGER NOT NULL DEFAULT 1");
+  if (!(await columnsOf("tenants")).has("billing_day")) {
+    await exec(
+      "ALTER TABLE tenants ADD COLUMN billing_day INTEGER NOT NULL DEFAULT 1",
+    );
   }
 }
 
-export function logActivity(
+/* ── ต้องเขียนผ่าน adapter เดียวกับที่เหลือ ──
+
+   ตอนย้ายทีละไฟล์ ระบบมีคอนเนกชัน sqlite สองตัวชั่วคราว: db() ของเดิม
+   กับ sql() ตัวใหม่ ทั้งคู่ชี้ไฟล์เดียวกัน ซึ่งอ่านพร้อมกันได้ไม่มีปัญหา
+   แต่เขียนไม่ได้ — พอ tx() เปิดธุรกรรมบนคอนเนกชันหนึ่ง อีกตัวจะได้
+   "database is locked" ทันที (เจอจริงตอน travelForward เรียก logActivity
+   ระหว่างที่ measureAll ยังอยู่ในธุรกรรม)
+
+   ตัวเขียนทุกตัวจึงต้องอยู่บนคอนเนกชันเดียว */
+export async function logActivity(
   tenantId: string,
   actor: string,
   action: string,
   detail?: string,
-) {
-  db()
-    .prepare(
-      "INSERT INTO activity_log (tenant_id, actor, action, detail, at) VALUES (?,?,?,?,?)",
-    )
-    .run(tenantId, actor, action, detail ?? null, new Date().toISOString());
+): Promise<void> {
+  await run(
+    "INSERT INTO activity_log (tenant_id, actor, action, detail, at) VALUES (?,?,?,?,?)",
+    tenantId,
+    actor,
+    action,
+    detail ?? null,
+    new Date().toISOString(),
+  );
 }

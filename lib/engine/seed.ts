@@ -1,4 +1,4 @@
-import { db } from "@/lib/engine/db";
+import { get, tx, type Sql } from "@/lib/engine/sql";
 import { ALL_PLAYS } from "@/lib/shared/plays";
 import {
   DEFAULT_TENANT_ID,
@@ -57,19 +57,20 @@ function pick(rnd: () => number, [a, b]: [number, number]) {
   return a + Math.floor(rnd() * (b - a + 1));
 }
 
-export function isSeeded(): boolean {
-  const row = db().prepare("SELECT COUNT(*) AS n FROM customers").get() as
-    | { n: number }
-    | undefined;
-  return (row?.n ?? 0) > 0;
+export async function isSeeded(): Promise<boolean> {
+  const row = await get<{ n: number | string }>(
+    "SELECT COUNT(*) AS n FROM customers",
+  );
+  return Number(row?.n ?? 0) > 0;
 }
 
 /** บัญชีนี้มีข้อมูลแล้วหรือยัง — ใช้ตอนเพิ่มบัญชีใหม่เข้าฐานที่มีอยู่แล้ว */
-export function isTenantSeeded(tenantId: string): boolean {
-  const row = db()
-    .prepare("SELECT COUNT(*) AS n FROM customers WHERE tenant_id = ?")
-    .get(tenantId) as { n: number } | undefined;
-  return (row?.n ?? 0) > 0;
+export async function isTenantSeeded(tenantId: string): Promise<boolean> {
+  const row = await get<{ n: number | string }>(
+    "SELECT COUNT(*) AS n FROM customers WHERE tenant_id = ?",
+    tenantId,
+  );
+  return Number(row?.n ?? 0) > 0;
 }
 
 /* ── ลบข้อมูลของบัญชีเดียว ─────────────────────────────────────
@@ -84,40 +85,46 @@ export function isTenantSeeded(tenantId: string): boolean {
    (จะเปลี่ยนเป็นลบตรงด้วย tenant_id ก็ได้ แต่ยังไม่ทำในรอบนี้ —
     การย้ายไป async ควรเปลี่ยนเรื่องเดียวต่อรอบ)
    ───────────────────────────────────────────────────────────── */
-function wipeTenant(tenantId: string) {
-  const d = db();
-
-  for (const t of ["campaign_audience", "messages", "attributions"]) {
-    d.prepare(
-      `DELETE FROM ${t} WHERE campaign_id IN
+async function wipeTenant(q: Sql, tenantId: string) {
+  for (const tbl of ["campaign_audience", "messages", "attributions"]) {
+    await q.run(
+      `DELETE FROM ${tbl} WHERE campaign_id IN
          (SELECT id FROM campaigns WHERE tenant_id = ?)`,
-    ).run(tenantId);
+      tenantId,
+    );
   }
-  d.prepare(
+  await q.run(
     `DELETE FROM line_items WHERE txn_id IN (
        SELECT tx.id FROM transactions tx
        JOIN customers c ON c.id = tx.customer_id
        WHERE c.tenant_id = ?)`,
-  ).run(tenantId);
-  for (const t of ["events", "consents", "memberships", "identities", "transactions"]) {
-    d.prepare(
-      `DELETE FROM ${t} WHERE customer_id IN
+    tenantId,
+  );
+  for (const tbl of [
+    "events",
+    "consents",
+    "memberships",
+    "identities",
+    "transactions",
+  ]) {
+    await q.run(
+      `DELETE FROM ${tbl} WHERE customer_id IN
          (SELECT id FROM customers WHERE tenant_id = ?)`,
-    ).run(tenantId);
+      tenantId,
+    );
   }
-  for (const t of [
+  for (const tbl of [
     "campaigns", "tenant_plays", "customer_features",
     "customers", "products", "brief_opens", "activity_log",
     "credit_purchases",
   ]) {
-    d.prepare(`DELETE FROM ${t} WHERE tenant_id = ?`).run(tenantId);
+    await q.run(`DELETE FROM ${tbl} WHERE tenant_id = ?`, tenantId);
   }
 }
 
 /* ── สร้างข้อมูลของบัญชีเดียวตามโปรไฟล์ ───────────────────────── */
 
-function seedTenant(p: TenantProfile, now: Date) {
-  const d = db();
+async function seedTenant(q: Sql, p: TenantProfile, now: Date) {
   const rnd = mulberry32(p.seedKey);
   const s = p.scale;
 
@@ -131,7 +138,7 @@ function seedTenant(p: TenantProfile, now: Date) {
      จะโผล่พร้อมกันเดือนละครั้งแทนที่จะโผล่ให้เห็นตอนพัฒนา */
   const billingDay = Math.min(28, openedAt.getDate());
 
-  d.prepare(
+  await q.run(
     `INSERT INTO tenants
        (id, name, cycle_shape, tier, created_at, max_messages_per_week,
         quiet_hours_start, quiet_hours_end, max_discount_pct, message_credits,
@@ -146,7 +153,7 @@ function seedTenant(p: TenantProfile, now: Date) {
        max_discount_pct = excluded.max_discount_pct,
        message_credits = excluded.message_credits,
        billing_day = excluded.billing_day`,
-  ).run(
+
     p.id, p.name, p.cycleShape, p.tier, iso(openedAt),
     p.limits.weeklyCap, p.limits.quietStart, p.limits.quietEnd,
     p.limits.maxDiscountPct, p.limits.credits, billingDay,
@@ -159,11 +166,9 @@ function seedTenant(p: TenantProfile, now: Date) {
   const plan = PLANS[p.tier];
   const welcome = Math.min(plan.welcomeCredits, p.limits.credits);
   const bought = Math.max(0, p.limits.credits - welcome);
-  const insCredit = d.prepare(
-    `INSERT INTO credit_purchases (tenant_id, at, messages, baht, kind)
-     VALUES (?,?,?,?,?)`,
-  );
-  if (welcome > 0) insCredit.run(p.id, iso(openedAt), welcome, 0, "welcome");
+  const insCreditQ = `INSERT INTO credit_purchases (tenant_id, at, messages, baht, kind)
+     VALUES (?,?,?,?,?)`;
+  if (welcome > 0) await q.run(insCreditQ, p.id, iso(openedAt), welcome, 0, "welcome");
   if (bought > 0) {
     /* ลงวันที่ตอนเปิดบัญชี ไม่ใช่ในรอบบิลปัจจุบัน
 
@@ -172,44 +177,28 @@ function seedTenant(p: TenantProfile, now: Date) {
        ขณะที่ข้อความที่เครดิตนั้นจ่ายไปถูกส่งเมื่อปีที่แล้ว (ประวัติเดโม
        เลื่อน sent_at ย้อนหลังไปพร้อม approved_at ตามที่ควรเป็น)
        ใบแจ้งค่าใช้จ่ายที่มีรายการซึ่งไม่ได้เกิดในรอบนั้น อ่านไม่ได้ */
-    insCredit.run(p.id, iso(openedAt), bought, priceForMessages(bought), "pack");
+    await q.run(insCreditQ, p.id, iso(openedAt), bought, priceForMessages(bought), "pack");
   }
 
-  const insProduct = d.prepare(
-    `INSERT INTO products (id, tenant_id, name, category, group_role, list_price, is_new_arrival, is_dead_stock)
-     VALUES (?,?,?,?,?,?,?,?)`,
-  );
+  const insProductQ = `INSERT INTO products (id, tenant_id, name, category, group_role, list_price, is_new_arrival, is_dead_stock)
+     VALUES (?,?,?,?,?,?,?,?)`;
   for (const c of p.catalogue) {
-    insProduct.run(
+    await q.run(insProductQ, 
       `${p.id}:${c.id}`, p.id, c.name, c.category, c.group_role, c.list_price,
       c.is_new_arrival ? 1 : 0, c.is_dead_stock ? 1 : 0,
     );
   }
 
-  const insCustomer = d.prepare(
-    "INSERT INTO customers (id, tenant_id, name, created_at) VALUES (?,?,?,?)",
-  );
-  const insIdentity = d.prepare(
-    "INSERT INTO identities (tenant_id, customer_id, type, value_hash) VALUES (?,?,?,?)",
-  );
-  const insTxn = d.prepare(
-    `INSERT INTO transactions (tenant_id, id, customer_id, occurred_at, total, discount_total, channel)
-     VALUES (?,?,?,?,?,?,?)`,
-  );
-  const insLine = d.prepare(
-    `INSERT INTO line_items (tenant_id, txn_id, product_id, qty, unit_price, unit_list_price)
-     VALUES (?,?,?,?,?,?)`,
-  );
-  const insConsent = d.prepare(
-    `INSERT INTO consents (tenant_id, customer_id, purpose, granted_at, revoked_at, source)
-     VALUES (?,?,?,?,?,?)`,
-  );
-  const insMembership = d.prepare(
-    "INSERT INTO memberships (tenant_id, customer_id, kind, started_at, expires_at) VALUES (?,?,?,?,?)",
-  );
-  const insEvent = d.prepare(
-    "INSERT INTO events (tenant_id, customer_id, type, occurred_at, meta) VALUES (?,?,?,?,?)",
-  );
+  const insCustomerQ = "INSERT INTO customers (id, tenant_id, name, created_at) VALUES (?,?,?,?)";
+  const insIdentityQ = "INSERT INTO identities (tenant_id, customer_id, type, value_hash) VALUES (?,?,?,?)";
+  const insTxnQ = `INSERT INTO transactions (tenant_id, id, customer_id, occurred_at, total, discount_total, channel)
+     VALUES (?,?,?,?,?,?,?)`;
+  const insLineQ = `INSERT INTO line_items (tenant_id, txn_id, product_id, qty, unit_price, unit_list_price)
+     VALUES (?,?,?,?,?,?)`;
+  const insConsentQ = `INSERT INTO consents (tenant_id, customer_id, purpose, granted_at, revoked_at, source)
+     VALUES (?,?,?,?,?,?)`;
+  const insMembershipQ = "INSERT INTO memberships (tenant_id, customer_id, kind, started_at, expires_at) VALUES (?,?,?,?,?)";
+  const insEventQ = "INSERT INTO events (tenant_id, customer_id, type, occurred_at, meta) VALUES (?,?,?,?,?)";
 
   /* recency ถูกวางแผนล่วงหน้าเพื่อให้จำนวนคนในแต่ละช่วงตรงเป้าพอดี
      ไม่ปล่อยให้เป็นผลพลอยได้ของการสุ่ม */
@@ -257,8 +246,8 @@ function seedTenant(p: TenantProfile, now: Date) {
     const signupDays = transacts
       ? oldest + 20 + Math.floor(rnd() * 120)
       : 5 + Math.floor(rnd() * 80);
-    insCustomer.run(id, p.id, name, iso(daysAgo(now, signupDays)));
-    insIdentity.run(p.id, id, "phone", `ph_${id}_${Math.floor(rnd() * 1e9)}`);
+    await q.run(insCustomerQ, id, p.id, name, iso(daysAgo(now, signupDays)));
+    await q.run(insIdentityQ, p.id, id, "phone", `ph_${id}_${Math.floor(rnd() * 1e9)}`);
 
     /* ── ความยินยอมและช่องทางที่ทักถึง ──
        คนที่ถอนความยินยอมคือคนที่ Keep ยอมแพ้ และไม่มีสิทธิ์ถูกส่ง
@@ -266,13 +255,13 @@ function seedTenant(p: TenantProfile, now: Date) {
     const consentRoll = rnd();
     if (consentRoll > p.noConsentShare) {
       const revoked = consentRoll > 1 - p.revokedShare;
-      insConsent.run(p.id, id, "marketing",
+      await q.run(insConsentQ, p.id, id, "marketing",
         iso(daysAgo(now, signupDays)),
         revoked ? iso(daysAgo(now, Math.floor(rnd() * 90))) : null,
         rnd() > 0.5 ? "signup_form" : "line_oa",
       );
     }
-    if (rnd() < p.lineShare) insIdentity.run(p.id, id, "line", `line_${id}`);
+    if (rnd() < p.lineShare) await q.run(insIdentityQ, p.id, id, "line", `line_${id}`);
 
     /* ── สมาชิกที่มีวันหมดอายุ — ป้อนให้ play กลุ่ม expiry ──
 
@@ -292,7 +281,7 @@ function seedTenant(p: TenantProfile, now: Date) {
         ? -Math.floor(rnd() * term) // หมดอายุแล้วไม่เกินหนึ่งรอบ
         : Math.floor(rnd() * term); // ยังไม่หมด กระจายสม่ำเสมอทั้งปี
       const startedDaysAgo = term - remaining;
-      insMembership.run(p.id, id, p.membership.kind,
+      await q.run(insMembershipQ, p.id, id, p.membership.kind,
         iso(daysAgo(now, startedDaysAgo)),
         iso(daysAgo(now, -remaining)),
       );
@@ -301,17 +290,17 @@ function seedTenant(p: TenantProfile, now: Date) {
     // มาแต่ไม่จ่าย
     const visits = Math.floor(rnd() * (p.events.visitMax + 1));
     for (let v = 0; v < visits; v++) {
-      insEvent.run(p.id, id, "visit", iso(daysAgo(now, Math.floor(rnd() * 240))), null);
+      await q.run(insEventQ, p.id, id, "visit", iso(daysAgo(now, Math.floor(rnd() * 240))), null);
     }
     // ใช้บริการที่ไม่ใช่การซื้อของ
     if (rnd() < p.events.bookingShare) {
-      insEvent.run(p.id, id, "booking",
+      await q.run(insEventQ, p.id, id, "booking",
         iso(daysAgo(now, Math.floor(rnd() * 120))),
         p.events.bookingLabel,
       );
     }
     if (!transacts && rnd() < p.events.formShare) {
-      insEvent.run(p.id, id, "form", iso(daysAgo(now, 7 + Math.floor(rnd() * 70))), "lead_form");
+      await q.run(insEventQ, p.id, id, "form", iso(daysAgo(now, 7 + Math.floor(rnd() * 70))), "lead_form");
     }
 
     if (!transacts) continue;
@@ -347,6 +336,16 @@ function seedTenant(p: TenantProfile, now: Date) {
         items.push(pool[Math.floor(rnd() * pool.length)]);
       }
 
+      /* ── แม่ต้องมาก่อนลูก ──
+
+         เดิมแทรก line_items ก่อนแล้วค่อยแทรก transactions เพราะยอดรวม
+         คำนวณได้จากรายการ sqlite ปล่อยผ่านเพราะสคีมาฝั่งนั้นไม่ได้ประกาศ
+         foreign key ไว้ แต่ Postgres ประกาศไว้และบังคับทันที —
+         "violates foreign key constraint line_items_txn_id_fkey"
+
+         คำนวณยอดให้ครบก่อน แล้วแทรกแม่ ตามด้วยลูก ลำดับนี้ถูกต้องกับ
+         ทั้งสองตัวขับ และถูกต้องกับความหมายของข้อมูลด้วย */
+      const lines: { c: CatalogueItem; qty: number; unit: number }[] = [];
       let total = 0;
       let discountTotal = 0;
       for (const c of items) {
@@ -364,40 +363,51 @@ function seedTenant(p: TenantProfile, now: Date) {
                 ? Math.min(maxOff, 0.05 + rnd() * 0.1)
                 : 0;
         const unit = Math.round(c.list_price * (1 - disc));
-        insLine.run(p.id, txnId, `${p.id}:${c.id}`, qty, unit, c.list_price);
+        lines.push({ c, qty, unit });
         total += unit * qty;
         discountTotal += (c.list_price - unit) * qty;
       }
-      insTxn.run(p.id, txnId, id, at, total, discountTotal,
+      await q.run(insTxnQ, p.id, txnId, id, at, total, discountTotal,
         rnd() > 0.82 ? p.channels[1] : p.channels[0],
       );
+      for (const l of lines) {
+        await q.run(
+          insLineQ, p.id, txnId, `${p.id}:${l.c.id}`, l.qty, l.unit, l.c.list_price,
+        );
+      }
     }
   }
 
   /* เปิด play ทั้งคลังให้บัญชีตั้งแต่วันแรก (D2)
      ตัวที่ไม่เข้ากับรูปทรงวงจรของบัญชีจะถูกกรองตอน MATCH ไม่ใช่ตรงนี้ */
-  const insTenantPlay = d.prepare(
-    "INSERT INTO tenant_plays (tenant_id, play_id, enabled) VALUES (?,?,1)",
-  );
-  for (const play of ALL_PLAYS) insTenantPlay.run(p.id, play.id);
+  const insTenantPlayQ = "INSERT INTO tenant_plays (tenant_id, play_id, enabled) VALUES (?,?,1)";
+  for (const play of ALL_PLAYS) await q.run(insTenantPlayQ, p.id, play.id);
 }
 
-export function seed({ force = false, only }: { force?: boolean; only?: string } = {}) {
-  const d = db();
+export async function seed({ force = false, only }: { force?: boolean; only?: string } = {}) {
   const targets = only
     ? TENANT_PROFILES.filter((t) => t.id === only)
     : TENANT_PROFILES;
   if (!targets.length) return { seeded: false, tenants: [] as string[] };
 
-  const pending = force ? targets : targets.filter((t) => !isTenantSeeded(t.id));
+  /* ── ต้องกรองแบบ async ──
+     `targets.filter((t) => !isTenantSeeded(t.id))` ดูเหมือนใช้ได้ แต่
+     isTenantSeeded คืน Promise ซึ่ง `!promise` เป็น false เสมอ ผลคือ
+     pending ว่างทุกครั้งและ seed ไม่ทำอะไรเลยโดยไม่มี error สักตัว */
+  const pending = force
+    ? targets
+    : (
+        await Promise.all(
+          targets.map(async (t) => ((await isTenantSeeded(t.id)) ? null : t)),
+        )
+      ).filter((t): t is TenantProfile => t !== null);
   if (!pending.length) return { seeded: false, tenants: [] as string[] };
 
   const now = new Date();
-  d.exec("BEGIN");
-  try {
+  await tx(async (q) => {
     for (const p of pending) {
-      wipeTenant(p.id);
-      seedTenant(p, now);
+      await wipeTenant(q, p.id);
+      await seedTenant(q, p, now);
     }
 
     /* prior ที่สืบทอดมาจากร้านอื่นในวงจรเดียวกัน (D9 · §7)
@@ -405,23 +415,26 @@ export function seed({ force = false, only }: { force?: boolean; only?: string }
        จึงเขียนครั้งเดียวครอบทุกรูปทรงวงจร ไม่ผูกกับบัญชีใด
        และเป็นเหตุผลว่าทำไมร้านที่สองได้ประโยชน์จากร้านแรกทันที */
     const perfEmpty =
-      (d.prepare("SELECT COUNT(*) AS n FROM play_performance").get() as { n: number })
-        .n === 0;
+      Number(
+        (
+          await q.get<{ n: number | string }>(
+            "SELECT COUNT(*) AS n FROM play_performance",
+          )
+        )?.n ?? 0,
+      ) === 0;
     if (perfEmpty) {
       const rnd = mulberry32(9090909);
-      const insPerf = d.prepare(
-        `INSERT INTO play_performance
+      const insPerfQ = `INSERT INTO play_performance
           (play_id, cycle_shape, size_bucket, trials, successes, posterior_alpha, posterior_beta)
          VALUES (?,?,?,?,?,?,?)
-         ON CONFLICT(play_id, cycle_shape, size_bucket) DO NOTHING`,
-      );
+         ON CONFLICT(play_id, cycle_shape, size_bucket) DO NOTHING`;
       for (const play of ALL_PLAYS) {
         for (const shape of play.cycle_shape) {
           const trials = 120 + Math.floor(rnd() * 900);
           const successes = Math.round(
             trials * play.priors.response_rate * (0.75 + rnd() * 0.5),
           );
-          insPerf.run(
+          await q.run(insPerfQ, 
             play.id, shape, "300_1000", trials, successes,
             1 + successes, 1 + (trials - successes),
           );
@@ -429,11 +442,7 @@ export function seed({ force = false, only }: { force?: boolean; only?: string }
       }
     }
 
-    d.exec("COMMIT");
-  } catch (err) {
-    d.exec("ROLLBACK");
-    throw err;
-  }
+  });
 
   return { seeded: true, tenants: pending.map((t) => t.id) };
 }

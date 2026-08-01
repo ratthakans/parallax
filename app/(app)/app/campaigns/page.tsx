@@ -1,5 +1,5 @@
+import { all } from "@/lib/engine/sql";
 import Link from "next/link";
-import { db } from "@/lib/engine/db";
 import { playById } from "@/lib/shared/plays";
 import { getActiveTenantId } from "@/lib/shared/active-tenant";
 import type { Verdict } from "@/lib/shared/types";
@@ -38,17 +38,13 @@ type Row = {
 export default async function CampaignsPage() {
   const tenantId = await getActiveTenantId();
 
-  const rows = db()
-    .prepare(
-      `SELECT c.*,
+  const rows = await all<Row>(`SELECT c.*,
               (SELECT COUNT(*) FROM messages m WHERE m.campaign_id = c.id) AS sent,
               (SELECT a.verdict FROM attributions a
                 WHERE a.campaign_id = c.id AND a.horizon_days = 90) AS verdict90
        FROM campaigns c
        WHERE c.tenant_id = ?
-       ORDER BY c.approved_at DESC`,
-    )
-    .all(tenantId) as Row[];
+       ORDER BY c.approved_at DESC`, tenantId);
 
   const live = rows.filter((r) => !r.dry_run);
   /* แคมเปญที่อนุมัติแล้วแต่ยังไม่ได้ส่ง คือ "งานที่ค้างอยู่"

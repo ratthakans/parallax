@@ -49,10 +49,10 @@ export default async function BillingPage() {
   const tenantId = await getActiveTenantId();
   const profile = profileFor(tenantId);
   const v = profile.vocab;
-  const u = usageFor(tenantId);
+  const u = await usageFor(tenantId);
   const plan = u.plan;
-  const costs = recentCampaignCosts(tenantId);
-  const roi = roiSummary(tenantId);
+  const costs = await recentCampaignCosts(tenantId);
+  const roi = await roiSummary(tenantId);
 
   const suggested = planForBaseSize(u.identified);
   const packRate = u.messagesThisPeriod > 0 ? u.creditSpendThisPeriod : 0;
@@ -304,8 +304,8 @@ export default async function BillingPage() {
                     <td className="c-mono whitespace-nowrap text-[0.76rem]">
                       {date(c.last_sent_at)}
                     </td>
-                    <td className="c-num text-right">{num(c.sent)}</td>
-                    <td className="c-num text-right">{baht(c.cost)}</td>
+                    <td className="c-num text-right">{num(Number(c.sent))}</td>
+                    <td className="c-num text-right">{baht(Number(c.cost))}</td>
                     <td className="text-right text-[var(--c-cyan)]">
                       {c.inPeriod ? "•" : ""}
                     </td>

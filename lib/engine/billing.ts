@@ -1,4 +1,5 @@
-import { db, logActivity } from "@/lib/engine/db";
+import { all, get, run, tx } from "@/lib/engine/sql";
+import { logActivity } from "@/lib/engine/db";
 import {
   MESSAGE_COST_BAHT,
   PLANS,
@@ -16,10 +17,11 @@ import {
    ที่บังคับใช้จริง ถ้าประกาศแต่ไม่มีคนเรียก มันคือคำโฆษณา ไม่ใช่เพดาน
    ───────────────────────────────────────────────────────────── */
 
-export function planFor(tenantId: string): Plan {
-  const row = db().prepare("SELECT tier FROM tenants WHERE id = ?").get(tenantId) as
-    | { tier: string }
-    | undefined;
+export async function planFor(tenantId: string): Promise<Plan> {
+  const row = await get<{ tier: string }>(
+    "SELECT tier FROM tenants WHERE id = ?",
+    tenantId,
+  );
   return planById(row?.tier ?? "growth");
 }
 
@@ -55,16 +57,14 @@ export function billingPeriod(billingDay: number, now = new Date()): Period {
    ตัวเลขที่ราคาคิดตาม จึงต้องนิยามให้ตรงกับที่หน้าราคาเขียน:
    คนที่มีตัวระบุอย่างน้อยหนึ่งอย่าง (จึงติดต่อหรือจับคู่ได้)
    ไม่ใช่จำนวนแถวในไฟล์ที่นำเข้า */
-export function identifiedCount(tenantId: string): number {
-  return (
-    db()
-      .prepare(
-        `SELECT COUNT(*) AS n FROM customers c
-         WHERE c.tenant_id = ?
-           AND EXISTS (SELECT 1 FROM identities i WHERE i.customer_id = c.id)`,
-      )
-      .get(tenantId) as { n: number }
-  ).n;
+export async function identifiedCount(tenantId: string): Promise<number> {
+  const row = await get<{ n: number | string }>(
+    `SELECT COUNT(*) AS n FROM customers c
+     WHERE c.tenant_id = ?
+       AND EXISTS (SELECT 1 FROM identities i WHERE i.customer_id = c.id)`,
+    tenantId,
+  );
+  return Number(row?.n ?? 0);
 }
 
 export type Usage = {
@@ -92,51 +92,55 @@ export type Usage = {
   invoiceThisPeriod: number;
 };
 
-export function usageFor(tenantId: string, now = new Date()): Usage {
-  const d = db();
-  const t = d
-    .prepare(
-      "SELECT tier, message_credits, billing_day FROM tenants WHERE id = ?",
-    )
-    .get(tenantId) as
-    | { tier: string; message_credits: number; billing_day: number }
-    | undefined;
+export async function usageFor(
+  tenantId: string,
+  now = new Date(),
+): Promise<Usage> {
+  const t = await get<{
+    tier: string;
+    message_credits: number;
+    billing_day: number;
+  }>("SELECT tier, message_credits, billing_day FROM tenants WHERE id = ?", tenantId);
 
   const plan = planById(t?.tier ?? "growth");
   const billingDay = t?.billing_day ?? 1;
   const period = billingPeriod(billingDay, now);
   const startIso = period.start.toISOString();
 
-  const identified = identifiedCount(tenantId);
+  const identified = await identifiedCount(tenantId);
 
-  const msgRow = d
-    .prepare(
-      `SELECT COUNT(*) AS n, COALESCE(SUM(m.cost), 0) AS c
-       FROM messages m JOIN campaigns c2 ON c2.id = m.campaign_id
-       WHERE c2.tenant_id = ? AND m.sent_at >= ?`,
-    )
-    .get(tenantId, startIso) as { n: number; c: number };
+  /* COUNT และ SUM คืน bigint/numeric จาก Postgres — แปลงทั้งคู่ ไม่งั้น
+     ยอดข้อความจะเป็นสตริงแล้วการบวกกลายเป็นการต่อข้อความ */
+  const msgRaw = await get<{ n: number | string; c: number | string }>(
+    `SELECT COUNT(*) AS n, COALESCE(SUM(m.cost), 0) AS c
+     FROM messages m JOIN campaigns c2 ON c2.id = m.campaign_id
+     WHERE c2.tenant_id = ? AND m.sent_at >= ?`,
+    tenantId,
+    startIso,
+  );
+  const msgRow = { n: Number(msgRaw?.n ?? 0), c: Number(msgRaw?.c ?? 0) };
 
-  const allTime = (
-    d
-      .prepare(
+  const allTime = Number(
+    (
+      await get<{ n: number | string }>(
         `SELECT COUNT(*) AS n FROM messages m
          JOIN campaigns c2 ON c2.id = m.campaign_id WHERE c2.tenant_id = ?`,
+        tenantId,
       )
-      .get(tenantId) as { n: number }
-  ).n;
+    )?.n ?? 0,
+  );
 
-  const purchases = d
-    .prepare(
-      `SELECT at, messages, baht, kind FROM credit_purchases
-       WHERE tenant_id = ? AND at >= ? ORDER BY at DESC`,
-    )
-    .all(tenantId, startIso) as {
+  const purchases = await all<{
     at: string;
     messages: number;
     baht: number;
     kind: string;
-  }[];
+  }>(
+    `SELECT at, messages, baht, kind FROM credit_purchases
+     WHERE tenant_id = ? AND at >= ? ORDER BY at DESC`,
+    tenantId,
+    startIso,
+  );
 
   const creditSpend = purchases.reduce((s, p) => s + p.baht, 0);
   const creditsLeft = t?.message_credits ?? 0;
@@ -175,29 +179,30 @@ export function usageFor(tenantId: string, now = new Date()): Usage {
 /* ── โควตาทดลองที่ยังเหลือ ────────────────────────────────────
    หน้าบรีฟต้องบอก "คุณมีสิทธิ์ส่งหนึ่งครั้ง" ไม่ใช่ "แผนนี้ส่งไม่ได้"
    ข้อความที่สองเป็นความจริงเก่าที่หยุดเป็นความจริงตอนเปิดโควตานี้ */
-export function reachTrialState(
+export async function reachTrialState(
   tenantId: string,
-): { campaignsLeft: number; audienceCap: number } | null {
-  const cap = planFor(tenantId).caps.reach;
+): Promise<{ campaignsLeft: number; audienceCap: number } | null> {
+  const cap = ((await planFor(tenantId))).caps.reach;
   if (cap.kind !== "trial") return null;
-  const used = (
-    db()
-      .prepare(
+  const used = Number(
+    (
+      await get<{ n: number | string }>(
         "SELECT COUNT(*) AS n FROM campaigns WHERE tenant_id = ? AND dry_run = 0",
+        tenantId,
       )
-      .get(tenantId) as { n: number }
-  ).n;
+    )?.n ?? 0,
+  );
   return {
     campaignsLeft: Math.max(0, cap.campaigns - used),
     audienceCap: cap.audience,
   };
 }
 
-export function reachBlockedReason(
+export async function reachBlockedReason(
   tenantId: string,
   opts: { audience?: number } = {},
-): string | null {
-  const plan = planFor(tenantId);
+): Promise<string | null> {
+  const plan = await planFor(tenantId);
   const cap = plan.caps.reach;
   if (cap.kind === "yes") return null;
 
@@ -210,13 +215,14 @@ export function reachBlockedReason(
      นับเฉพาะแคมเปญที่ส่งจริง (dry_run = 0) — การซ้อมส่งไม่ควรกินโควตา
      เพราะไม่มีข้อความออกไปหาใครและไม่มีอะไรให้วัด */
   if (cap.kind === "trial") {
-    const used = (
-      db()
-        .prepare(
+    const used = Number(
+      (
+        await get<{ n: number | string }>(
           "SELECT COUNT(*) AS n FROM campaigns WHERE tenant_id = ? AND dry_run = 0",
+          tenantId,
         )
-        .get(tenantId) as { n: number }
-    ).n;
+      )?.n ?? 0,
+    );
 
     if (used >= cap.campaigns) {
       return (
@@ -248,8 +254,10 @@ export function reachBlockedReason(
    ทิศทางเข้าข้างลูกค้า (ได้เกินที่จ่าย) จึงเป็นรูรั่วรายได้ ไม่ใช่รูรั่ว
    ความน่าเชื่อถือ — แต่บนเว็บที่ทั้งหน้าเถียงเรื่อง "พูดให้ตรงกับที่วัดได้"
    ตารางราคาที่ไม่ตรงกับของจริงคือความไม่สอดคล้องที่แพงที่สุดที่จะมี */
-export function proofBlockedReason(tenantId: string): string | null {
-  const plan = planFor(tenantId);
+export async function proofBlockedReason(
+  tenantId: string,
+): Promise<string | null> {
+  const plan = await planFor(tenantId);
   if (plan.caps.proof.kind === "yes") return null;
   return (
     `${plan.name} does not include measured proof — the holdout comparison and ` +
@@ -258,16 +266,16 @@ export function proofBlockedReason(tenantId: string): string | null {
 }
 
 /** เหตุผลที่นำเข้าข้อมูลชุดนี้ไม่ได้ — null คือนำเข้าได้ */
-export function contactCapBlockedReason(
+export async function contactCapBlockedReason(
   tenantId: string,
   adding: number,
   opts: { replacing?: boolean } = {},
-): string | null {
-  const plan = planFor(tenantId);
+): Promise<string | null> {
+  const plan = await planFor(tenantId);
   if (plan.contactCap == null) return null;
   /* แทนที่ทั้งฐานคือเริ่มจากศูนย์ ไม่ใช่บวกทับของเดิม — ถ้านับทับ
      ร้านที่อยู่ใกล้เพดานจะแก้ไขข้อมูลตัวเองไม่ได้เลย */
-  const base = opts.replacing ? 0 : identifiedCount(tenantId);
+  const base = opts.replacing ? 0 : await identifiedCount(tenantId);
   const after = base + Math.max(0, adding);
   if (after <= plan.contactCap) return null;
   const next = nextPlanUp(plan.id);
@@ -297,31 +305,32 @@ export function planForBaseSize(people: number): PlanId {
 /* ── การเปลี่ยนแปลงยอดเงิน ─────────────────────────────────────── */
 
 /** ซื้อเครดิตข้อความ — คืนจำนวนบาทที่คิด */
-export function buyCredits(
+export async function buyCredits(
   tenantId: string,
   messages: number,
   kind: "welcome" | "pack" = "pack",
   at = new Date(),
-): number {
+): Promise<number> {
   const n = Math.max(0, Math.floor(messages));
   if (n === 0) return 0;
   const baht = kind === "welcome" ? 0 : priceForMessages(n);
-  const d = db();
-  d.exec("BEGIN");
-  try {
-    d.prepare(
+  await tx(async (t) => {
+    await t.run(
       "UPDATE tenants SET message_credits = message_credits + ? WHERE id = ?",
-    ).run(n, tenantId);
-    d.prepare(
+      n,
+      tenantId,
+    );
+    await t.run(
       `INSERT INTO credit_purchases (tenant_id, at, messages, baht, kind)
        VALUES (?,?,?,?,?)`,
-    ).run(tenantId, at.toISOString(), n, baht, kind);
-    d.exec("COMMIT");
-  } catch (err) {
-    d.exec("ROLLBACK");
-    throw err;
-  }
-  logActivity(
+      tenantId,
+      at.toISOString(),
+      n,
+      baht,
+      kind,
+    );
+  });
+  await logActivity(
     tenantId,
     "owner",
     "buy_credits",
@@ -331,9 +340,9 @@ export function buyCredits(
 }
 
 /** เปลี่ยนแผน — ของเดโม ระบบจริงต้องผ่านการชำระเงินและสัญญา */
-export function changePlan(tenantId: string, planId: PlanId) {
-  db().prepare("UPDATE tenants SET tier = ? WHERE id = ?").run(planId, tenantId);
-  logActivity(tenantId, "owner", "change_plan", PLANS[planId].name);
+export async function changePlan(tenantId: string, planId: PlanId) {
+  await run("UPDATE tenants SET tier = ? WHERE id = ?", planId, tenantId);
+  await logActivity(tenantId, "owner", "change_plan", PLANS[planId].name);
 }
 
 /* ── ค่าส่งรายแคมเปญ ───────────────────────────────────────────
@@ -341,41 +350,42 @@ export function changePlan(tenantId: string, planId: PlanId) {
    ในรอบ — เพราะประวัติของบัญชีตัวอย่างกระจายย้อนหลังกว่าปี ตารางที่
    กรองเฉพาะรอบนี้จึงว่างเปล่าตลอดเวลาและอ่านเหมือนระบบพัง
    ยอดรวมของรอบยังคิดจาก usageFor ซึ่งกรองตามรอบจริง */
-export function recentCampaignCosts(
+export async function recentCampaignCosts(
   tenantId: string,
   limit = 12,
   now = new Date(),
 ) {
   const period = billingPeriod(
     (
-      db()
-        .prepare("SELECT billing_day FROM tenants WHERE id = ?")
-        .get(tenantId) as { billing_day: number } | undefined
+      await get<{ billing_day: number }>(
+        "SELECT billing_day FROM tenants WHERE id = ?",
+        tenantId,
+      )
     )?.billing_day ?? 1,
     now,
   );
   const startIso = period.start.toISOString();
 
-  const rows = db()
-    .prepare(
-      `SELECT c.id, c.play_id, c.approved_at,
-              MAX(m.sent_at) AS last_sent_at,
-              COUNT(m.customer_id) AS sent,
-              COALESCE(SUM(m.cost), 0) AS cost
-       FROM campaigns c JOIN messages m ON m.campaign_id = c.id
-       WHERE c.tenant_id = ? AND m.sent_at IS NOT NULL
-       GROUP BY c.id
-       ORDER BY last_sent_at DESC
-       LIMIT ?`,
-    )
-    .all(tenantId, limit) as {
+  const rows = await all<{
     id: string;
     play_id: string;
     approved_at: string;
     last_sent_at: string;
-    sent: number;
-    cost: number;
-  }[];
+    sent: number | string;
+    cost: number | string;
+  }>(
+    `SELECT c.id, c.play_id, c.approved_at,
+            MAX(m.sent_at) AS last_sent_at,
+            COUNT(m.customer_id) AS sent,
+            COALESCE(SUM(m.cost), 0) AS cost
+     FROM campaigns c JOIN messages m ON m.campaign_id = c.id
+     WHERE c.tenant_id = ? AND m.sent_at IS NOT NULL
+     GROUP BY c.id
+     ORDER BY last_sent_at DESC
+     LIMIT ?`,
+    tenantId,
+    limit,
+  );
 
   return rows.map((r) => ({ ...r, inPeriod: r.last_sent_at >= startIso }));
 }

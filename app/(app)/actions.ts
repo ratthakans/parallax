@@ -1,9 +1,11 @@
 "use server";
 
+import { all, get, run } from "@/lib/engine/sql";
+import { logActivity } from "@/lib/engine/db";
+
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
-import { db, logActivity } from "@/lib/engine/db";
 import { deriveFeatures } from "@/lib/engine/derive";
 import { approveCampaign, sendCampaign } from "@/lib/engine/dispatch";
 import { runMatch, getTenant } from "@/lib/engine/match";
@@ -119,7 +121,7 @@ export async function approveAction(
   const holdoutPct =
     holdoutRaw != null && String(holdoutRaw) !== "" ? Number(holdoutRaw) : undefined;
 
-  const planBlock = reachBlockedReason(tenantId);
+  const planBlock = await reachBlockedReason(tenantId);
   const { candidates } = await runMatch(tenantId);
   const candidate = candidates.find((c) => c.play.id === playId);
 
@@ -238,7 +240,7 @@ export async function measureAction(
 
   let rows;
   try {
-    rows = measureCampaign(campaignId, { tenantId });
+    rows = await measureCampaign(campaignId, { tenantId });
   } catch (err) {
     return { error: messageOf(err) };
   }
@@ -264,14 +266,10 @@ export async function measureAllAction(
   formData: FormData,
 ): Promise<ActionState> {
   const tenantId = await currentTenant(formData);
-  const rows = db()
-    .prepare(
-      "SELECT id FROM campaigns WHERE tenant_id = ? AND dry_run = 0 AND status != 'complete'",
-    )
-    .all(tenantId) as { id: string }[];
+  const rows = await all<{ id: string }>("SELECT id FROM campaigns WHERE tenant_id = ? AND dry_run = 0 AND status != 'complete'", tenantId);
 
   let horizons = 0;
-  for (const r of rows) horizons += measureCampaign(r.id, { tenantId }).length;
+  for (const r of rows) horizons += (await measureCampaign(r.id, { tenantId })).length;
   revalidateConsole();
 
   if (rows.length === 0) {
@@ -293,13 +291,9 @@ export async function togglePlayAction(
   const tenantId = await currentTenant(formData);
   const playId = String(formData.get("playId") ?? "");
   const enabled = formData.get("enabled") === "1";
-  db()
-    .prepare(
-      `INSERT INTO tenant_plays (tenant_id, play_id, enabled) VALUES (?,?,?)
-       ON CONFLICT(tenant_id, play_id) DO UPDATE SET enabled = excluded.enabled`,
-    )
-    .run(tenantId, playId, enabled ? 1 : 0);
-  logActivity(tenantId, ACTOR, enabled ? "enable_play" : "disable_play", playId);
+  await run(`INSERT INTO tenant_plays (tenant_id, play_id, enabled) VALUES (?,?,?)
+       ON CONFLICT(tenant_id, play_id) DO UPDATE SET enabled = excluded.enabled`, tenantId, playId, enabled ? 1 : 0);
+  await logActivity(tenantId, ACTOR, enabled ? "enable_play" : "disable_play", playId);
   revalidateConsole();
   return {
     ok: enabled
@@ -320,23 +314,17 @@ export async function updateGuardsAction(
     const n = Number(v);
     return Number.isFinite(n) && n >= 0 ? Math.floor(n) : null;
   };
-  db()
-    .prepare(
-      `INSERT INTO tenant_plays (tenant_id, play_id, enabled, min_audience, cooldown_days, max_discount_pct)
+  await run(`INSERT INTO tenant_plays (tenant_id, play_id, enabled, min_audience, cooldown_days, max_discount_pct)
        VALUES (?,?,1,?,?,?)
        ON CONFLICT(tenant_id, play_id) DO UPDATE SET
          min_audience = excluded.min_audience,
          cooldown_days = excluded.cooldown_days,
-         max_discount_pct = excluded.max_discount_pct`,
-    )
-    .run(
-      tenantId,
+         max_discount_pct = excluded.max_discount_pct`, tenantId,
       playId,
       readNum("minAudience"),
       readNum("cooldownDays"),
-      readNum("maxDiscountPct"),
-    );
-  logActivity(tenantId, ACTOR, "update_guards", playId);
+      readNum("maxDiscountPct"));
+  await logActivity(tenantId, ACTOR, "update_guards", playId);
   revalidateConsole();
   return { ok: "Saved — it takes effect on the next brief." };
 }
@@ -349,10 +337,8 @@ export async function deriveAction(
 ): Promise<ActionState> {
   const tenantId = await currentTenant(formData);
   await deriveFeatures(tenantId);
-  const n = db()
-    .prepare("SELECT COUNT(*) AS n FROM customer_features WHERE tenant_id = ?")
-    .get(tenantId) as { n: number };
-  logActivity(tenantId, ACTOR, "derive_features");
+  const n = (await get<{ n: number }>("SELECT COUNT(*) AS n FROM customer_features WHERE tenant_id = ?", tenantId))!;
+  await logActivity(tenantId, ACTOR, "derive_features");
   revalidateConsole();
   return { ok: `Recomputed — ${num(n.n)} rows in the feature table.` };
 }
@@ -381,7 +367,7 @@ export async function travelAction(
   if (!demoToolsEnabled()) return { error: DEMO_TOOLS_OFF_REASON };
   const raw = Number(formData.get("days") ?? 0);
   const days = Number.isFinite(raw) ? Math.min(365, Math.max(1, Math.floor(raw))) : 30;
-  const res = travelForward(tenantId, days);
+  const res = await travelForward(tenantId, days);
   revalidateConsole();
   if (res.campaigns === 0) {
     return {
@@ -399,7 +385,7 @@ export async function clearAiCacheAction(
 ): Promise<ActionState> {
   const tenantId = await currentTenant(formData);
   clearAiCache();
-  logActivity(tenantId, ACTOR, "clear_ai_cache");
+  await logActivity(tenantId, ACTOR, "clear_ai_cache");
   revalidateConsole();
   return { ok: "Cleared — the next brief writes its sentences from scratch." };
 }
@@ -417,13 +403,9 @@ export async function updateLimitsAction(
   const quietStart = readInt("quietStart", 0, 23, 21);
   const quietEnd = readInt("quietEnd", 0, 23, 9);
   const maxDiscount = readInt("maxDiscount", 0, 100, 20);
-  db()
-    .prepare(
-      `UPDATE tenants SET max_messages_per_week = ?, quiet_hours_start = ?,
-         quiet_hours_end = ?, max_discount_pct = ? WHERE id = ?`,
-    )
-    .run(weeklyCap, quietStart, quietEnd, maxDiscount, tenantId);
-  logActivity(tenantId, ACTOR, "update_limits");
+  await run(`UPDATE tenants SET max_messages_per_week = ?, quiet_hours_start = ?,
+         quiet_hours_end = ?, max_discount_pct = ? WHERE id = ?`, weeklyCap, quietStart, quietEnd, maxDiscount, tenantId);
+  await logActivity(tenantId, ACTOR, "update_limits");
   revalidateConsole();
 
   /* ตั้งเวลาเริ่มเท่ากับเวลาจบ = ไม่มีช่วงห้ามส่งเลย ต้องบอกให้ชัด
@@ -448,7 +430,7 @@ export async function buyCreditsAction(
      ไม่งั้นยิงค่าลบมาก็หักเครดิตติดลบได้ และยิงเลขใหญ่มาก็ได้เครดิตฟรี */
   const pack = CREDIT_PACKS.find((p) => p.messages === messages);
   if (!pack) return { error: "No credit pack of that size." };
-  const total = buyCredits(tenantId, pack.messages, "pack");
+  const total = await buyCredits(tenantId, pack.messages, "pack");
   revalidateConsole();
   return {
     ok: `Added ${num(pack.messages)} credits · ${num(total)} available now.`,
@@ -463,7 +445,7 @@ export async function changePlanAction(
   const tenantId = await currentTenant(formData);
   const plan = String(formData.get("plan") ?? "");
   if (!isPlanId(plan)) return { error: "No such plan." };
-  changePlan(tenantId, plan);
+  await changePlan(tenantId, plan);
   revalidateConsole();
   return { ok: `Now on ${PLANS[plan].name}. Caps and limits changed immediately.` };
 }

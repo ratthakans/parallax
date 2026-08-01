@@ -1,5 +1,5 @@
+import { get, run } from "@/lib/engine/sql";
 import Link from "next/link";
-import { db } from "@/lib/engine/db";
 import { runMatch, topThree, getTenant } from "@/lib/engine/match";
 import { roiSummary } from "@/lib/engine/proof";
 import { summariseBrief } from "@/lib/engine/ai";
@@ -31,27 +31,17 @@ export default async function BriefPage() {
   const v = profile.vocab;
   const tenant = await getTenant(tenantId);
   const { candidates, weeklyCap } = await runMatch(tenantId);
-  const planBlock = reachBlockedReason(tenantId);
-  const trial = reachTrialState(tenantId);
+  const planBlock = await reachBlockedReason(tenantId);
+  const trial = await reachTrialState(tenantId);
   const three = topThree(candidates);
   const features = await loadFeatures(tenantId);
-  const roi = roiSummary(tenantId);
+  const roi = await roiSummary(tenantId);
 
   // บันทึกการเปิดบรีฟ — สัญญาณเตือนการยกเลิกที่มาก่อนตัวเลขอื่น (E7)
   const today = new Date().toISOString().slice(0, 10);
-  db()
-    .prepare(
-      "INSERT INTO brief_opens (tenant_id, opened_on) VALUES (?,?) ON CONFLICT DO NOTHING",
-    )
-    .run(tenantId, today);
-  const opens = db()
-    .prepare(
-      "SELECT COUNT(*) AS n FROM brief_opens WHERE tenant_id = ? AND opened_on >= ?",
-    )
-    .get(
-      tenantId,
-      new Date(Date.now() - 28 * 86400000).toISOString().slice(0, 10),
-    ) as { n: number };
+  await run("INSERT INTO brief_opens (tenant_id, opened_on) VALUES (?,?) ON CONFLICT DO NOTHING", tenantId, today);
+  const opens = (await get<{ n: number }>("SELECT COUNT(*) AS n FROM brief_opens WHERE tenant_id = ? AND opened_on >= ?", tenantId,
+      new Date(Date.now() - 28 * 86400000).toISOString().slice(0, 10)))!;
 
   const slipping = features.filter((f) => f.churn_risk >= 1.5).length;
   const unreachable = features.filter(

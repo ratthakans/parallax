@@ -1,5 +1,6 @@
+import { all, get, run, tx } from "@/lib/engine/sql";
 import { createHash } from "node:crypto";
-import { db, logActivity } from "@/lib/engine/db";
+import { logActivity } from "@/lib/engine/db";
 import { playById } from "@/lib/shared/plays";
 import type { Verdict } from "@/lib/shared/types";
 
@@ -44,18 +45,22 @@ const ARM_SQL = `SELECT ca.customer_id AS id, COALESCE(SUM(t.total), 0) AS rev
   WHERE ca.campaign_id = ? AND ca.arm = ?
   GROUP BY ca.customer_id`;
 
-function armStat(
+async function armStat(
   campaignId: string,
   arm: "treated" | "holdout",
   approvedAt: string,
   horizonDays: number,
-): ArmStat {
+): Promise<ArmStat> {
   const end = new Date(
     Date.parse(approvedAt) + horizonDays * 86400000,
   ).toISOString();
-  const rows = db()
-    .prepare(ARM_SQL)
-    .all(approvedAt, end, campaignId, arm) as { rev: number }[];
+  const rows = await all<{ rev: number }>(
+    ARM_SQL,
+    approvedAt,
+    end,
+    campaignId,
+    arm,
+  );
   if (!rows.length) return EMPTY_ARM;
   const buyerRevs = rows.filter((r) => r.rev > 0).map((r) => r.rev);
   return {
@@ -92,15 +97,19 @@ function medianOf(xs: number[]): number {
 const MIN_HORIZON_CYCLE_RATIO = 0.25;
 
 /** วงจรมัธยฐานของคนในแคมเปญนี้ — อ่านจาก feature ที่คำนวณไว้แล้ว */
-function medianCycleOfAudience(campaignId: string): number | null {
-  const rows = db()
-    .prepare(
-      `SELECT json_extract(f.payload, '$.personal_cycle_days') AS c
-       FROM campaign_audience ca
-       JOIN customer_features f ON f.customer_id = ca.customer_id
-       WHERE ca.campaign_id = ?`,
-    )
-    .all(campaignId) as { c: number | null }[];
+async function medianCycleOfAudience(
+  campaignId: string,
+): Promise<number | null> {
+  /* json_extract เป็นภาษาถิ่นของ sqlite — adapter แปลงให้เป็นตัวดำเนินการ
+     JSON ของ Postgres ตอนส่งออก (ดู toJsonOperators ใน sql.ts) query จึง
+     เขียนแบบเดียวได้ทั้งสองตัวขับ */
+  const rows = await all<{ c: number | string | null }>(
+    `SELECT json_extract(f.payload, '$.personal_cycle_days') AS c
+     FROM campaign_audience ca
+     JOIN customer_features f ON f.customer_id = ca.customer_id
+     WHERE ca.campaign_id = ?`,
+    campaignId,
+  );
   const vals = rows
     .map((r) => Number(r.c))
     .filter((n) => Number.isFinite(n) && n > 0);
@@ -117,37 +126,41 @@ function medianCycleOfAudience(campaignId: string): number | null {
    คนเดียวกันที่อยู่หลายแคมเปญถูกนับแยกรอบ เพราะแต่ละรอบคือการทดลองหนึ่งครั้ง
    ───────────────────────────────────────────────────────────── */
 
-export function pooledMembers(tenantId: string, horizonDays: number): string[] {
+export async function pooledMembers(
+  tenantId: string,
+  horizonDays: number,
+): Promise<string[]> {
   const cutoff = new Date(Date.now() - horizonDays * 86400000).toISOString();
   return (
-    db()
-      .prepare(
-        `SELECT id FROM campaigns
-         WHERE tenant_id = ? AND dry_run = 0
-           AND measurement = 'pooled_90d_holdout'
-           AND holdout_size > 0
-           AND approved_at <= ?
-         ORDER BY approved_at`,
-      )
-      .all(tenantId, cutoff) as { id: string }[]
+    await all<{ id: string }>(
+      `SELECT id FROM campaigns
+       WHERE tenant_id = ? AND dry_run = 0
+         AND measurement = 'pooled_90d_holdout'
+         AND holdout_size > 0
+         AND approved_at <= ?
+       ORDER BY approved_at`,
+      tenantId,
+      cutoff,
+    )
   ).map((r) => r.id);
 }
 
-function armStatPooled(
+async function armStatPooled(
   campaignIds: string[],
   arm: "treated" | "holdout",
   horizonDays: number,
-): ArmStat {
-  const d = db();
-  const meta = d.prepare("SELECT approved_at FROM campaigns WHERE id = ?");
+): Promise<ArmStat> {
   let n = 0;
   let buyers = 0;
   let revenue = 0;
   const buyerRevs: number[] = [];
   for (const id of campaignIds) {
-    const c = meta.get(id) as { approved_at: string } | undefined;
+    const c = await get<{ approved_at: string }>(
+      "SELECT approved_at FROM campaigns WHERE id = ?",
+      id,
+    );
     if (!c) continue;
-    const s = armStat(id, arm, c.approved_at, horizonDays);
+    const s = await armStat(id, arm, c.approved_at, horizonDays);
     n += s.n;
     buyers += s.buyers;
     revenue += s.revenue;
@@ -192,17 +205,32 @@ export type Attribution = {
 
 /** วัดแคมเปญที่ครบกำหนดแล้ว เขียนผลลง attributions และ posterior */
 /** opts.tenantId ผูกคำสั่งกับบัญชีที่เรียก — เหตุผลเดียวกับใน sendCampaign */
-export function measureCampaign(
+type CampRow = {
+  id: string;
+  tenant_id: string;
+  play_id: string;
+  approved_at: string;
+  holdout_pct: number;
+  measurement: string;
+  treated_size: number;
+  holdout_size: number;
+  status: string;
+  est_cost: number;
+  dry_run: number;
+};
+
+export async function measureCampaign(
   campaignId: string,
   opts: { tenantId?: string } = {},
-): Attribution[] {
-  const d = db();
+): Promise<Attribution[]> {
   const camp = (
     opts.tenantId
-      ? d
-          .prepare("SELECT * FROM campaigns WHERE id = ? AND tenant_id = ?")
-          .get(campaignId, opts.tenantId)
-      : d.prepare("SELECT * FROM campaigns WHERE id = ?").get(campaignId)
+      ? await get<CampRow>(
+          "SELECT * FROM campaigns WHERE id = ? AND tenant_id = ?",
+          campaignId,
+          opts.tenantId,
+        )
+      : await get<CampRow>("SELECT * FROM campaigns WHERE id = ?", campaignId)
   ) as
     | {
         id: string;
@@ -223,8 +251,7 @@ export function measureCampaign(
   const nowIso = new Date().toISOString();
   const ageDays = (Date.now() - Date.parse(camp.approved_at)) / 86400000;
 
-  const ins = d.prepare(
-    `INSERT INTO attributions
+  const INS = `INSERT INTO attributions
       (tenant_id, campaign_id, horizon_days, rph_treated, rph_holdout, lift_abs, lift_pct,
        ci_low, ci_high, verdict, measured_at, matured)
      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
@@ -233,27 +260,26 @@ export function measureCampaign(
        lift_abs = excluded.lift_abs, lift_pct = excluded.lift_pct,
        ci_low = excluded.ci_low, ci_high = excluded.ci_high,
        verdict = excluded.verdict, measured_at = excluded.measured_at,
-       matured = excluded.matured`,
-  );
+       matured = excluded.matured`;
 
   /* โหมด pooled รายงานผลรวมของทุกแคมเปญที่ครบกำหนด ที่ T+90 เท่านั้น
      คนในกลุ่มจึงมากกว่าแคมเปญเดียว และ verdict มีโอกาสสรุปได้จริง */
   const isPooled = camp.measurement === "pooled_90d_holdout";
-  const pool = isPooled ? pooledMembers(camp.tenant_id, 90) : [];
+  const pool = isPooled ? await pooledMembers(camp.tenant_id, 90) : [];
   const inPool = pool.includes(campaignId);
-  const medianCycle = medianCycleOfAudience(campaignId);
+  const medianCycle = await medianCycleOfAudience(campaignId);
 
   for (const horizon of HORIZONS) {
     const usePool = isPooled && horizon === 90 && inPool && pool.length > 0;
 
     const real = usePool
       ? {
-          t: armStatPooled(pool, "treated", horizon),
-          h: armStatPooled(pool, "holdout", horizon),
+          t: await armStatPooled(pool, "treated", horizon),
+          h: await armStatPooled(pool, "holdout", horizon),
         }
       : {
-          t: armStat(campaignId, "treated", camp.approved_at, horizon),
-          h: armStat(campaignId, "holdout", camp.approved_at, horizon),
+          t: await armStat(campaignId, "treated", camp.approved_at, horizon),
+          h: await armStat(campaignId, "holdout", camp.approved_at, horizon),
         };
     const hasRealData = real.t.buyers > 0 || real.h.buyers > 0;
 
@@ -338,7 +364,8 @@ export function measureCampaign(
       measured_at: nowIso,
       matured: matured ? 1 : 0,
     };
-    ins.run(
+    await run(
+      INS,
       camp.tenant_id,
       row.campaign_id, row.horizon_days, row.rph_treated, row.rph_holdout,
       row.lift_abs, row.lift_pct, row.ci_low, row.ci_high, row.verdict,
@@ -353,7 +380,7 @@ export function measureCampaign(
         0,
         Math.round(nT * (playById(camp.play_id)?.priors.response_rate ?? 0.1)),
       );
-      d.prepare(
+      await run(
         `INSERT INTO play_performance
           (play_id, cycle_shape, size_bucket, trials, successes, posterior_alpha, posterior_beta)
          VALUES (?,?,?,?,?,?,?)
@@ -362,7 +389,6 @@ export function measureCampaign(
            successes = successes + excluded.successes,
            posterior_alpha = posterior_alpha + excluded.successes,
            posterior_beta = posterior_beta + (excluded.trials - excluded.successes)`,
-      ).run(
         camp.play_id, "considered", sizeBucket(camp.treated_size + camp.holdout_size),
         nT, successes, successes, nT - successes,
       );
@@ -370,9 +396,9 @@ export function measureCampaign(
   }
 
   if (ageDays >= 90) {
-    d.prepare("UPDATE campaigns SET status = 'complete' WHERE id = ?").run(campaignId);
+    await run("UPDATE campaigns SET status = \'complete\' WHERE id = ?", campaignId);
   }
-  logActivity(camp.tenant_id, "system", "measure_campaign", camp.play_id);
+  await logActivity(camp.tenant_id, "system", "measure_campaign", camp.play_id);
   return out;
 }
 
@@ -380,12 +406,13 @@ export function sizeBucket(n: number): string {
   return n >= 1000 ? "1000_plus" : n >= 300 ? "300_1000" : "under_300";
 }
 
-export function loadAttributions(campaignId: string): Attribution[] {
-  return db()
-    .prepare(
-      "SELECT * FROM attributions WHERE campaign_id = ? ORDER BY horizon_days",
-    )
-    .all(campaignId) as Attribution[];
+export async function loadAttributions(
+  campaignId: string,
+): Promise<Attribution[]> {
+  return all<Attribution>(
+    "SELECT * FROM attributions WHERE campaign_id = ? ORDER BY horizon_days",
+    campaignId,
+  );
 }
 
 /* ── ROI Tracker ค่าเฉลี่ยเคลื่อนที่ 90 วัน ────────────────────
@@ -419,22 +446,10 @@ export type RoiSummary = {
    ทิ้งไปเปล่า ๆ ทั้งที่เป็นข้อมูลที่ลูกค้าจ่ายเงินมาเพื่อดู */
 const MATURITY_ORDER = [90, 30, 7] as const;
 
-export function roiSummary(tenantId: string): RoiSummary {
-  const d = db();
+export async function roiSummary(tenantId: string): Promise<RoiSummary> {
   const since = new Date(Date.now() - 90 * 86400000).toISOString();
 
-  const rows = d
-    .prepare(
-      `SELECT c.id, c.treated_size, c.est_cost, c.play_id, c.approved_at,
-              c.offer_snapshot,
-              a.horizon_days, a.lift_abs, a.lift_pct, a.ci_low, a.ci_high,
-              a.rph_treated, a.verdict, a.measured_at, a.matured
-       FROM campaigns c
-       LEFT JOIN attributions a ON a.campaign_id = c.id
-       WHERE c.tenant_id = ? AND c.dry_run = 0
-         AND (c.approved_at >= ? OR a.measured_at >= ?)`,
-    )
-    .all(tenantId, since, since) as {
+  const rows = await all<{
     id: string;
     treated_size: number;
     est_cost: number;
@@ -450,7 +465,19 @@ export function roiSummary(tenantId: string): RoiSummary {
     verdict: Verdict | null;
     measured_at: string | null;
     matured: number | null;
-  }[];
+  }>(
+    `SELECT c.id, c.treated_size, c.est_cost, c.play_id, c.approved_at,
+            c.offer_snapshot,
+            a.horizon_days, a.lift_abs, a.lift_pct, a.ci_low, a.ci_high,
+            a.rph_treated, a.verdict, a.measured_at, a.matured
+     FROM campaigns c
+     LEFT JOIN attributions a ON a.campaign_id = c.id
+     WHERE c.tenant_id = ? AND c.dry_run = 0
+       AND (c.approved_at >= ? OR a.measured_at >= ?)`,
+    tenantId,
+    since,
+    since,
+  );
 
   // ยุบให้เหลือแถวเดียวต่อแคมเปญ — ขอบเขตที่สุกที่สุดที่สรุปได้
   type Row = (typeof rows)[number];
@@ -515,12 +542,15 @@ export function roiSummary(tenantId: string): RoiSummary {
      ไม่ใช่ค่าส่งของทุกแคมเปญที่อยู่ในหน้าต่าง — แคมเปญที่ยังวัดไม่ได้
      มีต้นทุนแต่ยังไม่มีผล เอามารวมแล้วตัวเลขจะแย่เกินจริงในทางกลับกัน */
   const spendRow = measuredIds.length
-    ? (d
-        .prepare(
+    ? {
+          c: Number(
+            (await get<{ c: number | string }>(
           `SELECT COALESCE(SUM(m.cost), 0) AS c FROM messages m
            WHERE m.campaign_id IN (${measuredIds.map(() => "?").join(",")})`,
-        )
-        .get(...measuredIds) as { c: number })
+              ...measuredIds,
+            ))?.c ?? 0,
+          ),
+        }
     : { c: 0 };
 
   /* ── ส่วนลดต้องคิดจากแถวชุดเดียวกับที่ให้ยอดเพิ่ม ──
@@ -551,7 +581,7 @@ export function roiSummary(tenantId: string): RoiSummary {
   }
 
   const spendBaht = Math.round(spendRow.c + discountBaht);
-  const repeatCustomers = countRepeatFromCampaigns(measuredIds);
+  const repeatCustomers = await countRepeatFromCampaigns(measuredIds);
 
   const mean = (xs: number[]) =>
     xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null;
@@ -577,18 +607,19 @@ export function roiSummary(tenantId: string): RoiSummary {
 
 /** ลูกค้าที่กลับมาซื้อซ้ำหลังได้รับข้อความ — ตัวหารของตัวเลขเรือธง
     นับจากแคมเปญชุดเดียวกับที่เข้าสมการ ROI เท่านั้น */
-function countRepeatFromCampaigns(campaignIds: string[]): number {
+async function countRepeatFromCampaigns(
+  campaignIds: string[],
+): Promise<number> {
   if (!campaignIds.length) return 0;
-  const row = db()
-    .prepare(
-      `SELECT COUNT(DISTINCT ca.customer_id) AS n
-       FROM campaign_audience ca
-       JOIN attributions a
-         ON a.campaign_id = ca.campaign_id AND a.verdict = 'positive'
-       WHERE ca.campaign_id IN (${campaignIds.map(() => "?").join(",")})
-         AND ca.arm = 'treated'`,
-    )
-    .get(...campaignIds) as { n: number };
+  const row = (await get<{ n: number | string }>(
+    `SELECT COUNT(DISTINCT ca.customer_id) AS n
+     FROM campaign_audience ca
+     JOIN attributions a
+       ON a.campaign_id = ca.campaign_id AND a.verdict = 'positive'
+     WHERE ca.campaign_id IN (${campaignIds.map(() => "?").join(",")})
+       AND ca.arm = 'treated'`,
+    ...campaignIds,
+  ))!;
   // สัดส่วนที่กลับมาซื้อซ้ำจริงประมาณจากอัตราการตอบสนองของแคมเปญที่ได้ผล
-  return Math.round(row.n * 0.11);
+  return Math.round(Number(row.n) * 0.11);
 }

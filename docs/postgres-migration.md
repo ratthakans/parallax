@@ -95,17 +95,17 @@ db.ts → derive.ts → seed.ts → match.ts → proof.ts → billing.ts
 | ไฟล์ | จุด | สถานะ |
 |---|---|---|
 | `ai.ts` | 5 | ✅ ย้ายแล้ว · ทดสอบบน Postgres จริงครบวงจร |
-| `derive.ts` | 12 | ✅ ย้ายแล้ว |
-| `seed.ts` | 9 | ⬜ |
-| `match.ts` | 8 | ✅ ย้ายแล้ว |
-| `proof.ts` | 11 | ⬜ |
-| `billing.ts` | 16 | ⬜ |
-| `dispatch.ts` | 14 | 🟡 `sendCampaign` เป็น async แล้ว · db() เหลือ 2 |
-| `ingest.ts` | 7 | ⬜ |
-| `demo.ts` | 11 | ⬜ |
-| `bootstrap.ts` | 1 | ⬜ |
-| `db.ts` (เลิก export `db()`) | — | ⬜ ทำท้ายสุด |
-| `app/(app)/**` | 11 | ⬜ |
+| `derive.ts` | 12 | ✅ |
+| `seed.ts` | 9 | ✅ |
+| `match.ts` | 8 | ✅ |
+| `proof.ts` | 11 | ✅ |
+| `billing.ts` | 16 | ✅ |
+| `dispatch.ts` | 14 | ✅ |
+| `ingest.ts` | 7 | ✅ |
+| `demo.ts` | 11 | ✅ |
+| `bootstrap.ts` | 1 | ✅ |
+| `db.ts` (เลิก export `db()`) | — | ✅ เหลือแต่สคีมา |
+| `app/(app)/**` · `verify/**` | 11 | ✅ |
 
 ### ย้ายทีละไฟล์ได้เพราะอะไร
 

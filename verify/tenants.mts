@@ -1,7 +1,7 @@
+import { get } from "@/lib/engine/sql";
 import "./isolate.mts";
 
 import { ensureReady } from "@/lib/engine/bootstrap";
-import { db } from "@/lib/engine/db";
 import { loadFeatures } from "@/lib/engine/derive";
 import { runMatch, topThree } from "@/lib/engine/match";
 import { roiSummary } from "@/lib/engine/proof";
@@ -26,7 +26,7 @@ for (const p of TENANT_PROFILES) {
   const top2Share = rev ? (top2.reduce((s,x)=>s+x.monetary_ltv,0)/rev)*100 : 0;
   const { candidates } = await runMatch(p.id);
   const three = topThree(candidates);
-  const roi = roiSummary(p.id);
+  const roi = await roiSummary(p.id);
   const reach = f.reduce<Record<string,number>>((a,x)=>{a[x.reachable_by]=(a[x.reachable_by]??0)+1;return a;},{});
 
   out.push(`\n═══ ${p.name} · ${CYCLE_LABEL[p.cycleShape]} (${p.cycleShape}) ═══`);
@@ -59,22 +59,20 @@ for (const p of TENANT_PROFILES) {
    และไม่มีแคมเปญที่ดึงคนจากบัญชีอื่นเข้ากลุ่ม
    (ห้ามตรวจจากรูปแบบชื่อ id ของธุรกรรม เพราะธุรกรรมที่ demo แทรกเข้ามา
     ใช้ randomUUID ไม่ได้ตั้งชื่อตามบัญชี — เคยทำให้ test ฟ้องผิด) */
-const dupCust = db().prepare(
-  "SELECT COUNT(*) n FROM (SELECT id FROM customers GROUP BY id HAVING COUNT(DISTINCT tenant_id) > 1)"
-).get() as {n:number};
+const dupCust = (await get<{n:number}>("SELECT COUNT(*) n FROM (SELECT id FROM customers GROUP BY id HAVING COUNT(DISTINCT tenant_id) > 1)"))!;
 ok(dupCust.n === 0, `ไม่มีลูกค้าที่อยู่หลายบัญชี (พบ ${dupCust.n})`);
-const audLeak = db().prepare(`SELECT COUNT(*) n FROM campaign_audience a
+const audLeak = (await get<{n:number}>(`SELECT COUNT(*) n FROM campaign_audience a
   JOIN campaigns k ON k.id = a.campaign_id
   JOIN customers c ON c.id = a.customer_id
-  WHERE c.tenant_id != k.tenant_id`).get() as {n:number};
+  WHERE c.tenant_id != k.tenant_id`))!;
 ok(audLeak.n === 0, `ไม่มีคนจากบัญชีอื่นในกลุ่มของแคมเปญ (พบ ${audLeak.n})`);
-const txnLeak = db().prepare(`SELECT COUNT(*) n FROM transactions t
-  LEFT JOIN customers c ON c.id = t.customer_id WHERE c.id IS NULL`).get() as {n:number};
+const txnLeak = (await get<{n:number}>(`SELECT COUNT(*) n FROM transactions t
+  LEFT JOIN customers c ON c.id = t.customer_id WHERE c.id IS NULL`))!;
 ok(txnLeak.n === 0, `ไม่มีธุรกรรมที่หาเจ้าของไม่ได้ (พบ ${txnLeak.n})`);
-const prodCross = db().prepare(`SELECT COUNT(*) n FROM line_items l
+const prodCross = (await get<{n:number}>(`SELECT COUNT(*) n FROM line_items l
   JOIN transactions t ON t.id = l.txn_id
   JOIN customers c ON c.id = t.customer_id
-  WHERE l.product_id NOT LIKE c.tenant_id || ':%'`).get() as {n:number};
+  WHERE l.product_id NOT LIKE c.tenant_id || ':%'`))!;
 ok(prodCross.n === 0, `ไม่มีสินค้าข้ามบัญชี (พบ ${prodCross.n})`);
 
 console.log(out.join("\n"));

@@ -1,4 +1,4 @@
-import { db } from "@/lib/engine/db";
+import { all } from "@/lib/engine/sql";
 import { aiCacheStats, aiConfigured } from "@/lib/engine/ai";
 import { getTenant } from "@/lib/engine/match";
 import { demoState } from "@/lib/engine/demo";
@@ -51,19 +51,15 @@ export default async function SettingsPage() {
   const tenant = await getTenant(tenantId);
   const ai = aiConfigured();
   const cache = await aiCacheStats();
-  const demo = demoState(tenantId);
+  const demo = await demoState(tenantId);
   const playCount = (await runMatch(tenantId)).candidates.length;
 
-  const log = db()
-    .prepare(
-      "SELECT actor, action, detail, at FROM activity_log WHERE tenant_id = ? ORDER BY id DESC LIMIT 15",
-    )
-    .all(tenantId) as {
+  const log = await all<{
     actor: string;
     action: string;
     detail: string | null;
     at: string;
-  }[];
+  }>("SELECT actor, action, detail, at FROM activity_log WHERE tenant_id = ? ORDER BY id DESC LIMIT 15", tenantId);
 
   const cachedTotal = cache.reduce((s, c) => s + c.n, 0);
 

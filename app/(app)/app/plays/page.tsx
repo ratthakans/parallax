@@ -1,4 +1,4 @@
-import { db } from "@/lib/engine/db";
+import { all } from "@/lib/engine/sql";
 import { effectiveGuards, getTenantPlays, runMatch } from "@/lib/engine/match";
 import { getActiveTenantId } from "@/lib/shared/active-tenant";
 import { profileFor } from "@/lib/shared/tenants";
@@ -25,18 +25,14 @@ export default async function PlaysPage() {
 
   const perf = new Map(
     (
-      db()
-        .prepare(
-          `SELECT play_id, trials, successes, posterior_alpha AS a, posterior_beta AS b
-           FROM play_performance`,
-        )
-        .all() as {
+      await all<{
         play_id: string;
         trials: number;
         successes: number;
         a: number;
         b: number;
-      }[]
+      }>(`SELECT play_id, trials, successes, posterior_alpha AS a, posterior_beta AS b
+           FROM play_performance`)
     ).map((r) => [r.play_id, r]),
   );
 

@@ -1,5 +1,6 @@
+import { all, get, tx } from "@/lib/engine/sql";
+import { logActivity } from "@/lib/engine/db";
 import { createHash, randomUUID } from "node:crypto";
-import { db, logActivity } from "@/lib/engine/db";
 import { playById } from "@/lib/shared/plays";
 import { measureCampaign } from "@/lib/engine/proof";
 
@@ -20,41 +21,35 @@ export type TravelResult = {
 };
 
 /** เลื่อนวันของแคมเปญที่มีอยู่ย้อนหลัง โดยยังไม่วัดผล */
-function shiftCampaigns(tenantId: string, days: number) {
-  const d = db();
+async function shiftCampaigns(tenantId: string, days: number) {
   const shiftMs = days * 86400000;
 
-  const rows = d
-    .prepare(
-      "SELECT id, approved_at FROM campaigns WHERE tenant_id = ? AND dry_run = 0",
-    )
-    .all(tenantId) as { id: string; approved_at: string }[];
+  const rows = await all<{ id: string; approved_at: string }>(
+    "SELECT id, approved_at FROM campaigns WHERE tenant_id = ? AND dry_run = 0",
+    tenantId,
+  );
 
-  d.exec("BEGIN");
-  try {
-    const upd = d.prepare("UPDATE campaigns SET approved_at = ? WHERE id = ?");
-    const updMsg = d.prepare(
-      "UPDATE messages SET sent_at = ? WHERE campaign_id = ? AND sent_at IS NOT NULL",
-    );
+  await tx(async (q) => {
+    const UPD = "UPDATE campaigns SET approved_at = ? WHERE id = ?";
+    const UPD_MSG =
+      "UPDATE messages SET sent_at = ? WHERE campaign_id = ? AND sent_at IS NOT NULL";
     for (const r of rows) {
-      const shifted = new Date(Date.parse(r.approved_at) - shiftMs).toISOString();
-      upd.run(shifted, r.id);
-      updMsg.run(shifted, r.id);
+      const shifted = new Date(
+        Date.parse(r.approved_at) - shiftMs,
+      ).toISOString();
+      await q.run(UPD, shifted, r.id);
+      await q.run(UPD_MSG, shifted, r.id);
     }
-    d.exec("COMMIT");
-  } catch (err) {
-    d.exec("ROLLBACK");
-    throw err;
-  }
+  });
   return rows.map((r) => r.id);
 }
 
 /** วัดผลทุกแคมเปญที่มี — ตัวที่ยังไม่ครบกำหนดจะได้ insufficient_data ตามปกติ */
-function measureAll(tenantId: string, ids: string[]) {
+async function measureAll(tenantId: string, ids: string[]) {
   let measured = 0;
   for (const id of ids) {
     try {
-      measureCampaign(id, { tenantId });
+      await measureCampaign(id, { tenantId });
       measured++;
     } catch {
       // แคมเปญที่วัดไม่ได้ถูกข้ามไป ไม่ทำให้ทั้งชุดล้ม
@@ -63,10 +58,18 @@ function measureAll(tenantId: string, ids: string[]) {
   return measured;
 }
 
-export function travelForward(tenantId: string, days: number): TravelResult {
-  const ids = shiftCampaigns(tenantId, days);
-  const measured = measureAll(tenantId, ids);
-  logActivity(tenantId, "demo", "travel_forward", `${days} days · ${measured} campaigns`);
+export async function travelForward(
+  tenantId: string,
+  days: number,
+): Promise<TravelResult> {
+  const ids = await shiftCampaigns(tenantId, days);
+  const measured = await measureAll(tenantId, ids);
+  await logActivity(
+    tenantId,
+    "demo",
+    "travel_forward",
+    `${days} days · ${measured} campaigns`,
+  );
   return { campaigns: ids.length, measured, days };
 }
 
@@ -79,14 +82,15 @@ export function travelForward(tenantId: string, days: number): TravelResult {
 export async function seedCampaignHistory(tenantId: string) {
   const { runMatch } = await import("./match");
   const { approveCampaign, sendCampaign } = await import("./dispatch");
-  const d = db();
-
-  const existing = d
-    .prepare(
-      "SELECT COUNT(*) AS n FROM campaigns WHERE tenant_id = ? AND dry_run = 0",
-    )
-    .get(tenantId) as { n: number };
-  if (existing.n > 0) return { created: 0 };
+  const existing = Number(
+    (
+      await get<{ n: number | string }>(
+        "SELECT COUNT(*) AS n FROM campaigns WHERE tenant_id = ? AND dry_run = 0",
+        tenantId,
+      )
+    )?.n ?? 0,
+  );
+  if (existing > 0) return { created: 0 };
 
   /* ไม่แก้ quiet hours ของร้านแล้ว — ส่งผ่าน ignoreQuietHours แทน
      การแก้ค่าจริงแล้วคืนทีหลังมีความเสี่ยงว่าคืนไม่ครบถ้ามีอะไรทำงานคาบเกี่ยว
@@ -141,9 +145,9 @@ export async function seedCampaignHistory(tenantId: string) {
 
   if (created > 0) {
     // เลื่อนอีก 95 วัน ให้ตัวที่ใหม่สุดก็ครบกำหนด T+90 แล้ว
-    const ids = shiftCampaigns(tenantId, 95);
-    injectCampaignEffect(tenantId);
-    measureAll(tenantId, ids);
+    const ids = await shiftCampaigns(tenantId, 95);
+    await injectCampaignEffect(tenantId);
+    await measureAll(tenantId, ids);
   }
   return { created };
 }
@@ -188,17 +192,14 @@ export async function seedCampaignHistory(tenantId: string) {
    ต้องเปลี่ยนใจคนที่ยังไม่จ่ายในสัดส่วน  L · p / (1 − p) */
 const RELATIVE_LIFT = 0.28;
 
-export function injectCampaignEffect(tenantId: string) {
-  const d = db();
-  const camps = d
-    .prepare(
-      `SELECT id, play_id, approved_at FROM campaigns
-       WHERE tenant_id = ? AND dry_run = 0`,
-    )
-    .all(tenantId) as { id: string; play_id: string; approved_at: string }[];
+export async function injectCampaignEffect(tenantId: string) {
+  const camps = await all<{ id: string; play_id: string; approved_at: string }>(
+    `SELECT id, play_id, approved_at FROM campaigns
+     WHERE tenant_id = ? AND dry_run = 0`,
+    tenantId,
+  );
 
-  const candidates = d.prepare(
-    `SELECT ca.customer_id AS id
+  const CANDIDATES = `SELECT ca.customer_id AS id
      FROM campaign_audience ca
      WHERE ca.campaign_id = ? AND ca.arm = 'treated'
        -- เคยจ่ายมาก่อน (คนของ keep engine)
@@ -208,30 +209,32 @@ export function injectCampaignEffect(tenantId: string) {
          SELECT 1 FROM transactions t1
          WHERE t1.customer_id = ca.customer_id
            AND t1.occurred_at >= ? AND t1.occurred_at < ?
-       )`,
-  );
+       )`;
   // ขนาดกลุ่มที่ได้รับข้อความ ใช้หาอัตราฐานของแคมเปญนี้
-  const treatedCount = d.prepare(
-    "SELECT COUNT(*) AS n FROM campaign_audience WHERE campaign_id = ? AND arm = 'treated'",
-  );
-  const insTxn = d.prepare(
-    `INSERT INTO transactions (tenant_id, id, customer_id, occurred_at, total, discount_total, channel)
-       VALUES (?,?,?,?,?,?,?)`,
-  );
+  const TREATED_COUNT =
+    "SELECT COUNT(*) AS n FROM campaign_audience WHERE campaign_id = ? AND arm = 'treated'";
+  const INS_TXN = `INSERT INTO transactions (tenant_id, id, customer_id, occurred_at, total, discount_total, channel)
+     VALUES (?,?,?,?,?,?,?)`;
 
   let added = 0;
-  d.exec("BEGIN");
-  try {
+  await tx(async (q) => {
     for (const c of camps) {
       const play = playById(c.play_id);
       const aov = play?.expected_order_value ?? 2000;
       const start = Date.parse(c.approved_at);
       const end = new Date(start + 90 * 86400000).toISOString();
-      const rows = candidates.all(c.id, c.approved_at, end) as { id: string }[];
+      const rows = await all<{ id: string }>(
+        CANDIDATES,
+        c.id,
+        c.approved_at,
+        end,
+      );
 
       /* อัตราฐาน = สัดส่วนคนในกลุ่มที่จ่ายอยู่แล้วโดยไม่ต้องมีข้อความ
          คำนวณจากข้อมูลของแคมเปญนั้นเอง ไม่ใช่ตั้งค่าไว้ต่อธุรกิจ */
-      const nTreated = (treatedCount.get(c.id) as { n: number }).n;
+      const nTreated = Number(
+        (await get<{ n: number | string }>(TREATED_COUNT, c.id))?.n ?? 0,
+      );
       const nSilent = rows.length;
       const base = nTreated > 0 ? (nTreated - nSilent) / nTreated : 0;
       const uplift =
@@ -246,7 +249,8 @@ export function injectCampaignEffect(tenantId: string) {
         if (h.readUInt16BE(0) / 65535 >= uplift) continue;
         const dayOffset = 1 + (h.readUInt16BE(2) % 75); // ซื้อภายใน 76 วันแรก
         const valueMul = 0.55 + (h.readUInt16BE(4) / 65535) * 0.9;
-        insTxn.run(
+        await q.run(
+          INS_TXN,
           tenantId,
           randomUUID(),
           r.id,
@@ -258,33 +262,26 @@ export function injectCampaignEffect(tenantId: string) {
         added++;
       }
     }
-    d.exec("COMMIT");
-  } catch (err) {
-    d.exec("ROLLBACK");
-    throw err;
-  }
+  });
 
-  logActivity(tenantId, "demo", "inject_campaign_effect", `${added} transactions`);
+  await logActivity(tenantId, "demo", "inject_campaign_effect", `${added} transactions`);
   return { added };
 }
 
-export function demoState(tenantId: string) {
-  const d = db();
-  const oldest = d
-    .prepare(
-      "SELECT MIN(approved_at) AS a FROM campaigns WHERE tenant_id = ? AND dry_run = 0",
-    )
-    .get(tenantId) as { a: string | null };
-  const verdicts = d
-    .prepare(
-      `SELECT a.verdict, COUNT(*) AS n
-       FROM attributions a JOIN campaigns c ON c.id = a.campaign_id
-       WHERE c.tenant_id = ? AND a.horizon_days = 90
-       GROUP BY a.verdict`,
-    )
-    .all(tenantId) as { verdict: string; n: number }[];
+export async function demoState(tenantId: string) {
+  const oldest = await get<{ a: string | null }>(
+    "SELECT MIN(approved_at) AS a FROM campaigns WHERE tenant_id = ? AND dry_run = 0",
+    tenantId,
+  );
+  const raw = await all<{ verdict: string; n: number | string }>(
+    `SELECT a.verdict, COUNT(*) AS n
+     FROM attributions a JOIN campaigns c ON c.id = a.campaign_id
+     WHERE c.tenant_id = ? AND a.horizon_days = 90
+     GROUP BY a.verdict`,
+    tenantId,
+  );
   return {
-    oldestCampaignAt: oldest.a,
-    verdicts,
+    oldestCampaignAt: oldest?.a ?? null,
+    verdicts: raw.map((r) => ({ verdict: r.verdict, n: Number(r.n) })),
   };
 }

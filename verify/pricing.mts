@@ -1,6 +1,6 @@
+import { get, run } from "@/lib/engine/sql";
 import "./isolate.mts";
 
-import { db } from "@/lib/engine/db";
 import { ensureReady } from "@/lib/engine/bootstrap";
 import { runMatch } from "@/lib/engine/match";
 import { roiSummary } from "@/lib/engine/proof";
@@ -129,11 +129,11 @@ ok(feb.start.getDate() === 28, `วันตัดรอบ 31 ถูกบี�
 /* ── 4 · เพดานจำนวนคนต้องปฏิเสธจริง ─────────────────────────── */
 
 const T = TENANT_PROFILES[0].id;
-const identified = identifiedCount(T);
+const identified = await identifiedCount(T);
 ok(identified > 0, `นับคนที่ระบุตัวตนได้ ${th(identified)} คน`);
 
-changePlan(T, "free"); // เพดาน 500
-const capBlock = contactCapBlockedReason(T, 0);
+await changePlan(T, "free"); // เพดาน 500
+const capBlock = await contactCapBlockedReason(T, 0);
 ok(
   capBlock != null,
   `แผน Free ปฏิเสธฐาน ${th(identified)} คนที่เกินเพดาน 500 — ${capBlock ? "มีเหตุผลแจ้ง" : "ไม่ปฏิเสธ"}`,
@@ -141,14 +141,14 @@ ok(
 
 /* แทนที่ทั้งฐานต้องนับจากศูนย์ ไม่ใช่บวกทับ ไม่งั้นร้านที่ใกล้เพดาน
    จะแก้ไขข้อมูลตัวเองไม่ได้เลย */
-const replaceSmall = contactCapBlockedReason(T, 100, { replacing: true });
+const replaceSmall = await contactCapBlockedReason(T, 100, { replacing: true });
 ok(replaceSmall == null, "แทนที่ทั้งฐานด้วยไฟล์ 100 คน ผ่านเพดาน Free ได้");
-const replaceBig = contactCapBlockedReason(T, 900, { replacing: true });
+const replaceBig = await contactCapBlockedReason(T, 900, { replacing: true });
 ok(replaceBig != null, "แทนที่ทั้งฐานด้วยไฟล์ 900 คน ยังถูกปฏิเสธ");
 
 /* ── 5 · Reach ต้องถูกบังคับที่ชั้น dispatch ไม่ใช่ที่หน้าจอ ──── */
 
-ok(reachBlockedReason(T) != null, "แผน Free รายงานว่าส่งไม่ได้");
+ok(await reachBlockedReason(T) != null, "แผน Free รายงานว่าส่งไม่ได้");
 
 const { candidates } = await runMatch(T);
 const target = candidates.find((c) => !c.blocked);
@@ -172,22 +172,18 @@ ok(
 );
 
 const leaked = (
-  db()
-    .prepare(
-      "SELECT COUNT(*) n FROM campaigns WHERE tenant_id=? AND approved_by='test'",
-    )
-    .get(T) as { n: number }
-).n;
+  await get<{ n: number }>("SELECT COUNT(*) n FROM campaigns WHERE tenant_id=? AND approved_by='test'", T)
+)!.n;
 ok(leaked === 0, `ไม่มีแคมเปญหลุดเข้าฐานตอนถูกปฏิเสธ (พบ ${leaked})`);
 
-changePlan(T, TENANT_PROFILES[0].tier); // คืนแผนเดิม
-ok(reachBlockedReason(T) == null, "คืนแผนเดิมแล้วส่งได้ตามปกติ");
+await changePlan(T, TENANT_PROFILES[0].tier); // คืนแผนเดิม
+ok(await reachBlockedReason(T) == null, "คืนแผนเดิมแล้วส่งได้ตามปกติ");
 
 /* ── 6 · บัญชีเครดิตต้องกระทบยอดได้ ──────────────────────────── */
 
-const before = usageFor(T);
-const packBaht = buyCredits(T, CREDIT_PACKS[0].messages);
-const after = usageFor(T);
+const before = await usageFor(T);
+const packBaht = await buyCredits(T, CREDIT_PACKS[0].messages);
+const after = await usageFor(T);
 
 ok(
   after.creditsLeft === before.creditsLeft + CREDIT_PACKS[0].messages,
@@ -208,7 +204,7 @@ ok(
 );
 
 /* เครดิตแรกเข้าต้องไม่คิดเงิน — ไม่งั้นคำว่า "แรกเข้า" ไม่มีความหมาย */
-const freeBaht = buyCredits(T, 100, "welcome");
+const freeBaht = await buyCredits(T, 100, "welcome");
 ok(freeBaht === 0, "เครดิตแรกเข้าไม่คิดเงิน");
 
 /* ── 7 · ทุกยอดเครดิตที่ซื้อ ต้องอธิบายยอดที่ใช้ได้ ────────────
@@ -217,13 +213,9 @@ ok(freeBaht === 0, "เครดิตแรกเข้าไม่คิดเ
 
 for (const p of TENANT_PROFILES) {
   const bought = (
-    db()
-      .prepare(
-        "SELECT COALESCE(SUM(messages),0) n FROM credit_purchases WHERE tenant_id=?",
-      )
-      .get(p.id) as { n: number }
-  ).n;
-  const u = usageFor(p.id);
+    await get<{ n: number }>("SELECT COALESCE(SUM(messages),0) n FROM credit_purchases WHERE tenant_id=?", p.id)
+  )!.n;
+  const u = await usageFor(p.id);
   const used = u.messagesAllTime;
   ok(
     u.creditsLeft + used === bought,
@@ -243,20 +235,18 @@ if (big) {
     approvedBy: "test",
   });
   // เหลือเครดิตน้อยกว่าคนที่ต้องส่งอย่างจงใจ
-  db()
-    .prepare("UPDATE tenants SET message_credits = ?, quiet_hours_start=0, quiet_hours_end=0 WHERE id=?")
-    .run(Math.max(1, Math.floor(r.treated / 3)), T2);
+  await run("UPDATE tenants SET message_credits = ?, quiet_hours_start=0, quiet_hours_end=0 WHERE id=?", Math.max(1, Math.floor(r.treated / 3)), T2);
   const allowance = (
-    db().prepare("SELECT message_credits c FROM tenants WHERE id=?").get(T2) as {
+    await get<{
       c: number;
-    }
-  ).c;
+    }>("SELECT message_credits c FROM tenants WHERE id=?", T2)
+  )!.c;
   const send = await sendCampaign(r.campaignId);
   const left = (
-    db().prepare("SELECT message_credits c FROM tenants WHERE id=?").get(T2) as {
+    await get<{
       c: number;
-    }
-  ).c;
+    }>("SELECT message_credits c FROM tenants WHERE id=?", T2)
+  )!.c;
   ok(send.sent === allowance, `ส่งได้เท่าเครดิตที่มี ${send.sent}/${allowance}`);
   ok(
     send.skippedNoCredit === r.treated - send.sent,
@@ -277,30 +267,22 @@ if (big) {
    ตรวจแบบไม่ผูกกับวิธีคำนวณ: ถ้าในแคมเปญที่วัดได้มีตัวใดให้ส่วนลด
    ตัวหารต้องมากกว่าค่าส่งข้อความล้วน ๆ อย่างมีนัย */
 for (const p of TENANT_PROFILES) {
-  const roi = roiSummary(p.id);
+  const roi = await roiSummary(p.id);
   if (roi.measured === 0) continue;
 
   const discountful = (
-    db()
-      .prepare(
-        `SELECT COUNT(*) n FROM campaigns c
+    await get<{ n: number }>(`SELECT COUNT(*) n FROM campaigns c
          JOIN attributions a ON a.campaign_id = c.id
          WHERE c.tenant_id = ? AND c.dry_run = 0 AND a.matured = 1
-           AND CAST(json_extract(c.offer_snapshot,'$.discount_pct') AS REAL) > 0`,
-      )
-      .get(p.id) as { n: number }
-  ).n;
+           AND CAST(json_extract(c.offer_snapshot,'$.discount_pct') AS REAL) > 0`, p.id)
+  )!.n;
 
   const msgOnly = (
-    db()
-      .prepare(
-        `SELECT COALESCE(SUM(m.cost),0) c FROM messages m
+    await get<{ c: number }>(`SELECT COALESCE(SUM(m.cost),0) c FROM messages m
          JOIN campaigns c2 ON c2.id = m.campaign_id
          JOIN attributions a ON a.campaign_id = c2.id AND a.matured = 1
-         WHERE c2.tenant_id = ?`,
-      )
-      .get(p.id) as { c: number }
-  ).c;
+         WHERE c2.tenant_id = ?`, p.id)
+  )!.c;
 
   if (discountful > 0) {
     ok(

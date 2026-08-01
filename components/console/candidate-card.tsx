@@ -33,7 +33,7 @@ export async function CandidateCard({
   rank?: number;
 }) {
   const { play } = candidate;
-  const planBlock = reachBlockedReason(tenantId);
+  const planBlock = await reachBlockedReason(tenantId);
   const size = candidate.audience.length;
   /* ตัวเลขนี้เป็นค่าประมาณ ไม่ใช่ค่าจริง
 

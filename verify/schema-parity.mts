@@ -43,10 +43,16 @@ if (!url) {
    ที่เขียนไว้ยังขาดอยู่ */
 const dir = mkdtempSync(join(tmpdir(), "parity-"));
 process.env.PARALLAX_DB_PATH = join(dir, "p.db");
-/* db() สร้างตารางให้เองตอนเปิดครั้งแรก — เรียกแล้วปิด เหลือไฟล์ที่มี
-   สคีมาครบตามที่ db.ts ประกาศไว้จริง ไม่ใช่ตามที่เราจำว่าประกาศไว้ */
-const { db } = await import("@/lib/engine/db");
-db();
+/* สร้างตารางตามที่ db.ts ประกาศไว้จริง ไม่ใช่ตามที่เราจำว่าประกาศไว้
+   ต้องล้าง DATABASE_URL ชั่วคราว ไม่งั้น ensureSchema จะข้ามไปเพราะ
+   คิดว่ากำลังใช้ Postgres */
+const savedUrl = process.env.DATABASE_URL;
+delete process.env.DATABASE_URL;
+const { ensureSchema } = await import("@/lib/engine/db");
+const { resetConnection } = await import("@/lib/engine/sql");
+await ensureSchema();
+await resetConnection();
+process.env.DATABASE_URL = savedUrl;
 const lite = new DatabaseSync(process.env.PARALLAX_DB_PATH);
 
 const pg = postgres(url, { prepare: false, max: 1 });

@@ -1,6 +1,6 @@
+import { all, get } from "@/lib/engine/sql";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { db } from "@/lib/engine/db";
 import { playById } from "@/lib/shared/plays";
 import { loadAttributions } from "@/lib/engine/proof";
 import { armFor, renderForCustomer } from "@/lib/engine/dispatch";
@@ -32,13 +32,8 @@ export default async function CampaignDetail({
   const { id } = await params;
   const tenantId = await getActiveTenantId();
   const v = profileFor(tenantId).vocab;
-  const d = db();
 
-  const camp = d.prepare("SELECT * FROM campaigns WHERE id = ? AND tenant_id = ?").get(
-    id,
-    tenantId,
-  ) as
-    | {
+  const camp = await get<{
         id: string;
         play_id: string;
         status: string;
@@ -53,8 +48,11 @@ export default async function CampaignDetail({
         holdout_size: number;
         dry_run: number;
         est_cost: number;
-      }
-    | undefined;
+      }>(
+    "SELECT * FROM campaigns WHERE id = ? AND tenant_id = ?",
+    id,
+    tenantId,
+  );
   if (!camp) notFound();
 
   const play = playById(camp.play_id);
@@ -64,16 +62,21 @@ export default async function CampaignDetail({
     all: { tone: string; body: string }[];
   };
   const offer = JSON.parse(camp.offer_snapshot) as Record<string, unknown>;
-  const attributions = loadAttributions(camp.id);
+  const attributions = await loadAttributions(camp.id);
 
-  const sentRow = d
-    .prepare("SELECT COUNT(*) AS n FROM messages WHERE campaign_id = ?")
-    .get(camp.id) as { n: number };
+  const sentRow = (await get<{ n: number | string }>(
+    "SELECT COUNT(*) AS n FROM messages WHERE campaign_id = ?",
+    camp.id,
+  ))!;
+  const sentCount = Number(sentRow.n);
 
   // ตัวอย่าง audience ที่แช่แข็งไว้ พร้อมข้อความที่แทนค่าแล้ว
-  const sample = d
-    .prepare(
-      `SELECT ca.customer_id AS id, ca.arm, c.name,
+  const sample = await all<{
+    id: string;
+    arm: "treated" | "holdout";
+    name: string;
+    last_product: string | null;
+  }>(`SELECT ca.customer_id AS id, ca.arm, c.name,
               (SELECT p.name FROM line_items li
                  JOIN transactions t ON t.id = li.txn_id
                  JOIN products p ON p.id = li.product_id
@@ -83,14 +86,7 @@ export default async function CampaignDetail({
        JOIN customers c ON c.id = ca.customer_id
        WHERE ca.campaign_id = ?
        ORDER BY ca.arm, ca.customer_id
-       LIMIT 12`,
-    )
-    .all(camp.id) as {
-    id: string;
-    arm: "treated" | "holdout";
-    name: string;
-    last_product: string | null;
-  }[];
+       LIMIT 12`, camp.id);
 
   const ageDays = Math.floor(
     (Date.now() - Date.parse(camp.approved_at)) / 86400000,
@@ -99,8 +95,8 @@ export default async function CampaignDetail({
   /* ── สถานะการส่ง และ "จะรู้ผลเมื่อไร" ──
      ผู้ใช้ที่เพิ่งกดอนุมัติมาถึงหน้านี้ ต้องเห็นทันทีว่าเหลืออะไรให้ทำ
      และถ้าทำครบแล้วจะได้คำตอบเมื่อไหร่ ไม่ใช่ต้องเดาเอง */
-  const fullySent = sentRow.n >= camp.treated_size;
-  const remaining = Math.max(0, camp.treated_size - sentRow.n);
+  const fullySent = sentCount >= camp.treated_size;
+  const remaining = Math.max(0, camp.treated_size - sentCount);
   const dueDate = (h: number) =>
     new Date(Date.parse(camp.approved_at) + h * 86400000).toLocaleDateString("en-GB", {
       day: "numeric",
@@ -150,7 +146,7 @@ export default async function CampaignDetail({
           <p className="c-thai mt-2 max-w-3xl text-[0.88rem] leading-relaxed text-[var(--c-text-2)]">
             {fullySent ? (
               <>
-                {num(sentRow.n)} sent · {num(camp.holdout_size)} held back
+                {num(sentCount)} sent · {num(camp.holdout_size)} held back
                 {camp.holdout_size > 0 ? (
                   <>
                     {" "}— first readable around {dueDate(30)}, fully concluded{" "}
@@ -180,7 +176,7 @@ export default async function CampaignDetail({
               fields={{ tenantId, campaignId: camp.id }}
               label={
                 fullySent
-                  ? `All sent · ${num(sentRow.n)}`
+                  ? `All sent · ${num(sentCount)}`
                   : `Send — ${num(remaining)} recipients`
               }
               pendingLabel={`Sending to ${num(remaining)}…`}
@@ -208,7 +204,7 @@ export default async function CampaignDetail({
         />
         <Metric
           label="Messages sent"
-          value={num(sentRow.n)}
+          value={num(sentCount)}
           sub="Pressing send again adds none"
         />
       </Panel>

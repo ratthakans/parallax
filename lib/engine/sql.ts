@@ -120,6 +120,30 @@ export function toDollarPlaceholders(text: string): string {
   return out;
 }
 
+
+/* ── json_extract → ตัวดำเนินการ JSON ของ Postgres ────────────
+
+   sqlite มี json_extract(col, '$.key') · Postgres ไม่มีฟังก์ชันชื่อนั้นเลย
+   และไม่มีไวยากรณ์กลางที่ทั้งคู่เข้าใจ
+
+   ทางเลือกคือให้ query แต่ละอันรู้ว่าตัวเองรันบนตัวขับไหน ซึ่งพัง
+   จุดประสงค์ของ adapter ทั้งหมด — ที่นี่จึงแปลงให้ตอนส่งออก เหมือนที่
+   แปลง ? เป็น $n อยู่แล้ว
+
+   ->> คืนค่าเป็น text เสมอ จึง cast เป็น numeric ต่อ เพราะทุกจุดที่ใช้
+   อยู่ตอนนี้เอาไปคำนวณ ไม่ใช่เอาไปเทียบสตริง */
+export function toJsonOperators(text: string): string {
+  return text.replace(
+    /json_extract\(\s*([\w.]+)\s*,\s*'\$\.([\w]+)'\s*\)/g,
+    "($1::jsonb ->> '$2')::numeric",
+  );
+}
+
+/** SQL ที่เขียนด้วยภาษาถิ่น sqlite → ภาษาถิ่น Postgres */
+export function toPostgres(text: string): string {
+  return toDollarPlaceholders(toJsonOperators(text));
+}
+
 /* ── ตัวขับ sqlite ────────────────────────────────────────────
    sync อยู่ข้างใน แต่ยื่นหน้าตาเป็น async ออกมา ฝั่งเรียกจึงเขียน
    เหมือนกันทั้งสองตัวขับ */
@@ -195,17 +219,17 @@ async function postgresDb(url: string): Promise<Db> {
 
   const wrap = (c: typeof client): Sql => ({
     async all<T>(text: string, ...params: Param[]) {
-      return (await c.unsafe(toDollarPlaceholders(text), params)) as unknown as T[];
+      return (await c.unsafe(toPostgres(text), params)) as unknown as T[];
     },
     async get<T>(text: string, ...params: Param[]) {
       const rows = (await c.unsafe(
-        toDollarPlaceholders(text),
+        toPostgres(text),
         params,
       )) as unknown as T[];
       return rows[0];
     },
     async run(text: string, ...params: Param[]) {
-      const rows = await c.unsafe(toDollarPlaceholders(text), params);
+      const rows = await c.unsafe(toPostgres(text), params);
       return { changes: rows.count ?? 0 };
     },
     async exec(text: string) {

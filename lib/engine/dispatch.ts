@@ -1,5 +1,6 @@
+import { all, get, tx } from "@/lib/engine/sql";
+import { logActivity } from "@/lib/engine/db";
 import { createHash, randomUUID } from "node:crypto";
-import { db, logActivity } from "@/lib/engine/db";
 import { effectiveGuards, getTenant, getTenantPlays, pickMeasurement } from "@/lib/engine/match";
 import { writeCopy, writeCopyFallback, type AiSource, type CopySet, type VocabCtx } from "@/lib/engine/ai";
 import { profileFor } from "@/lib/shared/tenants";
@@ -100,14 +101,13 @@ export async function approveCampaign(
   candidate: Candidate,
   input: ApproveInput,
 ): Promise<ApproveResult> {
-  const d = db();
   const tenant = await getTenant(input.tenantId);
   if (!tenant) throw new Error("Account not found");
 
   /* เพดานของแผนต้องบังคับที่นี่ ไม่ใช่ที่หน้าจอ — หน้าจอที่ซ่อนปุ่มไว้
      ไม่ได้ป้องกันการยิง Server Action ตรง ๆ และ Free tier ที่ส่งได้
      คือรายได้ที่หายไปเงียบ ๆ ไม่ใช่แค่ UI ที่ไม่ตรง */
-  const planBlock = reachBlockedReason(input.tenantId, {
+  const planBlock = await reachBlockedReason(input.tenantId, {
     audience: candidate.audience.length,
   });
   if (planBlock) throw new Error(planBlock);
@@ -140,8 +140,7 @@ export async function approveCampaign(
 
   const dryRun = Boolean(input.dryRun);
 
-  d.exec("BEGIN");
-  try {
+  await tx(async (t) => {
     /* H1 — audience ถูกแช่แข็งที่นี่ ตอนอนุมัติ
        ตั้งแต่บรรทัดนี้ไป ไม่มีการคำนวณ audience ใหม่อีก */
     const arms = candidate.audience.map((cid) => ({
@@ -151,13 +150,12 @@ export async function approveCampaign(
     const treated = arms.filter((a) => a.arm === "treated").length;
     const holdout = arms.length - treated;
 
-    d.prepare(
+    await t.run(
       `INSERT INTO campaigns
         (id, tenant_id, play_id, status, approved_by, approved_at, copy_snapshot,
          offer_snapshot, holdout_pct, measurement, audience_size, treated_size,
          holdout_size, dry_run, est_cost)
        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-    ).run(
       campaignId,
       input.tenantId,
       candidate.play.id,
@@ -181,30 +179,23 @@ export async function approveCampaign(
       candidate.estimated_cost,
     );
 
-    const insAudience = d.prepare(
-      "INSERT INTO campaign_audience (tenant_id, campaign_id, customer_id, arm) VALUES (?,?,?,?)",
-    );
+    const INS_AUDIENCE =
+      "INSERT INTO campaign_audience (tenant_id, campaign_id, customer_id, arm) VALUES (?,?,?,?)";
     for (const a of arms)
-        insAudience.run(input.tenantId, campaignId, a.cid, a.arm);
+      await t.run(INS_AUDIENCE, input.tenantId, campaignId, a.cid, a.arm);
+  });
 
-    d.exec("COMMIT");
-  } catch (err) {
-    d.exec("ROLLBACK");
-    throw err;
-  }
-
-  logActivity(
+  await logActivity(
     input.tenantId,
     input.approvedBy,
     dryRun ? "dry_run" : "approve_campaign",
     `${candidate.play.id} · ${size} people · holdout ${holdoutPct}%`,
   );
 
-  const treatedRow = d
-    .prepare(
-      "SELECT treated_size AS t, holdout_size AS h FROM campaigns WHERE id = ?",
-    )
-    .get(campaignId) as { t: number; h: number };
+  const treatedRow = (await get<{ t: number; h: number }>(
+    "SELECT treated_size AS t, holdout_size AS h FROM campaigns WHERE id = ?",
+    campaignId,
+  ))!;
 
   return {
     campaignId,
@@ -242,26 +233,27 @@ export type SendResult = {
    campaignId ต่อมาดิบ ๆ ส่วนที่นี่ค้นด้วย WHERE id = ? อย่างเดียว
    ยิง POST พร้อม id ของบัญชีอื่นจึงสั่งส่งข้อความและตัดเครดิตของบัญชีนั้นได้
    เป็นช่องเดียวกับที่เคยแก้ไปแล้วใน commitImport แต่ตกหล่นสองจุดนี้ */
+type Camp = {
+  id: string;
+  tenant_id: string;
+  play_id: string;
+  status: string;
+  dry_run: number;
+};
+
 export async function sendCampaign(
   campaignId: string,
   opts: { ignoreQuietHours?: boolean; tenantId?: string } = {},
 ): Promise<SendResult> {
-  const d = db();
   const camp = (
     opts.tenantId
-      ? d
-          .prepare("SELECT * FROM campaigns WHERE id = ? AND tenant_id = ?")
-          .get(campaignId, opts.tenantId)
-      : d.prepare("SELECT * FROM campaigns WHERE id = ?").get(campaignId)
-  ) as
-    | {
-        id: string;
-        tenant_id: string;
-        play_id: string;
-        status: string;
-        dry_run: number;
-      }
-    | undefined;
+      ? await get<Camp>(
+          "SELECT * FROM campaigns WHERE id = ? AND tenant_id = ?",
+          campaignId,
+          opts.tenantId,
+        )
+      : await get<Camp>("SELECT * FROM campaigns WHERE id = ?", campaignId)
+  );
   if (!camp) throw new Error("Campaign not found");
   if (camp.dry_run) throw new Error("A dry run does not send");
 
@@ -275,12 +267,11 @@ export async function sendCampaign(
     !opts.ignoreQuietHours &&
     (qs > qe ? hour >= qs || hour < qe : hour >= qs && hour < qe);
 
-  const targets = d
-    .prepare(
-      `SELECT customer_id FROM campaign_audience
-       WHERE campaign_id = ? AND arm = 'treated'`,
-    )
-    .all(campaignId) as { customer_id: string }[];
+  const targets = await all<{ customer_id: string }>(
+    `SELECT customer_id FROM campaign_audience
+     WHERE campaign_id = ? AND arm = 'treated'`,
+    campaignId,
+  );
 
   if (inQuiet) {
     return {
@@ -305,11 +296,9 @@ export async function sendCampaign(
 
   /* F12 — idempotency key คือ PRIMARY KEY (campaign_id, customer_id)
      เรียกซ้ำกี่ครั้งก็ส่งคนละหนึ่งข้อความเท่านั้น */
-  const insMessage = d.prepare(
-    `INSERT INTO messages (tenant_id, campaign_id, customer_id, channel, status, cost, sent_at)
-       VALUES (?,?,?,?,?,?,?)
-     ON CONFLICT(campaign_id, customer_id) DO NOTHING`,
-  );
+  const INS_MESSAGE = `INSERT INTO messages (tenant_id, campaign_id, customer_id, channel, status, cost, sent_at)
+     VALUES (?,?,?,?,?,?,?)
+     ON CONFLICT(campaign_id, customer_id) DO NOTHING`;
 
   let sent = 0;
   let skipped = 0;
@@ -317,22 +306,22 @@ export async function sendCampaign(
 
   let noCredit = 0;
 
-  d.exec("BEGIN");
-  try {
+  await tx(async (q) => {
     for (const t of targets) {
       if (sent >= allowance) {
         /* ยังต้องนับคนที่เคยส่งแล้วให้ถูก ไม่ใช่เหมาเป็น "เครดิตไม่พอ"
            เพราะคนกลุ่มนั้นไม่ได้ใช้เครดิตเพิ่มอยู่แล้ว */
-        const already = d
-          .prepare(
-            "SELECT 1 AS x FROM messages WHERE campaign_id = ? AND customer_id = ?",
-          )
-          .get(campaignId, t.customer_id) as { x: number } | undefined;
+        const already = await q.get<{ x: number }>(
+          "SELECT 1 AS x FROM messages WHERE campaign_id = ? AND customer_id = ?",
+          campaignId,
+          t.customer_id,
+        );
         if (already) skipped++;
         else noCredit++;
         continue;
       }
-      const res = insMessage.run(
+      const res = await q.run(
+        INS_MESSAGE,
         camp.tenant_id,
         campaignId,
         t.customer_id,
@@ -341,21 +330,21 @@ export async function sendCampaign(
         MESSAGE_COST_BAHT,
         nowIso,
       );
-      if (Number(res.changes) > 0) sent++;
+      if (res.changes > 0) sent++;
       else skipped++;
     }
-    d.prepare("UPDATE tenants SET message_credits = message_credits - ? WHERE id = ?").run(
+    await q.run(
+      "UPDATE tenants SET message_credits = message_credits - ? WHERE id = ?",
       sent,
       camp.tenant_id,
     );
-    d.prepare("UPDATE campaigns SET status = 'measuring' WHERE id = ?").run(campaignId);
-    d.exec("COMMIT");
-  } catch (err) {
-    d.exec("ROLLBACK");
-    throw err;
-  }
+    await q.run(
+      "UPDATE campaigns SET status = 'measuring' WHERE id = ?",
+      campaignId,
+    );
+  });
 
-  logActivity(
+  await logActivity(
     camp.tenant_id,
     "system",
     "send_campaign",
