@@ -1,4 +1,4 @@
-import { get, tx, type Sql } from "@/lib/engine/sql";
+import { get, insertMany, tx, type Param, type Sql } from "@/lib/engine/sql";
 import { ALL_PLAYS } from "@/lib/shared/plays";
 import {
   DEFAULT_TENANT_ID,
@@ -180,25 +180,31 @@ async function seedTenant(q: Sql, p: TenantProfile, now: Date) {
     await q.run(insCreditQ, p.id, iso(openedAt), bought, priceForMessages(bought), "pack");
   }
 
-  const insProductQ = `INSERT INTO products (id, tenant_id, name, category, group_role, list_price, is_new_arrival, is_dead_stock)
-     VALUES (?,?,?,?,?,?,?,?)`;
-  for (const c of p.catalogue) {
-    await q.run(insProductQ, 
+  await insertMany(
+    q,
+    "products",
+    ["id", "tenant_id", "name", "category", "group_role", "list_price", "is_new_arrival", "is_dead_stock"],
+    p.catalogue.map((c) => [
       `${p.id}:${c.id}`, p.id, c.name, c.category, c.group_role, c.list_price,
       c.is_new_arrival ? 1 : 0, c.is_dead_stock ? 1 : 0,
-    );
-  }
+    ]),
+  );
 
-  const insCustomerQ = "INSERT INTO customers (id, tenant_id, name, created_at) VALUES (?,?,?,?)";
-  const insIdentityQ = "INSERT INTO identities (tenant_id, customer_id, type, value_hash) VALUES (?,?,?,?)";
-  const insTxnQ = `INSERT INTO transactions (tenant_id, id, customer_id, occurred_at, total, discount_total, channel)
-     VALUES (?,?,?,?,?,?,?)`;
-  const insLineQ = `INSERT INTO line_items (tenant_id, txn_id, product_id, qty, unit_price, unit_list_price)
-     VALUES (?,?,?,?,?,?)`;
-  const insConsentQ = `INSERT INTO consents (tenant_id, customer_id, purpose, granted_at, revoked_at, source)
-     VALUES (?,?,?,?,?,?)`;
-  const insMembershipQ = "INSERT INTO memberships (tenant_id, customer_id, kind, started_at, expires_at) VALUES (?,?,?,?,?)";
-  const insEventQ = "INSERT INTO events (tenant_id, customer_id, type, occurred_at, meta) VALUES (?,?,?,?,?)";
+  /* ── สะสมก่อน แทรกทีเดียว ──
+
+     เดิมทุกแถวคือหนึ่งคำสั่ง ซึ่งบนไฟล์ sqlite แทบไม่ต่าง แต่กับ Postgres
+     แต่ละคำสั่งคือการไปกลับข้ามเครือข่าย วัดได้ 213ms ต่อแถว —
+     seed หนึ่งบัญชีจึงกินเวลาเป็นสิบนาที
+
+     สะสมลง array แล้วส่งผ่าน insertMany ครั้งเดียวต่อตาราง
+     วัดจริงบน Postgres: 10,000 แถว 1.63 วินาที (เทียบกับ ~35 นาที) */
+  const bufCustomer: Param[][] = [];
+  const bufIdentity: Param[][] = [];
+  const bufTxn: Param[][] = [];
+  const bufLine: Param[][] = [];
+  const bufConsent: Param[][] = [];
+  const bufMembership: Param[][] = [];
+  const bufEvent: Param[][] = [];
 
   /* recency ถูกวางแผนล่วงหน้าเพื่อให้จำนวนคนในแต่ละช่วงตรงเป้าพอดี
      ไม่ปล่อยให้เป็นผลพลอยได้ของการสุ่ม */
@@ -246,8 +252,8 @@ async function seedTenant(q: Sql, p: TenantProfile, now: Date) {
     const signupDays = transacts
       ? oldest + 20 + Math.floor(rnd() * 120)
       : 5 + Math.floor(rnd() * 80);
-    await q.run(insCustomerQ, id, p.id, name, iso(daysAgo(now, signupDays)));
-    await q.run(insIdentityQ, p.id, id, "phone", `ph_${id}_${Math.floor(rnd() * 1e9)}`);
+    bufCustomer.push([id, p.id, name, iso(daysAgo(now, signupDays))]);
+    bufIdentity.push([p.id, id, "phone", `ph_${id}_${Math.floor(rnd() * 1e9)}`]);
 
     /* ── ความยินยอมและช่องทางที่ทักถึง ──
        คนที่ถอนความยินยอมคือคนที่ Keep ยอมแพ้ และไม่มีสิทธิ์ถูกส่ง
@@ -255,13 +261,14 @@ async function seedTenant(q: Sql, p: TenantProfile, now: Date) {
     const consentRoll = rnd();
     if (consentRoll > p.noConsentShare) {
       const revoked = consentRoll > 1 - p.revokedShare;
-      await q.run(insConsentQ, p.id, id, "marketing",
+      bufConsent.push([
+        p.id, id, "marketing",
         iso(daysAgo(now, signupDays)),
         revoked ? iso(daysAgo(now, Math.floor(rnd() * 90))) : null,
         rnd() > 0.5 ? "signup_form" : "line_oa",
-      );
+      ]);
     }
-    if (rnd() < p.lineShare) await q.run(insIdentityQ, p.id, id, "line", `line_${id}`);
+    if (rnd() < p.lineShare) bufIdentity.push([p.id, id, "line", `line_${id}`]);
 
     /* ── สมาชิกที่มีวันหมดอายุ — ป้อนให้ play กลุ่ม expiry ──
 
@@ -281,26 +288,28 @@ async function seedTenant(q: Sql, p: TenantProfile, now: Date) {
         ? -Math.floor(rnd() * term) // หมดอายุแล้วไม่เกินหนึ่งรอบ
         : Math.floor(rnd() * term); // ยังไม่หมด กระจายสม่ำเสมอทั้งปี
       const startedDaysAgo = term - remaining;
-      await q.run(insMembershipQ, p.id, id, p.membership.kind,
+      bufMembership.push([
+        p.id, id, p.membership.kind,
         iso(daysAgo(now, startedDaysAgo)),
         iso(daysAgo(now, -remaining)),
-      );
+      ]);
     }
 
     // มาแต่ไม่จ่าย
     const visits = Math.floor(rnd() * (p.events.visitMax + 1));
     for (let v = 0; v < visits; v++) {
-      await q.run(insEventQ, p.id, id, "visit", iso(daysAgo(now, Math.floor(rnd() * 240))), null);
+      bufEvent.push([p.id, id, "visit", iso(daysAgo(now, Math.floor(rnd() * 240))), null]);
     }
     // ใช้บริการที่ไม่ใช่การซื้อของ
     if (rnd() < p.events.bookingShare) {
-      await q.run(insEventQ, p.id, id, "booking",
+      bufEvent.push([
+        p.id, id, "booking",
         iso(daysAgo(now, Math.floor(rnd() * 120))),
         p.events.bookingLabel,
-      );
+      ]);
     }
     if (!transacts && rnd() < p.events.formShare) {
-      await q.run(insEventQ, p.id, id, "form", iso(daysAgo(now, 7 + Math.floor(rnd() * 70))), "lead_form");
+      bufEvent.push([p.id, id, "form", iso(daysAgo(now, 7 + Math.floor(rnd() * 70))), "lead_form"]);
     }
 
     if (!transacts) continue;
@@ -367,21 +376,37 @@ async function seedTenant(q: Sql, p: TenantProfile, now: Date) {
         total += unit * qty;
         discountTotal += (c.list_price - unit) * qty;
       }
-      await q.run(insTxnQ, p.id, txnId, id, at, total, discountTotal,
+      bufTxn.push([
+        p.id, txnId, id, at, total, discountTotal,
         rnd() > 0.82 ? p.channels[1] : p.channels[0],
-      );
+      ]);
       for (const l of lines) {
-        await q.run(
-          insLineQ, p.id, txnId, `${p.id}:${l.c.id}`, l.qty, l.unit, l.c.list_price,
-        );
+        bufLine.push([
+          p.id, txnId, `${p.id}:${l.c.id}`, l.qty, l.unit, l.c.list_price,
+        ]);
       }
     }
   }
 
+  /* ── แทรกทุกถัง ──
+     ลำดับสำคัญ: customers ก่อน identities/consents/... และ transactions
+     ก่อน line_items เพราะ Postgres บังคับ foreign key ทันที */
+  await insertMany(q, "customers", ["id", "tenant_id", "name", "created_at"], bufCustomer);
+  await insertMany(q, "identities", ["tenant_id", "customer_id", "type", "value_hash"], bufIdentity);
+  await insertMany(q, "consents", ["tenant_id", "customer_id", "purpose", "granted_at", "revoked_at", "source"], bufConsent);
+  await insertMany(q, "memberships", ["tenant_id", "customer_id", "kind", "started_at", "expires_at"], bufMembership);
+  await insertMany(q, "events", ["tenant_id", "customer_id", "type", "occurred_at", "meta"], bufEvent);
+  await insertMany(q, "transactions", ["tenant_id", "id", "customer_id", "occurred_at", "total", "discount_total", "channel"], bufTxn);
+  await insertMany(q, "line_items", ["tenant_id", "txn_id", "product_id", "qty", "unit_price", "unit_list_price"], bufLine);
+
   /* เปิด play ทั้งคลังให้บัญชีตั้งแต่วันแรก (D2)
      ตัวที่ไม่เข้ากับรูปทรงวงจรของบัญชีจะถูกกรองตอน MATCH ไม่ใช่ตรงนี้ */
-  const insTenantPlayQ = "INSERT INTO tenant_plays (tenant_id, play_id, enabled) VALUES (?,?,1)";
-  for (const play of ALL_PLAYS) await q.run(insTenantPlayQ, p.id, play.id);
+  await insertMany(
+    q,
+    "tenant_plays",
+    ["tenant_id", "play_id", "enabled"],
+    ALL_PLAYS.map((play) => [p.id, play.id, 1]),
+  );
 }
 
 export async function seed({ force = false, only }: { force?: boolean; only?: string } = {}) {
@@ -424,22 +449,29 @@ export async function seed({ force = false, only }: { force?: boolean; only?: st
       ) === 0;
     if (perfEmpty) {
       const rnd = mulberry32(9090909);
-      const insPerfQ = `INSERT INTO play_performance
-          (play_id, cycle_shape, size_bucket, trials, successes, posterior_alpha, posterior_beta)
-         VALUES (?,?,?,?,?,?,?)
-         ON CONFLICT(play_id, cycle_shape, size_bucket) DO NOTHING`;
+      /* ลูปนี้ต้องเรียง rnd() ตามลำดับเดิมเป๊ะ ไม่งั้น posterior ที่ได้
+         จะเปลี่ยนไปทั้งชุด และตัวเลขที่หน้าจอแสดงจะไม่ตรงกับที่เคยเป็น —
+         สะสมลง array ไม่กระทบลำดับการเรียก rnd() */
+      const perf: Param[][] = [];
       for (const play of ALL_PLAYS) {
         for (const shape of play.cycle_shape) {
           const trials = 120 + Math.floor(rnd() * 900);
           const successes = Math.round(
             trials * play.priors.response_rate * (0.75 + rnd() * 0.5),
           );
-          await q.run(insPerfQ, 
+          perf.push([
             play.id, shape, "300_1000", trials, successes,
             1 + successes, 1 + (trials - successes),
-          );
+          ]);
         }
       }
+      await insertMany(
+        q,
+        "play_performance",
+        ["play_id", "cycle_shape", "size_bucket", "trials", "successes", "posterior_alpha", "posterior_beta"],
+        perf,
+        { onConflict: "ON CONFLICT(play_id, cycle_shape, size_bucket) DO NOTHING" },
+      );
     }
 
   });

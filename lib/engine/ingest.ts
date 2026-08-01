@@ -1,4 +1,4 @@
-import { tx } from "@/lib/engine/sql";
+import { insertMany, tx, type Param } from "@/lib/engine/sql";
 import { logActivity } from "@/lib/engine/db";
 import { createHash } from "node:crypto";
 import { deriveFeatures } from "@/lib/engine/derive";
@@ -371,18 +371,19 @@ export async function commitImport(
       }
     }
 
-    const insCustomerQ = `INSERT INTO customers (id, tenant_id, name, created_at) VALUES (?,?,?,?)
-       ON CONFLICT(id) DO UPDATE SET name = excluded.name`;
-    const insIdentityQ = `INSERT INTO identities (tenant_id, customer_id, type, value_hash) VALUES (?,?,?,?)
-       ON CONFLICT(customer_id, type) DO NOTHING`;
-    const insConsentQ = `INSERT INTO consents (tenant_id, customer_id, purpose, granted_at, revoked_at, source)
-       VALUES (?,?,?,?,?,?) ON CONFLICT(customer_id, purpose) DO NOTHING`;
-    const insProductQ = `INSERT INTO products (id, tenant_id, name, category, group_role, list_price)
-       VALUES (?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET group_role = excluded.group_role`;
-    const insTxnQ = `INSERT INTO transactions (tenant_id, id, customer_id, occurred_at, total, discount_total, channel)
-       VALUES (?,?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING`;
-    const insLineQ = `INSERT INTO line_items (tenant_id, txn_id, product_id, qty, unit_price, unit_list_price)
-       VALUES (?,?,?,?,?,?)`;
+    /* ── สะสมก่อน แทรกทีเดียว ──
+
+       เดิมแต่ละแถวของ CSV ยิงคำสั่งแยกกันห้าตัว ซึ่งบน sqlite ไม่รู้สึก
+       แต่บน Postgres แต่ละคำสั่งคือการไปกลับข้ามเครือข่าย วัดได้ 213ms
+       ต่อคำสั่ง — ไฟล์หมื่นแถวจึงกลายเป็นหลายชั่วโมง
+
+       นี่ไม่ใช่แค่เรื่องเดโม: นี่คือเส้นทางที่ลูกค้าจริงอัปโหลดข้อมูลเข้ามา */
+    const bufCustomer: Param[][] = [];
+    const bufIdentity: Param[][] = [];
+    const bufConsent: Param[][] = [];
+    const bufProduct: Param[][] = [];
+    const bufTxn: Param[][] = [];
+    const bufLine: Param[][] = [];
 
     const idFor = (s: string) =>
       createHash("sha256").update(s).digest("hex").slice(0, 20);
@@ -404,21 +405,22 @@ export async function commitImport(
       if (!seenCustomers.has(cid)) {
         seenCustomers.add(cid);
         customers++;
-        await q.run(insCustomerQ, 
+        bufCustomer.push([
           cid,
           tenantId,
           at(row, "customer_name").trim() || "ลูกค้าไม่ระบุชื่อ",
           when,
-        );
+        ]);
         // ตัวระบุถูก hash ก่อนเก็บ — ไม่มีเบอร์หรืออีเมลดิบในระบบ
-        await q.run(insIdentityQ, tenantId, cid,
+        bufIdentity.push([
+          tenantId, cid,
           ref.type,
           createHash("sha256").update(ref.value).digest("hex"),
-        );
+        ]);
         /* ไฟล์ POS ไม่มีข้อมูลความยินยอม จึงตั้งเป็น "ยังไม่ยินยอม"
            คนกลุ่มนี้จะไม่ถูกส่งและไม่ถูกส่งออกจนกว่าร้านจะเก็บ
            ความยินยอมจริง — ปลอดภัยกว่าการเดาว่ายินยอม */
-        await q.run(insConsentQ, tenantId, cid, "marketing", null, null, "csv_import");
+        bufConsent.push([tenantId, cid, "marketing", null, null, "csv_import"]);
       }
 
       const pname = at(row, "product_name").trim();
@@ -428,29 +430,46 @@ export async function commitImport(
         if (!seenProducts.has(pid)) {
           seenProducts.add(pid);
           const meta = preview.products.find((p) => p.name === pname);
-          await q.run(insProductQ, 
+          bufProduct.push([
             pid,
             tenantId,
             pname,
             meta?.category ?? "ทั่วไป",
             roleByName.get(pname) ?? "attachment",
             meta?.price ?? money.listUnit,
-          );
+          ]);
         }
       }
 
       const txnId = `t-${idFor(`${cid}:${when}:${++txnSeq}`)}`;
-      await q.run(insTxnQ, tenantId, txnId,
+      bufTxn.push([
+        tenantId, txnId,
         cid,
         when,
         money.total,
         money.discount,
         at(row, "channel").trim() || "pos",
-      );
+      ]);
       transactions++;
       // unit_price ต้องเป็นราคาต่อหน่วย ไม่ใช่ยอดรวมของแถว
-      if (pid) await q.run(insLineQ, tenantId, txnId, pid, money.qty, money.unitNet, money.listUnit);
+      if (pid)
+        bufLine.push([tenantId, txnId, pid, money.qty, money.unitNet, money.listUnit]);
     }
+
+    /* ── แทรกทุกถัง ──
+       ลำดับตามความสัมพันธ์: customers และ products ก่อน แล้ว transactions
+       แล้วจึง line_items — Postgres บังคับ foreign key ทันที */
+    await insertMany(q, "customers", ["id", "tenant_id", "name", "created_at"], bufCustomer,
+      { onConflict: "ON CONFLICT(id) DO UPDATE SET name = excluded.name" });
+    await insertMany(q, "identities", ["tenant_id", "customer_id", "type", "value_hash"], bufIdentity,
+      { onConflict: "ON CONFLICT(customer_id, type) DO NOTHING" });
+    await insertMany(q, "consents", ["tenant_id", "customer_id", "purpose", "granted_at", "revoked_at", "source"], bufConsent,
+      { onConflict: "ON CONFLICT(customer_id, purpose) DO NOTHING" });
+    await insertMany(q, "products", ["id", "tenant_id", "name", "category", "group_role", "list_price"], bufProduct,
+      { onConflict: "ON CONFLICT(id) DO UPDATE SET group_role = excluded.group_role" });
+    await insertMany(q, "transactions", ["tenant_id", "id", "customer_id", "occurred_at", "total", "discount_total", "channel"], bufTxn,
+      { onConflict: "ON CONFLICT(id) DO NOTHING" });
+    await insertMany(q, "line_items", ["tenant_id", "txn_id", "product_id", "qty", "unit_price", "unit_list_price"], bufLine);
 
     await logActivity(
       tenantId,

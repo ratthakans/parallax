@@ -144,6 +144,29 @@ export function toPostgres(text: string): string {
   return toDollarPlaceholders(toJsonOperators(text));
 }
 
+/* ── คำสั่งที่ช้าผิดปกติต้องมองเห็นได้ ────────────────────────
+
+   บนไฟล์ sqlite ทุกอย่างเร็วจนไม่มีอะไรให้สังเกต พอย้ายไป Postgres
+   คำสั่งเดียวที่ช้ากลายเป็นสิ่งที่ทำให้ทั้งคำขอพัง — และ error ที่ได้
+   ("canceling statement due to statement timeout") ไม่ได้บอกว่าคำสั่งไหน
+
+   ตั้ง PARALLAX_SLOW_MS เพื่อให้พิมพ์ทุกคำสั่งที่ช้ากว่านั้น
+   ปิดไว้โดยปริยาย จึงไม่มีต้นทุนตอนใช้งานปกติ */
+const SLOW_MS = Number(process.env.PARALLAX_SLOW_MS ?? 0);
+
+async function timed<T>(text: string, fn: () => Promise<T>): Promise<T> {
+  if (!SLOW_MS) return fn();
+  const t0 = Date.now();
+  try {
+    return await fn();
+  } finally {
+    const ms = Date.now() - t0;
+    if (ms >= SLOW_MS) {
+      console.warn(`[sql ${ms}ms] ${text.replace(/\s+/g, " ").slice(0, 120)}`);
+    }
+  }
+}
+
 /* ── ตัวขับ sqlite ────────────────────────────────────────────
    sync อยู่ข้างใน แต่ยื่นหน้าตาเป็น async ออกมา ฝั่งเรียกจึงเขียน
    เหมือนกันทั้งสองตัวขับ */
@@ -171,17 +194,22 @@ async function sqliteDb(path: string): Promise<Db> {
 
   const api: Sql = {
     async all<T>(text: string, ...params: Param[]) {
-      return d.prepare(text).all(...bind(params)) as T[];
+      return timed(text, async () => d.prepare(text).all(...bind(params)) as T[]);
     },
     async get<T>(text: string, ...params: Param[]) {
-      return d.prepare(text).get(...bind(params)) as T | undefined;
+      return timed(
+        text,
+        async () => d.prepare(text).get(...bind(params)) as T | undefined,
+      );
     },
     async run(text: string, ...params: Param[]) {
-      const r = d.prepare(text).run(...bind(params));
-      return { changes: Number(r.changes) };
+      return timed(text, async () => {
+        const r = d.prepare(text).run(...bind(params));
+        return { changes: Number(r.changes) };
+      });
     },
     async exec(text: string) {
-      d.exec(text);
+      await timed(text, async () => d.exec(text));
     },
   };
 
@@ -219,21 +247,30 @@ async function postgresDb(url: string): Promise<Db> {
 
   const wrap = (c: typeof client): Sql => ({
     async all<T>(text: string, ...params: Param[]) {
-      return (await c.unsafe(toPostgres(text), params)) as unknown as T[];
+      return timed(
+        text,
+        async () => (await c.unsafe(toPostgres(text), params)) as unknown as T[],
+      );
     },
     async get<T>(text: string, ...params: Param[]) {
-      const rows = (await c.unsafe(
-        toPostgres(text),
-        params,
-      )) as unknown as T[];
-      return rows[0];
+      return timed(text, async () => {
+        const rows = (await c.unsafe(
+          toPostgres(text),
+          params,
+        )) as unknown as T[];
+        return rows[0];
+      });
     },
     async run(text: string, ...params: Param[]) {
-      const rows = await c.unsafe(toPostgres(text), params);
-      return { changes: rows.count ?? 0 };
+      return timed(text, async () => {
+        const rows = await c.unsafe(toPostgres(text), params);
+        return { changes: rows.count ?? 0 };
+      });
     },
     async exec(text: string) {
-      await c.unsafe(text);
+      await timed(text, async () => {
+        await c.unsafe(text);
+      });
     },
   });
 
@@ -320,4 +357,49 @@ export async function exec(text: string): Promise<void> {
 
 export async function tx<T>(fn: (t: Sql) => Promise<T>): Promise<T> {
   return (await sql()).tx(fn);
+}
+
+/* ── แทรกหลายแถวด้วยคำสั่งเดียว ───────────────────────────────
+
+   บนไฟล์ sqlite การแทรกทีละแถวไม่ต่างอะไรมาก เพราะทุกอย่างอยู่ในโปรเซส
+   เดียวกัน แต่กับ Postgres ทุกคำสั่งคือการไปกลับข้ามเครือข่าย — seed ชุด
+   ตัวอย่างแทรกหลายพันแถว วัดแล้วเกินสิบนาทีก็ยังไม่จบ เทียบกับสี่วินาที
+   บน sqlite
+
+   และมันไม่ใช่แค่ข้อมูลเดโม commitImport แทรกด้วยรูปแบบเดียวกัน ร้านที่
+   อัปโหลด CSV หมื่นแถวจะเจอเหมือนกันเป๊ะ
+
+   ── ทำไมต้องหั่นเป็นก้อน ──
+
+   sqlite รับพารามิเตอร์ได้สูงสุด 32,766 ตัวต่อคำสั่ง (วัดแล้ว: 16,383 แถว
+   ที่สองคอลัมน์ผ่าน 20,000 ไม่ผ่าน) ส่วน Postgres รับ 65,535 เกณฑ์จึงเป็น
+   ของ sqlite และคำนวณจากจำนวนคอลัมน์จริง ไม่ใช่ตัวเลขตายตัวที่จะพังเงียบ ๆ
+   วันที่มีคนเพิ่มคอลัมน์
+
+   เผื่อไว้ที่ 30,000 เพราะบางคำสั่งมีพารามิเตอร์อื่นนอกเหนือจากแถว */
+const MAX_PARAMS = 30_000;
+
+export async function insertMany(
+  q: Sql,
+  table: string,
+  columns: string[],
+  rows: Param[][],
+  opts: { onConflict?: string } = {},
+): Promise<number> {
+  if (!rows.length) return 0;
+
+  const perRow = columns.length;
+  const chunkSize = Math.max(1, Math.floor(MAX_PARAMS / perRow));
+  const placeholder = `(${columns.map(() => "?").join(",")})`;
+  const head = `INSERT INTO ${table} (${columns.join(",")}) VALUES `;
+  const tail = opts.onConflict ? ` ${opts.onConflict}` : "";
+
+  let written = 0;
+  for (let i = 0; i < rows.length; i += chunkSize) {
+    const chunk = rows.slice(i, i + chunkSize);
+    const sql = head + chunk.map(() => placeholder).join(",") + tail;
+    const r = await q.run(sql, ...chunk.flat());
+    written += r.changes;
+  }
+  return written;
 }
