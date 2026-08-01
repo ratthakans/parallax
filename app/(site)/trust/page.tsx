@@ -184,6 +184,62 @@ export default function TrustPage() {
       </Section>
 
       {/* terms */}
+      {/* ── คุกกี้ ──────────────────────────────────────────────
+          หน้าความเป็นส่วนตัวที่ไม่เอ่ยถึงคุกกี้เลยสักคำ บนผลิตภัณฑ์ที่
+          ขายเรื่อง PDPA เป็นช่องว่างที่คนตรวจสอบจะสังเกตก่อนใคร
+
+          และคำตอบที่นี่แข็งแรงพอที่จะพูดออกมาดัง ๆ ได้: มีคุกกี้ตัวเดียว
+          ทั้งเว็บ ไม่มีตัววัดพฤติกรรม ไม่มีพิกเซลโฆษณา — จึงไม่มีแถบ
+          ขอความยินยอมให้ต้องกดปิด เพราะไม่มีอะไรให้ยินยอม */}
+      <Section tone="paper" id="cookies" size="band-sm">
+        <div className="shell">
+          <div className="grid gap-14 lg:grid-cols-2 lg:gap-20">
+            <Reveal>
+              <div>
+                <Label>Cookies</Label>
+                <h2 className="t-h2 balance mt-9 text-ink">
+                  One cookie. Nothing that follows you.
+                </h2>
+                <p className="t-body t-thai pretty mt-8 text-ink-3">
+                  There is no consent banner on this site because there is nothing to
+                consent to. No analytics, no advertising pixels, no third-party
+                trackers, and nothing that follows a visitor to another site.
+                </p>
+                <p className="t-small t-thai pretty mt-6 text-ink-4">
+                  The one cookie exists only so the console remembers which account a
+                screen is open on. It is readable by the server alone, never by
+                scripts in the page, and it carries an account identifier — never a
+                name, a phone number, or anything about a shop&apos;s customers.
+                </p>
+              </div>
+            </Reveal>
+            <Reveal delay={120}>
+              <div className="flex flex-col gap-6">
+                {[
+                  {
+                    t: "parallax_tenant",
+                    d: "Which account the console is showing. Strictly necessary — the console cannot work without it.",
+                  },
+                  {
+                    t: "Kept for 30 days",
+                    d: "Then it expires on its own. Clearing it returns the console to the default account; nothing else changes.",
+                  },
+                  {
+                    t: "HttpOnly · Secure · SameSite Lax",
+                    d: "Unreachable from page scripts, sent over HTTPS only, and never attached to a cross-site form post.",
+                  },
+                ].map((c) => (
+                  <div key={c.t} className="panel p-7">
+                    <p className="t-numeral text-ink">{c.t}</p>
+                    <p className="t-small t-thai pretty mt-3 text-ink-3">{c.d}</p>
+                  </div>
+                ))}
+              </div>
+            </Reveal>
+          </div>
+        </div>
+      </Section>
+
       <Section tone="mist" id="terms" size="band-sm">
         <div className="shell">
           <Reveal>

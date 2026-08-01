@@ -15,7 +15,11 @@ import { clearAiCache } from "@/lib/engine/ai";
 import { isKnownTenant } from "@/lib/shared/tenants";
 import { buyCredits, changePlan, reachBlockedReason } from "@/lib/engine/billing";
 import { CREDIT_PACKS, PLANS, isPlanId } from "@/lib/shared/plans";
-import { getActiveTenantId, TENANT_COOKIE } from "@/lib/shared/active-tenant";
+import {
+  getActiveTenantId,
+  TENANT_COOKIE,
+  TENANT_COOKIE_OPTIONS,
+} from "@/lib/shared/active-tenant";
 import { messageOf, type ActionState } from "@/lib/shared/action-state";
 import { num } from "@/lib/shared/format";
 import {
@@ -72,12 +76,7 @@ export async function switchTenantAction(formData: FormData) {
   const tenantId = String(formData.get("tenantId") ?? "");
   assertTenant(tenantId);
   const store = await cookies();
-  store.set(TENANT_COOKIE, tenantId, {
-    path: "/",
-    httpOnly: true,
-    sameSite: "lax",
-    maxAge: 60 * 60 * 24 * 30,
-  });
+  store.set(TENANT_COOKIE, tenantId, TENANT_COOKIE_OPTIONS);
   revalidateConsole();
 
   /* ── สลับบัญชีแล้วต้องพาไปหน้าบรีฟของบัญชีนั้น ──

@@ -1,0 +1,86 @@
+# ── ประตูที่ต้องผ่านก่อนโค้ดจะเข้า main ─────────────────────────
+#
+# โปรเจกต์นี้มีชุดตรวจที่เขียนไว้ดีมากอยู่แล้ว — boundary check 5 กฎ และ
+# ชุด invariant 4 ชุด — แต่ก่อนหน้านี้มันรันเมื่อมีคนนึกได้เท่านั้น
+# ชุดตรวจที่ต้องพึ่งความจำของคนคือชุดตรวจที่จะไม่ถูกรันในวันที่ต้องการมันที่สุด
+#
+# ── ทำไมเป็นสอง job ──
+#
+# typecheck กับ boundaries เร็วและไม่ต้องแตะฐานข้อมูล ส่วน verify ต้องสร้าง
+# ฐานข้อมูลจริงและช้ากว่า แยกกันแล้วรันพร้อมกัน คนเปิด PR จึงเห็นความผิดพลาด
+# ที่ชัดที่สุด (พิมพ์ผิด · ข้ามชั้นสถาปัตยกรรม) ภายในไม่กี่สิบวินาที
+# โดยไม่ต้องรอชุดที่ยาวกว่า
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # เรียกมือได้จากแท็บ Actions ตอนอยากยืนยันสาขาใดสาขาหนึ่ง
+  workflow_dispatch:
+
+# PR ที่ push ซ้ำระหว่างที่ยังรันอยู่ ให้ยกเลิกรอบเก่าทิ้ง
+# main ไม่ยกเลิก เพราะประวัติของ main ควรมีผลตรวจครบทุก commit
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  static:
+    name: Types · boundaries · build
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # ci ไม่ใช่ install — ยึด package-lock.json อย่างเดียว
+      # ไม่งั้น CI อาจผ่านด้วยเวอร์ชันที่ไม่มีใครมีอยู่จริงบนเครื่องตัวเอง
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # 5 กฎที่กันไม่ให้ชั้น marketing เรียกเครื่องยนต์ตรง ๆ
+      # ทุกกฎถูกพิสูจน์แล้วว่า FAIL จริงเมื่อจงใจละเมิด
+      - name: Layer boundaries
+        run: npm run check
+
+      - name: Build
+        run: npm run build
+
+  verify:
+    name: Engine invariants
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      # แต่ละชุดสร้างฐานข้อมูลชั่วคราวของตัวเอง (verify/isolate.mts)
+      # จึงรันต่อกันได้โดยไม่ปนกัน — เคยมีบั๊กที่ชุดหนึ่งทิ้งของไว้ให้อีกชุดเจอ
+      - name: Engine
+        run: npm run verify
+
+      - name: Plan caps
+        run: npm run verify:caps
+
+      - name: Tenant isolation
+        run: npm run verify:tenants
+
+      - name: Pricing
+        run: npm run verify:pricing
