@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { Mark } from "@/components/brand";
 
-const COLS: { title: string; links: { href: string; label: string }[] }[] = [
+const COLS: {
+  title: string;
+  links: { href: string; label: string; external?: boolean }[];
+}[] = [
   {
     title: "Platform",
     links: [
@@ -34,6 +37,9 @@ const COLS: { title: string; links: { href: string; label: string }[] }[] = [
     links: [
       { href: "/company", label: "About" },
       { href: "/investors", label: "Investors" },
+      /* เด็คเปิดแท็บใหม่ — มันเป็นแอปเต็มจอที่ยึดคีย์บอร์ด ถ้าเปิดทับ
+         แท็บเดิมคนจะเสียตำแหน่งที่กำลังอ่านอยู่บนเว็บไปเลย */
+      { href: "/deck", label: "Keynote deck", external: true },
       { href: "/trust", label: "Privacy" },
       { href: "/contact", label: "Contact" },
     ],
@@ -69,12 +75,28 @@ export function SiteFooter() {
                 <ul className="mt-6 flex flex-col gap-3.5">
                   {col.links.map((l) => (
                     <li key={l.href + l.label}>
-                      <Link
-                        href={l.href}
-                        className="text-[0.875rem] text-frost/65 transition-colors duration-300 hover:text-frost"
-                      >
-                        {l.label}
-                      </Link>
+                      {l.external ? (
+                        <a
+                          href={l.href}
+                          target="_blank"
+                          rel="noopener"
+                          className="group inline-flex items-center gap-1.5 text-[0.875rem] text-frost/65 transition-colors duration-300 hover:text-frost"
+                        >
+                          {l.label}
+                          {/* เครื่องหมายว่าจะเปิดแท็บใหม่ — บอกก่อนกด ไม่ใช่ให้รู้ตอนกดไปแล้ว */}
+                          <span aria-hidden className="text-[0.7em] opacity-60">
+                            ↗
+                          </span>
+                          <span className="sr-only">(opens in a new tab)</span>
+                        </a>
+                      ) : (
+                        <Link
+                          href={l.href}
+                          className="text-[0.875rem] text-frost/65 transition-colors duration-300 hover:text-frost"
+                        >
+                          {l.label}
+                        </Link>
+                      )}
                     </li>
                   ))}
                 </ul>

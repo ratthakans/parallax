@@ -32,6 +32,15 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "6mb",
     },
   },
+  /* ── /deck ให้เป็น URL ที่พิมพ์ได้ ────────────────────────────
+     ไฟล์อยู่ที่ public/deck/index.html ซึ่ง Next เสิร์ฟที่ /deck/index.html
+     เท่านั้น — ไม่มีการเติม index ให้อัตโนมัติเหมือนเว็บเซิร์ฟเวอร์ทั่วไป
+     rewrite ทำให้ /deck ใช้ได้ โดยที่ URL บนแถบยังเป็น /deck (ต่างจาก
+     redirect ที่จะเปลี่ยนแถบไปเป็น /deck/index.html ให้คนเห็น) */
+  async rewrites() {
+    return [{ source: "/deck", destination: "/deck/index.html" }];
+  },
+
   async headers() {
     return [{ source: "/:path*", headers: SECURITY_HEADERS }];
   },
