@@ -22,7 +22,7 @@ export function ensureReady(): Promise<void> {
     const missing = TENANT_PROFILES.filter((t) => !isTenantSeeded(t.id));
     if (missing.length) seed();
     for (const t of TENANT_PROFILES) {
-      if (!featuresComputedAt(t.id)) deriveFeatures(t.id);
+      if (!(await featuresComputedAt(t.id))) await deriveFeatures(t.id);
       await seedCampaignHistory(t.id);
     }
     ready = true;

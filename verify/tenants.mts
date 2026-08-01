@@ -15,7 +15,7 @@ const out: string[] = [];
 const ok = (c: boolean, m: string) => out.push(`${c ? "PASS" : "FAIL"}  ${m}`);
 
 for (const p of TENANT_PROFILES) {
-  const f = loadFeatures(p.id);
+  const f = await loadFeatures(p.id);
   const ever = f.filter(x => x.frequency_total > 0);
   const repeat = f.filter(x => x.frequency_total >= 2);
   const r30 = ever.filter(x => x.recency_days <= 30);
@@ -24,7 +24,7 @@ for (const p of TENANT_PROFILES) {
   const sorted = [...f].sort((a,b)=>b.monetary_ltv-a.monetary_ltv);
   const top2 = sorted.slice(0, Math.round(f.length*0.02));
   const top2Share = rev ? (top2.reduce((s,x)=>s+x.monetary_ltv,0)/rev)*100 : 0;
-  const { candidates } = runMatch(p.id);
+  const { candidates } = await runMatch(p.id);
   const three = topThree(candidates);
   const roi = roiSummary(p.id);
   const reach = f.reduce<Record<string,number>>((a,x)=>{a[x.reachable_by]=(a[x.reachable_by]??0)+1;return a;},{});

@@ -150,7 +150,7 @@ ok(replaceBig != null, "แทนที่ทั้งฐานด้วยไ�
 
 ok(reachBlockedReason(T) != null, "แผน Free รายงานว่าส่งไม่ได้");
 
-const { candidates } = runMatch(T);
+const { candidates } = await runMatch(T);
 const target = candidates.find((c) => !c.blocked);
 let threw = false;
 let message = "";
@@ -234,7 +234,7 @@ for (const p of TENANT_PROFILES) {
 /* ── 8 · เครดิตหมดต้องหยุดส่ง ไม่ใช่ติดลบ ─────────────────────── */
 
 const T2 = TENANT_PROFILES[1].id;
-const { candidates: c2 } = runMatch(T2);
+const { candidates: c2 } = await runMatch(T2);
 const big = [...c2].filter((c) => !c.blocked).sort((a, b) => b.audience.length - a.audience.length)[0];
 if (big) {
   const r = await approveCampaign(big, {
@@ -251,7 +251,7 @@ if (big) {
       c: number;
     }
   ).c;
-  const send = sendCampaign(r.campaignId);
+  const send = await sendCampaign(r.campaignId);
   const left = (
     db().prepare("SELECT message_credits c FROM tenants WHERE id=?").get(T2) as {
       c: number;

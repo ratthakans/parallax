@@ -120,7 +120,7 @@ export async function approveAction(
     holdoutRaw != null && String(holdoutRaw) !== "" ? Number(holdoutRaw) : undefined;
 
   const planBlock = reachBlockedReason(tenantId);
-  const { candidates } = runMatch(tenantId);
+  const { candidates } = await runMatch(tenantId);
   const candidate = candidates.find((c) => c.play.id === playId);
 
   if (!candidate) {
@@ -180,7 +180,7 @@ export async function sendAction(
 
   let res;
   try {
-    res = sendCampaign(campaignId, { tenantId });
+    res = await sendCampaign(campaignId, { tenantId });
   } catch (err) {
     return { error: messageOf(err) };
   }
@@ -189,7 +189,7 @@ export async function sendAction(
   revalidatePath(`/app/campaigns/${campaignId}`);
 
   if (res.skippedQuietHours) {
-    const t = getTenant(tenantId);
+    const t = await getTenant(tenantId);
     return {
       error:
         `Quiet hours ${t?.quiet_hours_start ?? 21}:00–${t?.quiet_hours_end ?? 9}:00 — ` +
@@ -348,7 +348,7 @@ export async function deriveAction(
   formData: FormData,
 ): Promise<ActionState> {
   const tenantId = await currentTenant(formData);
-  deriveFeatures(tenantId);
+  await deriveFeatures(tenantId);
   const n = db()
     .prepare("SELECT COUNT(*) AS n FROM customer_features WHERE tenant_id = ?")
     .get(tenantId) as { n: number };
@@ -367,7 +367,7 @@ export async function reseedAction(
   if (!demoToolsEnabled()) return { error: DEMO_TOOLS_OFF_REASON };
   // เฉพาะบัญชีที่เปิดอยู่ — ไม่ล้างอีกสามบัญชีที่ผู้ใช้ไม่ได้สั่ง
   seed({ force: true, only: tenantId });
-  deriveFeatures(tenantId);
+  await deriveFeatures(tenantId);
   resetReady();
   revalidateConsole();
   return { ok: "Rebuilt — campaigns and results for this account are gone." };

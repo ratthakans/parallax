@@ -115,7 +115,7 @@ export async function seedCampaignHistory(tenantId: string) {
      ประวัติจึงกระจายในปฏิทินเหมือนร้านที่ใช้งานมาปีกว่าจริง ๆ */
   for (let round = 0; round < 6 && created < 4; round++) {
     if (created > 0) travelForward(tenantId, 100);
-    const { candidates } = runMatch(tenantId);
+    const { candidates } = await runMatch(tenantId);
     const pick = candidates
       .filter(
         (c) =>
@@ -132,7 +132,7 @@ export async function seedCampaignHistory(tenantId: string) {
       approvedBy: "demo",
     });
     try {
-      sendCampaign(r.campaignId, { ignoreQuietHours: true, tenantId });
+      await sendCampaign(r.campaignId, { ignoreQuietHours: true, tenantId });
     } catch {
       // เครดิตหมด — ข้ามการส่ง แต่ยังนับแคมเปญ
     }

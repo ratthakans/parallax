@@ -29,12 +29,12 @@ export default async function BriefPage() {
   const tenantId = await getActiveTenantId();
   const profile = profileFor(tenantId);
   const v = profile.vocab;
-  const tenant = getTenant(tenantId);
-  const { candidates, weeklyCap } = runMatch(tenantId);
+  const tenant = await getTenant(tenantId);
+  const { candidates, weeklyCap } = await runMatch(tenantId);
   const planBlock = reachBlockedReason(tenantId);
   const trial = reachTrialState(tenantId);
   const three = topThree(candidates);
-  const features = loadFeatures(tenantId);
+  const features = await loadFeatures(tenantId);
   const roi = roiSummary(tenantId);
 
   // บันทึกการเปิดบรีฟ — สัญญาณเตือนการยกเลิกที่มาก่อนตัวเลขอื่น (E7)

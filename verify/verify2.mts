@@ -27,7 +27,7 @@ db().prepare("UPDATE tenants SET quiet_hours_start=0, quiet_hours_end=0 WHERE id
 // ── อนุมัติหลายแคมเปญเพื่อให้เพดานความถี่ได้ทำงาน (cap = 2/สัปดาห์) ──
 const approved: string[] = [];
 for (let round = 0; round < 8; round++) {
-  const { candidates } = runMatch(T);
+  const { candidates } = await runMatch(T);
   const c = candidates.find((x) => !x.blocked && x.play.engine === "keep" && x.audience.length >= 40);
   if (!c) break;
   const r = await approveCampaign(c, { tenantId: T, playId: c.play.id, approvedBy: "test" });
@@ -39,8 +39,8 @@ ok(approved.length >= 3, `อนุมัติได้ ${approved.length} แ�
 // ── F12 idempotency บนแคมเปญแรก ──
 const first = approved[0];
 const treated = (db().prepare("SELECT treated_size t FROM campaigns WHERE id=?").get(first) as {t:number}).t;
-const s1 = sendCampaign(first);
-const s2 = sendCampaign(first);
+const s1 = await sendCampaign(first);
+const s2 = await sendCampaign(first);
 const msgs = (db().prepare("SELECT COUNT(*) n FROM messages WHERE campaign_id=?").get(first) as {n:number}).n;
 ok(!s1.skippedQuietHours, "F10 ออกจากช่วงห้ามส่งแล้ว ส่งได้");
 ok(s1.sent === treated, `F12 ครั้งแรกส่ง ${s1.sent} = treated ${treated}`);
@@ -48,7 +48,7 @@ ok(s2.sent === 0, `F12 เรียกซ้ำส่งเพิ่ม ${s2.sen
 ok(msgs === treated, `F12 messages ทั้งหมด ${msgs} ไม่เกิน treated`);
 
 // ── F9 เพดานความถี่ข้ามทุกแคมเปญ ──
-const { candidates: after } = runMatch(T);
+const { candidates: after } = await runMatch(T);
 const capMsgs = after.flatMap(c => c.filtered).filter(f => f.reason.includes("cap") || f.reason.includes("Messaged within") || f.reason.includes("control group"));
 const capTotal = capMsgs.reduce((s,f)=>s+f.count,0);
 ok(capTotal > 0, `F9 มีคนถูกตัดออกเพราะเบรกความถี่/กลุ่มควบคุม ${capTotal} ราย ใน ${capMsgs.length} play`);

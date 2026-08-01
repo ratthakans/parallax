@@ -95,12 +95,12 @@ db.ts → derive.ts → seed.ts → match.ts → proof.ts → billing.ts
 | ไฟล์ | จุด | สถานะ |
 |---|---|---|
 | `ai.ts` | 5 | ✅ ย้ายแล้ว · ทดสอบบน Postgres จริงครบวงจร |
-| `derive.ts` | 12 | ⬜ |
+| `derive.ts` | 12 | ✅ ย้ายแล้ว |
 | `seed.ts` | 9 | ⬜ |
-| `match.ts` | 8 | ⬜ |
+| `match.ts` | 8 | ✅ ย้ายแล้ว |
 | `proof.ts` | 11 | ⬜ |
 | `billing.ts` | 16 | ⬜ |
-| `dispatch.ts` | 14 | ⬜ |
+| `dispatch.ts` | 14 | 🟡 `sendCampaign` เป็น async แล้ว · db() เหลือ 2 |
 | `ingest.ts` | 7 | ⬜ |
 | `demo.ts` | 11 | ⬜ |
 | `bootstrap.ts` | 1 | ⬜ |
@@ -113,6 +113,21 @@ db.ts → derive.ts → seed.ts → match.ts → proof.ts → billing.ts
 ไฟล์ที่ยังไม่ย้ายจึงเห็นข้อมูลชุดเดียวกัน ไม่ต้องตัดสวิตช์ทีเดียวทั้งระบบ
 **สลับไป Postgres จริงได้ก็ต่อเมื่อย้ายครบทุกไฟล์แล้วเท่านั้น** — ก่อนหน้านั้น
 ตั้ง `DATABASE_URL` เมื่อไร ข้อมูลจะแยกเป็นสองฐานทันที
+
+## ชนิดข้อมูลที่ต้องดูของจริง ไม่ใช่เดา
+
+`COUNT(*)` และ `SUM()` กลับมาเป็น bigint/numeric จากไดรเวอร์ Postgres แต่เป็น
+number จาก sqlite ทุกจุดที่เอาไปคำนวณต่อต้องผ่าน `Number()` ไม่งั้นได้ผลเพี้ยน
+แบบเงียบ ๆ — `posteriorRate` จะได้ `NaN` แล้วตกไปใช้ค่า fallback ทุกครั้ง
+โดยไม่มีสัญญาณอะไร
+
+ส่วนธงอย่าง `is_new_arrival` `dry_run` `enabled` `matured` — ผมเดาว่าเป็น
+boolean ฝั่ง Postgres แล้วแก้โค้ดให้ส่ง `true` เข้าไป ซึ่ง**ผิด** ตรวจ
+`information_schema` แล้วทั้งห้าคอลัมน์เป็น `integer` ทั้งสองฝั่ง `= 1`
+ตามเดิมพกพาได้อยู่แล้ว
+
+(adapter ยังแปลงบูลีนเป็น 0/1 ให้ sqlite ไว้เป็นตาข่ายรับ เพราะ node:sqlite
+ผูกค่าบูลีนไม่ได้เลย แต่ตอนนี้ยังไม่มีใครใช้ทางนั้น)
 
 ## บั๊กที่เจอตอนย้ายไฟล์แรก
 

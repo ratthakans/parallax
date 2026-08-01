@@ -21,9 +21,9 @@ export default async function ConsoleLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   await ensureReady();
   const tenantId = await getActiveTenantId();
-  const tenant = getTenant(tenantId);
+  const tenant = await getTenant(tenantId);
   const profile = profileFor(tenantId);
-  const computedAt = featuresComputedAt(tenantId);
+  const computedAt = await featuresComputedAt(tenantId);
 
   return (
     <div className="console">

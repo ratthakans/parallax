@@ -48,11 +48,11 @@ export default async function SettingsPage() {
   const tenantId = await getActiveTenantId();
   const profile = profileFor(tenantId);
   const v = profile.vocab;
-  const tenant = getTenant(tenantId);
+  const tenant = await getTenant(tenantId);
   const ai = aiConfigured();
   const cache = await aiCacheStats();
   const demo = demoState(tenantId);
-  const playCount = runMatch(tenantId).candidates.length;
+  const playCount = (await runMatch(tenantId)).candidates.length;
 
   const log = db()
     .prepare(

@@ -1,4 +1,4 @@
-import { db } from "@/lib/engine/db";
+import { all, get } from "@/lib/engine/sql";
 import { loadFeatures, type StoredFeature } from "@/lib/engine/derive";
 import { ALL_PLAYS } from "@/lib/shared/plays";
 import type { Candidate, MeasurementMode, Play, Selector } from "@/lib/shared/types";
@@ -37,16 +37,20 @@ export type TenantPlayConfig = {
   max_discount_pct: number | null;
 };
 
-export function getTenant(tenantId: string): TenantSettings | undefined {
-  return db().prepare("SELECT * FROM tenants WHERE id = ?").get(tenantId) as
-    | TenantSettings
-    | undefined;
+export async function getTenant(
+  tenantId: string,
+): Promise<TenantSettings | undefined> {
+  return get<TenantSettings>("SELECT * FROM tenants WHERE id = ?", tenantId);
 }
 
-export function getTenantPlays(tenantId: string): Map<string, TenantPlayConfig> {
-  const rows = db()
-    .prepare("SELECT * FROM tenant_plays WHERE tenant_id = ?")
-    .all(tenantId) as (Omit<TenantPlayConfig, "enabled"> & { enabled: number })[];
+export async function getTenantPlays(
+  tenantId: string,
+): Promise<Map<string, TenantPlayConfig>> {
+  /* enabled กลับมาเป็น 0/1 จาก sqlite และเป็น boolean จาก Postgres
+     Boolean() รับได้ทั้งคู่ จึงไม่ต้องรู้ว่าตอนนี้ใช้ตัวขับไหน */
+  const rows = await all<
+    Omit<TenantPlayConfig, "enabled"> & { enabled: number | boolean }
+  >("SELECT * FROM tenant_plays WHERE tenant_id = ?", tenantId);
   return new Map(
     rows.map((r) => [r.play_id, { ...r, enabled: Boolean(r.enabled) }]),
   );
@@ -173,29 +177,33 @@ export function pickMeasurement(size: number): {
 /* ── เพดานความถี่ข้ามทุกแคมเปญ (F9 · กับดักข้อ 1) ──────────────
    ลูกค้าคนหนึ่งเข้าเกณฑ์ห้า play พร้อมกันได้ง่ายมาก
    จึงต้องตรวจข้ามทั้ง Keep และ Reach ไม่ใช่ตรวจแค่ภายใน play เดียว */
-function recentContactCounts(tenantId: string, days: number): Map<string, number> {
+async function recentContactCounts(
+  tenantId: string,
+  days: number,
+): Promise<Map<string, number>> {
   const since = new Date(Date.now() - days * 86400000).toISOString();
-  const rows = db()
-    .prepare(
-      `SELECT ca.customer_id AS id, COUNT(*) AS n
-       FROM campaign_audience ca
-       JOIN campaigns c ON c.id = ca.campaign_id
-       WHERE c.tenant_id = ? AND c.dry_run = 0 AND ca.arm = 'treated'
-         AND c.approved_at >= ?
-       GROUP BY ca.customer_id`,
-    )
-    .all(tenantId, since) as { id: string; n: number }[];
-  return new Map(rows.map((r) => [r.id, r.n]));
+  /* COUNT(*) เป็น bigint จาก Postgres และ number จาก sqlite — Number()
+     ทำให้ตัวเลขที่เอาไปเทียบกับเพดานเป็นชนิดเดียวกันทั้งสองตัวขับ */
+  const rows = await all<{ id: string; n: number | string }>(
+    `SELECT ca.customer_id AS id, COUNT(*) AS n
+     FROM campaign_audience ca
+     JOIN campaigns c ON c.id = ca.campaign_id
+     WHERE c.tenant_id = ? AND c.dry_run = 0 AND ca.arm = 'treated'
+       AND c.approved_at >= ?
+     GROUP BY ca.customer_id`,
+    tenantId,
+    since,
+  );
+  return new Map(rows.map((r) => [r.id, Number(r.n)]));
 }
 
-function lastRunByPlay(tenantId: string): Map<string, string> {
-  const rows = db()
-    .prepare(
-      `SELECT play_id, MAX(approved_at) AS last_at
-       FROM campaigns WHERE tenant_id = ? AND dry_run = 0
-       GROUP BY play_id`,
-    )
-    .all(tenantId) as { play_id: string; last_at: string }[];
+async function lastRunByPlay(tenantId: string): Promise<Map<string, string>> {
+  const rows = await all<{ play_id: string; last_at: string }>(
+    `SELECT play_id, MAX(approved_at) AS last_at
+     FROM campaigns WHERE tenant_id = ? AND dry_run = 0
+     GROUP BY play_id`,
+    tenantId,
+  );
   return new Map(rows.map((r) => [r.play_id, r.last_at]));
 }
 
@@ -213,33 +221,32 @@ const RESPONSE_WINDOW_DAYS = 14;
    เพดานความถี่รายสัปดาห์เป็นตัวคุม ไม่ใช่ล็อกยาว 90 วัน
    ซึ่งจะทำให้ทักลูกค้าได้ปีละสี่ครั้งเท่านั้น
    ───────────────────────────────────────────────────────────── */
-function lockedCustomers(tenantId: string): {
+async function lockedCustomers(tenantId: string): Promise<{
   holdoutLocked: Set<string>;
   responseLocked: Set<string>;
-} {
+}> {
   const since = new Date(
     Date.now() - RESPONSE_WINDOW_DAYS * 86400000,
   ).toISOString();
 
-  const holdout = db()
-    .prepare(
-      `SELECT DISTINCT ca.customer_id AS id
-       FROM campaign_audience ca
-       JOIN campaigns c ON c.id = ca.campaign_id
-       WHERE c.tenant_id = ? AND c.dry_run = 0 AND c.status = 'measuring'
-         AND ca.arm = 'holdout'`,
-    )
-    .all(tenantId) as { id: string }[];
+  const holdout = await all<{ id: string }>(
+    `SELECT DISTINCT ca.customer_id AS id
+     FROM campaign_audience ca
+     JOIN campaigns c ON c.id = ca.campaign_id
+     WHERE c.tenant_id = ? AND c.dry_run = 0 AND c.status = 'measuring'
+       AND ca.arm = 'holdout'`,
+    tenantId,
+  );
 
-  const responding = db()
-    .prepare(
-      `SELECT DISTINCT ca.customer_id AS id
-       FROM campaign_audience ca
-       JOIN campaigns c ON c.id = ca.campaign_id
-       WHERE c.tenant_id = ? AND c.dry_run = 0 AND ca.arm = 'treated'
-         AND c.approved_at >= ?`,
-    )
-    .all(tenantId, since) as { id: string }[];
+  const responding = await all<{ id: string }>(
+    `SELECT DISTINCT ca.customer_id AS id
+     FROM campaign_audience ca
+     JOIN campaigns c ON c.id = ca.campaign_id
+     WHERE c.tenant_id = ? AND c.dry_run = 0 AND ca.arm = 'treated'
+       AND c.approved_at >= ?`,
+    tenantId,
+    since,
+  );
 
   return {
     holdoutLocked: new Set(holdout.map((r) => r.id)),
@@ -253,28 +260,32 @@ function lockedCustomers(tenantId: string): {
    ของร้านค้าปลีก (considered) มาใช้ ซึ่งขัดกับข้อความหลักของ engine
    ที่บอกว่าเรียนรู้ข้ามร้าน "ในวงจรเดียวกัน" — ถ้าปนวงจรกัน อัตรา
    ตอบสนองที่คาดจะเพี้ยนทันทีที่มีลูกค้าเจ้าที่สองที่วงจรไม่เหมือนเจ้าแรก */
-function posteriorRate(
+async function posteriorRate(
   playId: string,
   cycleShape: string,
   fallback: number,
-): number {
-  const d = db();
+): Promise<number> {
+  const exact = await get<{ a: number; b: number }>(
+    `SELECT posterior_alpha AS a, posterior_beta AS b
+     FROM play_performance WHERE play_id = ? AND cycle_shape = ? LIMIT 1`,
+    playId,
+    cycleShape,
+  );
+  // ยังไม่มีสถิติของวงจรนี้ — รวมทุกวงจรเป็นค่าประมาณกว้าง ๆ ดีกว่าไม่มีอะไรเลย
   const row =
-    (d
-      .prepare(
-        `SELECT posterior_alpha AS a, posterior_beta AS b
-         FROM play_performance WHERE play_id = ? AND cycle_shape = ? LIMIT 1`,
-      )
-      .get(playId, cycleShape) as { a: number; b: number } | undefined) ??
-    // ยังไม่มีสถิติของวงจรนี้ — รวมทุกวงจรเป็นค่าประมาณกว้าง ๆ ดีกว่าไม่มีอะไรเลย
-    (d
-      .prepare(
-        `SELECT SUM(posterior_alpha) AS a, SUM(posterior_beta) AS b
-         FROM play_performance WHERE play_id = ?`,
-      )
-      .get(playId) as { a: number | null; b: number | null } | undefined);
-  if (!row?.a || !row?.b) return fallback;
-  return row.a / (row.a + row.b);
+    exact ??
+    (await get<{ a: number | null; b: number | null }>(
+      `SELECT SUM(posterior_alpha) AS a, SUM(posterior_beta) AS b
+       FROM play_performance WHERE play_id = ?`,
+      playId,
+    ));
+  /* SUM() คืน numeric ซึ่งไดรเวอร์ Postgres ส่งมาเป็นสตริง ถ้าไม่แปลง
+     การหารข้างล่างจะได้ NaN เงียบ ๆ แล้วอัตราที่คาดจะตกไปใช้ fallback
+     ทุกครั้งโดยไม่มีใครรู้ */
+  const a = Number(row?.a ?? 0);
+  const b = Number(row?.b ?? 0);
+  if (!a || !b) return fallback;
+  return a / (a + b);
 }
 
 export type MatchResult = {
@@ -283,15 +294,15 @@ export type MatchResult = {
   weeklyCap: number;
 };
 
-export function runMatch(tenantId: string): MatchResult {
-  const tenant = getTenant(tenantId);
-  const features = loadFeatures(tenantId);
-  const cfgs = getTenantPlays(tenantId);
+export async function runMatch(tenantId: string): Promise<MatchResult> {
+  const tenant = await getTenant(tenantId);
+  const features = await loadFeatures(tenantId);
+  const cfgs = await getTenantPlays(tenantId);
   const weeklyCap = tenant?.max_messages_per_week ?? 2;
 
-  const contacts = recentContactCounts(tenantId, 7);
-  const lastRun = lastRunByPlay(tenantId);
-  const { holdoutLocked, responseLocked } = lockedCustomers(tenantId);
+  const contacts = await recentContactCounts(tenantId, 7);
+  const lastRun = await lastRunByPlay(tenantId);
+  const { holdoutLocked, responseLocked } = await lockedCustomers(tenantId);
 
   const candidates: Candidate[] = [];
 
@@ -371,7 +382,7 @@ export function runMatch(tenantId: string): MatchResult {
 
     const size = audience.length;
     const { measurement, holdout_pct } = pickMeasurement(size);
-    const rate = posteriorRate(play.id, shape, play.priors.response_rate);
+    const rate = await posteriorRate(play.id, shape, play.priors.response_rate);
     const priceWeight = 1;
     const perPerson =
       play.engine === "keep" ? MESSAGE_COST : MEDIA_COST_PER_PERSON;

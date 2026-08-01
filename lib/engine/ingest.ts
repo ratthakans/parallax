@@ -471,7 +471,7 @@ export async function commitImport(
     );
 
     // DERIVE ทันทีเพื่อให้เห็น insight ภายในสามนาที
-    deriveFeatures(tenantId);
+    await deriveFeatures(tenantId);
 
     return {
       customers,

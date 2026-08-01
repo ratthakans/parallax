@@ -20,8 +20,8 @@ export const dynamic = "force-dynamic";
 export default async function PlaysPage() {
   const tenantId = await getActiveTenantId();
   const v = profileFor(tenantId).vocab;
-  const { candidates } = runMatch(tenantId);
-  const cfgs = getTenantPlays(tenantId);
+  const { candidates } = await runMatch(tenantId);
+  const cfgs = await getTenantPlays(tenantId);
 
   const perf = new Map(
     (
@@ -100,8 +100,8 @@ function PlayGroup({
 }: {
   heading: string;
   note: string;
-  items: ReturnType<typeof runMatch>["candidates"];
-  cfgs: ReturnType<typeof getTenantPlays>;
+  items: Awaited<ReturnType<typeof runMatch>>["candidates"];
+  cfgs: Awaited<ReturnType<typeof getTenantPlays>>;
   perf: Map<string, PerfRow>;
   tenantId: string;
 }) {
@@ -286,7 +286,9 @@ function PlayGroup({
 }
 
 /** แสดงนิยาม play เป็น YAML เพื่อย้ำว่ามันคือข้อมูล ไม่ใช่โค้ด */
-function toYaml(p: ReturnType<typeof runMatch>["candidates"][number]["play"]) {
+function toYaml(
+  p: Awaited<ReturnType<typeof runMatch>>["candidates"][number]["play"],
+) {
   const lines: string[] = [];
   lines.push(`id: ${p.id}`);
   lines.push(`engine: ${p.engine}`);

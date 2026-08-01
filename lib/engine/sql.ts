@@ -129,15 +129,31 @@ async function sqliteDb(path: string): Promise<Db> {
   d.exec("PRAGMA journal_mode = WAL");
   d.exec("PRAGMA foreign_keys = ON");
 
+  /* ── บูลีนต้องกลายเป็น 0/1 ก่อนถึง sqlite ──
+
+     node:sqlite ผูกค่าได้แค่ string · number · bigint · null · Uint8Array
+     ส่ง true เข้าไปตรง ๆ จะได้ "Provided value cannot be bound to SQLite
+     parameter" ส่วน Postgres มีชนิด boolean จริงและรับ true ได้เลย
+
+     ตอนนี้ยังไม่มีคอลัมน์ไหนในระบบเป็น boolean จริง — is_new_arrival ·
+     dry_run · enabled · matured เป็น integer 0/1 ทั้งสองฝั่ง (ตรวจจาก
+     information_schema แล้ว) จุดเรียกจึงเขียน `= 1` ได้ตามเดิม
+
+     ตัวแปลงนี้จึงเป็นตาข่ายรับ ไม่ใช่ทางหลัก: วันที่มีใครเพิ่มคอลัมน์
+     boolean จริงแล้วส่ง true เข้ามา มันจะทำงานแทนที่จะโยน
+     "Provided value cannot be bound to SQLite parameter" ออกมา */
+  const bind = (params: Param[]) =>
+    params.map((p) => (typeof p === "boolean" ? (p ? 1 : 0) : p)) as never[];
+
   const api: Sql = {
     async all<T>(text: string, ...params: Param[]) {
-      return d.prepare(text).all(...(params as never[])) as T[];
+      return d.prepare(text).all(...bind(params)) as T[];
     },
     async get<T>(text: string, ...params: Param[]) {
-      return d.prepare(text).get(...(params as never[])) as T | undefined;
+      return d.prepare(text).get(...bind(params)) as T | undefined;
     },
     async run(text: string, ...params: Param[]) {
-      const r = d.prepare(text).run(...(params as never[]));
+      const r = d.prepare(text).run(...bind(params));
       return { changes: Number(r.changes) };
     },
     async exec(text: string) {

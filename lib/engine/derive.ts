@@ -1,4 +1,4 @@
-import { db } from "@/lib/engine/db";
+import { all, get, tx } from "@/lib/engine/sql";
 import type { CustomerFeature, DiscountAffinity, GroupRole, ReachableBy } from "@/lib/shared/types";
 
 /* ── DERIVE ────────────────────────────────────────────────────
@@ -25,34 +25,23 @@ type TxnRow = {
   discount_total: number;
 };
 
-export function deriveFeatures(tenantId: string) {
-  const d = db();
+export async function deriveFeatures(tenantId: string) {
   const now = Date.now();
   const nowIso = new Date(now).toISOString();
 
-  const customers = d
-    .prepare("SELECT id, name, created_at FROM customers WHERE tenant_id = ?")
-    .all(tenantId) as { id: string; name: string; created_at: string }[];
+  const customers = await all<{ id: string; name: string; created_at: string }>(
+    "SELECT id, name, created_at FROM customers WHERE tenant_id = ?",
+    tenantId,
+  );
 
-  const txns = d
-    .prepare(
-      `SELECT t.customer_id, t.occurred_at, t.total, t.discount_total
-       FROM transactions t JOIN customers c ON c.id = t.customer_id
-       WHERE c.tenant_id = ? ORDER BY t.customer_id, t.occurred_at`,
-    )
-    .all(tenantId) as TxnRow[];
+  const txns = await all<TxnRow>(
+    `SELECT t.customer_id, t.occurred_at, t.total, t.discount_total
+     FROM transactions t JOIN customers c ON c.id = t.customer_id
+     WHERE c.tenant_id = ? ORDER BY t.customer_id, t.occurred_at`,
+    tenantId,
+  );
 
-  const lineRows = d
-    .prepare(
-      `SELECT t.customer_id, p.group_role, p.category, li.unit_price, li.unit_list_price,
-              li.qty, t.occurred_at
-       FROM line_items li
-       JOIN transactions t ON t.id = li.txn_id
-       JOIN products p ON p.id = li.product_id
-       JOIN customers c ON c.id = t.customer_id
-       WHERE c.tenant_id = ?`,
-    )
-    .all(tenantId) as {
+  const lineRows = await all<{
     customer_id: string;
     group_role: GroupRole;
     category: string;
@@ -60,74 +49,79 @@ export function deriveFeatures(tenantId: string) {
     unit_list_price: number;
     qty: number;
     occurred_at: string;
-  }[];
+  }>(
+    `SELECT t.customer_id, p.group_role, p.category, li.unit_price, li.unit_list_price,
+            li.qty, t.occurred_at
+     FROM line_items li
+     JOIN transactions t ON t.id = li.txn_id
+     JOIN products p ON p.id = li.product_id
+     JOIN customers c ON c.id = t.customer_id
+     WHERE c.tenant_id = ?`,
+    tenantId,
+  );
 
-  const eventRows = d
-    .prepare(
-      `SELECT e.customer_id, e.type, e.occurred_at, e.meta
-       FROM events e JOIN customers c ON c.id = e.customer_id
-       WHERE c.tenant_id = ?`,
-    )
-    .all(tenantId) as {
+  const eventRows = await all<{
     customer_id: string;
     type: string;
     occurred_at: string;
     meta: string | null;
-  }[];
+  }>(
+    `SELECT e.customer_id, e.type, e.occurred_at, e.meta
+     FROM events e JOIN customers c ON c.id = e.customer_id
+     WHERE c.tenant_id = ?`,
+    tenantId,
+  );
 
-  const memberRows = d
-    .prepare(
-      `SELECT m.customer_id, m.expires_at, m.started_at
-       FROM memberships m JOIN customers c ON c.id = m.customer_id
-       WHERE c.tenant_id = ?`,
-    )
-    .all(tenantId) as {
+  const memberRows = await all<{
     customer_id: string;
     expires_at: string | null;
     started_at: string;
-  }[];
+  }>(
+    `SELECT m.customer_id, m.expires_at, m.started_at
+     FROM memberships m JOIN customers c ON c.id = m.customer_id
+     WHERE c.tenant_id = ?`,
+    tenantId,
+  );
 
-  const consentRows = d
-    .prepare(
-      `SELECT s.customer_id, s.purpose, s.granted_at, s.revoked_at
-       FROM consents s JOIN customers c ON c.id = s.customer_id
-       WHERE c.tenant_id = ?`,
-    )
-    .all(tenantId) as {
+  const consentRows = await all<{
     customer_id: string;
     purpose: string;
     granted_at: string | null;
     revoked_at: string | null;
-  }[];
+  }>(
+    `SELECT s.customer_id, s.purpose, s.granted_at, s.revoked_at
+     FROM consents s JOIN customers c ON c.id = s.customer_id
+     WHERE c.tenant_id = ?`,
+    tenantId,
+  );
 
   const lineIdentities = new Set(
     (
-      d
-        .prepare(
-          `SELECT i.customer_id FROM identities i
-           JOIN customers c ON c.id = i.customer_id
-           WHERE c.tenant_id = ? AND i.type = 'line'`,
-        )
-        .all(tenantId) as { customer_id: string }[]
+      await all<{ customer_id: string }>(
+        `SELECT i.customer_id FROM identities i
+         JOIN customers c ON c.id = i.customer_id
+         WHERE c.tenant_id = ? AND i.type = 'line'`,
+        tenantId,
+      )
     ).map((r) => r.customer_id),
   );
 
+  /* ธงเหล่านี้เป็น integer 0/1 ทั้งสองตัวขับ (ตรวจแล้วใน information_schema)
+     `= 1` จึงพกพาได้ตามเดิม ไม่ต้องแปลงอะไร */
   const newArrivalCats = new Set(
     (
-      d
-        .prepare(
-          "SELECT category FROM products WHERE tenant_id = ? AND is_new_arrival = 1",
-        )
-        .all(tenantId) as { category: string }[]
+      await all<{ category: string }>(
+        "SELECT category FROM products WHERE tenant_id = ? AND is_new_arrival = 1",
+        tenantId,
+      )
     ).map((r) => r.category),
   );
   const deadStockCats = new Set(
     (
-      d
-        .prepare(
-          "SELECT category FROM products WHERE tenant_id = ? AND is_dead_stock = 1",
-        )
-        .all(tenantId) as { category: string }[]
+      await all<{ category: string }>(
+        "SELECT category FROM products WHERE tenant_id = ? AND is_dead_stock = 1",
+        tenantId,
+      )
     ).map((r) => r.category),
   );
 
@@ -232,15 +226,16 @@ export function deriveFeatures(tenantId: string) {
       : 0;
   const quartiles = [q(0.25), q(0.5), q(0.75)];
 
-  const ins = d.prepare(
-    `INSERT INTO customer_features (customer_id, tenant_id, computed_at, payload)
+  const INS = `INSERT INTO customer_features (customer_id, tenant_id, computed_at, payload)
      VALUES (?,?,?,?)
      ON CONFLICT(customer_id) DO UPDATE SET
-       computed_at = excluded.computed_at, payload = excluded.payload`,
-  );
+       computed_at = excluded.computed_at, payload = excluded.payload`;
 
-  d.exec("BEGIN");
-  try {
+  /* ── ธุรกรรมเป็น callback ไม่ใช่ BEGIN/COMMIT ลอย ๆ ──
+     บน pool ของ Postgres คำสั่ง BEGIN กับคำสั่งที่ตามมาอาจไปคนละคอนเนกชัน
+     แล้วธุรกรรมจะไม่ครอบอะไรเลยโดยไม่มีใครรู้ — tx() บังคับให้ทุกคำสั่ง
+     ข้างในวิ่งบนคอนเนกชันเดียวกันเสมอ */
+  await tx(async (t) => {
     for (const c of customers) {
       const e = byCustomer.get(c.id);
       const dates = e ? [...e.dates].sort((a, b) => a - b) : [];
@@ -373,7 +368,8 @@ export function deriveFeatures(tenantId: string) {
       const hasNewArrivalAffinity = affinityCats.some((k) => newArrivalCats.has(k));
       const hasDeadStockAffinity = affinityCats.some((k) => deadStockCats.has(k));
 
-      ins.run(
+      await t.run(
+        INS,
         c.id,
         tenantId,
         nowIso,
@@ -385,11 +381,7 @@ export function deriveFeatures(tenantId: string) {
         }),
       );
     }
-    d.exec("COMMIT");
-  } catch (err) {
-    d.exec("ROLLBACK");
-    throw err;
-  }
+  });
 
   return { customers: customers.length, cohortCycle, computedAt: nowIso };
 }
@@ -400,18 +392,20 @@ export type StoredFeature = CustomerFeature & {
   anchor_starter: boolean;
 };
 
-export function loadFeatures(tenantId: string): StoredFeature[] {
-  const rows = db()
-    .prepare("SELECT payload FROM customer_features WHERE tenant_id = ?")
-    .all(tenantId) as { payload: string }[];
+export async function loadFeatures(tenantId: string): Promise<StoredFeature[]> {
+  const rows = await all<{ payload: string }>(
+    "SELECT payload FROM customer_features WHERE tenant_id = ?",
+    tenantId,
+  );
   return rows.map((r) => JSON.parse(r.payload) as StoredFeature);
 }
 
-export function featuresComputedAt(tenantId: string): string | null {
-  const row = db()
-    .prepare(
-      "SELECT computed_at FROM customer_features WHERE tenant_id = ? LIMIT 1",
-    )
-    .get(tenantId) as { computed_at: string } | undefined;
+export async function featuresComputedAt(
+  tenantId: string,
+): Promise<string | null> {
+  const row = await get<{ computed_at: string }>(
+    "SELECT computed_at FROM customer_features WHERE tenant_id = ? LIMIT 1",
+    tenantId,
+  );
   return row?.computed_at ?? null;
 }

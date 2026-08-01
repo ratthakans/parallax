@@ -101,7 +101,7 @@ export async function approveCampaign(
   input: ApproveInput,
 ): Promise<ApproveResult> {
   const d = db();
-  const tenant = getTenant(input.tenantId);
+  const tenant = await getTenant(input.tenantId);
   if (!tenant) throw new Error("Account not found");
 
   /* เพดานของแผนต้องบังคับที่นี่ ไม่ใช่ที่หน้าจอ — หน้าจอที่ซ่อนปุ่มไว้
@@ -112,7 +112,7 @@ export async function approveCampaign(
   });
   if (planBlock) throw new Error(planBlock);
 
-  const cfg = getTenantPlays(input.tenantId).get(candidate.play.id);
+  const cfg = (await getTenantPlays(input.tenantId)).get(candidate.play.id);
   const guards = effectiveGuards(candidate.play, cfg);
 
   // เพดานส่วนลดของร้านทับเพดานของ play เสมอ (F11)
@@ -242,10 +242,10 @@ export type SendResult = {
    campaignId ต่อมาดิบ ๆ ส่วนที่นี่ค้นด้วย WHERE id = ? อย่างเดียว
    ยิง POST พร้อม id ของบัญชีอื่นจึงสั่งส่งข้อความและตัดเครดิตของบัญชีนั้นได้
    เป็นช่องเดียวกับที่เคยแก้ไปแล้วใน commitImport แต่ตกหล่นสองจุดนี้ */
-export function sendCampaign(
+export async function sendCampaign(
   campaignId: string,
   opts: { ignoreQuietHours?: boolean; tenantId?: string } = {},
-): SendResult {
+): Promise<SendResult> {
   const d = db();
   const camp = (
     opts.tenantId
@@ -265,7 +265,7 @@ export function sendCampaign(
   if (!camp) throw new Error("Campaign not found");
   if (camp.dry_run) throw new Error("A dry run does not send");
 
-  const tenant = getTenant(camp.tenant_id);
+  const tenant = await getTenant(camp.tenant_id);
   if (!tenant) throw new Error("Account not found");
 
   // ช่วงเวลาห้ามส่ง (F10)
@@ -363,7 +363,7 @@ export function sendCampaign(
       (noCredit ? ` · out of credit ${noCredit}` : ""),
   );
 
-  const left = (getTenant(camp.tenant_id)?.message_credits ?? 0);
+  const left = (await getTenant(camp.tenant_id))?.message_credits ?? 0;
   return {
     attempted: targets.length,
     sent,

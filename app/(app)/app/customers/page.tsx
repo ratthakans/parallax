@@ -24,7 +24,7 @@ const AFFINITY_LABEL: Record<DiscountAffinity, string> = {
 export default async function CustomersPage() {
   const tenantId = await getActiveTenantId();
   const v = profileFor(tenantId).vocab;
-  const features = loadFeatures(tenantId);
+  const features = await loadFeatures(tenantId);
 
   const ever = features.filter((f) => f.frequency_total > 0);
   const repeat = features.filter((f) => f.frequency_total >= 2);

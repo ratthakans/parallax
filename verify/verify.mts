@@ -13,7 +13,7 @@ const out: string[] = [];
 const ok = (c: boolean, m: string) => out.push(`${c ? "PASS" : "FAIL"}  ${m}`);
 
 // เลือก candidate ที่ใหญ่พอจะมี holdout จริง
-const { candidates } = runMatch(T);
+const { candidates } = await runMatch(T);
 const c = candidates.find((x) => !x.blocked && x.audience.length >= 300);
 if (!c) throw new Error("no candidate with holdout");
 out.push(`play=${c.play.id} size=${c.audience.length} holdout=${c.holdout_pct}% mode=${c.measurement}`);
@@ -33,9 +33,9 @@ const share = (rows.filter(x=>x.arm==="holdout").length / rows.length) * 100;
 ok(Math.abs(share - c.holdout_pct) < 5, `H2 สัดส่วน holdout ${share.toFixed(1)}% ใกล้เป้า ${c.holdout_pct}%`);
 
 // ── F12 idempotency ──
-const s1 = sendCampaign(r.campaignId);
-const s2 = sendCampaign(r.campaignId);
-const s3 = sendCampaign(r.campaignId);
+const s1 = await sendCampaign(r.campaignId);
+const s2 = await sendCampaign(r.campaignId);
+const s3 = await sendCampaign(r.campaignId);
 const msgs = db().prepare("SELECT COUNT(*) n FROM messages WHERE campaign_id=?").get(r.campaignId) as {n:number};
 if (s1.skippedQuietHours) {
   ok(msgs.n === 0, "F10 ช่วงเวลาห้ามส่ง — ไม่ส่งเลย ถูกต้อง");
@@ -66,7 +66,7 @@ ok(attrs.every(a=>a.ci_low <= a.ci_high), "H4 ช่วงความเชื�
 ok(v.includes("insufficient_data"), "H5 แสดง insufficient_data ตรง ๆ เมื่อยังไม่ครบกำหนด");
 
 // ── F9 เพดานความถี่ข้ามแคมเปญ ──
-const after = runMatch(T);
+const after = await runMatch(T);
 // หลังอนุมัติแคมเปญเดียว เพดาน 2/สัปดาห์ยังไม่เข้าเงื่อนไข
 // สิ่งที่ต้องเห็นคือล็อกหน้าต่างตอบสนอง และล็อกกลุ่มควบคุม
 const reasons = new Set(after.candidates.flatMap(x=>x.filtered.map(f=>f.reason)));
