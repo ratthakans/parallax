@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { TENANT_COOKIE } from "@/lib/shared/active-tenant";
 import { currentUser } from "@/lib/shared/session";
 import { resolveTenant, switchableTenants } from "@/lib/engine/access";
+import { enterIdentity } from "@/lib/engine/sql";
 
 /* ── บัญชีที่เปิดอยู่ ประกอบจากสามอย่าง ──────────────────────────
 
@@ -25,6 +26,17 @@ export const activeTenantId = cache(async (): Promise<string> => {
   const store = await cookies();
   const wanted = store.get(TENANT_COOKIE)?.value ?? "";
   const user = await currentUser();
+
+  /* ── ผูกตัวตนให้ทุก query ที่ตามมาในคำขอนี้ ──
+
+     ทุกหน้าและเกือบทุก action เรียกตัวนี้ก่อนแตะข้อมูล จุดนี้จึงเป็น
+     ที่เดียวที่ครอบได้ทั้งคำขอโดยไม่ต้องแก้ 17 action ทีละตัว
+
+     จากตรงนี้ไป all/get/run จะเปิดธุรกรรมพร้อม claims ให้เอง แล้ว RLS
+     ทั้ง 39 ข้อทำงาน — ลืมเติม WHERE tenant_id = ได้ศูนย์แถว
+     ไม่ใช่ได้ข้อมูลของคนอื่น */
+  if (user) enterIdentity(user.userId);
+
   return resolveTenant(user?.userId ?? null, wanted);
 });
 

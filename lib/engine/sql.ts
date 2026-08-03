@@ -34,6 +34,7 @@ import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import postgres from "postgres";
+import { AsyncLocalStorage } from "node:async_hooks";
 
 export type Param = string | number | boolean | null;
 
@@ -333,22 +334,75 @@ export const usingPostgres = () => Boolean(process.env.DATABASE_URL);
    ⚠ ยังไม่มีใครเรียกสี่ตัวนี้ — มันคือหน้าตาที่ lib/engine จะย้ายมาใช้
    ตอนเลิกใช้ db() แบบ sync ดูบันทึกการย้ายใน docs/postgres-migration.md */
 
+/* ── ตัวตนของคำขอ เดินทางไปกับ async context ────────────────
+
+   ถ้าจะให้ RLS ทำงานกับทุก query ต้องมีสองทางเลือก:
+
+     ก. ส่ง handle ของธุรกรรมเข้าไปทุกฟังก์ชัน — แก้ลายเซ็น 60 ตัว
+        และผู้เรียกทั้งหมดของมัน
+     ข. เก็บไว้ใน async context แล้วให้ตัวช่วยหยิบเอง
+
+   ข. คือเหตุผลที่ AsyncLocalStorage มีอยู่ ลายเซ็นไม่เปลี่ยนสักตัว
+   และโค้ดที่ไม่ได้อยู่ในคำขอของผู้ใช้ (สคริปต์ · ชุดตรวจ · งานเบื้องหลัง)
+   ก็ยังทำงานเหมือนเดิมเพราะ context ว่าง
+
+   ── ทำไมไม่ตั้ง claims ค้างไว้กับคอนเนกชัน ──
+
+   pool หยิบคอนเนกชันไปใช้ซ้ำข้ามคำขอ ตัวตนที่ค้างอยู่จะกลายเป็นตัวตน
+   ของคนถัดไป — ดู asUser() ท้ายไฟล์ */
+const identity = new AsyncLocalStorage<{ userId: string }>();
+
+/** ผูกตัวตนให้ทุก query ที่เกิดข้างใน callback นี้ */
+export function withIdentity<T>(userId: string, fn: () => Promise<T>): Promise<T> {
+  return identity.run({ userId }, fn);
+}
+
+/* ── ผูกตัวตนโดยไม่ต้องมี callback ห่อ ──────────────────────
+
+   withIdentity() ต้องห่อโค้ดที่จะรัน ซึ่งใช้ไม่ได้กับ React Server
+   Component: layout ไม่ได้เรนเดอร์ page อยู่ในตัวมันเอง — มันคืน element
+   ให้ React ไปเรนเดอร์ทีหลัง การห่อใน layout จึงไม่ครอบ query ของ page
+
+   enterWith() ตั้งค่าให้ async context ปัจจุบันและทุกอย่างที่ตามมา
+   โดยไม่ต้องห่อ ซึ่งเป็นสิ่งที่มันถูกออกแบบมาเพื่อจุดเข้าของคำขอพอดี
+
+   เรียกจาก activeTenantId() ที่ทุกหน้าและเกือบทุก action เรียกอยู่แล้ว
+   ก่อนแตะข้อมูลใด ๆ — จุดเดียว ครอบทั้งคำขอ */
+export function enterIdentity(userId: string) {
+  identity.enterWith({ userId });
+}
+
+/** ธุรกรรมที่กำลังเปิดอยู่ของคำขอนี้ ถ้ามี */
+const activeTx = new AsyncLocalStorage<Sql>();
+
+/* ตัวช่วยทุกตัวเดินผ่านที่นี่ ลำดับคือ:
+     อยู่ในธุรกรรมแล้ว   → ใช้ handle นั้น (ไม่งั้นจะหลุดออกนอกธุรกรรม)
+     มีตัวตนและใช้ Postgres → เปิดธุรกรรมสั้น ๆ พร้อม claims
+     นอกนั้น              → ต่อตรงเหมือนเดิม */
+async function scoped<T>(fn: (t: Sql) => Promise<T>): Promise<T> {
+  const open = activeTx.getStore();
+  if (open) return fn(open);
+  const who = identity.getStore();
+  if (who && usingPostgres()) return asUser(who.userId, fn);
+  return fn(await sql());
+}
+
 export async function all<T>(text: string, ...params: Param[]): Promise<T[]> {
-  return (await sql()).all<T>(text, ...params);
+  return scoped((t) => t.all<T>(text, ...params));
 }
 
 export async function get<T>(
   text: string,
   ...params: Param[]
 ): Promise<T | undefined> {
-  return (await sql()).get<T>(text, ...params);
+  return scoped((t) => t.get<T>(text, ...params));
 }
 
 export async function run(
   text: string,
   ...params: Param[]
 ): Promise<{ changes: number }> {
-  return (await sql()).run(text, ...params);
+  return scoped((t) => t.run(text, ...params));
 }
 
 export async function exec(text: string): Promise<void> {
@@ -356,7 +410,12 @@ export async function exec(text: string): Promise<void> {
 }
 
 export async function tx<T>(fn: (t: Sql) => Promise<T>): Promise<T> {
-  return (await sql()).tx(fn);
+  /* ธุรกรรมซ้อนธุรกรรมไม่ได้ — ถ้าเปิดอยู่แล้วให้ใช้ตัวเดิมต่อ */
+  const open = activeTx.getStore();
+  if (open) return fn(open);
+  const who = identity.getStore();
+  if (who && usingPostgres()) return asUser(who.userId, fn);
+  return (await sql()).tx((t) => activeTx.run(t, () => fn(t)));
 }
 
 /* ── แทรกหลายแถวด้วยคำสั่งเดียว ───────────────────────────────
@@ -443,11 +502,12 @@ export async function asUser<T>(
      ไม่ใช่ชั้นเดียว */
   if (!usingPostgres()) return tx(fn);
 
-  return tx(async (t) => {
+  const d = await sql();
+  return d.tx(async (t) => {
     await t.run("SET LOCAL role authenticated");
     await t.run(
       `SET LOCAL request.jwt.claims = '{"sub":"${userId}","role":"authenticated"}'`,
     );
-    return fn(t);
+    return activeTx.run(t, () => fn(t));
   });
 }

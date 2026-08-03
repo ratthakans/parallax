@@ -147,24 +147,37 @@ alter table tenant_users enable row level security;
 create policy tu_read on tenant_users
   for select using (tenant_id in (select app.user_tenants()));
 
+/* ── นโยบายบน tenant_users ห้ามอ่าน tenant_users ตรง ๆ ──
+
+   เดิม tu_manage เขียนว่า `exists (select 1 from tenant_users me ...)`
+   ซึ่งดูสมเหตุสมผลแต่วนไม่รู้จบ: subquery นั้นโดน RLS ของ tenant_users
+   เอง ซึ่งเรียก tu_manage อีกรอบ Postgres ตอบ 42P17 "infinite recursion
+   detected in policy for relation"
+
+   มันไม่โผล่ตอนเขียน ตอน migrate หรือตอน typecheck — โผล่ตอนผู้ใช้จริง
+   คนแรกเปิดหน้าแรก
+
+   ทางแก้เหมือน user_tenants(): security definer ทำให้ฟังก์ชันรันในนาม
+   เจ้าของตาราง ซึ่งไม่โดน RLS จึงอ่านได้โดยไม่วนกลับ */
+create or replace function app.is_owner_of(t text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from tenant_users
+     where user_id = (select auth.uid())
+       and tenant_id = t
+       and role = 'owner'
+  )
+$$;
+
 create policy tu_manage on tenant_users
   for all
-  using (
-    exists (
-      select 1 from tenant_users me
-       where me.user_id = (select auth.uid())
-         and me.tenant_id = tenant_users.tenant_id
-         and me.role = 'owner'
-    )
-  )
-  with check (
-    exists (
-      select 1 from tenant_users me
-       where me.user_id = (select auth.uid())
-         and me.tenant_id = tenant_users.tenant_id
-         and me.role = 'owner'
-    )
-  );
+  using (app.is_owner_of(tenant_id))
+  with check (app.is_owner_of(tenant_id));
 
 -- ── play_performance — มุมที่สาม อ่านได้ทุกคน เขียนได้เฉพาะเบื้องหลัง ──
 --
