@@ -1,4 +1,4 @@
-import { all, get, tx } from "@/lib/engine/sql";
+import { all, get, insertMany, tx, type Param } from "@/lib/engine/sql";
 import type { CustomerFeature, DiscountAffinity, GroupRole, ReachableBy } from "@/lib/shared/types";
 
 /* ── DERIVE ────────────────────────────────────────────────────
@@ -226,16 +226,19 @@ export async function deriveFeatures(tenantId: string) {
       : 0;
   const quartiles = [q(0.25), q(0.5), q(0.75)];
 
-  const INS = `INSERT INTO customer_features (customer_id, tenant_id, computed_at, payload)
-     VALUES (?,?,?,?)
-     ON CONFLICT(customer_id) DO UPDATE SET
-       computed_at = excluded.computed_at, payload = excluded.payload`;
+  /* ── สะสมก่อน แทรกทีเดียว ──
+     ไฟล์นี้เขียนหนึ่งแถวต่อลูกค้าหนึ่งคน ฐาน 33,000 คนจึงเป็น 33,000
+     คำสั่ง — บน Postgres คือสองชั่วโมงกว่า (213ms ต่อคำสั่ง)
+
+     ที่นี่คือจุดที่หนักที่สุดในระบบ เพราะ DERIVE ทำงานทุกครั้งที่นำเข้า
+     ข้อมูลใหม่ ไม่ใช่แค่ตอน seed */
+  const rows: Param[][] = [];
 
   /* ── ธุรกรรมเป็น callback ไม่ใช่ BEGIN/COMMIT ลอย ๆ ──
      บน pool ของ Postgres คำสั่ง BEGIN กับคำสั่งที่ตามมาอาจไปคนละคอนเนกชัน
      แล้วธุรกรรมจะไม่ครอบอะไรเลยโดยไม่มีใครรู้ — tx() บังคับให้ทุกคำสั่ง
      ข้างในวิ่งบนคอนเนกชันเดียวกันเสมอ */
-  await tx(async (t) => {
+  {
     for (const c of customers) {
       const e = byCustomer.get(c.id);
       const dates = e ? [...e.dates].sort((a, b) => a - b) : [];
@@ -368,8 +371,7 @@ export async function deriveFeatures(tenantId: string) {
       const hasNewArrivalAffinity = affinityCats.some((k) => newArrivalCats.has(k));
       const hasDeadStockAffinity = affinityCats.some((k) => deadStockCats.has(k));
 
-      await t.run(
-        INS,
+      rows.push([
         c.id,
         tenantId,
         nowIso,
@@ -379,9 +381,22 @@ export async function deriveFeatures(tenantId: string) {
           dead_stock_match: hasDeadStockAffinity,
           anchor_starter: e?.firstGroup === "anchor",
         }),
-      );
+      ]);
     }
-  });
+  }
+
+  await tx((t) =>
+    insertMany(
+      t,
+      "customer_features",
+      ["customer_id", "tenant_id", "computed_at", "payload"],
+      rows,
+      {
+        onConflict:
+          "ON CONFLICT(customer_id) DO UPDATE SET computed_at = excluded.computed_at, payload = excluded.payload",
+      },
+    ),
+  );
 
   return { customers: customers.length, cohortCycle, computedAt: nowIso };
 }
