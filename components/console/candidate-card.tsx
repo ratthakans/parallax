@@ -146,6 +146,14 @@ export async function CandidateCard({
       ) : (
         <div className="mt-5">
           <div className="flex flex-wrap items-start gap-2.5">
+            {/* ── ปุ่มต้องบอกสิ่งที่มันทำ ไม่ใช่สิ่งที่จะเกิดขึ้นทีหลัง ──
+
+                เดิมเขียนว่า "Approve — send to ~119" แล้วบรรทัดถัดมาบอกว่า
+                "This does not send yet" — ป้ายสัญญาการส่ง แล้วข้อความมาถอนคำ
+                บนปุ่มที่กดแล้วย้อนกลับไม่ได้
+
+                สิ่งที่มันทำจริงคือแช่แข็งรายชื่อแล้วพาไปหน้าถัดไป การส่งเป็น
+                การกดครั้งที่สอง ป้ายจึงพูดแค่นั้น และบอกจำนวนคนไว้ให้ตัดสินใจ */}
             <ActionForm
               action={approveAction}
               fields={{
@@ -153,20 +161,20 @@ export async function CandidateCard({
                 playId: play.id,
                 tone: copy[1]?.tone ?? copy[0].tone,
               }}
-              label={`Approve — send to ${approx ? "~" : ""}${num(treated)}`}
+              label={`Approve ${approx ? "~" : ""}${num(treated)} — review before sending`}
               pendingLabel="Freezing the list…"
               variant="primary"
             />
             <ActionForm
               action={approveAction}
               fields={{ tenantId, playId: play.id, dryRun: "1" }}
-              label="Dry run"
+              label="Dry run — nothing is sent"
               pendingLabel="Freezing the list…"
             />
           </div>
           <p className="c-thai mt-3 max-w-3xl text-[0.78rem] text-[var(--c-text-4)]">
-            This does not send yet — the list is frozen first, then you press send on
-            the campaign page.{" "}
+            Approving freezes who is in the list and takes you to the next screen,
+            where sending is a separate press.{" "}
             {holdout > 0 ? (
               <>
                 About {num(holdout)} will be held back so we can tell whether the
@@ -175,7 +183,7 @@ export async function CandidateCard({
               </>
             ) : (
               <>
-                This cohort is too small to hold anyone back. Everyone gets the message
+                This group is too small to hold anyone back. Everyone gets the message
                 and it is measured by time-shifting instead — weaker evidence, so the
                 result indicates a direction rather than confirming one.
               </>

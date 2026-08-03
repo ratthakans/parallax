@@ -150,8 +150,8 @@ export default async function BriefPage() {
         </div>
       ) : (
         <Empty>
-          Nothing worth sending today — either something went out recently, or the
-          cohorts are too small to measure. The system will not propose what it
+          Nothing worth sending today — either a message went out recently, or the
+          groups are too small to measure. The system will not propose what it
           cannot prove. Check back tomorrow.
         </Empty>
       )}
@@ -173,7 +173,7 @@ export default async function BriefPage() {
             tone="muted"
           />
           <Metric
-            label="90-day rolling difference"
+            label="Extra revenue, last 90 days"
             value={roi.avgLiftPct != null ? pct(roi.avgLiftPct) : "Not enough yet"}
             sub={
               roi.ciLow != null
