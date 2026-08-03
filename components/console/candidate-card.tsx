@@ -62,10 +62,10 @@ export async function CandidateCard({
 
   const measurementNote =
     candidate.measurement === "pooled_90d_holdout"
-      ? "At this size results pool every 90 days — no per-campaign difference"
+      ? "ที่ขนาดนี้ผลจะถูกรวมทุก 90 วัน ไม่มีส่วนต่างรายแคมเปญ"
       : candidate.measurement === "time_shifted"
-        ? "Too small for a holdout — measured by time-shifting instead"
-        : "Large enough to report a per-campaign difference";
+        ? "เล็กเกินกว่าจะกันกลุ่มไว้ได้ วัดด้วยการเทียบช่วงเวลาแทน"
+        : "ใหญ่พอที่จะรายงานส่วนต่างของแคมเปญนี้ได้";
 
   return (
     <Panel className="p-5 md:p-6">
@@ -79,12 +79,12 @@ export async function CandidateCard({
         <EnginePill engine={play.engine} />
         <span className="c-thai text-[0.74rem] text-[var(--c-text-4)]">
           {play.engine === "keep"
-            ? `Bring existing ${v.people} back`
-            : `Find new ${v.people} shaped like the best ones`}
+            ? `ดึง${v.th.people}เดิมให้กลับมา`
+            : `หา${v.th.people}ใหม่ที่คล้ายกลุ่มที่ดีที่สุด`}
         </span>
       </div>
 
-      <h2 className="c-h2 mt-3 text-[var(--c-text)]">{play.name}</h2>
+      <h2 className="c-h2 mt-3 text-[var(--c-text)]">{play.nameTh}</h2>
 
       {/* ── ประโยคภาษาคน ── */}
       <p className="c-thai mt-3 max-w-3xl text-[0.95rem] leading-relaxed text-[var(--c-text-2)]">
@@ -100,27 +100,27 @@ export async function CandidateCard({
           เรียงลงแนวตั้งบนมือถือ อ่านง่ายกว่าและไม่มีอะไรหาย */}
       <div className="mt-6 grid grid-cols-1 gap-4 border-y border-[var(--c-line)] py-5 sm:grid-cols-3">
         <div className="flex items-baseline justify-between gap-3 sm:block">
-          <p className="c-label sm:mb-0">{approx ? "recipients (approx)" : "recipients"}</p>
+          <p className="c-label sm:mb-0">{approx ? "ส่งถึง (ประมาณ)" : "ส่งถึง"}</p>
           <p className="c-num text-[1.6rem] text-[var(--c-text)] sm:mt-2">
             {num(treated)}
           </p>
         </div>
         <div className="flex items-baseline justify-between gap-3 sm:block">
-          <p className="c-label sm:mb-0">expected return</p>
+          <p className="c-label sm:mb-0">คาดว่าจะได้กลับมา</p>
           <p className="c-num text-[1.6rem] text-[var(--c-cyan)] sm:mt-2">
             {baht(candidate.expected_value)}
           </p>
         </div>
         <div className="flex items-baseline justify-between gap-3 sm:block">
-          <p className="c-label sm:mb-0">messaging cost</p>
+          <p className="c-label sm:mb-0">ค่าส่งข้อความ</p>
           <p className="c-num text-[1.6rem] text-[var(--c-text)] sm:mt-2">
             {baht(candidate.estimated_cost)}
           </p>
         </div>
       </div>
       <p className="c-thai mt-3 text-[0.76rem] text-[var(--c-text-4)]">
-        From {num(size)} qualifying {v.people} · net around {baht(net)} ·
-        a projection, not a measured result
+        จาก{v.th.people}ที่เข้าเกณฑ์ {num(size)} คน · เหลือสุทธิราว {baht(net)} ·
+        เป็นค่าประมาณ ยังไม่ใช่ผลที่วัดได้จริง
       </p>
 
       {/* ── ปุ่ม ──
@@ -131,16 +131,16 @@ export async function CandidateCard({
         <div className="mt-5">
           <p className="c-thai text-[0.86rem] text-[var(--c-warn)]">{planBlock}</p>
           <p className="c-thai mt-1.5 text-[0.78rem] text-[var(--c-text-4)]">
-            The numbers above are fully calculated, so you can see what is waiting before deciding to upgrade.
+            ตัวเลขข้างบนคำนวณครบแล้ว จะได้เห็นว่ามีอะไรรออยู่ก่อนตัดสินใจอัปเกรด
           </p>
         </div>
       ) : candidate.blocked ? (
         <div className="mt-5">
           <p className="c-thai text-[0.86rem] text-[var(--c-warn)]">
-            Cannot send yet — {candidate.blocked}
+            ยังส่งไม่ได้ — {candidate.blocked}
           </p>
           <p className="c-thai mt-1.5 text-[0.78rem] text-[var(--c-text-4)]">
-            A limit is doing its job. Nothing to do — it returns next cycle if the conditions clear.
+            เพดานกำลังทำหน้าที่ของมัน ไม่ต้องทำอะไร รอบหน้าจะกลับมาถ้าเงื่อนไขผ่าน
           </p>
         </div>
       ) : (
@@ -161,31 +161,30 @@ export async function CandidateCard({
                 playId: play.id,
                 tone: copy[1]?.tone ?? copy[0].tone,
               }}
-              label={`Approve ${approx ? "~" : ""}${num(treated)} — review before sending`}
-              pendingLabel="Freezing the list…"
+              label={`อนุมัติ ${approx ? "~" : ""}${num(treated)} คน — ตรวจก่อนส่ง`}
+              pendingLabel="กำลังแช่แข็งรายชื่อ…"
               variant="primary"
             />
             <ActionForm
               action={approveAction}
               fields={{ tenantId, playId: play.id, dryRun: "1" }}
-              label="Dry run — nothing is sent"
-              pendingLabel="Freezing the list…"
+              label="ซ้อมส่ง — ไม่มีอะไรถูกส่งจริง"
+              pendingLabel="กำลังแช่แข็งรายชื่อ…"
             />
           </div>
           <p className="c-thai mt-3 max-w-3xl text-[0.78rem] text-[var(--c-text-4)]">
-            Approving freezes who is in the list and takes you to the next screen,
-            where sending is a separate press.{" "}
+            การอนุมัติคือการแช่แข็งรายชื่อแล้วพาไปหน้าถัดไป การส่งจริงเป็นการกดอีกครั้งหนึ่ง{" "}
             {holdout > 0 ? (
               <>
-                About {num(holdout)} will be held back so we can tell whether the
-                revenue came from the message at all. The exact count is known at
-                approval, because the split is computed from the campaign id.
+                จะกัน{v.th.people}ไว้ราว {num(holdout)} คนไม่ส่ง เพื่อให้บอกได้ว่ารายได้ที่เกิดขึ้น
+                มาจากข้อความจริงหรือไม่ จำนวนที่แน่นอนรู้ตอนอนุมัติ เพราะการแบ่งกลุ่ม
+                คำนวณจากรหัสแคมเปญ
               </>
             ) : (
               <>
-                This group is too small to hold anyone back. Everyone gets the message
-                and it is measured by time-shifting instead — weaker evidence, so the
-                result indicates a direction rather than confirming one.
+                กลุ่มนี้เล็กเกินกว่าจะกันใครไว้ได้ ทุกคนจะได้รับข้อความ และวัดผลด้วยการ
+                เทียบช่วงเวลาแทน ซึ่งเป็นหลักฐานที่อ่อนกว่า ผลจึงบอกได้แค่แนวโน้ม
+                ไม่ใช่คำยืนยัน
               </>
             )}
           </p>
@@ -199,7 +198,7 @@ export async function CandidateCard({
           ส่วนข้อความที่จะส่งแยกไว้ เพราะเป็นสิ่งที่ควรอ่านก่อนกดอนุมัติ */}
       <details className="mt-6 border-t border-[var(--c-line)] pt-5">
         <summary className="c-label cursor-pointer select-none text-[var(--c-text-2)]">
-          The message · three tones to choose from
+          ข้อความที่จะส่ง · เลือกได้สามโทน
         </summary>
         <div className="mt-4 grid gap-3 md:grid-cols-3">
           {copy.map((c) => (
@@ -219,7 +218,7 @@ export async function CandidateCard({
 
       <details className="mt-4 border-t border-[var(--c-line)] pt-5">
         <summary className="c-label cursor-pointer select-none text-[var(--c-text-2)]">
-          How it is measured, the criteria, and every formula
+          วิธีวัดผล เกณฑ์คัดเลือก และสูตรทั้งหมด
         </summary>
 
         <div className="mt-4">

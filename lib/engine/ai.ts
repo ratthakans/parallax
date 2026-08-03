@@ -497,6 +497,9 @@ export type VocabCtx = {
   purchase: string;
   item: string;
   orgKind: string;
+  /* คำไทยชุดเดียวกัน — คอนโซลกับข้อความ fallback ใช้ชุดนี้
+     ส่วน prompt ยังส่งคำอังกฤษไปด้วยเพราะช่วยให้โมเดลเข้าใจบริบทธุรกิจ */
+  th: { person: string; purchase: string; item: string; orgKind: string; purchaseVerb: string };
 };
 
 const DEFAULT_VOCAB: VocabCtx = {
@@ -504,6 +507,13 @@ const DEFAULT_VOCAB: VocabCtx = {
   purchase: "purchase",
   item: "product",
   orgKind: "shop",
+  th: {
+    person: "ลูกค้า",
+    purchase: "การซื้อ",
+    item: "สินค้า",
+    orgKind: "ร้าน",
+    purchaseVerb: "ซื้อ",
+  },
 };
 
 const COPY_SCHEMA = {
@@ -628,11 +638,11 @@ export type BriefInput = {
 export function summariseBriefFallback(input: BriefInput): string {
   const v = input.vocab ?? DEFAULT_VOCAB;
   if (!input.items.length) {
-    return `Nothing worth sending today — the system will not propose what it cannot measure. ${input.slipping.toLocaleString("en-US")} ${v.person}s are drifting; waiting for the cohort to grow.`;
+    return `วันนี้ยังไม่มีอะไรคุ้มค่าส่ง — ระบบจะไม่เสนอสิ่งที่วัดผลไม่ได้ ตอนนี้มี${v.th.person} ${input.slipping.toLocaleString("en-US")} คนกำลังห่างหายไป รอให้กลุ่มโตพอก่อน`;
   }
   const top = input.items[0];
   const total = input.items.reduce((s, i) => s + i.value, 0);
-  return `Three moves today. Start with ${top.name} — ${top.size.toLocaleString("en-US")} ${v.person}s, worth about ฿${Math.round(top.value).toLocaleString("en-US")}. All three together come to roughly ฿${Math.round(total).toLocaleString("en-US")}, and ${input.slipping.toLocaleString("en-US")} existing ${v.person}s are now drifting past their own normal cycle.`;
+  return `วันนี้มีสามอย่างที่ควรทำ เริ่มจาก "${top.name}" — ${v.th.person} ${top.size.toLocaleString("en-US")} คน มูลค่าราว ฿${Math.round(top.value).toLocaleString("en-US")} ทั้งสามรวมกันราว ฿${Math.round(total).toLocaleString("en-US")} และตอนนี้มี${v.th.person}เดิม ${input.slipping.toLocaleString("en-US")} คนที่เลยรอบปกติของตัวเองไปแล้ว`;
 }
 
 export async function summariseBrief(
@@ -687,9 +697,9 @@ export type WhyInput = {
 export function explainPlayFallback(i: WhyInput): string {
   const v = i.vocab ?? DEFAULT_VOCAB;
   const cut = i.filtered.reduce((s, f) => s + f.count, 0);
-  const base = `These ${i.size.toLocaleString("en-US")} ${v.person}s were chosen because ${i.logic}, using statistics from ${v.orgKind}s on the same cycle. This group replies at about ${(i.responseRate * 100).toFixed(1)}% and spends around ฿${i.orderValue.toLocaleString("en-US")} per order.`;
+  const base = `เลือก${v.th.person} ${i.size.toLocaleString("en-US")} คนนี้เพราะ ${i.logic} โดยใช้สถิติจาก${v.th.orgKind}อื่นที่มีวงจรเดียวกัน กลุ่มนี้ตอบกลับราว ${(i.responseRate * 100).toFixed(1)}% และ${v.th.purchaseVerb}ครั้งละราว ฿${i.orderValue.toLocaleString("en-US")}`;
   return cut > 0
-    ? `${base} A further ${cut.toLocaleString("en-US")} who qualified were excluded — ${i.filtered.map((f) => f.reason).join(", or ")}.`
+    ? `${base} และมีอีก ${cut.toLocaleString("en-US")} คนที่เข้าเกณฑ์แต่ถูกตัดออก — ${i.filtered.map((f) => f.reason).join(" · ")}`
     : base;
 }
 
@@ -701,8 +711,8 @@ export async function explainPlay(i: WhyInput): Promise<AiResult<string>> {
     maxTokens: 700,
     system:
       `You explain to whoever runs the ${(i.vocab ?? DEFAULT_VOCAB).orgKind} why the system chose this group of ${(i.vocab ?? DEFAULT_VOCAB).person}s. ` +
-      "Plain conversational English, no more than three sentences, no jargon. " +
-      "Say who was excluded and why, if anyone was. " +
+      "ตอบเป็นภาษาไทยแบบพูดคุยธรรมดา ไม่เกินสามประโยค ไม่ใช้ศัพท์เทคนิค " +
+      "บอกด้วยว่าใครถูกตัดออกและเพราะอะไร ถ้ามี " +
       "Never invent a number you were not given. Reply as JSON matching the schema only.",
     prompt: `Campaign: ${i.playName}
 Selection logic: ${i.logic}

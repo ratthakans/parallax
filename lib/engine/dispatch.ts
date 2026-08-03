@@ -50,6 +50,13 @@ export function vocabFor(tenantId: string): VocabCtx {
     purchase: v.purchase,
     item: v.item,
     orgKind: v.orgKind,
+    th: {
+      person: v.th.person,
+      purchase: v.th.purchase,
+      item: v.th.item,
+      orgKind: v.th.orgKind,
+      purchaseVerb: v.th.purchaseVerb,
+    },
   };
 }
 

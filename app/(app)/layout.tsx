@@ -28,7 +28,7 @@ export default async function ConsoleLayout({
   return (
     <div className="console">
       <a href="#console-main" className="c-skip c-btn c-btn-primary">
-        Skip to content
+        ข้ามไปยังเนื้อหา
       </a>
       <div className="c-shell">
         <ConsoleNav

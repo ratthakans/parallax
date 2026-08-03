@@ -34,6 +34,28 @@ export type Vocab = {
   /** รูปกริยาของการจ่าย ใช้ต่อประโยค เช่น "กลับมา___ซ้ำ"
       ("การชำระ" เป็นคำนาม ต่อท้าย "กลับมา" ไม่ได้) */
   purchaseVerb: string;
+
+  /* ── คำชุดเดียวกันในภาษาไทย ─────────────────────────────────
+
+     เว็บการตลาดขายของ คอนโซลทำงาน — คนละงานคนละภาษาได้
+
+     คนที่เปิดคอนโซลทุกเช้าคือเจ้าของร้านไทย ไม่ใช่คนที่อ่านหน้าขาย
+     วัดแล้วคอนโซลเป็นภาษาอังกฤษ 100% (อักษรไทย 24 ตัว เทียบกับละติน
+     6,536 ตัว) ซึ่งเป็นเครื่องมือทำงานที่พูดภาษาที่คนทำงานไม่ได้ใช้
+
+     ส่วนหน้าขาย · Playbook · เด็ค ยังเป็นอังกฤษ เพราะเป็นของที่ถูก
+     แคปไปแชร์กับนักลงทุนและคนนอก */
+  th: {
+    person: string;
+    people: string;
+    purchase: string;
+    spend: string;
+    item: string;
+    base: string;
+    topGroup: string;
+    orgKind: string;
+    purchaseVerb: string;
+  };
 };
 
 export type CatalogueItem = {
@@ -143,6 +165,11 @@ const MST_GOLF: TenantProfile = {
     cycleExample: "someone buying balls every month is nothing like someone replacing irons every two years",
     orgKind: "shop",
     purchaseVerb: "buy",
+    th: {
+      person: "ลูกค้า", people: "ลูกค้า", purchase: "การซื้อ",
+      spend: "ยอดใช้จ่าย", item: "สินค้า", base: "ฐานลูกค้า",
+      topGroup: "ลูกค้า", orgKind: "ร้าน", purchaseVerb: "ซื้อ",
+    },
   },
   limits: { weeklyCap: 2, quietStart: 21, quietEnd: 9, maxDiscountPct: 20, credits: 2000 },
   scale: {
@@ -214,6 +241,11 @@ const HONG_MOVE: TenantProfile = {
     cycleExample: "someone flying into Hat Yai monthly is nothing like a tourist who comes once a year",
     orgKind: "company",
     purchaseVerb: "travel",
+    th: {
+      person: "ผู้โดยสาร", people: "ผู้โดยสาร", purchase: "การเดินทาง",
+      spend: "ค่าโดยสาร", item: "บริการ", base: "ฐานผู้โดยสาร",
+      topGroup: "ผู้โดยสาร", orgKind: "บริษัท", purchaseVerb: "เดินทาง",
+    },
   },
   // เดินทางกลางคืนเป็นเรื่องปกติของสนามบิน ช่วงห้ามส่งจึงแคบกว่าค้าปลีก
   limits: { weeklyCap: 2, quietStart: 23, quietEnd: 7, maxDiscountPct: 15, credits: 9000 },
@@ -291,6 +323,11 @@ const BRC_GOLF: TenantProfile = {
     cycleExample: "a member playing weekly is nothing like one who only comes on long weekends",
     orgKind: "club",
     purchaseVerb: "play",
+    th: {
+      person: "นักกอล์ฟ", people: "นักกอล์ฟ", purchase: "การออกรอบ",
+      spend: "ยอดใช้จ่าย", item: "บริการ", base: "ฐานนักกอล์ฟ",
+      topGroup: "สมาชิก", orgKind: "สนาม", purchaseVerb: "ออกรอบ",
+    },
   },
   limits: { weeklyCap: 2, quietStart: 20, quietEnd: 6, maxDiscountPct: 25, credits: 7500 },
   scale: {
@@ -364,6 +401,11 @@ const DEMOCRAT: TenantProfile = {
     cycleExample: "a member renewing on time every year is nothing like one returning after several years away",
     orgKind: "party",
     purchaseVerb: "pay",
+    th: {
+      person: "สมาชิก", people: "สมาชิก", purchase: "การชำระ",
+      spend: "ยอดที่ชำระ", item: "ประเภทการชำระ", base: "ทะเบียนสมาชิก",
+      topGroup: "ผู้สนับสนุน", orgKind: "พรรค", purchaseVerb: "ชำระ",
+    },
   },
   /* เพดานเข้มกว่าทุกบัญชี: ข้อความจากPolitical partyที่ส่งถี่เกินไป
      ไม่ได้เสียแค่คนคนนั้น แต่กลายเป็นข่าวได้ และห้ามใช้ส่วนลดโดยสิ้นเชิง

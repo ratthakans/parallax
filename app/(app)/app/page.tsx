@@ -73,8 +73,8 @@ export default async function BriefPage() {
     <>
       <PageHead
         label={`morning brief · ${dateLabel}`}
-        title="Three moves for today"
-        lead="Nothing to configure, no rules to write. Read the three below, approve or don't — done."
+        title="สามอย่างที่ควรทำวันนี้"
+        lead="ไม่มีอะไรต้องตั้งค่า ไม่ต้องเขียนกฎ อ่านสามอย่างข้างล่าง, approve or don't — done."
       />
 
       {/* ── ข้อจำกัดของบัญชีนี้ มาก่อนทุกอย่าง ──
@@ -94,12 +94,11 @@ export default async function BriefPage() {
           เป็นโควตา ไม่ใช่กำแพง — บอกว่ามีอะไรให้ใช้ ไม่ใช่บอกว่าอะไรถูกห้าม */}
       {!planBlock && trial && trial.campaignsLeft > 0 && (
         <Panel flat className="mb-6 border-l-2 border-[var(--c-accent)] p-5">
-          <p className="c-label text-[var(--c-accent)]">included in this plan</p>
+          <p className="c-label text-[var(--c-accent)]">แผนนี้ได้อะไรบ้าง</p>
           <p className="c-thai mt-2.5 max-w-2xl text-[0.84rem] leading-relaxed text-[var(--c-text-2)]">
-            {trial.campaignsLeft} live campaign, up to{" "}
-            {trial.audienceCap.toLocaleString("en-US")} people, with a real held-back
-            group. Approve one below and you will be measuring your own base — not a
-            projection of it.
+            ส่งจริงได้ {trial.campaignsLeft} แคมเปญ สูงสุด{" "}
+            {trial.audienceCap.toLocaleString("en-US")} คน พร้อมกลุ่มที่กันไว้จริง
+            อนุมัติสักอันข้างล่างแล้วคุณจะได้วัดฐานของตัวเอง ไม่ใช่ค่าประมาณของมัน
           </p>
         </Panel>
       )}
@@ -108,14 +107,13 @@ export default async function BriefPage() {
         <Panel flat className="mb-6 border-l-2 border-[var(--c-warn)] p-5">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
-              <p className="c-label text-[var(--c-warn)]">this plan cannot send yet</p>
+              <p className="c-label text-[var(--c-warn)]">แผนนี้ยังส่งไม่ได้</p>
               <p className="c-thai mt-2.5 max-w-2xl text-[0.84rem] leading-relaxed text-[var(--c-text-2)]">
-                {planBlock} The three below are still fully calculated, so you can see
-                how much is waiting before you decide.
+                {planBlock} สามอย่างข้างล่างยังคำนวณครบ จะได้เห็นว่ามีมูลค่ารออยู่เท่าไรก่อนตัดสินใจ
               </p>
             </div>
             <Link href="/app/billing" className="c-btn c-btn-primary c-btn-sm">
-              See plans and billing
+              ดูแผนและค่าใช้จ่าย
             </Link>
           </div>
         </Panel>
@@ -130,7 +128,7 @@ export default async function BriefPage() {
           <AiBadge source={summary.source} note={summary.note} />
           {three.length > 0 && (
             <span className="c-mono text-[0.72rem] text-[var(--c-text-4)]">
-              Expected value today {baht(totalValue)}
+              มูลค่าที่คาดไว้วันนี้ {baht(totalValue)}
             </span>
           )}
         </div>
@@ -150,9 +148,8 @@ export default async function BriefPage() {
         </div>
       ) : (
         <Empty>
-          Nothing worth sending today — either a message went out recently, or the
-          groups are too small to measure. The system will not propose what it
-          cannot prove. Check back tomorrow.
+          วันนี้ยังไม่มีอะไรคุ้มค่าส่ง — อาจเพราะเพิ่งส่งไป หรือกลุ่มเล็กเกินกว่าจะวัดผลได้
+          ระบบจะไม่เสนอสิ่งที่พิสูจน์ไม่ได้ พรุ่งนี้มาดูใหม่
         </Empty>
       )}
 
@@ -161,19 +158,19 @@ export default async function BriefPage() {
         <p className="c-label">{v.base} today</p>
         <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-7 md:grid-cols-4">
           <Metric
-            label="About to go quiet"
+            label="กำลังจะเงียบ"
             value={num(slipping)}
             sub={`${v.people} past 1.5× their own normal cycle`}
             tone="bad"
           />
           <Metric
-            label="Unreachable"
+            label="ทักไม่ถึง"
             value={num(unreachable)}
-            sub="No LINE, or no consent on file"
+            sub="ไม่มี LINE หรือยังไม่ได้ให้ความยินยอม"
             tone="muted"
           />
           <Metric
-            label="Extra revenue, last 90 days"
+            label="รายได้ส่วนเพิ่ม 90 วันล่าสุด"
             value={roi.avgLiftPct != null ? pct(roi.avgLiftPct) : "Not enough yet"}
             sub={
               roi.ciLow != null
@@ -183,9 +180,9 @@ export default async function BriefPage() {
             tone={roi.avgLiftPct != null && roi.avgLiftPct > 0 ? "good" : "muted"}
           />
           <Metric
-            label="Brief opens, last 28 days"
+            label="เปิดบรีฟ 28 วันล่าสุด"
             value={`${opens.n}/28`}
-            sub="Stop opening it and we are about to lose this account"
+            sub="ถ้าเลิกเปิด แปลว่าเรากำลังจะเสียบัญชีนี้"
             tone="accent"
           />
         </div>
@@ -205,15 +202,15 @@ export default async function BriefPage() {
           <ActionForm
             action={deriveAction}
             fields={{ tenantId }}
-            label="Recompute features"
-            pendingLabel="Recomputing…"
+            label="คำนวณข้อมูลลูกค้าใหม่"
+            pendingLabel="กำลังคำนวณ…"
             size="sm"
           />
           <ActionForm
             action={measureAllAction}
             fields={{ tenantId }}
-            label="Measure what is due"
-            pendingLabel="Measuring…"
+            label="วัดผลที่ถึงกำหนด"
+            pendingLabel="กำลังวัด…"
             size="sm"
           />
         </div>
@@ -222,40 +219,40 @@ export default async function BriefPage() {
       {/* ── เบรก ── */}
       <Panel flat className="mt-5 p-5 md:p-6">
         <div className="flex flex-wrap items-baseline justify-between gap-3">
-          <p className="c-label">limits in force</p>
+          <p className="c-label">เพดานที่บังคับอยู่</p>
           {/* เดิมสูง 17px — เล็กเกินกว่าจะกดถูกด้วยนิ้วหัวแม่มือ
               ให้พื้นที่กดเท่าปุ่ม แม้หน้าตายังเป็นลิงก์ */}
           <Link
             href="/app/settings"
             className="c-mono -mx-2 inline-flex min-h-11 items-center px-2 text-[0.72rem] text-[var(--c-cyan)]"
           >
-            Change in settings →
+            แก้ที่หน้าตั้งค่า →
           </Link>
         </div>
         <div className="mt-5 grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-4">
           <Metric
             size="sm"
-            label="Messages per person per week"
+            label="ข้อความต่อคนต่อสัปดาห์"
             value={`Max ${weeklyCap}`}
-            sub="Counted across every campaign"
+            sub="นับรวมทุกแคมเปญ"
           />
           <Metric
             size="sm"
             label="Quiet hours"
             value={`${tenant?.quiet_hours_start ?? 21}:00–${tenant?.quiet_hours_end ?? 9}:00`}
-            sub="Press send inside this window and nothing goes out"
+            sub="กดส่งในช่วงนี้จะไม่มีอะไรออกไป"
           />
           <Metric
             size="sm"
-            label="Discount ceiling"
+            label="เพดานส่วนลด"
             value={`${tenant?.max_discount_pct ?? 0}%`}
-            sub="Overrides every play's own ceiling"
+            sub="ทับเพดานของทุก play"
           />
           <Metric
             size="sm"
-            label="Held back today"
+            label="กันไว้วันนี้"
             value={`${num(blocked)} play`}
-            sub="Reasons listed in the play library"
+            sub="ดูเหตุผลได้ที่คลัง play"
           />
         </div>
         <p className="c-thai mt-5 text-[0.78rem] text-[var(--c-text-4)]">

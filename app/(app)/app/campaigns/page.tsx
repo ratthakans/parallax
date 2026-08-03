@@ -67,8 +67,8 @@ export default async function CampaignsPage() {
           <ActionForm
             action={measureAllAction}
             fields={{ tenantId }}
-            label="Measure what is due"
-            pendingLabel="Measuring…"
+            label="วัดผลที่ถึงกำหนด"
+            pendingLabel="กำลังวัด…"
           />
         }
       />

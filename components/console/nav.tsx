@@ -18,9 +18,9 @@ function groupsFor(baseLabel: string, personLabel: string) {
     {
       title: "Daily",
       links: [
-        { href: "/app", label: "Morning Brief", hint: "Three moves for today" },
-        { href: "/app/campaigns", label: "Campaigns", hint: "Approved · measuring" },
-        { href: "/app/proof", label: "Proof", hint: "The difference, and the verdict" },
+        { href: "/app", label: "บรีฟเช้านี้", hint: "สามอย่างที่ควรทำวันนี้" },
+        { href: "/app/campaigns", label: "แคมเปญ", hint: "อนุมัติแล้ว · กำลังวัดผล" },
+        { href: "/app/proof", label: "ผลที่วัดได้", hint: "ส่วนต่างที่วัดได้ และข้อสรุป" },
       ],
     },
     {
@@ -32,15 +32,15 @@ function groupsFor(baseLabel: string, personLabel: string) {
           hint: `Per-${personLabel} figures`,
         },
         // จำนวน play ที่ใช้ได้ขึ้นกับรูปทรงวงจรของบัญชี จึงไม่ตรึงเลขไว้
-        { href: "/app/plays", label: "Play library", hint: "Every move the system knows" },
-        { href: "/app/import", label: "Import", hint: "Drag a CSV in" },
+        { href: "/app/plays", label: "คลัง play", hint: "ทุกวิธีที่ระบบรู้จัก" },
+        { href: "/app/import", label: "นำเข้าข้อมูล", hint: "ลากไฟล์ CSV เข้ามา" },
       ],
     },
     {
       title: "Control",
       links: [
-        { href: "/app/billing", label: "Billing", hint: "Plan · credits · is it paying" },
-        { href: "/app/settings", label: "Settings", hint: "Limits · AI · demo tools" },
+        { href: "/app/billing", label: "ค่าใช้จ่าย", hint: "แผน · เครดิต · คุ้มไหม" },
+        { href: "/app/settings", label: "ตั้งค่า", hint: "เพดาน · AI · เครื่องมือเดโม" },
       ],
     },
   ];
@@ -100,7 +100,7 @@ export function ConsoleNav({
             aria-label={open ? "Close menu" : "Open menu"}
             className="c-btn c-btn-ghost c-btn-sm lg:hidden"
           >
-            Menu
+            เมนู
           </button>
         </div>
         <hr className="c-hair" />
@@ -123,7 +123,7 @@ export function ConsoleNav({
               aria-expanded={pickerOpen}
               className="c-mono -mx-2 inline-flex min-h-9 items-center px-2 text-[0.68rem] text-[var(--c-cyan)]"
             >
-              {pickerOpen ? "close" : "switch"}
+              {pickerOpen ? "ปิด" : "สลับ"}
             </button>
           </div>
           <p className="mt-2 text-[0.9rem] leading-snug text-[var(--c-text)]">

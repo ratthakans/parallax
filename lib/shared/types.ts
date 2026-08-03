@@ -97,6 +97,8 @@ export type Play = {
   engine: Engine;
   /** ชื่อที่เจ้าของธุรกิจอ่าน — ไม่ใช่ชื่อทางเทคนิค */
   name: string;
+  /** ชื่อภาษาไทย — คอนโซลใช้ตัวนี้ หน้าขายใช้ name */
+  nameTh: string;
   logic: string;
   crossIndustry: string;
   cycle_shape: CycleShape[];
