@@ -1,3 +1,4 @@
+import { activeTenantId } from "@/app/(app)/tenant";
 import type { Metadata } from "next";
 import Link from "next/link";
 import "./console.css";
@@ -5,11 +6,14 @@ import { ConsoleNav } from "@/components/console/nav";
 import { demoToolsEnabled } from "@/lib/shared/demo-tools";
 import { ensureReady } from "@/lib/engine/bootstrap";
 import { getTenant } from "@/lib/engine/match";
-import { getActiveTenantId } from "@/lib/shared/active-tenant";
+
 import { planById } from "@/lib/shared/plans";
 import { TENANT_PROFILES, profileFor } from "@/lib/shared/tenants";
 import { featuresComputedAt } from "@/lib/engine/derive";
 import { switchTenantAction } from "./actions";
+import { signOutAction } from "@/app/login/actions";
+import { myTenants } from "./tenant";
+import { currentUser } from "@/lib/shared/session";
 
 export const metadata: Metadata = {
   title: "Console",
@@ -20,10 +24,12 @@ export default async function ConsoleLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   await ensureReady();
-  const tenantId = await getActiveTenantId();
+  const tenantId = await activeTenantId();
   const tenant = await getTenant(tenantId);
   const profile = profileFor(tenantId);
   const computedAt = await featuresComputedAt(tenantId);
+  const allowed = await myTenants();
+  const user = await currentUser();
 
   return (
     <div className="console">

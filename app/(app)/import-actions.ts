@@ -1,5 +1,7 @@
 "use server";
 
+import { activeTenantId } from "@/app/(app)/tenant";
+
 import { revalidatePath } from "next/cache";
 import { mapColumns, type AiSource } from "@/lib/engine/ai";
 import { buildPreview, commitImport, parseCsv } from "@/lib/engine/ingest";
@@ -9,7 +11,6 @@ import type {
   ImportPreview,
   ImportResult,
 } from "@/lib/shared/ingest-types";
-import { getActiveTenantId } from "@/lib/shared/active-tenant";
 
 /* ── Server Actions ของหน้านำเข้าข้อมูล ─────────────────────────
    แยกไฟล์จาก actions.ts เพราะรับ payload ใหญ่ (เนื้อไฟล์ CSV)
@@ -80,7 +81,7 @@ export async function commitCsv(
 ): Promise<CommitOutcome> {
   try {
     const parsed = parseCsv(csvText);
-    const result = await commitImport(await getActiveTenantId(), parsed, mapping, { replace });
+    const result = await commitImport(await activeTenantId(), parsed, mapping, { replace });
     for (const p of [
       "/app", "/app/plays", "/app/campaigns", "/app/proof",
       "/app/customers", "/app/import",

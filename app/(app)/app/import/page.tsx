@@ -1,6 +1,7 @@
+import { activeTenantId } from "@/app/(app)/tenant";
 import { aiConfigured } from "@/lib/engine/ai";
 import { usageFor } from "@/lib/engine/billing";
-import { getActiveTenantId } from "@/lib/shared/active-tenant";
+
 import { profileFor } from "@/lib/shared/tenants";
 import { Metric, PageHead, Panel, num } from "@/components/console/ui";
 import { Importer } from "@/components/console/importer";
@@ -10,7 +11,7 @@ export const dynamic = "force-dynamic";
 export default async function ImportPage() {
   /* ── หน้านี้เคยไม่รู้จักบัญชีที่เปิดอยู่เลย ──────────────────────
 
-     จากแปดหน้าของคอนโซล นี่เป็นหน้าเดียวที่ไม่เคยเรียก getActiveTenantId()
+     จากแปดหน้าของคอนโซล นี่เป็นหน้าเดียวที่ไม่เคยเรียก activeTenantId()
      ผลคือสลับบัญชีขณะอยู่หน้านี้แล้วจอไม่เปลี่ยนอะไรสักอย่าง — ซึ่งอ่านได้
      ว่าการสลับพัง ทั้งที่จริงคือหน้านี้ไม่เคยแสดงบัญชีตั้งแต่แรก
 
@@ -22,7 +23,7 @@ export default async function ImportPage() {
      เพดานจำนวนคนก็เช่นกัน — contactCapBlockedReason ปฏิเสธการนำเข้าที่
      ทำให้เกินเพดานอยู่แล้ว แต่ปฏิเสธ *หลัง* อัปโหลดและแม็ปคอลัมน์เสร็จ
      บอกที่ว่างที่เหลือก่อนลากไฟล์เข้ามา ถูกกว่าบอกตอนงานเสียไปแล้ว */
-  const tenantId = await getActiveTenantId();
+  const tenantId = await activeTenantId();
   const profile = profileFor(tenantId);
   const v = profile.vocab;
   const u = await usageFor(tenantId);

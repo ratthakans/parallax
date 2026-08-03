@@ -1,8 +1,9 @@
+import { activeTenantId } from "@/app/(app)/tenant";
 import { all } from "@/lib/engine/sql";
 import Link from "next/link";
 import { playById } from "@/lib/shared/plays";
 import { roiSummary } from "@/lib/engine/proof";
-import { getActiveTenantId } from "@/lib/shared/active-tenant";
+
 import { profileFor } from "@/lib/shared/tenants";
 import type { Verdict } from "@/lib/shared/types";
 import {
@@ -26,7 +27,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ProofPage() {
   const demoTools = demoToolsEnabled();
-  const tenantId = await getActiveTenantId();
+  const tenantId = await activeTenantId();
   const profile = profileFor(tenantId);
   const v = profile.vocab;
   const proofBlocked = await proofBlockedReason(tenantId);

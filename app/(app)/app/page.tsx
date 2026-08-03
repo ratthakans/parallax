@@ -1,10 +1,11 @@
+import { activeTenantId } from "@/app/(app)/tenant";
 import { get, run } from "@/lib/engine/sql";
 import Link from "next/link";
 import { runMatch, topThree, getTenant } from "@/lib/engine/match";
 import { roiSummary } from "@/lib/engine/proof";
 import { summariseBrief } from "@/lib/engine/ai";
 import { vocabFor } from "@/lib/engine/dispatch";
-import { getActiveTenantId } from "@/lib/shared/active-tenant";
+
 import { profileFor } from "@/lib/shared/tenants";
 import { CYCLE_LABEL } from "@/lib/shared/types";
 import { loadFeatures } from "@/lib/engine/derive";
@@ -26,7 +27,7 @@ import { deriveAction, measureAllAction } from "../actions";
 export const dynamic = "force-dynamic";
 
 export default async function BriefPage() {
-  const tenantId = await getActiveTenantId();
+  const tenantId = await activeTenantId();
   const profile = profileFor(tenantId);
   const v = profile.vocab;
   const tenant = await getTenant(tenantId);

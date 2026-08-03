@@ -1,5 +1,9 @@
 "use server";
 
+import { activeTenantId } from "@/app/(app)/tenant";
+import { currentUser } from "@/lib/shared/session";
+import { membershipEnforced, tenantsForUser } from "@/lib/engine/access";
+
 import { all, get, run } from "@/lib/engine/sql";
 import { logActivity } from "@/lib/engine/db";
 
@@ -17,11 +21,10 @@ import { clearAiCache } from "@/lib/engine/ai";
 import { isKnownTenant } from "@/lib/shared/tenants";
 import { buyCredits, changePlan, reachBlockedReason } from "@/lib/engine/billing";
 import { CREDIT_PACKS, PLANS, isPlanId } from "@/lib/shared/plans";
-import {
-  getActiveTenantId,
-  TENANT_COOKIE,
+import { TENANT_COOKIE,
   TENANT_COOKIE_OPTIONS,
 } from "@/lib/shared/active-tenant";
+
 import { messageOf, type ActionState } from "@/lib/shared/action-state";
 import { num } from "@/lib/shared/format";
 import {
@@ -63,7 +66,7 @@ function assertTenant(tenantId: string) {
    ของผู้ใช้ที่ล็อกอินแล้ว และตรวจว่าคนนี้มีสิทธิ์ในบัญชีนี้จริง
    แต่จุดที่ต้องแก้เหลือฟังก์ชันเดียวคือฟังก์ชันนี้ */
 async function currentTenant(formData?: FormData): Promise<string> {
-  const tenantId = await getActiveTenantId();
+  const tenantId = await activeTenantId();
   const claimed = formData ? String(formData.get("tenantId") ?? "") : "";
   if (claimed && claimed !== tenantId) {
     throw new Error(
@@ -77,6 +80,23 @@ async function currentTenant(formData?: FormData): Promise<string> {
 export async function switchTenantAction(formData: FormData) {
   const tenantId = String(formData.get("tenantId") ?? "");
   assertTenant(tenantId);
+
+  /* ── คุกกี้เป็นความชอบ ไม่ใช่สิทธิ์ ──
+
+     คอมเมนต์เดิมตรงนี้เขียนว่า "ของเดโม ไม่ใช่การควบคุมสิทธิ์" ซึ่งจริง:
+     ใครยิง Server Action ตรงมาพร้อมรหัสบัญชีใดก็เขียนคุกกี้ได้
+
+     ตอนนี้ต้องเป็นสมาชิกของบัญชีนั้นก่อน และ activeTenantId ก็ตรวจซ้ำ
+     อีกชั้นตอนอ่าน — คุกกี้ที่ชี้ไปบัญชีที่ไม่ใช่ของเขาจึงไม่มีผลอยู่ดี */
+  const user = await currentUser();
+  if (membershipEnforced()) {
+    if (!user) redirect("/login");
+    const mine = await tenantsForUser(user.userId);
+    if (!mine.includes(tenantId)) {
+      throw new Error("บัญชีผู้ใช้นี้ไม่มีสิทธิ์เข้าถึงร้านนั้น");
+    }
+  }
+
   const store = await cookies();
   store.set(TENANT_COOKIE, tenantId, TENANT_COOKIE_OPTIONS);
   revalidateConsole();

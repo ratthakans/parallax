@@ -1,8 +1,9 @@
+import { activeTenantId } from "@/app/(app)/tenant";
 import { all } from "@/lib/engine/sql";
 import { aiCacheStats, aiConfigured } from "@/lib/engine/ai";
 import { getTenant } from "@/lib/engine/match";
 import { demoState } from "@/lib/engine/demo";
-import { getActiveTenantId } from "@/lib/shared/active-tenant";
+
 import { profileFor } from "@/lib/shared/tenants";
 import { ALL_PLAYS } from "@/lib/shared/plays";
 import { runMatch } from "@/lib/engine/match";
@@ -45,7 +46,7 @@ const AI_NEVER = [
 
 export default async function SettingsPage() {
   const demoTools = demoToolsEnabled();
-  const tenantId = await getActiveTenantId();
+  const tenantId = await activeTenantId();
   const profile = profileFor(tenantId);
   const v = profile.vocab;
   const tenant = await getTenant(tenantId);

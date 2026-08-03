@@ -403,3 +403,51 @@ export async function insertMany(
   }
   return written;
 }
+
+/* ── ทำให้ RLS ทำงานจริง โดยไม่แตะ query สักตัว ─────────────────
+
+   นโยบายทั้ง 39 ข้อใน 0002_rls.sql ตั้งอยู่บน auth.uid() ซึ่ง Postgres
+   อ่านจาก current_setting('request.jwt.claims')->>'sub' — ไม่ใช่จาก
+   ชื่อผู้ใช้ที่ต่อฐาน
+
+   แปลว่าเราคงคอนเนกชันเดิม (postgres ผ่าน Supavisor) และ SQL ทั้ง 204
+   คำสั่งไว้ได้ทั้งหมด แค่บอกฐานข้อมูลว่า "คำขอนี้เป็นของ user คนนี้"
+   ก่อนเริ่มธุรกรรม จากนั้นนโยบายจะทำงานเองทุกข้อ
+
+   ทางเลือกอื่นคือย้ายไปเรียกผ่าน PostgREST ของ Supabase ซึ่งพก JWT
+   ไปเอง แต่นั่นแปลว่าเขียน query ใหม่ทั้ง 204 ตัว
+
+   ── SET LOCAL ไม่ใช่ SET ──
+
+   LOCAL ผูกกับธุรกรรม พอจบธุรกรรมค่าหายไปเอง ถ้าใช้ SET เฉย ๆ ค่าจะ
+   ค้างอยู่กับคอนเนกชัน และคอนเนกชันนั้นถูกคืนเข้า pool แล้วหยิบไปใช้กับ
+   คำขอของคนอื่นต่อ — ซึ่งแปลว่าคนหนึ่งจะอ่านข้อมูลในนามอีกคน
+   นี่คือความผิดพลาดที่แย่ที่สุดที่เป็นไปได้ในไฟล์นี้
+
+   ── ทำไมต้องตรวจรูปแบบ uuid ──
+
+   SET LOCAL รับพารามิเตอร์ไม่ได้ ค่าจึงต้องต่อเข้าไปในสตริง SQL ตรง ๆ
+   userId มาจาก JWT ที่ Supabase ตรวจแล้วก็จริง แต่การต่อสตริงลง SQL
+   ต้องมีด่านของตัวเองเสมอ ไม่ใช่พึ่งว่าต้นทางสะอาด */
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export async function asUser<T>(
+  userId: string,
+  fn: (t: Sql) => Promise<T>,
+): Promise<T> {
+  if (!UUID.test(userId)) throw new Error("รหัสผู้ใช้ไม่ใช่รูปแบบ uuid");
+
+  /* sqlite ไม่มี RLS — บนเครื่องพัฒนาจึงรันตรง ๆ การแยกบัญชียังทำงาน
+     เพราะทุก query มี WHERE tenant_id อยู่แล้ว RLS เป็นชั้นที่สอง
+     ไม่ใช่ชั้นเดียว */
+  if (!usingPostgres()) return tx(fn);
+
+  return tx(async (t) => {
+    await t.run("SET LOCAL role authenticated");
+    await t.run(
+      `SET LOCAL request.jwt.claims = '{"sub":"${userId}","role":"authenticated"}'`,
+    );
+    return fn(t);
+  });
+}

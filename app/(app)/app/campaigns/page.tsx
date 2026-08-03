@@ -1,7 +1,8 @@
+import { activeTenantId } from "@/app/(app)/tenant";
 import { all } from "@/lib/engine/sql";
 import Link from "next/link";
 import { playById } from "@/lib/shared/plays";
-import { getActiveTenantId } from "@/lib/shared/active-tenant";
+
 import type { Verdict } from "@/lib/shared/types";
 import {
   Empty,
@@ -36,7 +37,7 @@ type Row = {
 };
 
 export default async function CampaignsPage() {
-  const tenantId = await getActiveTenantId();
+  const tenantId = await activeTenantId();
 
   const rows = await all<Row>(`SELECT c.*,
               (SELECT COUNT(*) FROM messages m WHERE m.campaign_id = c.id) AS sent,

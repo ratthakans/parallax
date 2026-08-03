@@ -1,5 +1,6 @@
+import { activeTenantId } from "@/app/(app)/tenant";
 import { loadFeatures } from "@/lib/engine/derive";
-import { getActiveTenantId } from "@/lib/shared/active-tenant";
+
 import { profileFor } from "@/lib/shared/tenants";
 import type { DiscountAffinity, ReachableBy } from "@/lib/shared/types";
 import { Metric, PageHead, Panel, baht, num, pct } from "@/components/console/ui";
@@ -22,7 +23,7 @@ const AFFINITY_LABEL: Record<DiscountAffinity, string> = {
 };
 
 export default async function CustomersPage() {
-  const tenantId = await getActiveTenantId();
+  const tenantId = await activeTenantId();
   const v = profileFor(tenantId).vocab;
   const features = await loadFeatures(tenantId);
 

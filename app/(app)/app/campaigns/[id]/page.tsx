@@ -1,10 +1,11 @@
+import { activeTenantId } from "@/app/(app)/tenant";
 import { all, get } from "@/lib/engine/sql";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { playById } from "@/lib/shared/plays";
 import { loadAttributions } from "@/lib/engine/proof";
 import { armFor, renderForCustomer } from "@/lib/engine/dispatch";
-import { getActiveTenantId } from "@/lib/shared/active-tenant";
+
 import { profileFor } from "@/lib/shared/tenants";
 import type { Verdict } from "@/lib/shared/types";
 import {
@@ -30,7 +31,7 @@ export default async function CampaignDetail({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const tenantId = await getActiveTenantId();
+  const tenantId = await activeTenantId();
   const v = profileFor(tenantId).vocab;
 
   const camp = await get<{

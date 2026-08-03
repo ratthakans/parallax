@@ -59,6 +59,8 @@ export function ConsoleNav({
   switchAction,
   baseLabel,
   personLabel,
+  userEmail,
+  signOutAction,
 }: {
   tenantId: string;
   tenantName: string;
@@ -70,6 +72,8 @@ export function ConsoleNav({
   switchAction: (formData: FormData) => void | Promise<void>;
   baseLabel: string;
   personLabel: string;
+  userEmail?: string;
+  signOutAction?: () => void | Promise<void>;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -211,9 +215,32 @@ export function ConsoleNav({
 
         <hr className="c-hair" />
 
+        {/* ── ใครล็อกอินอยู่ ──
+            เดิมคอนโซลไม่บอกเลยว่ากำลังทำงานในนามใคร ซึ่งใช้ได้ตอนที่ทุกคน
+            คือ "owner" แต่พอมีผู้ใช้จริงหลายคน การไม่รู้ว่าตัวเองเป็นใคร
+            คือจุดเริ่มของการกดผิดบัญชี */}
+        {userEmail && (
+          <>
+            <div className="p-4 lg:p-5">
+              <p className="c-label">เข้าสู่ระบบในนาม</p>
+              <p className="c-mono mt-2 text-[0.74rem] break-all text-[var(--c-text-2)]">
+                {userEmail}
+              </p>
+              {signOutAction && (
+                <form action={signOutAction} className="mt-3">
+                  <button type="submit" className="c-btn c-btn-ghost c-btn-sm">
+                    ออกจากระบบ
+                  </button>
+                </form>
+              )}
+            </div>
+            <hr className="c-hair" />
+          </>
+        )}
+
         <div className="p-4 lg:p-5">
           <Link href="/" className="c-navlink px-0 text-[0.82rem]">
-            ← Back to the site
+            ← กลับไปหน้าเว็บ
           </Link>
         </div>
       </div>

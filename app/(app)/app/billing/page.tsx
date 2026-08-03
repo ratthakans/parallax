@@ -1,5 +1,6 @@
+import { activeTenantId } from "@/app/(app)/tenant";
 import Link from "next/link";
-import { getActiveTenantId } from "@/lib/shared/active-tenant";
+
 import { profileFor } from "@/lib/shared/tenants";
 import {
   recentCampaignCosts,
@@ -46,7 +47,7 @@ function Bar({ pct }: { pct: number }) {
 }
 
 export default async function BillingPage() {
-  const tenantId = await getActiveTenantId();
+  const tenantId = await activeTenantId();
   const profile = profileFor(tenantId);
   const v = profile.vocab;
   const u = await usageFor(tenantId);

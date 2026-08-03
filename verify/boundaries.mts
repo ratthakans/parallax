@@ -97,6 +97,31 @@ const rel = (f: string) => relative(ROOT, f);
   if (bad.length) fails.push("import ไดรเวอร์ตรง:\n    " + bad.join("\n    "));
 }
 
+/* ── 3.5 · "use server" / "use client" ต้องอยู่บรรทัดแรก ──
+
+   Next ปฏิเสธไฟล์ที่มี directive อยู่ใต้ import ("The 'use server'
+   directive must be at the top of the file") ซึ่งพังตอน build เท่านั้น
+   ไม่พังตอน typecheck
+
+   มันหลุดมาสองครั้งจากสคริปต์ที่เติม import ด้วยการต่อข้างหน้าไฟล์ —
+   ซึ่งดันบรรทัดแรกลงไปโดยไม่มีอะไรทัก */
+{
+  const bad: string[] = [];
+  const DIRECTIVES = new Set(['"use server";', '"use client";']);
+  for (const f of files) {
+    const lines = read(f).split("\n");
+    /* ดูเป็นบรรทัด ไม่ใช่ค้นข้อความ — ไม่งั้นกฎจับไฟล์ตัวเองที่มีสตริงนี้
+       อยู่ในโค้ดของกฎ และจับสตริงที่บังเอิญโผล่ในคอมเมนต์ด้วย */
+    const at = lines.findIndex((l) => DIRECTIVES.has(l.trim()));
+    if (at <= 0) continue;
+    const before = lines.slice(0, at).join("\n").trim();
+    if (before) bad.push(rel(f));
+  }
+  checks.push("directive อยู่บรรทัดแรกของไฟล์");
+  if (bad.length)
+    fails.push("directive ไม่ได้อยู่บนสุด:\n    " + [...new Set(bad)].join("\n    "));
+}
+
 /* ── 4 · คอนโซลห้ามดึงไลบรารีคอมโพเนนต์ของฝั่งการตลาด ──
 
    components/ui.tsx เป็นของเว็บการตลาด (PageHero · Quote · CTA ·

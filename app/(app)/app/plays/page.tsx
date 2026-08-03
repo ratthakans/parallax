@@ -1,6 +1,7 @@
+import { activeTenantId } from "@/app/(app)/tenant";
 import { all } from "@/lib/engine/sql";
 import { effectiveGuards, getTenantPlays, runMatch } from "@/lib/engine/match";
-import { getActiveTenantId } from "@/lib/shared/active-tenant";
+
 import { profileFor } from "@/lib/shared/tenants";
 import { CYCLE_LABEL } from "@/lib/shared/types";
 import {
@@ -18,7 +19,7 @@ import { ActionForm } from "@/components/console/action-form";
 export const dynamic = "force-dynamic";
 
 export default async function PlaysPage() {
-  const tenantId = await getActiveTenantId();
+  const tenantId = await activeTenantId();
   const v = profileFor(tenantId).vocab;
   const { candidates } = await runMatch(tenantId);
   const cfgs = await getTenantPlays(tenantId);
