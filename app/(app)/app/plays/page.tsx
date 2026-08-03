@@ -175,7 +175,7 @@ function PlayGroup({
 
               <details className="mt-5 border-t border-[var(--c-line)] pt-4">
                 <summary className="c-label cursor-pointer select-none text-[var(--c-text-2)]">
-                  Guards · prior · measurement
+                  เพดาน · ค่าตั้งต้น · วิธีวัด
                 </summary>
 
                 <div className="mt-4 grid gap-6 lg:grid-cols-[1.1fr_1fr]">
@@ -239,7 +239,7 @@ function PlayGroup({
                           : "No posterior yet — using the play's default"}
                       </p>
                       <p className="c-thai mt-2 text-[0.74rem] text-[var(--c-text-4)]">
-                        Only aggregate statistics cross — no customer row ever leaves the account
+                        ข้ามบัญชีเฉพาะสถิติรวม ไม่มีแถวลูกค้าออกจากบัญชีเลย
                       </p>
                     </div>
                     <div>

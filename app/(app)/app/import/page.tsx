@@ -34,8 +34,8 @@ export default async function ImportPage() {
   return (
     <>
       <PageHead
-        label="Import"
-        title="Drop a file, see where the revenue leaks"
+        label="นำเข้าข้อมูล"
+        title="ลากไฟล์เข้ามา แล้วดูว่ารายได้รั่วตรงไหน"
         lead="Almost every POS exports CSV. That is an API already open that nobody can close — no vendor deal required."
       />
 
@@ -43,8 +43,8 @@ export default async function ImportPage() {
       <Panel flat className="mb-6 border-l-2 border-[var(--c-accent)] p-5 md:p-6">
         <p className="c-label text-[var(--c-accent)]">this file goes into</p>
         <div className="mt-4 grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-4">
-          <Metric size="sm" label="Account" value={profile.name} sub={profile.industry} />
-          <Metric size="sm" label="Plan" value={u.plan.name} />
+          <Metric size="sm" label="บัญชี" value={profile.name} sub={profile.industry} />
+          <Metric size="sm" label="แผน" value={u.plan.name} />
           <Metric
             size="sm"
             label={`Identifiable ${v.people}`}
@@ -58,8 +58,8 @@ export default async function ImportPage() {
           />
           <Metric
             size="sm"
-            label="Room for"
-            value={headroom != null ? `${num(headroom)} more` : "—"}
+            label="รับได้อีก"
+            value={headroom != null ? `อีก ${num(headroom)} คน` : "—"}
             sub={
               headroom != null
                 ? "An import past this is refused"
@@ -69,9 +69,8 @@ export default async function ImportPage() {
           />
         </div>
         <p className="c-thai mt-5 text-[0.78rem] text-[var(--c-text-4)]">
-          Switch account in the sidebar before importing if this is not the right
-          one — the file is written to the account named here, not the one you had
-          open last.
+          ถ้าไม่ใช่บัญชีที่ต้องการ ให้สลับบัญชีที่แถบข้างก่อนนำเข้า — ไฟล์จะถูกเขียนเข้าบัญชีที่ระบุตรงนี้
+            ไม่ใช่บัญชีที่เปิดค้างไว้ในแท็บอื่น
         </p>
       </Panel>
 

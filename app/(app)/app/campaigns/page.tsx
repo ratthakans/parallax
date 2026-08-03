@@ -60,8 +60,8 @@ export default async function CampaignsPage() {
   return (
     <>
       <PageHead
-        label="Campaigns"
-        title="Approved · sent · waiting on results"
+        label="แคมเปญ"
+        title="อนุมัติแล้ว · ส่งแล้ว · รอผล"
         lead="Approval freezes the list immediately — nobody can be added or removed after, because a list that can change makes the measurement worthless. Send from the button on each row."
         actions={
           <ActionForm
@@ -93,7 +93,7 @@ export default async function CampaignsPage() {
                 href={`/app/campaigns/${r.id}`}
                 className="c-btn c-btn-primary c-btn-sm"
               >
-                Review to send · {playById(r.play_id)?.name ?? r.play_id} ·{" "}
+                ตรวจเพื่อส่ง · {playById(r.play_id)?.name ?? r.play_id} ·{" "}
                 {num(r.treated_size - r.sent)}
               </Link>
             ))}
@@ -102,12 +102,12 @@ export default async function CampaignsPage() {
       )}
 
       <Panel flat className="mb-8 grid grid-cols-2 gap-x-6 gap-y-7 p-5 md:grid-cols-4 md:p-6">
-        <Metric label="Live campaigns" value={num(live.length)} />
-        <Metric label="Total treated" value={num(totalTreated)} tone="accent" />
+        <Metric label="แคมเปญที่ยังเดินอยู่" value={num(live.length)} />
+        <Metric label="ส่งไปทั้งหมด" value={num(totalTreated)} tone="accent" />
         <Metric
-          label="Total held back"
+          label="กันไว้ทั้งหมด"
           value={num(totalHoldout)}
-          sub="The second view in the measurement"
+          sub="มุมที่สองของการวัด"
           tone="muted"
         />
         <Metric label="Messages sent" value={num(totalSent)} />
@@ -124,13 +124,13 @@ export default async function CampaignsPage() {
               <thead>
                 <tr>
                   <th>play</th>
-                  <th>Approved</th>
-                  <th>Cohort</th>
-                  <th>Treated / held</th>
-                  <th>Method</th>
-                  <th>Sent</th>
-                  <th>Cost</th>
-                  <th>Status</th>
+                  <th>อนุมัติเมื่อ</th>
+                  <th>กลุ่ม</th>
+                  <th>ส่ง / กันไว้</th>
+                  <th>วิธีวัด</th>
+                  <th>ส่งแล้ว</th>
+                  <th>ค่าใช้จ่าย</th>
+                  <th>สถานะ</th>
                   <th />
                 </tr>
               </thead>
@@ -167,13 +167,13 @@ export default async function CampaignsPage() {
                       <td className="c-mono whitespace-nowrap">{baht(r.est_cost)}</td>
                       <td className="whitespace-nowrap">
                         {r.dry_run ? (
-                          <span className="c-pill">Dry run</span>
+                          <span className="c-pill">ซ้อมส่ง</span>
                         ) : r.sent < r.treated_size ? (
-                          <span className="c-pill c-pill-reach">Not sent</span>
+                          <span className="c-pill c-pill-reach">ยังไม่ส่ง</span>
                         ) : r.verdict90 ? (
                           <VerdictPill verdict={r.verdict90} />
                         ) : (
-                          <span className="c-pill c-pill-warn">Measuring</span>
+                          <span className="c-pill c-pill-warn">กำลังวัดผล</span>
                         )}
                       </td>
                       <td>
@@ -186,7 +186,7 @@ export default async function CampaignsPage() {
                           }`}
                         >
                           {!r.dry_run && r.sent < r.treated_size
-                            ? "Review to send"
+                            ? "ตรวจเพื่อส่ง"
                             : "Open"}
                         </Link>
                       </td>

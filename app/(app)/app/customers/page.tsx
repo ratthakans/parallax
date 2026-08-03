@@ -101,8 +101,8 @@ export default async function CustomersPage() {
         <Panel className="p-5 md:p-6">
           <h2 className="c-h2 text-[var(--c-text)]">Reachable channels</h2>
           <p className="c-thai mt-1.5 text-[0.8rem] text-[var(--c-text-3)]">
-            The switch that moves people from KEEP to REACH — “consented, no direct
-          channel” is exactly where KEEP gives up and REACH can legally take over.
+            สวิตช์ที่โยนคนจาก KEEP ไป REACH — "ยินยอมแล้ว แต่ไม่มีช่องทางตรง" คือจุดที่ KEEP ยอมแพ้
+            แล้ว REACH รับต่อได้อย่างถูกกฎหมาย
           </p>
           <div className="mt-5 flex flex-col gap-3">
             {(["line", "email", "paid_only", "none"] as ReachableBy[]).map((k) => {
@@ -141,7 +141,7 @@ export default async function CustomersPage() {
         <Panel className="p-5 md:p-6">
           <h2 className="c-h2 text-[var(--c-text)]">Discount sensitivity</h2>
           <p className="c-thai mt-1.5 text-[0.8rem] text-[var(--c-text-3)]">
-            Derived from list price against sale price — without asking the shop for a single cost figure
+            คำนวณจากราคาป้ายเทียบราคาขาย โดยไม่ต้องถามต้นทุนจากร้านสักตัวเดียว
           </p>
           <div className="mt-5 flex flex-col gap-3">
             {(["full_price", "mixed", "discount_seeker"] as DiscountAffinity[]).map((k) => {
@@ -174,12 +174,11 @@ export default async function CustomersPage() {
             })}
           </div>
           <p className="c-thai mt-5 text-[0.78rem] text-[var(--c-text-4)]">
-            The full-price group is the REACH seed — not the highest spenders
+            กลุ่มที่ซื้อเต็มราคาคือต้นแบบของ REACH ไม่ใช่กลุ่มที่จ่ายมากที่สุด
           </p>
           <p className="c-thai mt-2 text-[0.78rem] text-[var(--c-warn)]">
-            People without consent are never exported to an ad platform, including the
-          suppression list — so they may still see the shop's ads. That is the lawful
-          outcome, not a defect.
+            คนที่ไม่ได้ให้ความยินยอมจะไม่ถูกส่งออกไปแพลตฟอร์มโฆษณาเลย รวมถึงรายชื่อที่ใช้ตัดออกด้วย
+            เขาจึงอาจยังเห็นโฆษณาของร้านอยู่ ซึ่งเป็นราคาที่ถูกต้องตามกฎหมายที่ต้องจ่าย
           </p>
         </Panel>
       </div>
@@ -187,7 +186,7 @@ export default async function CustomersPage() {
       <Panel className="p-5 md:p-6">
         <h2 className="c-h2 text-[var(--c-text)]">Top 25 to contact first</h2>
         <p className="c-thai mt-1.5 text-[0.8rem] text-[var(--c-text-3)]">
-          Ranked by churn risk × value, not by spend
+          จัดอันดับด้วยความเสี่ยงที่จะหายไป × มูลค่า ไม่ใช่ด้วยยอดใช้จ่าย
         </p>
         <div className="c-scroll mt-5">
           <table className="c-table min-w-[62rem]">

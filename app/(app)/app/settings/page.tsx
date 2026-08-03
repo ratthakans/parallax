@@ -66,8 +66,8 @@ export default async function SettingsPage() {
   return (
     <>
       <PageHead
-        label="Settings"
-        title="Limits · AI · demo tools"
+        label="ตั้งค่า"
+        title="เพดาน · AI · เครื่องมือเดโม"
         lead="Every limit here is enforced in the dispatch layer, not on screen — change one and it applies from the next match run."
       />
 
@@ -75,11 +75,11 @@ export default async function SettingsPage() {
       <Panel className="mb-6 p-5 md:p-6">
         <h2 className="c-h2 text-[var(--c-text)]">What this account is</h2>
         <div className="mt-5 grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-4">
-          <Metric size="sm" label="Account" value={profile.name} />
-          <Metric size="sm" label="Industry" value={profile.industry} />
+          <Metric size="sm" label="บัญชี" value={profile.name} />
+          <Metric size="sm" label="ประเภทธุรกิจ" value={profile.industry} />
           <Metric
             size="sm"
-            label="Revenue cycle shape"
+            label="รูปทรงวงจรรายได้"
             value={CYCLE_LABEL[profile.cycleShape]}
             sub={`${playCount} of ${ALL_PLAYS.length} plays apply`}
           />
@@ -94,9 +94,8 @@ export default async function SettingsPage() {
           Dataset source: {profile.source}
         </p>
         <p className="c-thai mt-2 max-w-3xl text-[0.78rem] text-[var(--c-text-4)]">
-          Plays are filtered by the account's cycle shape rather than run for
-          everyone — which is why a taxi company never gets a “clear dead stock”
-          offer, and a political party never gets a cross-sell.
+          play ถูกกรองด้วยรูปทรงวงจรของบัญชี ไม่ใช่รันให้ทุกคนเหมือนกัน — บริษัทแท็กซี่จึงไม่มีวัน
+            ได้ข้อเสนอ "ระบายของค้างสต๊อก" และ
         </p>
         {profile.compliance && (
           <div className="mt-6 border-l-2 border-[var(--c-warn)] pl-4">
@@ -112,13 +111,13 @@ export default async function SettingsPage() {
       <Panel className="mb-6 p-5 md:p-6">
         <h2 className="c-h2 text-[var(--c-text)]">Limits in force</h2>
         <p className="c-thai mt-1.5 text-[0.83rem] text-[var(--c-text-3)]">
-          A system that can send without limit is a system that gets the shop muted
+          ระบบที่ส่งได้ไม่จำกัดคือระบบที่ทำให้ร้านถูกปิดเสียง
         </p>
         <ActionForm
           action={updateLimitsAction}
           fields={{ tenantId }}
-          label="Save limits"
-          pendingLabel="Saving…"
+          label="บันทึกเพดาน"
+          pendingLabel="กำลังบันทึก…"
           variant="primary"
           className="mt-6 flex flex-col items-start gap-6"
         >
@@ -134,7 +133,7 @@ export default async function SettingsPage() {
                 defaultValue={tenant?.max_messages_per_week ?? 2}
               />
               <span className="c-thai text-[0.74rem] text-[var(--c-text-4)]">
-                Checked across every campaign, KEEP and REACH alike
+                นับรวมทุกแคมเปญ ทั้ง KEEP และ REACH
               </span>
             </label>
             <label className="flex flex-col gap-2">
@@ -148,7 +147,7 @@ export default async function SettingsPage() {
                 defaultValue={tenant?.quiet_hours_start ?? 21}
               />
               <span className="c-thai text-[0.74rem] text-[var(--c-text-4)]">
-                Press send inside this window and nothing goes out
+                กดส่งในช่วงนี้จะไม่มีอะไรออกไป
               </span>
             </label>
             <label className="flex flex-col gap-2">
@@ -176,7 +175,7 @@ export default async function SettingsPage() {
                 defaultValue={tenant?.max_discount_pct ?? 20}
               />
               <span className="c-thai text-[0.74rem] text-[var(--c-text-4)]">
-                Always overrides a play's own ceiling
+                ทับเพดานของ play เสมอ
               </span>
             </label>
           </div>
@@ -189,9 +188,8 @@ export default async function SettingsPage() {
           <div>
             <h2 className="c-h2 text-[var(--c-text)]">Where AI sits</h2>
             <p className="c-thai mt-1.5 max-w-2xl text-[0.83rem] text-[var(--c-text-3)]">
-              Selection, ranking and computing the difference are pure arithmetic. No LLM
-              is allowed near them — they must be explainable, repeatable, and free to
-              run.
+              การเลือกกลุ่ม จัดอันดับ และคำนวณส่วนต่าง เป็นเลขคณิตล้วน ห้าม LLM เข้าใกล้ —
+            เพราะต้องอธิบายได้ ทำซ้ำได้ผลเดิม และไม่มีค่าใช้จ่ายในการรัน
             </p>
           </div>
           <span className={`c-pill ${ai ? "c-pill-good" : "c-pill-warn"}`}>
@@ -248,8 +246,8 @@ export default async function SettingsPage() {
             <ActionForm
               action={clearAiCacheAction}
               fields={{ tenantId }}
-              label="Clear AI cache"
-              pendingLabel="Clearing…"
+              label="ล้างแคช AI"
+              pendingLabel="กำลังล้าง…"
               size="sm"
               className="mt-4"
             />
@@ -261,11 +259,8 @@ export default async function SettingsPage() {
       <Panel className="mb-6 p-5 md:p-6">
         <h2 className="c-h2 text-[var(--c-text)]">Demo tools</h2>
         <p className="c-thai mt-1.5 max-w-2xl text-[0.83rem] text-[var(--c-text-3)]">
-          A campaign approved ten seconds ago has not reached T+7, so everything reads
-          “not enough yet” — statistically correct, and useless for showing what the
-          Proof layer does. Time travel shifts approval dates backwards and re-measures.
-          Everything else is real — the holdout, the arm split, the formulas. No result
-          is edited.
+          แคมเปญที่เพิ่งอนุมัติเมื่อสิบวินาทีที่แล้วยังไม่ถึง T+7 ทุกอย่างจึงขึ้นว่า "ยังไม่พอสรุป" —
+            ถูกต้องตามสถิติ แต่ใช้แสดงความสามารถของชั้น Proof ไม่ได้
         </p>
 
         {/* บอกเหตุผลตรงที่ปุ่มอยู่ ไม่ใช่ปล่อยให้กดแล้วงงว่าทำไมไม่ทำงาน */}
@@ -284,7 +279,7 @@ export default async function SettingsPage() {
               action={travelAction}
               fields={{ tenantId, days: d }}
               label={`Travel forward ${d} days`}
-              pendingLabel="Shifting and re-measuring…"
+              pendingLabel="กำลังเลื่อนเวลาและวัดใหม่…"
               disabled={!demoTools}
               full
             />
@@ -294,13 +289,13 @@ export default async function SettingsPage() {
         <div className="mt-6 grid grid-cols-2 gap-x-6 gap-y-6 md:grid-cols-4">
           <Metric
             size="sm"
-            label="Oldest campaign"
+            label="แคมเปญที่เก่าที่สุด"
             value={
               demo.oldestCampaignAt
                 ? `${Math.floor((Date.now() - Date.parse(demo.oldestCampaignAt)) / 86400000)}d`
                 : "—"
             }
-            sub="Needs 90+ days before T+90 concludes"
+            sub="ต้องมีอายุ 90 วันขึ้นไป T+90 ถึงจะสรุปได้"
           />
           {(["positive", "no_effect", "insufficient_data"] as const).map((v) => {
             const hit = demo.verdicts.find((x) => x.verdict === v);
@@ -326,9 +321,9 @@ export default async function SettingsPage() {
         <ActionForm
           action={reseedAction}
           fields={{ tenantId }}
-          label="Rebuild the dataset"
-          confirm="Press again to delete and rebuild"
-          pendingLabel="Rebuilding…"
+          label="สร้างชุดข้อมูลใหม่"
+          confirm="กดอีกครั้งเพื่อลบและสร้างใหม่"
+          pendingLabel="กำลังสร้างใหม่…"
           variant="danger"
           size="sm"
           disabled={!demoTools}
@@ -349,7 +344,7 @@ export default async function SettingsPage() {
       <Panel className="p-5 md:p-6">
         <h2 className="c-h2 text-[var(--c-text)]">Activity log</h2>
         <p className="c-thai mt-1.5 text-[0.83rem] text-[var(--c-text-3)]">
-          Who did what, and when — every approval and send is recorded
+          ใครทำอะไรเมื่อไร — ทุกการอนุมัติและการส่งถูกบันทึกไว้
         </p>
         <div className="c-scroll mt-5">
           <table className="c-table min-w-[38rem]">
@@ -381,8 +376,8 @@ export default async function SettingsPage() {
           </table>
         </div>
         <p className="c-thai mt-5 text-[0.78rem] text-[var(--c-warn)]">
-          This console has no login yet, so every actor is recorded as owner —
-          authorisation has to be added before real use.
+          คอนโซลนี้ยังไม่มีระบบเข้าสู่ระบบ ทุกการกระทำจึงถูกบันทึกเป็น owner —
+          ต้องเพิ่มการยืนยันตัวตนก่อนใช้งานจริง
         </p>
       </Panel>
     </>

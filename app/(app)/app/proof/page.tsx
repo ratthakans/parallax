@@ -60,9 +60,9 @@ export default async function ProofPage() {
   return (
     <>
       <PageHead
-        label="Proof"
-        title="Did what we sent actually work?"
-        lead="Every campaign holds a group back and compares the two. The difference is what the message caused — not revenue that would have arrived anyway. And when it did not work, this page says so."
+        label="ผลที่วัดได้"
+        title="สิ่งที่ส่งไปได้ผลจริงไหม"
+        lead="ทุกแคมเปญกันคนกลุ่มหนึ่งไว้ไม่ส่ง แล้วเทียบสองกลุ่ม ส่วนต่างคือสิ่งที่ข้อความทำให้เกิดขึ้นจริง ไม่ใช่รายได้ที่จะเข้ามาอยู่แล้ว และถ้าไม่ได้ผล หน้านี้จะบอกตรง ๆ"
         actions={
           <ActionForm
             action={measureAllAction}
@@ -88,17 +88,16 @@ export default async function ProofPage() {
             {proofBlocked}
           </p>
           <p className="c-thai mt-4 max-w-2xl text-[0.84rem] leading-relaxed text-[var(--c-text-3)]">
-            What you get: every campaign holds a group back and compares the two, so
-            the figure you read is what the message caused — not revenue that would
-            have arrived anyway. When the difference cannot be told apart from noise,
-            this page says so instead of rounding it up.
+            สิ่งที่จะได้: ทุกแคมเปญกันคนกลุ่มหนึ่งไว้ไม่ส่ง แล้วเทียบสองกลุ่ม ตัวเลขที่อ่านจึงเป็นสิ่งที่
+            ข้อความทำให้เกิดขึ้นจริง ไม่ใช่รายได้ที่จะเข้ามาอยู่แล้ว และเมื่อส่วนต่างแยกจากความผันผวน
+            ไม่ออก หน้านี้จะบอกตรง ๆ แทนที่จะปัดขึ้น
           </p>
           <div className="mt-6 flex flex-wrap gap-2.5">
             <Link href="/app/billing" className="c-btn c-btn-primary">
-              See plans
+              ดูแผน
             </Link>
             <Link href="/app" className="c-btn c-btn-ghost">
-              Back to the brief
+              กลับไปบรีฟ
             </Link>
           </div>
         </Panel>
@@ -115,10 +114,9 @@ export default async function ProofPage() {
         <Panel flat className="mb-6 border-l-2 border-[var(--c-warn)] p-5">
           <p className="c-label text-[var(--c-warn)]">synthetic dataset</p>
           <p className="c-thai mt-2.5 max-w-3xl text-[0.84rem] leading-relaxed text-[var(--c-text-2)]">
-            Every figure below is computed for real by the engine — the holdout,
-            the difference, the confidence interval — but from a generated dataset,
-            not a live customer. No business has been measured with this yet, and we
-            will not claim a lift until one has.
+            ตัวเลขทุกตัวข้างล่างคำนวณจริงโดยเครื่องยนต์ — ทั้งกลุ่มที่กันไว้ ส่วนต่าง และช่วงความเชื่อมั่น —
+            แต่คำนวณจากชุดข้อมูลที่สร้างขึ้น ไม่ใช่ลูกค้าจริง ยังไม่มีธุรกิจไหนถูกวัดด้วยระบบนี้
+            และเราจะไม่อ้างส่วนต่างจนกว่าจะมี
           </p>
         </Panel>
       )}
@@ -135,38 +133,38 @@ export default async function ProofPage() {
       <Panel className="mb-6 p-5 md:p-6">
         <div className="grid grid-cols-2 gap-x-6 gap-y-8 md:grid-cols-4">
           <Metric
-            label={`Cost per returning ${v.person}`}
+            label={`ต้นทุนต่อ${v.th.person}ที่กลับมา`}
             value={
               roi.costPerRepeatCustomer != null
                 ? baht(roi.costPerRepeatCustomer)
-                : "Not enough yet"
+                : "ยังไม่พอสรุป"
             }
-            sub="Total spend ÷ people who came back because of a message"
+            sub="ยอดใช้จ่ายทั้งหมด ÷ คนที่กลับมาเพราะข้อความ"
             tone={roi.costPerRepeatCustomer != null ? "accent" : "muted"}
             size="lg"
           />
           <Metric
-            label="90-day rolling difference"
+            label="รายได้ส่วนเพิ่ม 90 วันล่าสุด"
             value={roi.liftBaht > 0 ? baht(roi.liftBaht) : "—"}
-            sub="Across every measured campaign"
+            sub="รวมทุกแคมเปญที่วัดผลแล้ว"
             tone={roi.liftBaht > 0 ? "good" : "muted"}
           />
           <Metric
-            label="Spend"
+            label="ยอดใช้จ่าย"
             value={baht(roi.spendBaht)}
-            sub="Messaging actually sent, plus discount given"
+            sub="ค่าข้อความที่ส่งจริง บวกส่วนลดที่ให้ไป"
           />
           <Metric
-            label="Cost per incremental baht"
+            label="ต้นทุนต่อรายได้ส่วนเพิ่มหนึ่งบาท"
             value={
               roi.costPerIncrementalBaht != null
                 ? `฿${roi.costPerIncrementalBaht}`
-                : "Not enough yet"
+                : "ยังไม่พอสรุป"
             }
             sub={
               roi.costPerIncrementalBaht != null
                 ? `฿1 spent returns about ${baht(1 / roi.costPerIncrementalBaht)}`
-                : "What one incremental baht costs"
+                : "ต้นทุนของรายได้ส่วนเพิ่มหนึ่งบาท"
             }
             tone={roi.costPerIncrementalBaht != null ? "plain" : "muted"}
           />
@@ -176,10 +174,10 @@ export default async function ProofPage() {
 
         <div className="grid gap-6 md:grid-cols-[1fr_1.4fr]">
           <div>
-            <p className="c-label">average difference, with confidence interval</p>
+            <p className="c-label">ส่วนต่างเฉลี่ย พร้อมช่วงความเชื่อมั่น</p>
             <p className="c-thai mt-1.5 text-[0.74rem] text-[var(--c-text-4)]">
-              Averaged across every measured campaign, including the inconclusive ones —
-            average only the significant ones and the figure is always inflated.
+              เฉลี่ยจากทุกแคมเปญที่วัดผลแล้ว รวมตัวที่ยังสรุปไม่ได้ด้วย — ถ้าเฉลี่ยเฉพาะตัวที่มีนัยสำคัญ
+              ตัวเลขจะสูงเกินจริงเสมอ
             </p>
             {roi.avgLiftPct != null ? (
               <>
@@ -210,14 +208,14 @@ export default async function ProofPage() {
           </div>
 
           <div>
-            <p className="c-label">verdict mix</p>
+            <p className="c-label">สัดส่วนข้อสรุป</p>
             {total ? (
               <div className="mt-4 flex flex-col gap-3">
                 {(
                   [
-                    ["positive", "Worked", "var(--c-good)"],
-                    ["no_effect", "No different", "var(--c-bad)"],
-                    ["insufficient_data", "Not enough yet", "var(--c-warn)"],
+                    ["positive", "ได้ผล", "var(--c-good)"],
+                    ["no_effect", "ไม่ต่างจากไม่ส่ง", "var(--c-bad)"],
+                    ["insufficient_data", "ยังไม่พอสรุป", "var(--c-warn)"],
                   ] as const
                 ).map(([k, label, color]) => {
                   const n = roi.verdictMix[k];
@@ -254,33 +252,31 @@ export default async function ProofPage() {
 
       {rows.length === 0 ? (
         <Empty>
-          No results yet — approve a campaign from the Morning Brief, then measure what is due
+          ยังไม่มีผล — อนุมัติแคมเปญจากบรีฟเช้านี้ แล้วกดวัดผลที่ถึงกำหนด
         </Empty>
       ) : (
         <Panel className="p-5 md:p-6">
-          <h2 className="c-h2 text-[var(--c-text)]">Every measured campaign</h2>
+          <h2 className="c-h2 text-[var(--c-text)]">ทุกแคมเปญที่วัดผลแล้ว</h2>
           <p className="c-thai mt-2 max-w-3xl text-[0.82rem] text-[var(--c-text-3)]">
-            Per-head figures are “return rate × median basket of those who bought,”
-          not raw revenue per head. The verdict is decided on the return rate, because
-          raw revenue is too volatile to conclude on at cohorts of a few thousand.
+            ตัวเลขต่อคนคือ "อัตราการกลับมา × ยอดกลางของคนที่ซื้อ" ไม่ใช่รายได้ดิบต่อหัว ข้อสรุปตัดสิน
+            จากอัตราการกลับมา เพราะรายได้ดิบผันผวนเกินกว่าจะสรุปได้ที่กลุ่มไม่กี่พันคน
           </p>
           <p className="c-thai mt-1.5 max-w-3xl text-[0.82rem] text-[var(--c-warn)]">
-            Cohorts of 300–1,000 use the pooled 90-day mode — those rows show the same
-            figures because they are concluded from a combined control group, not from
-            that campaign alone.
+            กลุ่ม 300–1,000 คนใช้โหมดรวมผล 90 วัน แถวเหล่านั้นจึงแสดงตัวเลขเดียวกัน เพราะสรุปจาก
+            กลุ่มควบคุมที่รวมกัน ไม่ใช่จากแคมเปญนั้นเดี่ยว ๆ
           </p>
           <div className="c-scroll mt-5">
             <table className="c-table min-w-[62rem]">
               <thead>
                 <tr>
                   <th>play</th>
-                  <th>Horizon</th>
-                  <th>Treated / held</th>
-                  <th>Per head · treated</th>
-                  <th>Per head · held</th>
-                  <th>Difference</th>
+                  <th>ช่วงเวลา</th>
+                  <th>ส่ง / กันไว้</th>
+                  <th>ต่อคน · กลุ่มที่ส่ง</th>
+                  <th>ต่อคน · กลุ่มที่กันไว้</th>
+                  <th>ส่วนต่าง</th>
                   <th>95% CI</th>
-                  <th>Verdict</th>
+                  <th>ข้อสรุป</th>
                   <th />
                 </tr>
               </thead>

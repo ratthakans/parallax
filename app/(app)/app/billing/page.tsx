@@ -66,7 +66,7 @@ export default async function BillingPage() {
   return (
     <>
       <PageHead
-        label="Billing"
+        label="ค่าใช้จ่าย"
         title={`${plan.name} — what you paid, and what came back`}
         lead={`The subscription is priced on identifiable ${v.people}. Messaging is prepaid credits, never hidden inside the fee.`}
       />
@@ -98,12 +98,12 @@ export default async function BillingPage() {
 
         <div className="mt-6 grid gap-x-8 gap-y-6 sm:grid-cols-2 lg:grid-cols-4">
           <Metric
-            label="Subscription"
+            label="ค่าบริการรายเดือน"
             value={plan.monthlyBaht == null ? "Let's talk" : baht(plan.monthlyBaht)}
             sub={`${plan.name} · per month`}
           />
           <Metric
-            label="Credits bought this period"
+            label="เครดิตที่ซื้อรอบนี้"
             value={baht(u.creditSpendThisPeriod)}
             sub={
               u.purchasesThisPeriod.length
@@ -113,13 +113,13 @@ export default async function BillingPage() {
             tone={packRate > 0 ? "plain" : "muted"}
           />
           <Metric
-            label="Total this period"
+            label="รวมรอบนี้"
             value={baht(u.invoiceThisPeriod)}
             tone="accent"
-            sub="Subscription + credits"
+            sub="ค่าบริการ + เครดิต"
           />
           <Metric
-            label="Delivery cost incurred"
+            label="ค่าส่งที่เกิดขึ้นจริง"
             value={baht(u.messageCostThisPeriod)}
             sub={`${num(u.messagesThisPeriod)} messages × ฿${MESSAGE_COST_BAHT}`}
             tone="muted"
@@ -146,8 +146,8 @@ export default async function BillingPage() {
                 : `Room for ${num(Math.max(0, u.contactCap - u.identified))} more before the cap`}
           </p>
           <p className="c-thai mt-2 text-[0.76rem] text-[var(--c-text-4)]">
-            Counts anyone carrying at least one identifier, so they can be matched or
-            contacted — not rows in an imported file.
+            นับคนที่มีตัวระบุอย่างน้อยหนึ่งอย่าง เพื่อให้จับคู่หรือติดต่อได้
+            ไม่ใช่นับจำนวนแถวในไฟล์ที่นำเข้า
           </p>
         </Panel>
 
@@ -171,8 +171,8 @@ export default async function BillingPage() {
               ` — at this rate the balance lasts about ${num(u.creditRunwayDays)} more days`}
           </p>
           <p className="c-thai mt-2 text-[0.76rem] text-[var(--c-text-4)]">
-            When credits run out sending stops. No retroactive billing, no negative
-            balance — a stalled campaign reports exactly how many are still waiting.
+            เครดิตหมดเมื่อไรการส่งหยุดทันที ไม่มีการเรียกเก็บย้อนหลัง ไม่มียอดติดลบ —
+            แคมเปญที่ค้างจะรายงานตรง ๆ ว่าเหลือกี่คนที่ยังรออยู่
           </p>
 
           <div className="mt-6 grid gap-2.5 border-t border-[var(--c-line)] pt-5 sm:grid-cols-3">
@@ -182,7 +182,7 @@ export default async function BillingPage() {
                 action={buyCreditsAction}
                 fields={{ tenantId, messages: pk.messages }}
                 buttonClassName="w-full flex-col !py-2.5"
-                pendingLabel="Adding…"
+                pendingLabel="กำลังเพิ่ม…"
                 label={
                   <>
                     <span className="c-mono text-[0.82rem]">+{num(pk.messages)}</span>
@@ -206,7 +206,7 @@ export default async function BillingPage() {
         </p>
         <div className="mt-6 grid gap-x-8 gap-y-6 sm:grid-cols-2 lg:grid-cols-4">
           <Metric
-            label="Subscription per year"
+            label="ค่าบริการต่อปี"
             value={yearlyFee > 0 ? baht(yearlyFee) : "Let's talk"}
             sub={
               annualBaht(plan) != null
@@ -215,13 +215,13 @@ export default async function BillingPage() {
             }
           />
           <Metric
-            label="Delivery cost all time"
+            label="ค่าส่งสะสมทั้งหมด"
             value={baht(u.messagesAllTime * MESSAGE_COST_BAHT)}
             sub={`${num(u.messagesAllTime)} messages since the account opened`}
             tone="muted"
           />
           <Metric
-            label="Measured lift"
+            label="ส่วนต่างที่วัดได้"
             value={measuredLift > 0 ? baht(measuredLift) : "Not measurable yet"}
             sub={
               roi.campaigns > 0
@@ -234,7 +234,7 @@ export default async function BillingPage() {
               เลขที่เล็กกว่าหนึ่งสตางค์อ่านไม่ออกว่าดีหรือแย่ หน้านี้เป็น
               หน้าเรื่องเงินเข้าเงินออก จึงกลับด้านให้เป็นสิ่งที่ตอบคำถามตรง ๆ */}
           <Metric
-            label="Returned per ฿1 spent"
+            label="ได้กลับมาต่อทุก ฿1 ที่จ่าย"
             value={
               roi.costPerIncrementalBaht != null && roi.costPerIncrementalBaht > 0
                 ? baht(1 / roi.costPerIncrementalBaht)
@@ -260,10 +260,8 @@ export default async function BillingPage() {
             ถูกใส่ผลของแคมเปญไว้ที่ +28% ซึ่งสูงกว่าที่คาดจากร้านจริง
             และแคมเปญที่ไม่ให้ส่วนลดจะมีตัวหารเป็นค่าส่งข้อความล้วน ๆ */}
         <p className="c-thai mt-4 max-w-3xl border-l-2 border-[var(--c-warn)] pl-4 text-[0.78rem] leading-relaxed text-[var(--c-text-3)]">
-          This account runs on a synthetic dataset, so the return figure is far
-          higher than a real shop should expect — especially on campaigns with no
-          discount, where the denominator is only delivery cost. The formula and the
-          control group are real; the underlying numbers are not.
+          บัญชีนี้ใช้ชุดข้อมูลจำลอง ตัวเลขผลตอบแทนจึงสูงกว่าที่ร้านจริงควรคาดหวังมาก
+            โดยเฉพาะแคมเปญที่ไม่มีส่วนลด
         </p>
       </Panel>
 
@@ -271,8 +269,8 @@ export default async function BillingPage() {
       <Panel className="mb-6 p-5 md:p-6">
         <h2 className="c-h2 text-[var(--c-text)]">Delivery cost by campaign</h2>
         <p className="c-thai mt-1.5 max-w-3xl text-[0.83rem] text-[var(--c-text-3)]">
-          Most recent first — marked rows count toward this billing period. The demo
-          account's history spans over a year, so most fall outside it.
+          เรียงล่าสุดก่อน — แถวที่ทำเครื่องหมายไว้นับเข้ารอบบิลนี้ ประวัติของบัญชีตัวอย่างยาวกว่าหนึ่งปี
+            ส่วนใหญ่จึงอยู่นอกรอบ
         </p>
         {costs.length === 0 ? (
           <div className="mt-5">
@@ -432,16 +430,14 @@ export default async function BillingPage() {
               action={changePlanAction}
               fields={{ tenantId, plan: id }}
               label={`Move to ${PLANS[id].name}`}
-              pendingLabel="Switching…"
+              pendingLabel="กำลังเปลี่ยน…"
               size="sm"
             />
           ))}
         </div>
         <p className="c-thai mt-4 max-w-3xl text-[0.76rem] leading-relaxed text-[var(--c-text-4)]">
-          Plan switching is a demo control — it writes straight to the database so you
-          can see where the caps actually bite. Move to Pilot, return to the Morning
-          Brief, and approval is gone. A real system would route through payment and
-          a contract first.
+          การสลับแผนเป็นเครื่องมือเดโม — เขียนลงฐานข้อมูลตรง ๆ เพื่อให้เห็นว่าเพดานกัดตรงไหนจริง
+            ลองเปลี่ยนเป็น Pilot แล้วกลับไปหน้าบรีฟ
         </p>
       </Panel>
     </>
