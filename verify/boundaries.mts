@@ -140,6 +140,58 @@ const rel = (f: string) => relative(ROOT, f);
   if (bad.length) fails.push("คอนโซลดึงคอมโพเนนต์ฝั่งการตลาด:\n    " + bad.join("\n    "));
 }
 
+/* ── 4.5 · ห้ามปล่อย promise ลอย ──────────────────────────────
+
+   ฟังก์ชันใน lib/ ที่เป็น async เกือบทั้งหมดเปิดธุรกรรม เรียกมันโดยไม่ await
+   แปลว่าธุรกรรมนั้นยังเปิดค้างอยู่ตอนบรรทัดถัดไปเริ่มทำงาน บนไฟล์ sqlite
+   ที่มีคอนเนกชันเดียวจะได้ "cannot start a transaction within a transaction"
+   ส่วนบน Postgres จะได้ผลลัพธ์ที่ขึ้นกับจังหวะ ซึ่งแย่กว่าเพราะไม่มีใครฟ้อง
+
+   มันเคยหลุดสองจุดพร้อมกัน — travelForward ใน seedCampaignHistory และ seed
+   ใน reseedAction — และไม่มีอะไรจับได้เลยจนกระทั่งโค้ดข้าง ๆ เปลี่ยนไปวิ่ง
+   ขนาน แล้วจังหวะที่บังเอิญพอดีก็หายไป typecheck มองไม่เห็นเพราะการทิ้ง
+   promise เป็นโค้ดที่ถูกต้องตามชนิดข้อมูลทุกประการ */
+{
+  const asyncNames = new Set<string>();
+  for (const f of files.filter((f) => rel(f).startsWith("lib/"))) {
+    for (const m of read(f).matchAll(/^export async function (\w+)/gm)) {
+      asyncNames.add(m[1]);
+    }
+  }
+
+  const bad: string[] = [];
+  for (const f of files.filter(
+    (f) => rel(f).startsWith("lib/") || rel(f).startsWith("app/"),
+  )) {
+    const src = read(f);
+    for (const name of asyncNames) {
+      /* ต้องเป็นตำแหน่งของ "คำสั่ง" ไม่ใช่ตำแหน่งของ "ค่า" — ตัวอักษร
+         ก่อนหน้าจึงต้องเป็นต้นบรรทัด, ; , { , } หรือ ) ของ if/else
+         ไม่ใช่ = , . , ( หรือ , ซึ่งแปลว่าค่านั้นถูกส่งต่อไปที่อื่นแล้ว */
+      const call = new RegExp(`(^|[;{}\\n)])(\\s*)${name}\\s*\\(`, "g");
+      for (const m of src.matchAll(call)) {
+        const open = m.index + m[0].length - 1;
+        // นับวงเล็บจนปิดครบ เพื่อให้การเรียกที่กินหลายบรรทัดถูกอ่านถูกต้อง
+        let depth = 0;
+        let i = open;
+        for (; i < src.length; i++) {
+          if (src[i] === "(") depth++;
+          else if (src[i] === ")" && --depth === 0) break;
+        }
+        /* ปิดท้ายด้วย ; = เป็นคำสั่งเดี่ยว ๆ ไม่มีใครรับค่าไปทำอะไรต่อ
+           ถ้าปิดท้ายด้วย , หรือ ) แปลว่ามันอยู่ใน Promise.all หรือถูกส่ง
+           เป็นอาร์กิวเมนต์ ซึ่งมีคนรออยู่แล้ว */
+        if (src.slice(i + 1).trimStart()[0] !== ";") continue;
+        const line = src.slice(0, m.index).split("\n").length;
+        bad.push(`${rel(f)}:${line}  ${name}(…)`);
+      }
+    }
+  }
+  checks.push(`ไม่มี promise ลอย (ตรวจ ${asyncNames.size} ฟังก์ชัน async ของ lib/)`);
+  if (bad.length)
+    fails.push("เรียกฟังก์ชัน async โดยไม่ await:\n    " + bad.join("\n    "));
+}
+
 /* ── 5 · ไม่มีไฟล์ตกค้างใน lib/ ชั้นบนสุด ──
    ไฟล์ที่ไม่ได้อยู่ใน shared หรือ engine คือไฟล์ที่ยังไม่มีใครตัดสินว่า
    มันแตะข้อมูลลูกค้าหรือเปล่า ซึ่งเป็นสถานะที่ไม่ควรมี */

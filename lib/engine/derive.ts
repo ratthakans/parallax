@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { all, get, insertMany, tx, type Param } from "@/lib/engine/sql";
 import type { CustomerFeature, DiscountAffinity, GroupRole, ReachableBy } from "@/lib/shared/types";
 
@@ -25,6 +26,11 @@ type TxnRow = {
   discount_total: number;
 };
 
+/* ⚠ เขียนทับตารางที่ loadFeatures อ่าน และ loadFeatures ถูกแคชต่อคำขอ
+   ถ้าคำขอเดียวกัน derive แล้วอ่านต่อ จะได้ของเก่าโดยไม่มีอะไรฟ้อง
+   ตอนนี้ไม่มีจุดไหนทำแบบนั้น (deriveAction กับ reseedAction จบด้วย
+   revalidate แล้วปล่อยให้คำขอถัดไปอ่านของใหม่) — ถ้าจะเพิ่ม ต้องอ่าน
+   ผลลัพธ์จากค่าที่ฟังก์ชันนี้คืน ไม่ใช่ถามตารางซ้ำในคำขอเดิม */
 export async function deriveFeatures(tenantId: string) {
   const now = Date.now();
   const nowIso = new Date(now).toISOString();
@@ -407,13 +413,25 @@ export type StoredFeature = CustomerFeature & {
   anchor_starter: boolean;
 };
 
-export async function loadFeatures(tenantId: string): Promise<StoredFeature[]> {
+/* ── อ่านครั้งเดียวต่อคำขอ ────────────────────────────────────
+
+   นี่คือคำถามที่หนักที่สุดของคอนโซล — หลายพันแถวพร้อม payload JSON
+   และหน้าหนึ่งหน้าเรียกมันมากกว่าหนึ่งครั้งได้ง่ายมาก (runMatch เรียก
+   หนึ่ง หน้าที่แสดงผลเรียกอีกหนึ่ง) วัดแล้วบน Postgres คือ 1,117ms
+   ที่จ่ายซ้ำโดยได้คำตอบเดิมเป๊ะ
+
+   cache() ของ React ผูกกับคำขอ ไม่ใช่กับโปรเซส — ผู้ใช้คนถัดไปได้ของสด
+   เสมอ และนอกบริบทของ React (สคริปต์ · ชุดตรวจ) มันปล่อยผ่านตามปกติ
+   นี่คือรูปแบบเดียวกับที่ lib/shared/session.ts ใช้ ตามคู่มือ DAL ของ Next */
+export const loadFeatures = cache(async function loadFeatures(
+  tenantId: string,
+): Promise<StoredFeature[]> {
   const rows = await all<{ payload: string }>(
     "SELECT payload FROM customer_features WHERE tenant_id = ?",
     tenantId,
   );
   return rows.map((r) => JSON.parse(r.payload) as StoredFeature);
-}
+});
 
 export async function featuresComputedAt(
   tenantId: string,

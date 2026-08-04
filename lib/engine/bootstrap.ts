@@ -61,29 +61,3 @@ export function resetReady() {
   ready = false;
 }
 
-export async function tenantStats(tenantId: string) {
-  /* ทุกคำถามที่นี่คือ COUNT(*) ซึ่ง Postgres คืนเป็น bigint และ sqlite
-     คืนเป็น number — ตัวช่วยตัวเดียวจึงแปลงให้เป็นตัวเลขทุกครั้ง
-     แทนที่จะให้แต่ละจุดจำเอง */
-  const count = async (sql: string, ...args: (string | number)[]) =>
-    Number((await get<{ n: number | string }>(sql, ...args))?.n ?? 0);
-
-  const customers = await count(
-    "SELECT COUNT(*) AS n FROM customers WHERE tenant_id = ?",
-    tenantId,
-  );
-  const campaigns = await count(
-    "SELECT COUNT(*) AS n FROM campaigns WHERE tenant_id = ? AND dry_run = 0",
-    tenantId,
-  );
-  const measuring = await count(
-    "SELECT COUNT(*) AS n FROM campaigns WHERE tenant_id = ? AND dry_run = 0 AND status = 'measuring'",
-    tenantId,
-  );
-  const sent = await count(
-    `SELECT COUNT(*) AS n FROM messages m
-     JOIN campaigns c ON c.id = m.campaign_id WHERE c.tenant_id = ?`,
-    tenantId,
-  );
-  return { customers, campaigns, measuring, messagesSent: sent };
-}

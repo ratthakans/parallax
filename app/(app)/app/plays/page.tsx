@@ -21,21 +21,19 @@ export const dynamic = "force-dynamic";
 export default async function PlaysPage() {
   const tenantId = await activeTenantId();
   const v = profileFor(tenantId).vocab;
-  const { candidates } = await runMatch(tenantId);
-  const cfgs = await getTenantPlays(tenantId);
-
-  const perf = new Map(
-    (
-      await all<{
-        play_id: string;
-        trials: number;
-        successes: number;
-        a: number;
-        b: number;
-      }>(`SELECT play_id, trials, successes, posterior_alpha AS a, posterior_beta AS b
-           FROM play_performance`)
-    ).map((r) => [r.play_id, r]),
-  );
+  const [{ candidates }, cfgs, perfRows] = await Promise.all([
+    runMatch(tenantId),
+    getTenantPlays(tenantId),
+    all<{
+      play_id: string;
+      trials: number;
+      successes: number;
+      a: number;
+      b: number;
+    }>(`SELECT play_id, trials, successes, posterior_alpha AS a, posterior_beta AS b
+         FROM play_performance`),
+  ]);
+  const perf = new Map(perfRows.map((r) => [r.play_id, r]));
 
   const keep = candidates.filter((c) => c.play.engine === "keep");
   const reach = candidates.filter((c) => c.play.engine === "reach");

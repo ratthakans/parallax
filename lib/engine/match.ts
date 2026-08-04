@@ -254,55 +254,95 @@ async function lockedCustomers(tenantId: string): Promise<{
   };
 }
 
-/* posterior ต้องอ่านของรูปทรงวงจรเดียวกัน ไม่ใช่แถวไหนก็ได้
+/* ── อัตราตอบสนองที่เรียนรู้ข้ามร้าน ──────────────────────────
 
-   `LIMIT 1` โดยไม่ระบุ cycle_shape ทำให้สนามกอล์ฟ (expiry) หยิบสถิติ
-   ของร้านค้าปลีก (considered) มาใช้ ซึ่งขัดกับข้อความหลักของ engine
-   ที่บอกว่าเรียนรู้ข้ามร้าน "ในวงจรเดียวกัน" — ถ้าปนวงจรกัน อัตรา
-   ตอบสนองที่คาดจะเพี้ยนทันทีที่มีลูกค้าเจ้าที่สองที่วงจรไม่เหมือนเจ้าแรก */
-async function posteriorRate(
+   posterior ต้องอ่านของรูปทรงวงจรเดียวกัน ไม่ใช่แถวไหนก็ได้ — ถ้าปนวงจรกัน
+   สนามกอล์ฟ (expiry) จะหยิบสถิติของร้านค้าปลีก (considered) มาใช้ ซึ่งขัดกับ
+   ข้อความหลักของ engine ที่บอกว่าเรียนรู้ข้ามร้าน "ในวงจรเดียวกัน"
+
+   ── ทำไมโหลดทั้งตาราง ──
+
+   ของเดิมถามทีละ play จากในลูป ซึ่งบนไฟล์ sqlite ไม่รู้สึกอะไรเลย แต่บน
+   Postgres ที่โตเกียวมันคือ 19 รอบไป-กลับต่อการเปิดหน้าหนึ่งครั้ง วัดแล้ว
+   4,085ms จาก 24 วินาทีของทั้งหน้า
+
+   ตารางนี้เป็นสถิติรวมของทุกร้าน ไม่ผูกกับบัญชี ขนาดสูงสุดคือ
+   play × cycle_shape × size_bucket = 23 × 4 × 3 = 276 แถว (ตอนนี้ 65)
+   โหลดทั้งก้อนจึงถูกกว่าการถามทีละใบเสมอ และจะยังถูกกว่าต่อไป */
+type Posteriors = (
   playId: string,
   cycleShape: string,
   fallback: number,
-): Promise<number> {
-  const exact = await get<{ a: number; b: number }>(
-    `SELECT posterior_alpha AS a, posterior_beta AS b
-     FROM play_performance WHERE play_id = ? AND cycle_shape = ? LIMIT 1`,
-    playId,
-    cycleShape,
+) => number;
+
+async function loadPosteriors(): Promise<Posteriors> {
+  const rows = await all<{
+    play_id: string;
+    cycle_shape: string;
+    a: number | string;
+    b: number | string;
+  }>(
+    `SELECT play_id, cycle_shape, posterior_alpha AS a, posterior_beta AS b
+     FROM play_performance`,
   );
-  // ยังไม่มีสถิติของวงจรนี้ — รวมทุกวงจรเป็นค่าประมาณกว้าง ๆ ดีกว่าไม่มีอะไรเลย
-  const row =
-    exact ??
-    (await get<{ a: number | null; b: number | null }>(
-      `SELECT SUM(posterior_alpha) AS a, SUM(posterior_beta) AS b
-       FROM play_performance WHERE play_id = ?`,
-      playId,
-    ));
-  /* SUM() คืน numeric ซึ่งไดรเวอร์ Postgres ส่งมาเป็นสตริง ถ้าไม่แปลง
-     การหารข้างล่างจะได้ NaN เงียบ ๆ แล้วอัตราที่คาดจะตกไปใช้ fallback
-     ทุกครั้งโดยไม่มีใครรู้ */
-  const a = Number(row?.a ?? 0);
-  const b = Number(row?.b ?? 0);
-  if (!a || !b) return fallback;
-  return a / (a + b);
+
+  /* รวมข้าม size_bucket — คีย์หลักคือ (play_id, cycle_shape, size_bucket)
+     ของเดิมใช้ LIMIT 1 ซึ่งหยิบ bucket ไหนก็ได้ ตอนนี้มี bucket เดียวจึงได้
+     เลขเท่ากันเป๊ะ แต่วันที่มีหลาย bucket การรวมจะยังตอบเหมือนเดิมทุกครั้ง
+     ไม่ใช่เปลี่ยนคำตอบตามลำดับที่ฐานคืนแถวมา */
+  const byShape = new Map<string, [number, number]>();
+  const pooled = new Map<string, [number, number]>();
+  const add = (m: Map<string, [number, number]>, k: string, a: number, b: number) => {
+    const [x, y] = m.get(k) ?? [0, 0];
+    m.set(k, [x + a, y + b]);
+  };
+
+  for (const r of rows) {
+    /* ไดรเวอร์ Postgres ส่ง numeric มาเป็นสตริง ถ้าไม่แปลง การหารข้างล่าง
+       จะได้ NaN เงียบ ๆ แล้วอัตราที่คาดจะตกไปใช้ fallback โดยไม่มีใครรู้ */
+    const a = Number(r.a);
+    const b = Number(r.b);
+    add(pooled, r.play_id, a, b);
+    add(byShape, `${r.cycle_shape} ${r.play_id}`, a, b);
+  }
+
+  return (playId, cycleShape, fallback) => {
+    // ยังไม่มีสถิติของวงจรนี้ — รวมทุกวงจรเป็นค่าประมาณกว้าง ๆ ดีกว่าไม่มีอะไรเลย
+    const [a, b] =
+      byShape.get(`${cycleShape} ${playId}`) ?? pooled.get(playId) ?? [0, 0];
+    return a && b ? a / (a + b) : fallback;
+  };
 }
 
 export type MatchResult = {
   candidates: Candidate[];
   features: StoredFeature[];
   weeklyCap: number;
+  /* คืน tenant ออกไปด้วย เพราะทุกหน้าที่เรียก runMatch ต้องใช้มันต่อ
+     ถ้าไม่คืน หน้านั้นจะถาม getTenant เองอีกรอบ — ซึ่งเคยเป็นแบบนั้นจริง */
+  tenant: TenantSettings | undefined;
 };
 
 export async function runMatch(tenantId: string): Promise<MatchResult> {
-  const tenant = await getTenant(tenantId);
-  const features = await loadFeatures(tenantId);
-  const cfgs = await getTenantPlays(tenantId);
-  const weeklyCap = tenant?.max_messages_per_week ?? 2;
+  /* ── หกคำถามนี้ไม่ขึ้นต่อกัน จึงไม่ควรต่อแถวกัน ──
 
-  const contacts = await recentContactCounts(tenantId, 7);
-  const lastRun = await lastRunByPlay(tenantId);
-  const { holdoutLocked, responseLocked } = await lockedCustomers(tenantId);
+     ของเดิม await ทีละอัน = หกรอบไป-กลับเรียงกัน บนไฟล์ sqlite ไม่ต่างอะไร
+     แต่บน Postgres ข้ามทวีปคือ 6 × RTT ทั้งที่ทำพร้อมกันได้ทั้งหมด
+
+     loadPosteriors อยู่ในแถวนี้ได้เพราะมันโหลดทั้งตารางแล้วค่อยกรองด้วย
+     cycle_shape ในหน่วยความจำ จึงไม่ต้องรอคำตอบของ getTenant ก่อน */
+  const [tenant, features, cfgs, contacts, lastRun, locked, posteriorRate] =
+    await Promise.all([
+      getTenant(tenantId),
+      loadFeatures(tenantId),
+      getTenantPlays(tenantId),
+      recentContactCounts(tenantId, 7),
+      lastRunByPlay(tenantId),
+      lockedCustomers(tenantId),
+      loadPosteriors(),
+    ]);
+  const { holdoutLocked, responseLocked } = locked;
+  const weeklyCap = tenant?.max_messages_per_week ?? 2;
 
   const candidates: Candidate[] = [];
 
@@ -382,7 +422,7 @@ export async function runMatch(tenantId: string): Promise<MatchResult> {
 
     const size = audience.length;
     const { measurement, holdout_pct } = pickMeasurement(size);
-    const rate = await posteriorRate(play.id, shape, play.priors.response_rate);
+    const rate = posteriorRate(play.id, shape, play.priors.response_rate);
     const priceWeight = 1;
     const perPerson =
       play.engine === "keep" ? MESSAGE_COST : MEDIA_COST_PER_PERSON;
@@ -428,7 +468,7 @@ export async function runMatch(tenantId: string): Promise<MatchResult> {
     return b.score - a.score;
   });
 
-  return { candidates, features, weeklyCap };
+  return { candidates, features, weeklyCap, tenant };
 }
 
 /** สามอย่างที่ควรทำวันนี้ — บรีฟเช้า (E1) */

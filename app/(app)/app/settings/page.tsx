@@ -49,18 +49,22 @@ export default async function SettingsPage() {
   const tenantId = await activeTenantId();
   const profile = profileFor(tenantId);
   const v = profile.vocab;
-  const tenant = await getTenant(tenantId);
   const ai = aiConfigured();
-  const cache = await aiCacheStats();
-  const demo = await demoState(tenantId);
-  const playCount = (await runMatch(tenantId)).candidates.length;
 
-  const log = await all<{
-    actor: string;
-    action: string;
-    detail: string | null;
-    at: string;
-  }>("SELECT actor, action, detail, at FROM activity_log WHERE tenant_id = ? ORDER BY id DESC LIMIT 15", tenantId);
+  // ห้าคำถามที่ไม่ขึ้นต่อกัน — ถามพร้อมกัน ไม่ใช่ต่อแถว
+  const [match, cache, demo, log] = await Promise.all([
+    runMatch(tenantId),
+    aiCacheStats(),
+    demoState(tenantId),
+    all<{
+      actor: string;
+      action: string;
+      detail: string | null;
+      at: string;
+    }>("SELECT actor, action, detail, at FROM activity_log WHERE tenant_id = ? ORDER BY id DESC LIMIT 15", tenantId),
+  ]);
+  const tenant = match.tenant;
+  const playCount = match.candidates.length;
 
   const cachedTotal = cache.reduce((s, c) => s + c.n, 0);
 

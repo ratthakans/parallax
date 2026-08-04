@@ -30,10 +30,10 @@ export default async function ProofPage() {
   const tenantId = await activeTenantId();
   const profile = profileFor(tenantId);
   const v = profile.vocab;
-  const proofBlocked = await proofBlockedReason(tenantId);
-  const roi = await roiSummary(tenantId);
-
-  const rows = await all<{
+  const [proofBlocked, roi, rows] = await Promise.all([
+    proofBlockedReason(tenantId),
+    roiSummary(tenantId),
+    all<{
     id: string;
     play_id: string;
     treated_size: number;
@@ -54,7 +54,8 @@ export default async function ProofPage() {
        FROM attributions a
        JOIN campaigns c ON c.id = a.campaign_id
        WHERE c.tenant_id = ? AND c.dry_run = 0
-       ORDER BY c.approved_at DESC, a.horizon_days`, tenantId);
+       ORDER BY c.approved_at DESC, a.horizon_days`, tenantId),
+  ]);
 
   const total = Object.values(roi.verdictMix).reduce((a, b) => a + b, 0);
 

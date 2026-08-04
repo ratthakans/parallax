@@ -238,8 +238,6 @@ export function capLabel(c: Cap): string {
   }
 }
 
-export const capIsOn = (c: Cap) => c.kind === "yes";
-
 /** แถวเปรียบเทียบ — เรียงตามลำดับที่คนตัดสินใจอ่าน ไม่ใช่ตามโครงสร้างข้อมูล */
 export const CAP_ROWS: { key: keyof Plan["caps"]; label: string; note?: string }[] = [
   { key: "keep", label: "Keep — who returns, and when" },

@@ -372,7 +372,7 @@ export async function reseedAction(
      Server Action ยิงตรงได้โดยไม่ผ่านหน้าจอ */
   if (!demoToolsEnabled()) return { error: DEMO_TOOLS_OFF_REASON };
   // เฉพาะบัญชีที่เปิดอยู่ — ไม่ล้างอีกสามบัญชีที่ผู้ใช้ไม่ได้สั่ง
-  seed({ force: true, only: tenantId });
+  await seed({ force: true, only: tenantId });
   await deriveFeatures(tenantId);
   resetReady();
   revalidateConsole();
@@ -404,7 +404,7 @@ export async function clearAiCacheAction(
   formData: FormData,
 ): Promise<ActionState> {
   const tenantId = await currentTenant(formData);
-  clearAiCache();
+  await clearAiCache();
   await logActivity(tenantId, ACTOR, "clear_ai_cache");
   revalidateConsole();
   return { ok: "Cleared — the next brief writes its sentences from scratch." };

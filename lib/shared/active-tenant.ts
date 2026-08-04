@@ -1,16 +1,10 @@
-import { cookies } from "next/headers";
-import { DEFAULT_TENANT_ID, isKnownTenant, profileFor } from "@/lib/shared/tenants";
+/* ── คุกกี้ที่จำว่าครั้งก่อนเปิดบัญชีไหนอยู่ ────────────────────
 
-/* ── บัญชีที่กำลังเปิดอยู่ ──────────────────────────────────────
-   เก็บใน cookie เพราะ Console ยังไม่มีระบบล็อกอิน
+   ไฟล์นี้เก็บแค่ชื่อคุกกี้กับแอตทริบิวต์ของมัน ไม่ได้ตัดสินสิทธิ์อะไร
 
-   นี่คือของชั่วคราวสำหรับเดโม ไม่ใช่การแยกผู้เช่าที่ปลอดภัย:
-   ใครก็ตามที่แก้ cookie ได้ ย่อมสลับไปดูข้อมูลของบัญชีอื่นได้
-   ตอนต่อ auth จริง ต้องเปลี่ยนมาอ่านบัญชีจาก session ของผู้ใช้
-   และตรวจสิทธิ์ทุกครั้งว่าคนนี้เข้าถึงบัญชีนี้ได้จริง
-
-   ค่าจาก cookie ถูกตรวจกับทะเบียนก่อนใช้เสมอ ค่าที่ไม่รู้จักจะตกไป
-   เป็นบัญชีตั้งต้น ไม่ใช่ถูกยัดลงคำสั่ง SQL ตรง ๆ
+   ค่าที่อยู่ในคุกกี้เป็น "ความชอบ" ไม่ใช่ "สิทธิ์" — ใครแก้คุกกี้ก็เขียน
+   ชื่อบัญชีอะไรลงไปก็ได้ คนที่ตัดสินว่าเปิดได้จริงไหมคือ resolveTenant()
+   ใน lib/engine/access.ts ซึ่งถาม tenant_users ทุกครั้ง
    ───────────────────────────────────────────────────────────── */
 
 export const TENANT_COOKIE = "parallax_tenant";
@@ -40,14 +34,3 @@ export const TENANT_COOKIE_OPTIONS = {
   secure: process.env.NODE_ENV === "production",
   maxAge: 60 * 60 * 24 * 30,
 } as const;
-
-export async function getActiveTenantId(): Promise<string> {
-  const store = await cookies();
-  const raw = store.get(TENANT_COOKIE)?.value ?? "";
-  return isKnownTenant(raw) ? raw : DEFAULT_TENANT_ID;
-}
-
-/** โปรไฟล์ของบัญชีที่เปิดอยู่ — คำเรียกและข้อจำกัดมาจากที่นี่ */
-export async function getActiveProfile() {
-  return profileFor(await getActiveTenantId());
-}

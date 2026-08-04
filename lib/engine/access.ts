@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { all, usingPostgres } from "@/lib/engine/sql";
 import {
   DEFAULT_TENANT_ID,
@@ -21,14 +22,23 @@ import {
    มาจาก tenant_users เสมอ
    ───────────────────────────────────────────────────────────── */
 
-/** บัญชีที่ผู้ใช้คนนี้เข้าถึงได้จริง */
-export async function tenantsForUser(userId: string): Promise<string[]> {
+/* ── บัญชีที่ผู้ใช้คนนี้เข้าถึงได้จริง ──────────────────────────
+
+   ถูกถามสองครั้งต่อคำขอเสมอ — ครั้งหนึ่งตอนตัดสินว่าเปิดบัญชีไหน
+   (resolveTenant) อีกครั้งตอนวาดตัวสลับบัญชีบนแถบข้าง (switchableTenants)
+   ทั้งสองอยู่คนละต้นไม้ของ React จึงแชร์ผลกันเองไม่ได้ถ้าไม่แคช
+
+   ไม่มีจุดไหนในระบบเขียน tenant_users เลย (คำเชิญยังทำมือผ่าน SQL)
+   คำตอบจึงคงที่ตลอดคำขอโดยนิยาม */
+export const tenantsForUser = cache(async function tenantsForUser(
+  userId: string,
+): Promise<string[]> {
   const rows = await all<{ tenant_id: string }>(
     "SELECT tenant_id FROM tenant_users WHERE user_id = ? ORDER BY tenant_id",
     userId,
   );
   return rows.map((r) => r.tenant_id).filter(isKnownTenant);
-}
+});
 
 /* ── โหมดเดโม ────────────────────────────────────────────────
 

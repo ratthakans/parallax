@@ -29,9 +29,3 @@ export const currentUser = cache(async (): Promise<Session | null> => {
   return { userId: data.user.id, email: data.user.email ?? "" };
 });
 
-/** ต้องล็อกอิน — ไม่งั้นส่งไปหน้าเข้าสู่ระบบ */
-export const requireUser = cache(async (): Promise<Session> => {
-  const u = await currentUser();
-  if (!u) redirect("/login");
-  return u;
-});

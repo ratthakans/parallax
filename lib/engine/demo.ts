@@ -118,7 +118,12 @@ export async function seedCampaignHistory(tenantId: string) {
        เลื่อน 100 วันต่อรอบ ให้หน้าต่างวัดผล 90 วันของรอบก่อนปิดพอดี
      ประวัติจึงกระจายในปฏิทินเหมือนร้านที่ใช้งานมาปีกว่าจริง ๆ */
   for (let round = 0; round < 6 && created < 4; round++) {
-    if (created > 0) travelForward(tenantId, 100);
+    /* ต้อง await — ของเดิมปล่อยลอย ธุรกรรมข้างในจึงยังเปิดค้างอยู่ตอนที่
+       บรรทัดถัดไปเริ่มทำงาน บนไฟล์ sqlite ที่มีคอนเนกชันเดียว นั่นแปลว่า
+       "cannot start a transaction within a transaction" ซึ่งไม่เคยโผล่มาก่อน
+       เพราะ runMatch ข้างล่างเคย await ทีละอันหกรอบ — พอมันวิ่งขนาน
+       จังหวะที่บังเอิญพอดีก็หายไป */
+    if (created > 0) await travelForward(tenantId, 100);
     const { candidates } = await runMatch(tenantId);
     const pick = candidates
       .filter(

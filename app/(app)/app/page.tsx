@@ -1,14 +1,13 @@
 import { activeTenantId } from "@/app/(app)/tenant";
 import { get, run } from "@/lib/engine/sql";
 import Link from "next/link";
-import { runMatch, topThree, getTenant } from "@/lib/engine/match";
+import { runMatch, topThree } from "@/lib/engine/match";
 import { roiSummary } from "@/lib/engine/proof";
 import { summariseBrief } from "@/lib/engine/ai";
 import { vocabFor } from "@/lib/engine/dispatch";
 
 import { profileFor } from "@/lib/shared/tenants";
 import { CYCLE_LABEL } from "@/lib/shared/types";
-import { loadFeatures } from "@/lib/engine/derive";
 import { CandidateCard } from "@/components/console/candidate-card";
 import { ActionForm } from "@/components/console/action-form";
 import { reachBlockedReason, reachTrialState } from "@/lib/engine/billing";
@@ -26,23 +25,44 @@ import { deriveAction, measureAllAction } from "../actions";
 
 export const dynamic = "force-dynamic";
 
+// บันทึกการเปิดบรีฟ — สัญญาณเตือนการยกเลิกที่มาก่อนตัวเลขอื่น (E7)
+async function recordOpen(tenantId: string): Promise<number> {
+  const day = (offset = 0) =>
+    new Date(Date.now() - offset * 86400000).toISOString().slice(0, 10);
+  await run(
+    "INSERT INTO brief_opens (tenant_id, opened_on) VALUES (?,?) ON CONFLICT DO NOTHING",
+    tenantId,
+    day(),
+  );
+  const row = await get<{ n: number }>(
+    "SELECT COUNT(*) AS n FROM brief_opens WHERE tenant_id = ? AND opened_on >= ?",
+    tenantId,
+    day(28),
+  );
+  return Number(row?.n ?? 0);
+}
+
 export default async function BriefPage() {
   const tenantId = await activeTenantId();
   const profile = profileFor(tenantId);
   const v = profile.vocab;
-  const tenant = await getTenant(tenantId);
-  const { candidates, weeklyCap } = await runMatch(tenantId);
-  const planBlock = await reachBlockedReason(tenantId);
-  const trial = await reachTrialState(tenantId);
-  const three = topThree(candidates);
-  const features = await loadFeatures(tenantId);
-  const roi = await roiSummary(tenantId);
 
-  // บันทึกการเปิดบรีฟ — สัญญาณเตือนการยกเลิกที่มาก่อนตัวเลขอื่น (E7)
-  const today = new Date().toISOString().slice(0, 10);
-  await run("INSERT INTO brief_opens (tenant_id, opened_on) VALUES (?,?) ON CONFLICT DO NOTHING", tenantId, today);
-  const opens = (await get<{ n: number }>("SELECT COUNT(*) AS n FROM brief_opens WHERE tenant_id = ? AND opened_on >= ?", tenantId,
-      new Date(Date.now() - 28 * 86400000).toISOString().slice(0, 10)))!;
+  /* ── สี่คำถามนี้ไม่ขึ้นต่อกัน จึงถามพร้อมกัน ──
+
+     ของเดิมเรียงกันแปดบรรทัด ซึ่งบนไฟล์ sqlite ไม่มีใครสังเกตเห็น แต่บน
+     Postgres คือการรอทีละรอบไป-กลับข้ามทวีป
+
+     tenant กับ features มาจาก runMatch ไม่ใช่ถามซ้ำ — ของเดิมเรียก
+     getTenant และ loadFeatures อีกรอบทั้งที่ runMatch เพิ่งอ่านมาให้แล้ว */
+  const [match, planBlock, trial, roi, opens] = await Promise.all([
+    runMatch(tenantId),
+    reachBlockedReason(tenantId),
+    reachTrialState(tenantId),
+    roiSummary(tenantId),
+    recordOpen(tenantId),
+  ]);
+  const { candidates, weeklyCap, features, tenant } = match;
+  const three = topThree(candidates);
 
   const slipping = features.filter((f) => f.churn_risk >= 1.5).length;
   const unreachable = features.filter(
@@ -182,7 +202,7 @@ export default async function BriefPage() {
           />
           <Metric
             label="เปิดบรีฟ 28 วันล่าสุด"
-            value={`${opens.n}/28`}
+            value={`${opens}/28`}
             sub="ถ้าเลิกเปิด แปลว่าเรากำลังจะเสียบัญชีนี้"
             tone="accent"
           />

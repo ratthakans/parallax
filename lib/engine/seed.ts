@@ -57,13 +57,6 @@ function pick(rnd: () => number, [a, b]: [number, number]) {
   return a + Math.floor(rnd() * (b - a + 1));
 }
 
-export async function isSeeded(): Promise<boolean> {
-  const row = await get<{ n: number | string }>(
-    "SELECT COUNT(*) AS n FROM customers",
-  );
-  return Number(row?.n ?? 0) > 0;
-}
-
 /** บัญชีนี้มีข้อมูลแล้วหรือยัง — ใช้ตอนเพิ่มบัญชีใหม่เข้าฐานที่มีอยู่แล้ว */
 export async function isTenantSeeded(tenantId: string): Promise<boolean> {
   const row = await get<{ n: number | string }>(

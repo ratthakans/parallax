@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { all, get, run, tx } from "@/lib/engine/sql";
 import { logActivity } from "@/lib/engine/db";
 import {
@@ -17,13 +18,20 @@ import {
    ที่บังคับใช้จริง ถ้าประกาศแต่ไม่มีคนเรียก มันคือคำโฆษณา ไม่ใช่เพดาน
    ───────────────────────────────────────────────────────────── */
 
-export async function planFor(tenantId: string): Promise<Plan> {
+/* ทุกเพดานในไฟล์นี้เริ่มจากคำถามเดียวกัน — วัดบนคำขอจริงแล้วพบว่า
+   หน้าบรีฟหนึ่งหน้าถาม "ร้านนี้อยู่แผนไหน" ห้าครั้ง คำตอบเดียวกันทั้งห้า
+
+   แผนเปลี่ยนได้ระหว่างคำขอเดียวกันในทางทฤษฎี แต่จุดเดียวที่เขียนคือ
+   changePlanAction ซึ่งจบด้วย revalidate แล้วไม่อ่านต่อ */
+export const planFor = cache(async function planFor(
+  tenantId: string,
+): Promise<Plan> {
   const row = await get<{ tier: string }>(
     "SELECT tier FROM tenants WHERE id = ?",
     tenantId,
   );
   return planById(row?.tier ?? "growth");
-}
+});
 
 /* ── รอบบิล ────────────────────────────────────────────────────
    คำนวณจากปฏิทินกับ billing_day ทุกครั้ง ไม่เก็บสถานะ "รอบปัจจุบัน"

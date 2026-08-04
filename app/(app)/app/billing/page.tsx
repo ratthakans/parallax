@@ -50,10 +50,12 @@ export default async function BillingPage() {
   const tenantId = await activeTenantId();
   const profile = profileFor(tenantId);
   const v = profile.vocab;
-  const u = await usageFor(tenantId);
+  const [u, costs, roi] = await Promise.all([
+    usageFor(tenantId),
+    recentCampaignCosts(tenantId),
+    roiSummary(tenantId),
+  ]);
   const plan = u.plan;
-  const costs = await recentCampaignCosts(tenantId);
-  const roi = await roiSummary(tenantId);
 
   const suggested = planForBaseSize(u.identified);
   const packRate = u.messagesThisPeriod > 0 ? u.creditSpendThisPeriod : 0;
