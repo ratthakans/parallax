@@ -364,7 +364,7 @@ export async function runMatch(tenantId: string): Promise<MatchResult> {
       last != null &&
       (Date.now() - Date.parse(last)) / 86400000 < guards.cooldown_days;
 
-    const filtered: { reason: string; count: number }[] = [];
+    const filtered: Candidate["filtered"] = [];
     let noConsent = 0;
     let cappedOut = 0;
     let respondingOut = 0;
@@ -407,16 +407,28 @@ export async function runMatch(tenantId: string): Promise<MatchResult> {
       audience.push(f.customer_id);
     }
 
-    if (noConsent) filtered.push({ reason: "No marketing consent", count: noConsent });
-    if (cappedOut) filtered.push({ reason: `Hit the ${weeklyCap}-per-week cap`, count: cappedOut });
+    if (noConsent)
+      filtered.push({
+        reason: "No marketing consent",
+        reasonTh: "ยังไม่ได้ให้ความยินยอมรับข้อความ",
+        count: noConsent,
+      });
+    if (cappedOut)
+      filtered.push({
+        reason: `Hit the ${weeklyCap}-per-week cap`,
+        reasonTh: `ครบเพดาน ${weeklyCap} ข้อความต่อสัปดาห์แล้ว`,
+        count: cappedOut,
+      });
     if (respondingOut)
       filtered.push({
         reason: `Messaged within the last ${RESPONSE_WINDOW_DAYS} days`,
+        reasonTh: `เพิ่งได้รับข้อความไปภายใน ${RESPONSE_WINDOW_DAYS} วัน`,
         count: respondingOut,
       });
     if (holdoutOut)
       filtered.push({
         reason: "In the control group of a campaign still measuring",
+        reasonTh: "อยู่ในกลุ่มควบคุมของแคมเปญที่ยังวัดผลไม่จบ",
         count: holdoutOut,
       });
 

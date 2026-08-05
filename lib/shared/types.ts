@@ -16,6 +16,15 @@ export const CYCLE_LABEL: Record<CycleShape, string> = {
   considered: "Considered",
 };
 
+/* คอนโซลพูดไทย เว็บการตลาดพูดอังกฤษ — ชื่อรูปทรงวงจรจึงต้องมีทั้งคู่
+   เหมือน Play ที่มี name กับ nameTh */
+export const CYCLE_LABEL_TH: Record<CycleShape, string> = {
+  replenishment: "ซื้อซ้ำตามรอบ",
+  recall: "ถึงกำหนดกลับมา",
+  expiry: "มีวันหมดอายุ",
+  considered: "ใช้เวลาตัดสินใจ",
+};
+
 export type Engine = "keep" | "reach";
 
 export type GroupRole = "anchor" | "attachment" | "consumable";
@@ -105,7 +114,9 @@ export type Play = {
   selector: Selector;
   guards: Guards;
   offer: { type: string; fallback?: string };
-  copy_brief: { angle: string; avoid: string[] };
+  /* angle เป็นบรีฟที่ส่งให้โมเดล · angleTh คือประโยคที่ลูกค้าอ่านจริง
+     ถ้ามีแค่ angle ข้อความที่ออกไปทาง LINE จะเป็นภาษาอังกฤษทั้งฉบับ */
+  copy_brief: { angle: string; angleTh: string; avoid: string[] };
   channel: string;
   measurement: "auto";
   priors: { response_rate: number };
@@ -162,8 +173,17 @@ export type MeasurementMode =
 export type Candidate = {
   play: Play;
   audience: string[];
-  /** คนที่ถูกกรองออกและเหตุผล — ต้องอธิบายได้ทุกครั้ง (D7) */
-  filtered: { reason: string; count: number }[];
+  /* ── คนที่ถูกกรองออกและเหตุผล — ต้องอธิบายได้ทุกครั้ง (D7) ──
+
+     สองภาษาโดยตั้งใจ ไม่ใช่ความซ้ำซ้อน:
+
+       reason    คีย์ที่เครื่องอ่าน — ชุดตรวจ verify กับ verify2 ยืนยัน
+                 พฤติกรรมของเบรกด้วยการหาข้อความนี้ และ prompt ที่ส่งให้
+                 โมเดลก็ใช้ตัวนี้ ถ้าแปลทิ้งไป ทั้งสองอย่างพังพร้อมกัน
+       reasonTh  ประโยคที่คนอ่าน — คอนโซลแสดงตัวนี้เท่านั้น
+
+     เหมือน Play ที่มีทั้ง name และ nameTh ด้วยเหตุผลเดียวกัน */
+  filtered: { reason: string; reasonTh: string; count: number }[];
   score: number;
   expected_response_rate: number;
   expected_order_value: number;

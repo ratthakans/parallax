@@ -50,8 +50,8 @@ export default async function ConsoleLayout({
             industry: t.industry,
           }))}
           switchAction={switchTenantAction}
-          baseLabel={profile.vocab.base}
-          personLabel={profile.vocab.person}
+          baseLabel={profile.vocab.th.base}
+          personLabel={profile.vocab.th.person}
         />
         <main id="console-main" tabIndex={-1} className="c-main">
           {/* ── ปฐมนิเทศคนที่เพิ่งกดเข้ามาจากหน้าเว็บ ────────────

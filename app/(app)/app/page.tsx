@@ -7,7 +7,7 @@ import { summariseBrief } from "@/lib/engine/ai";
 import { vocabFor } from "@/lib/engine/dispatch";
 
 import { profileFor } from "@/lib/shared/tenants";
-import { CYCLE_LABEL } from "@/lib/shared/types";
+import { CYCLE_LABEL_TH } from "@/lib/shared/types";
 import { CandidateCard } from "@/components/console/candidate-card";
 import { ActionForm } from "@/components/console/action-form";
 import { reachBlockedReason, reachTrialState } from "@/lib/engine/billing";
@@ -75,8 +75,14 @@ export default async function BriefPage() {
     businessName: tenant?.name ?? "the shop",
     slipping,
     unreachable,
+    /* ── ชื่อเดียวกันกับที่การ์ดข้างล่างใช้ ──
+
+       เดิมส่ง play.name (อังกฤษ) เข้าไป ประโยคสรุปจึงเรียกงานชิ้นแรกว่า
+       "Look after your biggest spenders" ส่วนการ์ดที่อยู่ใต้มันทันที
+       เรียกว่า "ดูแลคนที่จ่ายมากที่สุด" — สองชื่อสำหรับของชิ้นเดียวกัน
+       บนจอเดียวกัน คนอ่านต้องเดาเองว่าหมายถึงอันเดียวกันไหม */
     items: three.map((c) => ({
-      name: c.play.name,
+      name: c.play.nameTh,
       size: c.audience.length,
       value: c.expected_value,
       why: c.play.logic,
@@ -95,14 +101,14 @@ export default async function BriefPage() {
       <PageHead
         label={`morning brief · ${dateLabel}`}
         title="สามอย่างที่ควรทำวันนี้"
-        lead="ไม่มีอะไรต้องตั้งค่า ไม่ต้องเขียนกฎ อ่านสามอย่างข้างล่าง, approve or don't — done."
+        lead="ไม่มีอะไรต้องตั้งค่า ไม่ต้องเขียนกฎ — อ่านสามอย่างข้างล่าง แล้วอนุมัติหรือไม่อนุมัติ จบ"
       />
 
       {/* ── ข้อจำกัดของบัญชีนี้ มาก่อนทุกอย่าง ──
           ถ้ามีข้อกฎหมายกำกับ ต้องเห็นก่อนกดอนุมัติ ไม่ใช่ซ่อนในหน้าตั้งค่า */}
       {profile.compliance && (
         <Panel flat className="mb-6 border-l-2 border-[var(--c-warn)] p-5">
-          <p className="c-label text-[var(--c-warn)]">constraints on this account</p>
+          <p className="c-label-th text-[var(--c-warn)]">ข้อจำกัดของบัญชีนี้</p>
           <p className="c-thai mt-2.5 max-w-3xl text-[0.84rem] leading-relaxed text-[var(--c-text-2)]">
             {profile.compliance}
           </p>
@@ -115,7 +121,7 @@ export default async function BriefPage() {
           เป็นโควตา ไม่ใช่กำแพง — บอกว่ามีอะไรให้ใช้ ไม่ใช่บอกว่าอะไรถูกห้าม */}
       {!planBlock && trial && trial.campaignsLeft > 0 && (
         <Panel flat className="mb-6 border-l-2 border-[var(--c-accent)] p-5">
-          <p className="c-label text-[var(--c-accent)]">แผนนี้ได้อะไรบ้าง</p>
+          <p className="c-label-th text-[var(--c-accent)]">แผนนี้ได้อะไรบ้าง</p>
           <p className="c-thai mt-2.5 max-w-2xl text-[0.84rem] leading-relaxed text-[var(--c-text-2)]">
             ส่งจริงได้ {trial.campaignsLeft} แคมเปญ สูงสุด{" "}
             {trial.audienceCap.toLocaleString("en-US")} คน พร้อมกลุ่มที่กันไว้จริง
@@ -128,7 +134,7 @@ export default async function BriefPage() {
         <Panel flat className="mb-6 border-l-2 border-[var(--c-warn)] p-5">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
-              <p className="c-label text-[var(--c-warn)]">แผนนี้ยังส่งไม่ได้</p>
+              <p className="c-label-th text-[var(--c-warn)]">แผนนี้ยังส่งไม่ได้</p>
               <p className="c-thai mt-2.5 max-w-2xl text-[0.84rem] leading-relaxed text-[var(--c-text-2)]">
                 {planBlock} สามอย่างข้างล่างยังคำนวณครบ จะได้เห็นว่ามีมูลค่ารออยู่เท่าไรก่อนตัดสินใจ
               </p>
@@ -176,12 +182,12 @@ export default async function BriefPage() {
 
       {/* ── ตัวเลขสถานะฐาน ── */}
       <Panel flat className="mt-8 p-5 md:p-6">
-        <p className="c-label">{v.base} today</p>
+        <p className="c-label-th">{v.th.base}วันนี้</p>
         <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-7 md:grid-cols-4">
           <Metric
             label="กำลังจะเงียบ"
             value={num(slipping)}
-            sub={`${v.people} past 1.5× their own normal cycle`}
+            sub={`${v.th.people}ที่เลยรอบปกติของตัวเองไป 1.5 เท่า`}
             tone="bad"
           />
           <Metric
@@ -192,11 +198,11 @@ export default async function BriefPage() {
           />
           <Metric
             label="รายได้ส่วนเพิ่ม 90 วันล่าสุด"
-            value={roi.avgLiftPct != null ? pct(roi.avgLiftPct) : "Not enough yet"}
+            value={roi.avgLiftPct != null ? pct(roi.avgLiftPct) : "ยังสรุปไม่ได้"}
             sub={
               roi.ciLow != null
-                ? `95% CI ${roi.ciLow.toFixed(1)} to ${roi.ciHigh!.toFixed(1)}`
-                : `${roi.measured} of ${roi.campaigns} campaigns measured`
+                ? `ช่วงความเชื่อมั่น 95% · ${roi.ciLow.toFixed(1)} ถึง ${roi.ciHigh!.toFixed(1)}`
+                : `วัดผลแล้ว ${roi.measured} จาก ${roi.campaigns} แคมเปญ`
             }
             tone={roi.avgLiftPct != null && roi.avgLiftPct > 0 ? "good" : "muted"}
           />
@@ -214,10 +220,10 @@ export default async function BriefPage() {
           ที่เจ้าของร้านไม่ต้องกดเป็นประจำ (ระบบคำนวณและวัดผลเองเป็นรอบ)
           วางไว้บนสุดทำให้แข่งความสนใจกับสิ่งเดียวที่หน้านี้ต้องการให้ทำ */}
       <Panel flat className="mt-8 p-5 md:p-6">
-        <p className="c-label">maintenance</p>
+        <p className="c-label-th">งานระบบ</p>
         <p className="c-thai mt-2 max-w-3xl text-[0.8rem] text-[var(--c-text-3)]">
-          You should not normally need these. The system recomputes and measures on
-            a schedule — these are for when you want the result now.
+          ปกติไม่ต้องกด ระบบคำนวณและวัดผลเองเป็นรอบอยู่แล้ว —
+          ปุ่มพวกนี้มีไว้ตอนที่อยากได้ผลเดี๋ยวนี้
         </p>
         <div className="mt-4 flex flex-wrap items-start gap-2.5">
           <ActionForm
@@ -240,7 +246,7 @@ export default async function BriefPage() {
       {/* ── เบรก ── */}
       <Panel flat className="mt-5 p-5 md:p-6">
         <div className="flex flex-wrap items-baseline justify-between gap-3">
-          <p className="c-label">เพดานที่บังคับอยู่</p>
+          <p className="c-label-th">เพดานที่บังคับอยู่</p>
           {/* เดิมสูง 17px — เล็กเกินกว่าจะกดถูกด้วยนิ้วหัวแม่มือ
               ให้พื้นที่กดเท่าปุ่ม แม้หน้าตายังเป็นลิงก์ */}
           <Link
@@ -254,12 +260,12 @@ export default async function BriefPage() {
           <Metric
             size="sm"
             label="ข้อความต่อคนต่อสัปดาห์"
-            value={`Max ${weeklyCap}`}
+            value={`ไม่เกิน ${weeklyCap}`}
             sub="นับรวมทุกแคมเปญ"
           />
           <Metric
             size="sm"
-            label="Quiet hours"
+            label="ช่วงเวลาห้ามส่ง"
             value={`${tenant?.quiet_hours_start ?? 21}:00–${tenant?.quiet_hours_end ?? 9}:00`}
             sub="กดส่งในช่วงนี้จะไม่มีอะไรออกไป"
           />
@@ -272,15 +278,24 @@ export default async function BriefPage() {
           <Metric
             size="sm"
             label="กันไว้วันนี้"
-            value={`${num(blocked)} play`}
+            value={`${num(blocked)} วิธี`}
             sub="ดูเหตุผลได้ที่คลัง play"
           />
         </div>
         <p className="c-thai mt-5 text-[0.78rem] text-[var(--c-text-4)]">
-          Synthetic dataset for {profile.name} — {profile.industry} · base of{" "}
-          {num(features.length)} {v.person} · cycle shape{" "}
-          {CYCLE_LABEL[profile.cycleShape]}. Deterministic generation, so the
-          numbers repeat exactly. Reset and time-travel tools live in settings.
+          {/* ── ไวยากรณ์ที่แตกเพราะการแทนค่า ──
+
+              ของเดิมเขียนว่า "base of {"{n}"} {"{v.person}"}" ซึ่งได้
+              "base of 1,240 customer" — เอกพจน์ผิดทุกครั้งที่ n ไม่ใช่ 1
+              และ v.person เป็นคำเอกพจน์ตามนิยามของมัน จะแก้ด้วยการเติม s
+              ก็ผิดกับบัญชีที่ใช้คำอื่น (member · rider)
+
+              ภาษาไทยไม่ผันพจน์ ปัญหาทั้งชุดจึงหายไปพร้อมกับการแปล
+              ซึ่งเป็นสิ่งที่ย่อหน้านี้ควรเป็นอยู่แล้วในคอนโซลที่พูดไทย */}
+          ชุดข้อมูลตัวอย่างของ {profile.name} — {profile.industry} · ฐาน{" "}
+          {num(features.length)} {v.th.person} · รูปแบบวงจร{" "}
+          {CYCLE_LABEL_TH[profile.cycleShape]} · สร้างด้วยสูตรตายตัว
+          ตัวเลขจึงซ้ำเดิมทุกครั้ง เครื่องมือล้างข้อมูลและเดินเวลาอยู่ในหน้าตั้งค่า
         </p>
       </Panel>
     </>

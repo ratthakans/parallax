@@ -90,8 +90,11 @@ export async function CandidateCard({
       <p className="c-thai mt-3 max-w-3xl text-[0.95rem] leading-relaxed text-[var(--c-text-2)]">
         {why.value}
       </p>
+      {/* ป้ายอย่างเดียว ไม่ต้องมีคำอธิบายซ้ำ — หน้าหนึ่งมีสามการ์ด
+          เหตุผลเดียวกันจึงเคยขึ้นสามครั้งต่อหนึ่งจอ ย่อหน้าสรุปบนสุด
+          อธิบายไว้ครั้งเดียวแล้ว ตรงนี้เหลือแค่บอกว่าประโยคนี้มาจากไหน */}
       <div className="mt-2.5">
-        <AiBadge source={why.source} note={why.note} />
+        <AiBadge source={why.source} />
       </div>
 
       {/* ── สามตัวเลขที่ใช้ตัดสินใจ ── */}
@@ -100,19 +103,19 @@ export async function CandidateCard({
           เรียงลงแนวตั้งบนมือถือ อ่านง่ายกว่าและไม่มีอะไรหาย */}
       <div className="mt-6 grid grid-cols-1 gap-4 border-y border-[var(--c-line)] py-5 sm:grid-cols-3">
         <div className="flex items-baseline justify-between gap-3 sm:block">
-          <p className="c-label sm:mb-0">{approx ? "ส่งถึง (ประมาณ)" : "ส่งถึง"}</p>
+          <p className="c-label-th sm:mb-0">{approx ? "ส่งถึง (ประมาณ)" : "ส่งถึง"}</p>
           <p className="c-num text-[1.6rem] text-[var(--c-text)] sm:mt-2">
             {num(treated)}
           </p>
         </div>
         <div className="flex items-baseline justify-between gap-3 sm:block">
-          <p className="c-label sm:mb-0">คาดว่าจะได้กลับมา</p>
+          <p className="c-label-th sm:mb-0">คาดว่าจะได้กลับมา</p>
           <p className="c-num text-[1.6rem] text-[var(--c-cyan)] sm:mt-2">
             {baht(candidate.expected_value)}
           </p>
         </div>
         <div className="flex items-baseline justify-between gap-3 sm:block">
-          <p className="c-label sm:mb-0">ค่าส่งข้อความ</p>
+          <p className="c-label-th sm:mb-0">ค่าส่งข้อความ</p>
           <p className="c-num text-[1.6rem] text-[var(--c-text)] sm:mt-2">
             {baht(candidate.estimated_cost)}
           </p>
@@ -264,7 +267,7 @@ export async function CandidateCard({
                       key={f.reason}
                       className="c-thai flex justify-between gap-4 text-[0.8rem] text-[var(--c-text-2)]"
                     >
-                      <span>{f.reason}</span>
+                      <span>{f.reasonTh}</span>
                       <span className="c-mono shrink-0 text-[var(--c-text-4)]">
                         {num(f.count)}
                       </span>

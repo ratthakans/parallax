@@ -153,7 +153,16 @@ async function ask<T>(opts: AskOptions<T>): Promise<AiResult<T>> {
     return {
       value: opts.fallback(),
       source: "fallback",
-      note: "ANTHROPIC_API_KEY is not set — using templates",
+      /* ── ชื่อตัวแปรสภาพแวดล้อมไม่ใช่ภาษาที่เจ้าของร้านอ่าน ──
+
+         ข้อความนี้ขึ้นบนหน้าบรีฟ ซึ่งคนอ่านคือเจ้าของสนามกอล์ฟ ไม่ใช่คนดูแล
+         เซิร์ฟเวอร์ "ANTHROPIC_API_KEY is not set" บอกเขาแค่ว่ามีบางอย่าง
+         ที่เขาไม่รู้จักและทำอะไรไม่ได้
+
+         สิ่งที่เขาต้องรู้จริงมีอย่างเดียว: ประโยคพวกนี้มาจากสูตร ไม่ใช่จากโมเดล
+         ซึ่งแปลว่ามันถูกต้องแต่ไม่ได้ปรับตามบริบท — ส่วนวิธีเปิดใช้ AI
+         อยู่ในหน้าตั้งค่า ที่ที่คนดูแลระบบจะไปหา */
+      note: "ประโยคนี้มาจากสูตรสำเร็จ ยังไม่ได้เชื่อมต่อ AI",
     };
   }
 
@@ -539,6 +548,21 @@ const COPY_SCHEMA = {
 /** ต้องมีตัวแปรเหล่านี้เท่านั้น — แทนค่ารายบุคคลตอนส่ง ไม่เรียก AI ต่อคน */
 const ALLOWED_VARS = ["{{name}}", "{{last_product}}"];
 
+/* ── ข้อความที่ออกไปถึงลูกค้าจริง ต้องเป็นภาษาของลูกค้า ─────────
+
+   ของเดิมเขียนเป็นภาษาอังกฤษทั้งฉบับ:
+
+     "Dear {{name}},
+      First look at new stock, not a discount the shop would like to invite you.
+      Your last item — {{last_product}}
+      Take 20% off this round"
+
+   นี่ไม่ใช่ป้ายบนหน้าจอที่แปลทีหลังก็ได้ — มันคือข้อความที่จะถูกส่งทาง
+   LINE ไปหาลูกค้าคนไทยของสนามกอล์ฟในฉะเชิงเทรา และผู้ใช้แท็กซี่ที่หาดใหญ่
+
+   สังเกตด้วยว่าประโยคเดิมพังทางไวยากรณ์อยู่แล้ว: angle กับ mid ถูกต่อกัน
+   ตรง ๆ จึงได้ "…not a discount the shop would like to invite you."
+   ซึ่งเป็นสองประโยคที่ชนกัน ไม่มีใครเห็นเพราะไม่มีใครอ่านมันเป็นภาษาอังกฤษ */
 export function writeCopyFallback(
   play: Play,
   discountPct: number,
@@ -546,20 +570,17 @@ export function writeCopyFallback(
 ): CopySet {
   const offerLine =
     discountPct > 0
-      ? `Take ${discountPct}% off this round`
-      : "You get first access";
+      ? `รอบนี้ลดให้ ${discountPct}%`
+      : "ได้สิทธิ์ดูก่อนใคร";
+  const angle = play.copy_brief.angleTh;
   const tones = [
-    {
-      tone: "formal",
-      open: "Dear {{name}},",
-      mid: `the ${v.orgKind} would like to invite you.`,
-    },
-    { tone: "warm", open: "Hi {{name}},", mid: "we wanted you to know first." },
-    { tone: "playful", open: "{{name}} 👋", mid: "worth a look?" },
+    { tone: "formal", open: "เรียนคุณ {{name}}", mid: `ทาง${v.th.orgKind}อยากเชิญคุณ` },
+    { tone: "warm", open: "สวัสดีค่ะคุณ {{name}}", mid: "อยากให้คุณรู้ก่อนใคร" },
+    { tone: "playful", open: "{{name}} 👋", mid: "ลองดูสักหน่อยไหม" },
   ];
   return tones.map((t) => ({
     tone: t.tone,
-    body: `${t.open}\n${play.copy_brief.angle} ${t.mid}\nYour last ${v.item} — {{last_product}}\n${offerLine}`,
+    body: `${t.open}\n${angle} — ${t.mid}\n${v.th.item}ล่าสุดของคุณ — {{last_product}}\n${offerLine}`,
   }));
 }
 
@@ -582,17 +603,20 @@ export async function writeCopy(
       `You write LINE messages for ${vc.orgKind} "${ctx.businessName}". ` +
       `They go to existing ${vc.person}s. ` +
       "Write three tones: formal, warm, playful. " +
-      "Each message is at most four lines, in natural English as the owner would write it. " +
+      /* ผู้รับเป็นคนไทย ข้อความจึงต้องเป็นภาษาไทย — ของเดิมสั่งว่า
+         "in natural English as the owner would write it" ซึ่งเจ้าของร้าน
+         ไทยไม่ได้เขียนแบบนั้น และลูกค้าก็ไม่ได้อ่านแบบนั้น */
+      "เขียนเป็นภาษาไทยแบบที่เจ้าของร้านพิมพ์เอง ไม่เกินสี่บรรทัดต่อข้อความ " +
+      `เรียกผู้รับว่า "${vc.th.person}" และเรียกสิ่งที่เขาจ่ายเงินซื้อว่า "${vc.th.item}" ` +
       "Only {{name}} and {{last_product}} may be used, and every message must include {{name}}. " +
       "Never add a price, number or date you were not given. " +
       "Reply as JSON matching the schema only",
     prompt: `Campaign: ${play.name}
 Reason to reach out: ${play.logic}
-Angle to use: ${play.copy_brief.angle}
+Angle to use: ${play.copy_brief.angleTh}
 Avoid: ${play.copy_brief.avoid.join(" · ") || "none"}
 Offer: ${ctx.discountPct > 0 ? `up to ${ctx.discountPct}% off` : "No discount — use access or status instead"}
 Audience: ${ctx.audienceSize} ${vc.person}s
-Address the recipient as "${vc.person}" and call what they paid for a "${vc.item}"
 
 Write all three tones.`,
     fallback: () => ({ variants: writeCopyFallback(play, ctx.discountPct, vc) }),
@@ -653,11 +677,22 @@ export async function summariseBrief(
     input,
     schema: BRIEF_SCHEMA,
     maxTokens: 700,
+    /* ── ต้องขอภาษาไทย ไม่ใช่อังกฤษ ──
+
+       เดิมสั่งว่า "Write plain conversational English" ทั้งที่ประโยคสำรอง
+       ของฟังก์ชันนี้เป็นไทย และคอนโซลทั้งหน้าเป็นไทย แปลว่าวันที่ตั้ง
+       ANTHROPIC_API_KEY สำเร็จ ย่อหน้าบนสุดของบรีฟจะเปลี่ยนเป็นอังกฤษ
+       ทันทีโดยไม่มีใครแตะโค้ด — และไม่มีชุดตรวจไหนจับได้ เพราะเส้นทาง
+       ที่มีคีย์ไม่เคยถูกรันเลย (ดูหมายเหตุหัวไฟล์)
+
+       explainPlay ข้างล่างสั่งเป็นไทยอยู่แล้ว สองฟังก์ชันนี้จึงเคยจะพูด
+       คนละภาษาบนหน้าจอเดียวกัน */
     system:
       `You summarise the morning brief for whoever runs the ${(input.vocab ?? DEFAULT_VOCAB).orgKind}. ` +
-      `Call people in the base "${(input.vocab ?? DEFAULT_VOCAB).person}". ` +
-      "Write plain conversational English, no more than three sentences, in baht and headcount. " +
-      "Never use jargon such as RFM, cohort, attribution, churn or segment. " +
+      `Call people in the base "${(input.vocab ?? DEFAULT_VOCAB).th.person}". ` +
+      "ตอบเป็นภาษาไทยแบบพูดคุยธรรมดา ไม่เกินสามประโยค ใช้หน่วยบาทและจำนวนคน " +
+      "ห้ามใช้ศัพท์เทคนิคอย่าง RFM · cohort · attribution · churn · segment " +
+      "ชื่องานที่ได้รับมาเป็นภาษาไทยอยู่แล้ว ให้ใช้ตามนั้น ห้ามแปลกลับเป็นอังกฤษ " +
       "Never invent a number you were not given. Reply as JSON matching the schema only.",
     prompt: `Account: ${input.businessName}
 ${(input.vocab ?? DEFAULT_VOCAB).person} drifting past their own cycle: ${input.slipping}
@@ -688,18 +723,32 @@ export type WhyInput = {
   playName: string;
   logic: string;
   size: number;
-  filtered: { reason: string; count: number }[];
+  filtered: { reason: string; reasonTh: string; count: number }[];
   responseRate: number;
   orderValue: number;
   vocab?: VocabCtx;
 };
 
+/* ── ประโยคไทยต้องเป็นประโยคไทยทั้งประโยค ─────────────────────
+
+   ของเดิมวางเกณฑ์คัดเลือก (play.logic ซึ่งเป็นภาษาอังกฤษโดยตั้งใจ)
+   ไว้กลางประโยค:
+
+     "เลือกลูกค้า 70 คนนี้เพราะ The top 10% by lifetime spend โดยใช้…"
+
+   ผลคือประโยคที่ผิดไวยากรณ์ทั้งสองภาษาพร้อมกัน และใบที่สามหนักกว่านั้น
+   เพราะ logic ของมันเป็นประโยคเต็ม ("a small list, but the highest
+   quality one you have") ที่ถูกฝังกลางประโยคไทยอีกที
+
+   เกณฑ์อังกฤษไม่ได้หายไปไหน — การ์ดแสดงมันเป็นบรรทัดของตัวเองอยู่แล้ว
+   ในส่วนที่กางออกได้ ซึ่งเป็นที่ที่มันควรอยู่: อ้างอิงที่ตรวจสอบได้
+   ไม่ใช่คำที่ถูกยัดกลางประโยคของคนอื่น */
 export function explainPlayFallback(i: WhyInput): string {
   const v = i.vocab ?? DEFAULT_VOCAB;
   const cut = i.filtered.reduce((s, f) => s + f.count, 0);
-  const base = `เลือก${v.th.person} ${i.size.toLocaleString("en-US")} คนนี้เพราะ ${i.logic} โดยใช้สถิติจาก${v.th.orgKind}อื่นที่มีวงจรเดียวกัน กลุ่มนี้ตอบกลับราว ${(i.responseRate * 100).toFixed(1)}% และ${v.th.purchaseVerb}ครั้งละราว ฿${i.orderValue.toLocaleString("en-US")}`;
+  const base = `เลือก${v.th.person}กลุ่มนี้ ${i.size.toLocaleString("en-US")} คน จากสถิติของ${v.th.orgKind}อื่นที่มีวงจรเดียวกัน — กลุ่มนี้ตอบกลับราว ${(i.responseRate * 100).toFixed(1)}% และ${v.th.purchaseVerb}ครั้งละราว ฿${i.orderValue.toLocaleString("en-US")}`;
   return cut > 0
-    ? `${base} และมีอีก ${cut.toLocaleString("en-US")} คนที่เข้าเกณฑ์แต่ถูกตัดออก — ${i.filtered.map((f) => f.reason).join(" · ")}`
+    ? `${base} มีอีก ${cut.toLocaleString("en-US")} คนที่เข้าเกณฑ์แต่ถูกตัดออก — ${i.filtered.map((f) => f.reasonTh).join(" · ")}`
     : base;
 }
 

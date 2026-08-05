@@ -198,16 +198,18 @@ export default async function SettingsPage() {
             </p>
           </div>
           <span className={`c-pill ${ai ? "c-pill-good" : "c-pill-warn"}`}>
-            {ai ? "AI connected" : "AI not connected"}
+            {ai ? "เชื่อมต่อ AI แล้ว" : "ยังไม่ได้เชื่อมต่อ AI"}
           </span>
         </div>
 
+        {/* ── หน้านี้เป็นที่เดียวที่ควรเห็นชื่อตัวแปร ──
+            เพราะเป็นหน้าที่คนดูแลระบบมาหาวิธีเปิดใช้งาน ส่วนหน้าบรีฟ
+            ที่เจ้าของร้านอ่านทุกเช้า ไม่ต้องรู้ว่ามันชื่ออะไร */}
         {!ai && (
           <p className="c-thai mt-5 border-l-2 border-[var(--c-warn)] pl-4 text-[0.84rem] text-[var(--c-text-2)]">
-            <span className="c-mono">ANTHROPIC_API_KEY</span> is not set, so the five
-            jobs below fall back to deterministic templates. Everything still works and
-            costs nothing, but the copy is templated and column mapping guesses from
-            header names alone.
+            งานทั้งห้าอย่างข้างล่างกำลังใช้สูตรสำเร็จแทน ทุกอย่างยังทำงานครบและไม่มีค่าใช้จ่าย
+            แต่ข้อความจะเป็นแบบตายตัว และการจับคู่คอลัมน์ตอนนำเข้าจะเดาจากชื่อหัวตารางอย่างเดียว —
+            ตั้งค่า <span className="c-mono">ANTHROPIC_API_KEY</span> แล้วรีสตาร์ทเพื่อเปิดใช้งาน
           </p>
         )}
 

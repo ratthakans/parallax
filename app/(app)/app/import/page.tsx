@@ -77,12 +77,12 @@ export default async function ImportPage() {
 
       {!ai && (
         <Panel flat className="mb-6 border-l-2 border-[var(--c-warn)] p-5">
-          <p className="c-label text-[var(--c-warn)]">ai not connected</p>
+          <p className="c-label-th text-[var(--c-warn)]">ยังไม่ได้เชื่อมต่อ AI</p>
           <p className="c-thai mt-2.5 text-[0.84rem] text-[var(--c-text-2)]">
-            Column mapping falls back to pattern matching, which handles
-            straightforwardly named headers but misreads unusual ones. Set{" "}
-            <span className="c-mono">ANTHROPIC_API_KEY</span> and restart so the model
-            can read sample rows as well.
+            การจับคู่คอลัมน์จะใช้การเทียบรูปแบบชื่อแทน ซึ่งอ่านหัวตารางที่ตั้งชื่อตรงไปตรงมาได้
+            แต่จะเดาผิดกับชื่อที่แปลก — ตั้งค่า{" "}
+            <span className="c-mono">ANTHROPIC_API_KEY</span> แล้วรีสตาร์ท
+            เพื่อให้โมเดลอ่านตัวอย่างข้อมูลประกอบด้วย
           </p>
         </Panel>
       )}

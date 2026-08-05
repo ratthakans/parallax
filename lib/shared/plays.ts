@@ -33,6 +33,7 @@ export const KEEP_PLAYS: Play[] = [
     offer: { type: "status_privilege", fallback: "early_access" },
     copy_brief: {
       angle: "First look at new stock, not a discount",
+      angleTh: "ให้ดูของใหม่ก่อนใคร ไม่ใช่การลดราคา",
       avoid: ["Discounting", "Urgency"],
     },
     priors: { response_rate: 0.22 },
@@ -58,6 +59,7 @@ export const KEEP_PLAYS: Play[] = [
     offer: { type: "personal_checkin", fallback: "small_credit" },
     copy_brief: {
       angle: "It has been a while — something you would like is waiting",
+      angleTh: "หายไปพักหนึ่งแล้ว มีของที่น่าจะถูกใจรออยู่",
       avoid: ["Blame", "Deep discounts"],
     },
     priors: { response_rate: 0.14 },
@@ -83,6 +85,7 @@ export const KEEP_PLAYS: Play[] = [
     offer: { type: "attachment_bundle", fallback: "free_shipping" },
     copy_brief: {
       angle: "The pair is one piece short",
+      angleTh: "ยังขาดอีกชิ้นให้ครบชุด",
       avoid: ["Urgency", "Deep discounts"],
     },
     priors: { response_rate: 0.08 },
@@ -106,6 +109,7 @@ export const KEEP_PLAYS: Play[] = [
     offer: { type: "fitted_product_offer", fallback: "consultation" },
     copy_brief: {
       angle: "Already measured — all that is left is choosing what matches",
+      angleTh: "วัดไว้แล้ว เหลือแค่เลือกให้เข้ากัน",
       avoid: ["Hard selling", "Deep discounts"],
     },
     priors: { response_rate: 0.19 },
@@ -129,6 +133,7 @@ export const KEEP_PLAYS: Play[] = [
     offer: { type: "tier_progress", fallback: "bonus_points" },
     copy_brief: {
       angle: "Almost at the next tier",
+      angleTh: "อีกนิดเดียวก็ขึ้นระดับถัดไป",
       avoid: ["Pressure", "Countdown"],
     },
     priors: { response_rate: 0.16 },
@@ -153,6 +158,7 @@ export const KEEP_PLAYS: Play[] = [
     offer: { type: "first_purchase_incentive", fallback: "welcome_guide" },
     copy_brief: {
       angle: "You are signed up — try your first benefit",
+      angleTh: "สมัครแล้ว ลองใช้สิทธิ์แรกดู",
       avoid: ["Chasing"],
     },
     priors: { response_rate: 0.11 },
@@ -176,6 +182,7 @@ export const KEEP_PLAYS: Play[] = [
     offer: { type: "new_arrival_preview", fallback: "restock_alert" },
     copy_brief: {
       angle: "A new model just landed in the brand you use",
+      angleTh: "แบรนด์ที่ใช้อยู่มีรุ่นใหม่เข้ามา",
       avoid: ["Price cuts"],
     },
     priors: { response_rate: 0.13 },
@@ -199,6 +206,7 @@ export const KEEP_PLAYS: Play[] = [
     offer: { type: "assisted_selection", fallback: "trial" },
     copy_brief: {
       angle: "You visit often — shall we help you choose?",
+      angleTh: "แวะมาบ่อย ให้ช่วยเลือกไหม",
       avoid: ["Calling them out", "Deep discounts"],
     },
     priors: { response_rate: 0.09 },
@@ -220,7 +228,8 @@ export const KEEP_PLAYS: Play[] = [
     },
     guards: { min_audience: 10, cooldown_days: 300, max_discount_pct: 20 },
     offer: { type: "birthday_privilege", fallback: "greeting" },
-    copy_brief: { angle: "Greet first, offer second", avoid: ["Selling before greeting"] },
+    copy_brief: { angle: "Greet first, offer second",
+      angleTh: "ทักทายก่อน ค่อยเสนอทีหลัง", avoid: ["Selling before greeting"] },
     priors: { response_rate: 0.24 },
     expected_order_value: 1900,
   },
@@ -242,6 +251,7 @@ export const KEEP_PLAYS: Play[] = [
     offer: { type: "reactivation_offer", fallback: "whats_new" },
     copy_brief: {
       angle: "Wake them with what they bought, not what we want to clear",
+      angleTh: "ทักด้วยของที่เคยซื้อ ไม่ใช่ของที่อยากระบาย",
       avoid: ["Guilt", "Counting days away"],
     },
     priors: { response_rate: 0.06 },
@@ -266,6 +276,7 @@ export const KEEP_PLAYS: Play[] = [
     offer: { type: "reorder_shortcut", fallback: "reminder" },
     copy_brief: {
       angle: "What you use is probably running low — reorder in one tap",
+      angleTh: "ของที่ใช้อยู่น่าจะใกล้หมด สั่งซ้ำได้ในกดเดียว",
       avoid: ["Cross-sell"],
     },
     priors: { response_rate: 0.27 },
@@ -289,6 +300,7 @@ export const KEEP_PLAYS: Play[] = [
     offer: { type: "renewal", fallback: "extension" },
     copy_brief: {
       angle: "Ranked by value at risk, not by date",
+      angleTh: "เรียงตามมูลค่าที่กำลังจะเสีย ไม่ใช่ตามวันที่",
       avoid: ["Fear"],
     },
     priors: { response_rate: 0.31 },
@@ -312,6 +324,7 @@ export const KEEP_PLAYS: Play[] = [
     offer: { type: "booking_slot", fallback: "reminder" },
     copy_brief: {
       angle: "You are due — book ahead now",
+      angleTh: "ถึงกำหนดแล้ว จองล่วงหน้าได้เลย",
       avoid: ["Upsell"],
     },
     priors: { response_rate: 0.29 },
@@ -336,6 +349,7 @@ export const KEEP_PLAYS: Play[] = [
     offer: { type: "clearance_match", fallback: "bundle" },
     copy_brief: {
       angle: "The category you follow is reduced this round",
+      angleTh: "หมวดที่ติดตามอยู่ลดราคารอบนี้",
       avoid: ["Calling it dead stock"],
     },
     priors: { response_rate: 0.12 },
@@ -361,6 +375,7 @@ export const KEEP_PLAYS: Play[] = [
     offer: { type: "referral_reward", fallback: "thanks" },
     copy_brief: {
       angle: "Thank you for coming back — bring a friend?",
+      angleTh: "ขอบคุณที่กลับมา ชวนเพื่อนมาด้วยไหม",
       avoid: ["Sounding like a salesperson"],
     },
     priors: { response_rate: 0.1 },
@@ -392,6 +407,7 @@ export const REACH_PLAYS: Play[] = [
     offer: { type: "lookalike_seed" },
     copy_brief: {
       angle: "The signature of the customers who keep the shop alive",
+      angleTh: "ลักษณะร่วมของลูกค้าที่ทำให้ร้านอยู่ได้",
       avoid: ["Using top spenders as the template"],
     },
     priors: { response_rate: 0.03 },
@@ -409,7 +425,8 @@ export const REACH_PLAYS: Play[] = [
     selector: { anchor_starter: true, repeat_buyer: true, consent_marketing: true },
     guards: { min_audience: 80, cooldown_days: 30, max_discount_pct: 0 },
     offer: { type: "lookalike_seed" },
-    copy_brief: { angle: "A path that starts from the same item", avoid: [] },
+    copy_brief: { angle: "A path that starts from the same item",
+      angleTh: "เส้นทางที่เริ่มจากของชิ้นเดียวกัน", avoid: [] },
     priors: { response_rate: 0.028 },
     expected_order_value: 3100,
   },
@@ -425,7 +442,8 @@ export const REACH_PLAYS: Play[] = [
     selector: { ltv_decile_min: 10, consent_marketing: true },
     guards: { min_audience: 50, cooldown_days: 30, max_discount_pct: 0 },
     offer: { type: "lookalike_seed" },
-    copy_brief: { angle: "Small, high quality", avoid: [] },
+    copy_brief: { angle: "Small, high quality",
+      angleTh: "กลุ่มเล็ก แต่คุณภาพสูง", avoid: [] },
     priors: { response_rate: 0.035 },
     expected_order_value: 4200,
   },
@@ -441,7 +459,8 @@ export const REACH_PLAYS: Play[] = [
     selector: { repeat_buyer: false, consent_marketing: true },
     guards: { min_audience: 1, cooldown_days: 7, max_discount_pct: 0 },
     offer: { type: "suppression_list" },
-    copy_brief: { angle: "No copy — this is a suppression list", avoid: [] },
+    copy_brief: { angle: "No copy — this is a suppression list",
+      angleTh: "ไม่มีข้อความ — นี่คือรายชื่อตัดออก", avoid: [] },
     priors: { response_rate: 1 },
     expected_order_value: 0,
   },
@@ -461,7 +480,8 @@ export const REACH_PLAYS: Play[] = [
     },
     guards: { min_audience: 50, cooldown_days: 30, max_discount_pct: 0 },
     offer: { type: "suppression_list" },
-    copy_brief: { angle: "No copy — this is a suppression list", avoid: [] },
+    copy_brief: { angle: "No copy — this is a suppression list",
+      angleTh: "ไม่มีข้อความ — นี่คือรายชื่อตัดออก", avoid: [] },
     priors: { response_rate: 1 },
     expected_order_value: 0,
   },
@@ -483,6 +503,7 @@ export const REACH_PLAYS: Play[] = [
     offer: { type: "paid_audience" },
     copy_brief: {
       angle: "They have not vanished — they moved somewhere only media reaches",
+      angleTh: "เขาไม่ได้หายไป แค่ย้ายไปอยู่ที่ที่ถึงได้ด้วยสื่อเท่านั้น",
       avoid: [],
     },
     priors: { response_rate: 0.02 },
@@ -504,7 +525,8 @@ export const REACH_PLAYS: Play[] = [
     },
     guards: { min_audience: 40, cooldown_days: 21, max_discount_pct: 0 },
     offer: { type: "paid_audience" },
-    copy_brief: { angle: "Interested once, still undecided", avoid: [] },
+    copy_brief: { angle: "Interested once, still undecided",
+      angleTh: "เคยสนใจ แต่ยังไม่ตัดสินใจ", avoid: [] },
     priors: { response_rate: 0.045 },
     expected_order_value: 1700,
   },
@@ -524,7 +546,8 @@ export const REACH_PLAYS: Play[] = [
     },
     guards: { min_audience: 80, cooldown_days: 45, max_discount_pct: 0 },
     offer: { type: "lookalike_seed" },
-    copy_brief: { angle: "People who buy A are open to B", avoid: [] },
+    copy_brief: { angle: "People who buy A are open to B",
+      angleTh: "คนที่ซื้อ A มักเปิดรับ B", avoid: [] },
     priors: { response_rate: 0.025 },
     expected_order_value: 2000,
   },

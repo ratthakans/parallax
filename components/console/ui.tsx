@@ -17,6 +17,18 @@ export function Panel({
   );
 }
 
+/* ── ป้ายกำกับเลือกคลาสจากภาษาของตัวมันเอง ────────────────────
+
+   .c-label เป็น scaffolding แบบอังกฤษ — mono · ตัวพิมพ์ใหญ่ · ถ่างช่องไฟ
+   ซึ่งอ่านดีกับ MORNING BRIEF แต่ทำลายจังหวะสระและวรรณยุกต์ของอักษรไทย
+   (เหตุผลเต็มอยู่ใน console.css)
+
+   ให้คอมโพเนนต์ตัดสินจากเนื้อความเอง ดีกว่าให้จุดเรียกทุกจุดจำ — Metric
+   กับ PageHead ถูกเรียกหลายสิบจุดข้ามทุกหน้า และจะมีจุดใหม่เพิ่มอีก
+   กฎที่ต้องจำคือกฎที่จะหลุดในอีกหกเดือน */
+const HAS_THAI = /[฀-๿]/;
+export const labelClass = (s: string) => (HAS_THAI.test(s) ? "c-label-th" : "c-label");
+
 export function PageHead({
   label,
   title,
@@ -31,7 +43,7 @@ export function PageHead({
   return (
     <header className="mb-8 flex flex-wrap items-end justify-between gap-5">
       <div className="min-w-0">
-        <p className="c-label">{label}</p>
+        <p className={labelClass(label)}>{label}</p>
         <h1 className="c-h1 mt-3 text-[var(--c-text)]">{title}</h1>
         {lead && (
           <p className="c-thai mt-3 max-w-2xl text-[0.9rem] text-[var(--c-text-3)]">
@@ -71,7 +83,7 @@ export function Metric({
     size === "lg" ? "text-[2.4rem]" : size === "sm" ? "text-[1.3rem]" : "text-[1.8rem]";
   return (
     <div className="min-w-0">
-      <p className="c-label">{label}</p>
+      <p className={labelClass(label)}>{label}</p>
       <p className={`c-num mt-2.5 ${fs} ${color}`}>{value}</p>
       {sub && (
         <p className="c-thai mt-1.5 text-[0.78rem] text-[var(--c-text-4)]">{sub}</p>
@@ -140,10 +152,10 @@ export function AiBadge({
 }) {
   const meta =
     source === "ai"
-      ? { label: "Written by AI", cls: "c-pill-good" }
+      ? { label: "AI เขียน", cls: "c-pill-good" }
       : source === "cache"
-        ? { label: "AI (cached)", cls: "c-pill-keep" }
-        : { label: "Template copy", cls: "c-pill-warn" };
+        ? { label: "AI เขียน · จากแคช", cls: "c-pill-keep" }
+        : { label: "สูตรสำเร็จ", cls: "c-pill-warn" };
   return (
     <span className="inline-flex flex-wrap items-center gap-2">
       <span className={`c-pill ${meta.cls}`}>{meta.label}</span>

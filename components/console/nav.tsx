@@ -13,10 +13,14 @@ import { Mark } from "@/components/brand";
    Play library แล้วอ่านเหมือนพิมพ์ตกหล่น จึงขึ้นต้นด้วยตัวใหญ่ตรงนี้ */
 const sentence = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-function groupsFor(baseLabel: string, personLabel: string) {
+/* หัวข้อกลุ่มกับคำใบ้ต้องเป็นไทยเหมือนชื่อเมนูที่อยู่ใต้มัน
+   ของเดิม "Data and engine" ยืนคร่อม "คลัง play" กับ "นำเข้าข้อมูล"
+   และ hint ของเมนูแรกเป็น `Per-${personLabel} figures` ซึ่งประกอบจาก
+   คำเอกพจน์อังกฤษ ทั้งที่เมนูข้าง ๆ พูดไทยหมด */
+function groupsFor(baseLabelTh: string, personLabelTh: string) {
   return [
     {
-      title: "Daily",
+      title: "ประจำวัน",
       links: [
         { href: "/app", label: "บรีฟเช้านี้", hint: "สามอย่างที่ควรทำวันนี้" },
         { href: "/app/campaigns", label: "แคมเปญ", hint: "อนุมัติแล้ว · กำลังวัดผล" },
@@ -24,12 +28,12 @@ function groupsFor(baseLabel: string, personLabel: string) {
       ],
     },
     {
-      title: "Data and engine",
+      title: "ข้อมูลและเครื่องยนต์",
       links: [
         {
           href: "/app/customers",
-          label: sentence(baseLabel),
-          hint: `Per-${personLabel} figures`,
+          label: baseLabelTh,
+          hint: `ตัวเลขราย${personLabelTh}`,
         },
         // จำนวน play ที่ใช้ได้ขึ้นกับรูปทรงวงจรของบัญชี จึงไม่ตรึงเลขไว้
         { href: "/app/plays", label: "คลัง play", hint: "ทุกวิธีที่ระบบรู้จัก" },
@@ -37,7 +41,7 @@ function groupsFor(baseLabel: string, personLabel: string) {
       ],
     },
     {
-      title: "Control",
+      title: "ควบคุม",
       links: [
         { href: "/app/billing", label: "ค่าใช้จ่าย", hint: "แผน · เครดิต · คุ้มไหม" },
         { href: "/app/settings", label: "ตั้งค่า", hint: "เพดาน · AI · เครื่องมือเดโม" },
@@ -199,17 +203,18 @@ export function ConsoleNav({
         <hr className="c-hair" />
 
         <div className="p-4 lg:p-5">
-          <p className="c-label">feature table</p>
+          <p className="c-label-th">ตารางข้อมูลลูกค้า</p>
           <p className="c-mono mt-2 text-[0.72rem] leading-relaxed text-[var(--c-text-3)]">
             {computedAt
-              ? `Last computed ${new Date(computedAt).toLocaleString("en-GB", {
+              ? new Date(computedAt).toLocaleString("th-TH", {
                   dateStyle: "short",
                   timeStyle: "short",
-                })}`
-              : "Not computed yet"}
+                })
+              : "—"}
           </p>
           <p className="c-thai mt-3 text-[0.72rem] text-[var(--c-text-4)]">
-            Precomputed on a schedule, never live on page load
+            {computedAt ? "คำนวณล่าสุด" : "ยังไม่ได้คำนวณ"} — ระบบคำนวณไว้ล่วงหน้าเป็นรอบ
+            ไม่ได้คำนวณสดตอนเปิดหน้า
           </p>
         </div>
 
@@ -222,7 +227,7 @@ export function ConsoleNav({
         {userEmail && (
           <>
             <div className="p-4 lg:p-5">
-              <p className="c-label">เข้าสู่ระบบในนาม</p>
+              <p className="c-label-th">เข้าสู่ระบบในนาม</p>
               <p className="c-mono mt-2 text-[0.74rem] break-all text-[var(--c-text-2)]">
                 {userEmail}
               </p>

@@ -176,7 +176,7 @@ export default async function ProofPage() {
 
         <div className="grid gap-6 md:grid-cols-[1fr_1.4fr]">
           <div>
-            <p className="c-label">ส่วนต่างเฉลี่ย พร้อมช่วงความเชื่อมั่น</p>
+            <p className="c-label-th">ส่วนต่างเฉลี่ย พร้อมช่วงความเชื่อมั่น</p>
             <p className="c-thai mt-1.5 text-[0.74rem] text-[var(--c-text-4)]">
               เฉลี่ยจากทุกแคมเปญที่วัดผลแล้ว รวมตัวที่ยังสรุปไม่ได้ด้วย — ถ้าเฉลี่ยเฉพาะตัวที่มีนัยสำคัญ
               ตัวเลขจะสูงเกินจริงเสมอ
@@ -210,7 +210,7 @@ export default async function ProofPage() {
           </div>
 
           <div>
-            <p className="c-label">สัดส่วนข้อสรุป</p>
+            <p className="c-label-th">สัดส่วนข้อสรุป</p>
             {total ? (
               <div className="mt-4 flex flex-col gap-3">
                 {(

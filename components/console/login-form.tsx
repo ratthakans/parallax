@@ -27,7 +27,7 @@ export function LoginForm({ next }: { next?: string }) {
       {next && <input type="hidden" name="next" value={next} />}
 
       <label className="flex flex-col gap-2">
-        <span className="c-label">อีเมล</span>
+        <span className="c-label-th">อีเมล</span>
         <input
           name="email"
           type="email"
@@ -38,7 +38,7 @@ export function LoginForm({ next }: { next?: string }) {
       </label>
 
       <label className="flex flex-col gap-2">
-        <span className="c-label">รหัสผ่าน</span>
+        <span className="c-label-th">รหัสผ่าน</span>
         <input
           name="password"
           type="password"
