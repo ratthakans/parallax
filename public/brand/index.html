@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="th">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>PARALLAX — โลโก้</title>
+<style>
+  @font-face{font-family:"Plex Thai";font-weight:400;font-display:swap;
+    src:url("/deck/assets/website-brand/ab8c2f9dfe50fb3c-s.p.09e83-4vqkr8v.woff2") format("woff2")}
+  @font-face{font-family:"Plex Thai";font-weight:500;font-display:swap;
+    src:url("/deck/assets/website-brand/666deae7c569669f-s.p.2t1pwrt0o-zp3.woff2") format("woff2")}
+  @font-face{font-family:"Plex Mono";font-weight:400;font-display:swap;
+    src:url("/deck/assets/website-brand/99e609270109b47d-s.p.40sczeszzbjw1.woff2") format("woff2")}
+
+  :root{
+    --ink:#0a1633; --ink-3:#5b6b8c; --ink-4:#637393;
+    --paper:#fff; --paper-2:#f5f9ff; --line:#e0e8f6;
+    --signal:#0047ff; --abyss:#00113d; --cyan:#9ee6ff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);
+    font-family:"Plex Thai",system-ui,sans-serif;font-weight:400;
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:60rem;margin:0 auto;padding:4rem 1.5rem 6rem}
+  .label{font-family:"Plex Mono",ui-monospace,monospace;font-size:.7rem;
+    letter-spacing:.18em;text-transform:uppercase;color:var(--ink-4)}
+  h1{font-size:1.5rem;font-weight:500;letter-spacing:-.01em;margin:.6rem 0 0}
+  .lead{color:var(--ink-3);font-size:.92rem;line-height:1.7;max-width:34rem;margin:.8rem 0 0}
+
+  section{margin-top:3.5rem}
+  h2{font-size:.95rem;font-weight:500;margin:0 0 1rem;padding-bottom:.7rem;
+    border-bottom:1px solid var(--line)}
+
+  .row{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(17rem,1fr))}
+  .card{border:1px solid var(--line);border-radius:.6rem;overflow:hidden;background:var(--paper)}
+  .stage{display:flex;align-items:center;justify-content:center;padding:2.2rem 1.5rem;min-height:8.5rem}
+  .stage.light{background:var(--paper)}
+  .stage.tint{background:var(--paper-2)}
+  .stage.dark{background:var(--abyss)}
+  .stage img{max-width:100%;height:auto}
+  .stage .lg{width:15rem}
+  .stage .sm{width:3.2rem}
+  .foot{display:flex;justify-content:space-between;gap:1rem;align-items:baseline;
+    padding:.7rem .9rem;border-top:1px solid var(--line);background:var(--paper-2)}
+  .foot a{font-family:"Plex Mono",monospace;font-size:.68rem;color:var(--signal);
+    text-decoration:none;word-break:break-all}
+  .foot a:hover{text-decoration:underline}
+  .foot span{font-family:"Plex Mono",monospace;font-size:.66rem;color:var(--ink-4);white-space:nowrap}
+
+  table{width:100%;border-collapse:collapse;font-size:.84rem}
+  th,td{text-align:left;padding:.6rem .5rem;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-family:"Plex Mono",monospace;font-size:.66rem;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--ink-4);font-weight:400}
+  td.mono{font-family:"Plex Mono",monospace;font-size:.78rem}
+  .swatch{display:inline-block;width:.85rem;height:.85rem;border-radius:.2rem;
+    vertical-align:-.1rem;margin-right:.45rem;border:1px solid rgba(10,22,51,.12)}
+  ul{margin:.4rem 0 0;padding-left:1.1rem;color:var(--ink-3);font-size:.88rem;line-height:1.8}
+  code{font-family:"Plex Mono",monospace;font-size:.85em;background:var(--paper-2);
+    padding:.1rem .3rem;border-radius:.2rem}
+</style>
+
+<div class="wrap">
+  <p class="label">brand</p>
+  <h1>โลโก้ PARALLAX</h1>
+  <p class="lead">
+    ทุกไฟล์ในหน้านี้สร้างจากรูปทรงเดียวกับที่เว็บใช้จริง
+    (<code>components/brand.tsx</code>) ไม่ได้วาดใหม่ให้คล้าย —
+    ตัวอักษรคือ IBM Plex Sans Thai น้ำหนัก 500 ระยะห่างตัวอักษร 0.24em
+  </p>
+
+  <section>
+    <h2>โลโก้เต็ม</h2>
+    <div class="row">
+      <div class="card">
+        <div class="stage light"><img class="lg" src="parallax-logo-ink.svg" alt="PARALLAX สีหมึก"></div>
+        <div class="foot"><a href="parallax-logo-ink.svg" download>parallax-logo-ink.svg</a><span>พื้นสว่าง</span></div>
+      </div>
+      <div class="card">
+        <div class="stage dark"><img class="lg" src="parallax-logo-white.svg" alt="PARALLAX สีขาว"></div>
+        <div class="foot"><a href="parallax-logo-white.svg" download>parallax-logo-white.svg</a><span>พื้นเข้ม</span></div>
+      </div>
+      <div class="card">
+        <div class="stage tint"><img class="lg" src="parallax-logo-signal.svg" alt="PARALLAX สีน้ำเงิน"></div>
+        <div class="foot"><a href="parallax-logo-signal.svg" download>parallax-logo-signal.svg</a><span>สีเน้น</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>เครื่องหมายอย่างเดียว</h2>
+    <div class="row">
+      <div class="card">
+        <div class="stage light"><img class="sm" src="parallax-mark-ink.svg" alt=""></div>
+        <div class="foot"><a href="parallax-mark-ink.svg" download>parallax-mark-ink.svg</a><span>พื้นสว่าง</span></div>
+      </div>
+      <div class="card">
+        <div class="stage dark"><img class="sm" src="parallax-mark-white.svg" alt=""></div>
+        <div class="foot"><a href="parallax-mark-white.svg" download>parallax-mark-white.svg</a><span>พื้นเข้ม</span></div>
+      </div>
+      <div class="card">
+        <div class="stage tint"><img class="sm" src="parallax-mark-signal.svg" alt=""></div>
+        <div class="foot"><a href="parallax-mark-signal.svg" download>parallax-mark-signal.svg</a><span>สีเน้น</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>PNG — พื้นหลังโปร่งใส</h2>
+    <p class="lead" style="margin-bottom:1rem">
+      แปลงมาจากไฟล์ SVG ข้างบนตัวต่อตัว จึงไม่มีทางเพี้ยนจากกัน
+      ใช้กับที่ที่รับ SVG ไม่ได้ — LINE · Slack · Word · รูปโปรไฟล์
+    </p>
+    <div class="row">
+      <div class="card">
+        <div class="stage light"><img class="lg" src="parallax-logo-ink.png" alt=""></div>
+        <div class="foot"><a href="parallax-logo-ink.png" download>parallax-logo-ink.png</a><span>2400×269</span></div>
+      </div>
+      <div class="card">
+        <div class="stage dark"><img class="lg" src="parallax-logo-white.png" alt=""></div>
+        <div class="foot"><a href="parallax-logo-white.png" download>parallax-logo-white.png</a><span>2400×269</span></div>
+      </div>
+      <div class="card">
+        <div class="stage tint"><img class="lg" src="parallax-logo-signal.png" alt=""></div>
+        <div class="foot"><a href="parallax-logo-signal.png" download>parallax-logo-signal.png</a><span>2400×269</span></div>
+      </div>
+      <div class="card">
+        <div class="stage light"><img class="sm" src="parallax-mark-ink.png" alt=""></div>
+        <div class="foot"><a href="parallax-mark-ink.png" download>parallax-mark-ink.png</a><span>1024²</span></div>
+      </div>
+      <div class="card">
+        <div class="stage dark"><img class="sm" src="parallax-mark-white.png" alt=""></div>
+        <div class="foot"><a href="parallax-mark-white.png" download>parallax-mark-white.png</a><span>1024²</span></div>
+      </div>
+      <div class="card">
+        <div class="stage tint"><img class="sm" src="parallax-mark-signal.png" alt=""></div>
+        <div class="foot"><a href="parallax-mark-signal.png" download>parallax-mark-signal.png</a><span>1024²</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>สี</h2>
+    <table>
+      <tr><th>ชื่อ</th><th>ค่า</th><th>ใช้เมื่อ</th></tr>
+      <tr>
+        <td><span class="swatch" style="background:#0a1633"></span>ink</td>
+        <td class="mono">#0a1633</td>
+        <td>โลโก้บนพื้นสว่าง — ค่าตั้งต้น</td>
+      </tr>
+      <tr>
+        <td><span class="swatch" style="background:#ffffff"></span>paper</td>
+        <td class="mono">#ffffff</td>
+        <td>โลโก้บนพื้นเข้ม</td>
+      </tr>
+      <tr>
+        <td><span class="swatch" style="background:#0047ff"></span>signal</td>
+        <td class="mono">#0047ff</td>
+        <td>สีเน้นของแบรนด์ · favicon</td>
+      </tr>
+      <tr>
+        <td><span class="swatch" style="background:#00113d"></span>abyss</td>
+        <td class="mono">#00113d</td>
+        <td>พื้นเข้มที่ตั้งใจให้โลโก้ขาวไปวาง</td>
+      </tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>ข้อควรระวัง</h2>
+    <ul>
+      <li>โลโก้เป็นสีเดียวเสมอ — เว็บใช้ <code>currentColor</code> ทั้งเครื่องหมายและตัวอักษร ไม่มีเวอร์ชันสองสี</li>
+      <li>เว้นระยะรอบโลโก้อย่างน้อยเท่าความสูงของตัว P</li>
+      <li>เส้นฐานของสามเหลี่ยมจาง 35% โดยตั้งใจ อย่าทำให้ทึบเท่าเส้นอื่น</li>
+      <li>ต่ำกว่าราว 90px กว้าง ให้ใช้เครื่องหมายอย่างเดียว ตัวอักษรจะอ่านไม่ออก</li>
+      <li>อย่าตั้งคำว่า PARALLAX ด้วยฟอนต์อื่น หรือเปลี่ยนระยะห่างตัวอักษร</li>
+      <li><code>parallax-logo-editable.svg</code> ไม่ได้ฝังฟอนต์ไว้ — เครื่องที่เปิดต้องมี IBM Plex Sans Thai
+          (โหลดฟรีจาก Google Fonts) ส่วนไฟล์อื่นฝังมาแล้ว เปิดที่ไหนก็ตรง</li>
+    </ul>
+  </section>
+</div>
