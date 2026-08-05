@@ -3,91 +3,242 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>PARALLAX — โลโก้</title>
+<title>PARALLAX — โลโก้และการใช้งาน</title>
 <style>
   @font-face{font-family:"Plex Thai";font-weight:400;font-display:swap;
     src:url("/deck/assets/website-brand/ab8c2f9dfe50fb3c-s.p.09e83-4vqkr8v.woff2") format("woff2")}
   @font-face{font-family:"Plex Thai";font-weight:500;font-display:swap;
     src:url("/deck/assets/website-brand/666deae7c569669f-s.p.2t1pwrt0o-zp3.woff2") format("woff2")}
+  @font-face{font-family:"Plex Thai";font-weight:300;font-display:swap;
+    src:url("/deck/assets/website-brand/d9fa5058ff337146-s.p.3fee8ylquem6h.woff2") format("woff2")}
   @font-face{font-family:"Plex Mono";font-weight:400;font-display:swap;
     src:url("/deck/assets/website-brand/99e609270109b47d-s.p.40sczeszzbjw1.woff2") format("woff2")}
 
   :root{
-    --ink:#0a1633; --ink-3:#5b6b8c; --ink-4:#637393;
-    --paper:#fff; --paper-2:#f5f9ff; --line:#e0e8f6;
-    --signal:#0047ff; --abyss:#00113d; --cyan:#9ee6ff;
+    --ink:#0a1633; --ink-2:#2c3a5c; --ink-3:#5b6b8c; --ink-4:#637393;
+    --paper:#fff; --paper-2:#f5f9ff; --line:#e0e8f6; --line-2:#eef3fc;
+    --signal:#0047ff; --abyss:#00113d; --frost:#eaf3ff;
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--paper);color:var(--ink);
     font-family:"Plex Thai",system-ui,sans-serif;font-weight:400;
-    -webkit-font-smoothing:antialiased}
-  .wrap{max-width:60rem;margin:0 auto;padding:4rem 1.5rem 6rem}
-  .label{font-family:"Plex Mono",ui-monospace,monospace;font-size:.7rem;
-    letter-spacing:.18em;text-transform:uppercase;color:var(--ink-4)}
-  h1{font-size:1.5rem;font-weight:500;letter-spacing:-.01em;margin:.6rem 0 0}
-  .lead{color:var(--ink-3);font-size:.92rem;line-height:1.7;max-width:34rem;margin:.8rem 0 0}
+    -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  .shell{max-width:62rem;margin:0 auto;padding:0 1.5rem}
 
-  section{margin-top:3.5rem}
-  h2{font-size:.95rem;font-weight:500;margin:0 0 1rem;padding-bottom:.7rem;
-    border-bottom:1px solid var(--line)}
+  .eyebrow{font-family:"Plex Mono",monospace;font-size:.68rem;
+    letter-spacing:.2em;text-transform:uppercase;color:var(--ink-4)}
 
-  .row{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(17rem,1fr))}
+  /* ── หัวเรื่อง ── */
+  header{background:var(--abyss);color:var(--frost);padding:5rem 0 4.5rem;margin-bottom:4rem}
+  header .eyebrow{color:#7c9bd0}
+  h1{font-size:clamp(1.6rem,4vw,2.25rem);font-weight:300;letter-spacing:-.015em;
+    line-height:1.3;margin:1.1rem 0 0;max-width:22ch}
+  .claim{margin:2.4rem 0 0;max-width:42ch;font-size:1rem;line-height:1.8;
+    color:#a9c2e8;font-weight:300}
+  .claim b{color:var(--frost);font-weight:400}
+
+  section{margin:0 0 4.5rem}
+  h2{font-size:1.02rem;font-weight:500;margin:0 0 .5rem;letter-spacing:-.005em}
+  .sub{color:var(--ink-3);font-size:.9rem;line-height:1.75;max-width:46ch;margin:0 0 1.5rem}
+  .sub b{color:var(--ink-2);font-weight:500}
+  hr{border:0;border-top:1px solid var(--line);margin:0 0 1.4rem}
+
+  /* ── การ์ดตัวอย่าง ── */
+  .row{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(16rem,1fr))}
   .card{border:1px solid var(--line);border-radius:.6rem;overflow:hidden;background:var(--paper)}
-  .stage{display:flex;align-items:center;justify-content:center;padding:2.2rem 1.5rem;min-height:8.5rem}
+  .stage{display:flex;align-items:center;justify-content:center;padding:2.4rem 1.6rem;min-height:8.5rem}
   .stage.light{background:var(--paper)}
   .stage.tint{background:var(--paper-2)}
   .stage.dark{background:var(--abyss)}
-  .stage img{max-width:100%;height:auto}
-  .stage .lg{width:15rem}
-  .stage .sm{width:3.2rem}
-  .foot{display:flex;justify-content:space-between;gap:1rem;align-items:baseline;
-    padding:.7rem .9rem;border-top:1px solid var(--line);background:var(--paper-2)}
-  .foot a{font-family:"Plex Mono",monospace;font-size:.68rem;color:var(--signal);
+  .stage img{max-width:100%;height:auto;display:block}
+  .stage .lg{width:14rem}
+  .stage .sm{width:3rem}
+  .foot{display:flex;justify-content:space-between;gap:.8rem;align-items:baseline;
+    padding:.65rem .85rem;border-top:1px solid var(--line);background:var(--paper-2)}
+  .foot a{font-family:"Plex Mono",monospace;font-size:.66rem;color:var(--signal);
     text-decoration:none;word-break:break-all}
   .foot a:hover{text-decoration:underline}
-  .foot span{font-family:"Plex Mono",monospace;font-size:.66rem;color:var(--ink-4);white-space:nowrap}
+  .foot span{font-family:"Plex Mono",monospace;font-size:.63rem;color:var(--ink-4);white-space:nowrap}
 
-  table{width:100%;border-collapse:collapse;font-size:.84rem}
-  th,td{text-align:left;padding:.6rem .5rem;border-bottom:1px solid var(--line);vertical-align:top}
-  th{font-family:"Plex Mono",monospace;font-size:.66rem;letter-spacing:.14em;
+  /* ── ความหมาย ── */
+  .meaning{display:grid;gap:2.2rem;align-items:center;grid-template-columns:1fr}
+  @media(min-width:46rem){.meaning{grid-template-columns:19rem 1fr;gap:3rem}}
+  .meaning figure{margin:0;background:var(--paper-2);border:1px solid var(--line);
+    border-radius:.6rem;padding:1.4rem}
+  .legend{margin:0;padding:0;list-style:none}
+  .legend li{display:grid;grid-template-columns:1.6rem 1fr;gap:.8rem;
+    padding:1rem 0;border-top:1px solid var(--line-2)}
+  .legend li:first-child{border-top:0;padding-top:0}
+  .legend .n{font-family:"Plex Mono",monospace;font-size:.66rem;color:var(--signal);padding-top:.2rem}
+  .legend b{display:block;font-weight:500;font-size:.92rem;margin-bottom:.3rem}
+  .legend p{margin:0;color:var(--ink-3);font-size:.86rem;line-height:1.75}
+
+  /* ── ตาราง ── */
+  table{width:100%;border-collapse:collapse;font-size:.86rem}
+  th,td{text-align:left;padding:.75rem .5rem;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-family:"Plex Mono",monospace;font-size:.63rem;letter-spacing:.14em;
     text-transform:uppercase;color:var(--ink-4);font-weight:400}
-  td.mono{font-family:"Plex Mono",monospace;font-size:.78rem}
+  td{color:var(--ink-3);line-height:1.7}
+  td b{color:var(--ink);font-weight:500}
+  td.k{font-family:"Plex Mono",monospace;font-size:.76rem;color:var(--ink-2);white-space:nowrap}
   .swatch{display:inline-block;width:.85rem;height:.85rem;border-radius:.2rem;
-    vertical-align:-.1rem;margin-right:.45rem;border:1px solid rgba(10,22,51,.12)}
-  ul{margin:.4rem 0 0;padding-left:1.1rem;color:var(--ink-3);font-size:.88rem;line-height:1.8}
+    vertical-align:-.1rem;margin-right:.5rem;border:1px solid rgba(10,22,51,.14)}
+
+  /* ── บันไดขนาด ── */
+  .ladder{border:1px solid var(--line);border-radius:.6rem;overflow:hidden}
+  .rung{display:flex;align-items:center;gap:1.2rem;padding:1.4rem 1.5rem;
+    border-top:1px solid var(--line-2)}
+  .rung:first-child{border-top:0}
+  .rung img{display:block}
+  .rung .note{font-family:"Plex Mono",monospace;font-size:.64rem;color:var(--ink-4);
+    margin-left:auto;text-align:right;line-height:1.6}
+  .rung.no{background:repeating-linear-gradient(-45deg,#fff,#fff 9px,#fdf6f6 9px,#fdf6f6 18px)}
+  .rung.no .note{color:#9c3b3b}
+
+  ul.plain{margin:0;padding-left:1.15rem;color:var(--ink-3);font-size:.88rem;line-height:1.9}
+  ul.plain b{color:var(--ink);font-weight:500}
   code{font-family:"Plex Mono",monospace;font-size:.85em;background:var(--paper-2);
-    padding:.1rem .3rem;border-radius:.2rem}
+    padding:.12rem .32rem;border-radius:.2rem;color:var(--ink-2)}
+  footer{border-top:1px solid var(--line);padding:2rem 0 4rem;
+    font-family:"Plex Mono",monospace;font-size:.65rem;color:var(--ink-4)}
 </style>
 
-<div class="wrap">
-  <p class="label">brand</p>
-  <h1>โลโก้ PARALLAX</h1>
-  <p class="lead">
-    ทุกไฟล์ในหน้านี้สร้างจากรูปทรงเดียวกับที่เว็บใช้จริง
-    (<code>components/brand.tsx</code>) ไม่ได้วาดใหม่ให้คล้าย —
-    ตัวอักษรคือ IBM Plex Sans Thai น้ำหนัก 500 ระยะห่างตัวอักษร 0.24em
-  </p>
+<header>
+  <div class="shell">
+    <p class="eyebrow">brand · v1</p>
+    <h1>โลโก้ PARALLAX และกฎที่ทำให้มันยังเป็นตัวเดิมในอีกสามปี</h1>
+    <p class="claim">
+      กลุ่มหนึ่งได้รับข้อความ กลุ่มหนึ่งไม่ —
+      <b>ส่วนต่างคือความจริง</b>
+    </p>
+  </div>
+</header>
 
+<div class="shell">
+
+  <!-- ── ความหมาย ─────────────────────────────────────────── -->
   <section>
-    <h2>โลโก้เต็ม</h2>
+    <h2>เครื่องหมายนี้ไม่ใช่ภูเขา</h2>
+    <p class="sub">
+      มันคือแผนภาพการวัดระยะแบบ parallax — วิธีที่มนุษย์วัดระยะถึงดาว
+      คือมองจากสองตำแหน่งแล้ววัดส่วนต่าง
+      ซึ่งเป็นสิ่งเดียวกับที่ระบบนี้ทำกับทุกแคมเปญ
+    </p>
+    <hr>
+    <div class="meaning">
+      <figure>
+        <svg viewBox="0 0 300 252" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto">
+          <g stroke="#0047ff" stroke-width="1" stroke-dasharray="3 4" opacity="0.55">
+            <line x1="60" y1="200" x2="60" y2="228"/>
+            <line x1="240" y1="200" x2="240" y2="228"/>
+          </g>
+          <g font-family="Plex Mono, monospace" font-size="9" fill="#5b6b8c">
+            <text x="60" y="243" text-anchor="middle">treated</text>
+            <text x="240" y="243" text-anchor="middle">holdout</text>
+          </g>
+
+          <path d="M60 190 L150 40 L240 190" fill="none" stroke="#0a1633"
+                stroke-width="11" stroke-linecap="round"/>
+          <path d="M60 190 L240 190" fill="none" stroke="#0a1633"
+                stroke-width="11" stroke-linecap="round" opacity="0.35"/>
+          <circle cx="150" cy="40" r="19" fill="#0047ff"/>
+
+          <g font-family="Plex Mono, monospace" font-size="11" fill="#0047ff">
+            <text x="150" y="16" text-anchor="middle">01</text>
+            <text x="88" y="116">02</text>
+            <text x="150" y="176" text-anchor="middle">03</text>
+          </g>
+        </svg>
+      </figure>
+
+      <ol class="legend">
+        <li>
+          <span class="n">01</span>
+          <div>
+            <b>จุดบนยอด — ความจริงที่ต้องการวัด</b>
+            <p>ลูกค้าที่กลับมา เป็นสิ่งเดียวในภาพที่ทึบเต็มดวง
+              เพราะทุกอย่างที่เหลือมีอยู่เพื่อไปถึงจุดนี้</p>
+          </div>
+        </li>
+        <li>
+          <span class="n">02</span>
+          <div>
+            <b>เส้นเล็งสองเส้น — สองมุมมองต่อสิ่งเดียวกัน</b>
+            <p>กลุ่มที่ได้รับข้อความ และกลุ่มที่กันไว้ไม่ส่ง
+              จุดยอดวัดได้ก็ต่อเมื่อมีเส้นเล็งครบสอง ไม่ใช่เส้นเดียว</p>
+          </div>
+        </li>
+        <li>
+          <span class="n">03</span>
+          <div>
+            <b>เส้นฐาน — เครื่องมือวัด ไม่ใช่ประธานของภาพ</b>
+            <p>จางกว่าเส้นอื่นโดยตั้งใจ ในการวัดแบบ parallax
+              ความยาวเส้นฐานคือตัวกำหนดความแม่นยำ —
+              มันสำคัญที่สุดและถ่อมตัวที่สุดพร้อมกัน</p>
+          </div>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- ── โลโก้หลัก ─────────────────────────────────────────── -->
+  <section>
+    <h2>โลโก้หลัก</h2>
+    <p class="sub">
+      ค่าตั้งต้นทุกที่ที่โลโก้ได้ยืนคนเดียว
+      สีเดียวเสมอ — เครื่องหมายกับตัวอักษรใช้สีเดียวกันไม่มีข้อยกเว้น
+    </p>
+    <hr>
     <div class="row">
       <div class="card">
-        <div class="stage light"><img class="lg" src="parallax-logo-ink.svg" alt="PARALLAX สีหมึก"></div>
+        <div class="stage light"><img class="lg" src="parallax-logo-ink.svg" alt="PARALLAX"></div>
         <div class="foot"><a href="parallax-logo-ink.svg" download>parallax-logo-ink.svg</a><span>พื้นสว่าง</span></div>
       </div>
       <div class="card">
-        <div class="stage dark"><img class="lg" src="parallax-logo-white.svg" alt="PARALLAX สีขาว"></div>
+        <div class="stage dark"><img class="lg" src="parallax-logo-white.svg" alt="PARALLAX"></div>
         <div class="foot"><a href="parallax-logo-white.svg" download>parallax-logo-white.svg</a><span>พื้นเข้ม</span></div>
       </div>
       <div class="card">
-        <div class="stage tint"><img class="lg" src="parallax-logo-signal.svg" alt="PARALLAX สีน้ำเงิน"></div>
+        <div class="stage tint"><img class="lg" src="parallax-logo-signal.svg" alt="PARALLAX"></div>
         <div class="foot"><a href="parallax-logo-signal.svg" download>parallax-logo-signal.svg</a><span>สีเน้น</span></div>
       </div>
     </div>
   </section>
 
+  <!-- ── โลโก้รอง ─────────────────────────────────────────── -->
+  <section>
+    <h2>โลโก้รอง — เครื่องหมายสูงเท่าตัว P</h2>
+    <p class="sub">
+      ตัวหลักมีเครื่องหมายสูงกว่าตัวอักษร 1.37 เท่า ซึ่งถูกต้องตอนยืนเดี่ยว
+      แต่จะข่มโลโก้ข้าง ๆ ทุกครั้งที่ต้องยืนเรียงกัน
+      ตัวนี้ลดเครื่องหมายลงจนสูงเท่าตัว P พอดีและบีบระยะให้แคบลง
+      <b>ใช้เมื่อมีโลโก้เจ้าอื่นอยู่ในแถวเดียวกัน</b> — co-branding · ท้ายเอกสาร · แถบพาร์ทเนอร์
+    </p>
+    <hr>
+    <div class="row">
+      <div class="card">
+        <div class="stage light"><img class="lg" src="parallax-logo-compact-ink.svg" alt="PARALLAX"></div>
+        <div class="foot"><a href="parallax-logo-compact-ink.svg" download>parallax-logo-compact-ink.svg</a><span>พื้นสว่าง</span></div>
+      </div>
+      <div class="card">
+        <div class="stage dark"><img class="lg" src="parallax-logo-compact-white.svg" alt="PARALLAX"></div>
+        <div class="foot"><a href="parallax-logo-compact-white.svg" download>parallax-logo-compact-white.svg</a><span>พื้นเข้ม</span></div>
+      </div>
+      <div class="card">
+        <div class="stage tint"><img class="lg" src="parallax-logo-compact-signal.svg" alt="PARALLAX"></div>
+        <div class="foot"><a href="parallax-logo-compact-signal.svg" download>parallax-logo-compact-signal.svg</a><span>สีเน้น</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── เครื่องหมาย ───────────────────────────────────────── -->
   <section>
     <h2>เครื่องหมายอย่างเดียว</h2>
+    <p class="sub">
+      ใช้เมื่อพื้นที่แคบเกินกว่าตัวอักษรจะอ่านออก — favicon · รูปโปรไฟล์ · ไอคอนแอป
+      หรือเมื่อชื่อแบรนด์ปรากฏอยู่แล้วในบริบทนั้น
+    </p>
+    <hr>
     <div class="row">
       <div class="card">
         <div class="stage light"><img class="sm" src="parallax-mark-ink.svg" alt=""></div>
@@ -104,24 +255,122 @@
     </div>
   </section>
 
+  <!-- ── กฎ ───────────────────────────────────────────────── -->
   <section>
-    <h2>PNG — พื้นหลังโปร่งใส</h2>
-    <p class="lead" style="margin-bottom:1rem">
-      แปลงมาจากไฟล์ SVG ข้างบนตัวต่อตัว จึงไม่มีทางเพี้ยนจากกัน
+    <h2>สามกฎ วัดจากตัวโลโก้เอง</h2>
+    <p class="sub">
+      ทุกกฎอ้างอิงส่วนใดส่วนหนึ่งของโลโก้ ไม่ใช่ตัวเลขพิกเซลตายตัว
+      จึงยังถูกต้องไม่ว่าจะย่อขยายเท่าไร
+    </p>
+    <hr>
+    <table>
+      <tr><th>กฎ</th><th>ค่า</th><th>ทำไม</th></tr>
+      <tr>
+        <td><b>ระยะปลอดภัย</b></td>
+        <td class="k">= ความสูงตัว P</td>
+        <td>ไม่มีอะไรล้ำเข้ามาในกรอบนี้ — ตัวอักษร เส้นขอบ ขอบกระดาษ หรือโลโก้เจ้าอื่น
+            วัดจากตัว P เพราะตัวอักษรคือส่วนที่เสียหายก่อนเมื่อถูกเบียด</td>
+      </tr>
+      <tr>
+        <td><b>baseline rule</b></td>
+        <td class="k">เส้นฐาน 35%</td>
+        <td>เส้นฐานของสามเหลี่ยมจางกว่าเส้นอื่นเสมอ ห้ามทำให้ทึบเท่ากัน —
+            ในการวัดแบบ parallax เส้นฐานคือเครื่องมือ ไม่ใช่สิ่งที่ถูกวัด</td>
+      </tr>
+      <tr>
+        <td><b>ขนาดต่ำสุด</b></td>
+        <td class="k">โลโก้ 96px<br>เครื่องหมาย 16px</td>
+        <td>ต่ำกว่านี้จุดยอดเริ่มกลืนกับเส้น และช่องไฟ 0.24em ทำให้ตัวอักษรแตกเป็นเสี่ยง
+            ดูของจริงข้างล่างแล้วตัดสินเอง ไม่ต้องเชื่อตัวเลข</td>
+      </tr>
+    </table>
+  </section>
+
+  <!-- ── ระยะปลอดภัย ──────────────────────────────────────── -->
+  <section>
+    <h2>ระยะปลอดภัย</h2>
+    <p class="sub">กรอบเส้นประคือเขตห้ามล้ำ ด้านละหนึ่งความสูงของตัว P</p>
+    <hr>
+    <div style="border:1px solid var(--line);border-radius:.6rem;background:var(--paper-2);padding:2.6rem 1.5rem">
+      <svg viewBox="-160 -110 1523 357" xmlns="http://www.w3.org/2000/svg"
+           style="display:block;width:100%;height:auto;max-width:46rem;margin:0 auto">
+        <rect x="-100" y="-100" width="1403.06" height="337.06" fill="none"
+              stroke="#0047ff" stroke-width="3" stroke-dasharray="11 11" opacity="0.5"/>
+        <g stroke="#0047ff" stroke-width="2.5" opacity="0.75">
+          <line x1="-140" y1="0" x2="-108" y2="0"/>
+          <line x1="-140" y1="100" x2="-108" y2="100"/>
+          <line x1="-124" y1="0" x2="-124" y2="100"/>
+        </g>
+        <text x="-152" y="60" font-family="Plex Mono, monospace" font-size="34"
+              fill="#0047ff" text-anchor="end" transform="translate(0,0)">P</text>
+        <image href="parallax-logo-ink.svg" x="0" y="0" width="1203.06" height="137.06"/>
+      </svg>
+    </div>
+  </section>
+
+  <!-- ── บันไดขนาด ────────────────────────────────────────── -->
+  <section>
+    <h2>ขนาดจริงบนหน้าจอนี้</h2>
+    <p class="sub">ขนาดต่ำสุดไม่ใช่ความเห็น — เลื่อนลงจนอ่านไม่ออก นั่นคือเส้นแบ่ง</p>
+    <hr>
+    <div class="ladder">
+      <div class="rung">
+        <img src="parallax-logo-ink.svg" width="240" alt="">
+        <span class="note">240px<br>สบาย</span>
+      </div>
+      <div class="rung">
+        <img src="parallax-logo-ink.svg" width="144" alt="">
+        <span class="note">144px<br>ท้ายเอกสาร</span>
+      </div>
+      <div class="rung">
+        <img src="parallax-logo-ink.svg" width="96" alt="">
+        <span class="note">96px<br>ต่ำสุดที่ยอมรับ</span>
+      </div>
+      <div class="rung no">
+        <img src="parallax-logo-ink.svg" width="64" alt="">
+        <span class="note">64px<br>เลิกใช้ตัวเต็ม → เปลี่ยนไปใช้เครื่องหมาย</span>
+      </div>
+      <div class="rung">
+        <img src="parallax-mark-ink.svg" height="32" alt="">
+        <img src="parallax-mark-ink.svg" height="24" alt="">
+        <img src="parallax-mark-ink.svg" height="16" alt="">
+        <span class="note">32 · 24 · 16px<br>เครื่องหมายยังอ่านออกถึง 16px</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── PNG ──────────────────────────────────────────────── -->
+  <section>
+    <h2>PNG พื้นหลังโปร่งใส</h2>
+    <p class="sub">
+      เรนเดอร์จากไฟล์ SVG ข้างบนตัวต่อตัว จึงไม่มีทางเพี้ยนจากกัน
       ใช้กับที่ที่รับ SVG ไม่ได้ — LINE · Slack · Word · รูปโปรไฟล์
     </p>
+    <hr>
     <div class="row">
       <div class="card">
         <div class="stage light"><img class="lg" src="parallax-logo-ink.png" alt=""></div>
-        <div class="foot"><a href="parallax-logo-ink.png" download>parallax-logo-ink.png</a><span>2400×269</span></div>
+        <div class="foot"><a href="parallax-logo-ink.png" download>parallax-logo-ink.png</a><span>2400 กว้าง</span></div>
       </div>
       <div class="card">
         <div class="stage dark"><img class="lg" src="parallax-logo-white.png" alt=""></div>
-        <div class="foot"><a href="parallax-logo-white.png" download>parallax-logo-white.png</a><span>2400×269</span></div>
+        <div class="foot"><a href="parallax-logo-white.png" download>parallax-logo-white.png</a><span>2400 กว้าง</span></div>
       </div>
       <div class="card">
         <div class="stage tint"><img class="lg" src="parallax-logo-signal.png" alt=""></div>
-        <div class="foot"><a href="parallax-logo-signal.png" download>parallax-logo-signal.png</a><span>2400×269</span></div>
+        <div class="foot"><a href="parallax-logo-signal.png" download>parallax-logo-signal.png</a><span>2400 กว้าง</span></div>
+      </div>
+      <div class="card">
+        <div class="stage light"><img class="lg" src="parallax-logo-compact-ink.png" alt=""></div>
+        <div class="foot"><a href="parallax-logo-compact-ink.png" download>parallax-logo-compact-ink.png</a><span>รอง · 2400</span></div>
+      </div>
+      <div class="card">
+        <div class="stage dark"><img class="lg" src="parallax-logo-compact-white.png" alt=""></div>
+        <div class="foot"><a href="parallax-logo-compact-white.png" download>parallax-logo-compact-white.png</a><span>รอง · 2400</span></div>
+      </div>
+      <div class="card">
+        <div class="stage tint"><img class="lg" src="parallax-logo-compact-signal.png" alt=""></div>
+        <div class="foot"><a href="parallax-logo-compact-signal.png" download>parallax-logo-compact-signal.png</a><span>รอง · 2400</span></div>
       </div>
       <div class="card">
         <div class="stage light"><img class="sm" src="parallax-mark-ink.png" alt=""></div>
@@ -138,43 +387,70 @@
     </div>
   </section>
 
+  <!-- ── สี ───────────────────────────────────────────────── -->
   <section>
     <h2>สี</h2>
+    <p class="sub">โลโก้ใช้ได้สามค่านี้เท่านั้น ไม่มีค่าที่สี่</p>
+    <hr>
     <table>
       <tr><th>ชื่อ</th><th>ค่า</th><th>ใช้เมื่อ</th></tr>
       <tr>
-        <td><span class="swatch" style="background:#0a1633"></span>ink</td>
-        <td class="mono">#0a1633</td>
-        <td>โลโก้บนพื้นสว่าง — ค่าตั้งต้น</td>
+        <td><b><span class="swatch" style="background:#0a1633"></span>ink</b></td>
+        <td class="k">#0a1633</td>
+        <td>พื้นสว่าง — ค่าตั้งต้น</td>
       </tr>
       <tr>
-        <td><span class="swatch" style="background:#ffffff"></span>paper</td>
-        <td class="mono">#ffffff</td>
-        <td>โลโก้บนพื้นเข้ม</td>
+        <td><b><span class="swatch" style="background:#fff"></span>paper</b></td>
+        <td class="k">#ffffff</td>
+        <td>พื้นเข้มและภาพถ่าย</td>
       </tr>
       <tr>
-        <td><span class="swatch" style="background:#0047ff"></span>signal</td>
-        <td class="mono">#0047ff</td>
-        <td>สีเน้นของแบรนด์ · favicon</td>
+        <td><b><span class="swatch" style="background:#0047ff"></span>signal</b></td>
+        <td class="k">#0047ff</td>
+        <td>สีเน้นของแบรนด์ · favicon · เมื่อโลโก้ต้องเป็นสิ่งเดียวที่เห็นในเฟรม</td>
       </tr>
       <tr>
-        <td><span class="swatch" style="background:#00113d"></span>abyss</td>
-        <td class="mono">#00113d</td>
-        <td>พื้นเข้มที่ตั้งใจให้โลโก้ขาวไปวาง</td>
+        <td><b><span class="swatch" style="background:#00113d"></span>abyss</b></td>
+        <td class="k">#00113d</td>
+        <td>ไม่ใช่สีของโลโก้ — เป็นพื้นเข้มที่โลโก้ขาวถูกออกแบบมาให้ไปวาง</td>
       </tr>
     </table>
   </section>
 
+  <!-- ── ห้าม ─────────────────────────────────────────────── -->
   <section>
-    <h2>ข้อควรระวัง</h2>
-    <ul>
-      <li>โลโก้เป็นสีเดียวเสมอ — เว็บใช้ <code>currentColor</code> ทั้งเครื่องหมายและตัวอักษร ไม่มีเวอร์ชันสองสี</li>
-      <li>เว้นระยะรอบโลโก้อย่างน้อยเท่าความสูงของตัว P</li>
-      <li>เส้นฐานของสามเหลี่ยมจาง 35% โดยตั้งใจ อย่าทำให้ทึบเท่าเส้นอื่น</li>
-      <li>ต่ำกว่าราว 90px กว้าง ให้ใช้เครื่องหมายอย่างเดียว ตัวอักษรจะอ่านไม่ออก</li>
-      <li>อย่าตั้งคำว่า PARALLAX ด้วยฟอนต์อื่น หรือเปลี่ยนระยะห่างตัวอักษร</li>
-      <li><code>parallax-logo-editable.svg</code> ไม่ได้ฝังฟอนต์ไว้ — เครื่องที่เปิดต้องมี IBM Plex Sans Thai
-          (โหลดฟรีจาก Google Fonts) ส่วนไฟล์อื่นฝังมาแล้ว เปิดที่ไหนก็ตรง</li>
+    <h2>สิ่งที่ทำไม่ได้</h2>
+    <hr>
+    <ul class="plain">
+      <li><b>อย่าทำเป็นสองสี</b> — เว็บใช้ <code>currentColor</code> ทั้งเครื่องหมายและตัวอักษร
+          ความเป็นสีเดียวคือคำประกาศว่าทั้งสองเป็นเนื้อเดียวกัน</li>
+      <li><b>อย่าตั้งคำว่า PARALLAX ด้วยฟอนต์อื่น</b> หรือเปลี่ยนช่องไฟจาก 0.24em</li>
+      <li><b>อย่าทำให้เส้นฐานทึบ</b> — ดู baseline rule ข้างบน</li>
+      <li><b>อย่าใส่กรอบ เงา หรือไล่สี</b> ให้เครื่องหมาย</li>
+      <li><b>อย่ายืดหรือบีบ</b> — ย่อขยายตามสัดส่วนเท่านั้น</li>
+      <li><b>อย่าวางบนภาพที่ยุ่ง</b> — ถ้าต้องวางบนภาพ ใช้สีขาวและหาบริเวณที่นิ่งพอ</li>
+    </ul>
+  </section>
+
+  <!-- ── หมายเหตุ ─────────────────────────────────────────── -->
+  <section>
+    <h2>หมายเหตุทางเทคนิค</h2>
+    <hr>
+    <ul class="plain">
+      <li>ไฟล์ทุกตัวสร้างจาก <code>scripts/gen-brand.mjs</code> ซึ่งอ่านรูปทรงจาก
+          <code>components/brand.tsx</code> — ถ้าโลโก้บนเว็บเปลี่ยน ให้แก้ที่นั่นแล้วรันสคริปต์ซ้ำ
+          <b>อย่าแก้ svg ทีละไฟล์</b></li>
+      <li>ไฟล์ล็อกอัพฝังฟอนต์ Plex ชุด latin ไว้ในตัว เปิดในเครื่องที่ไม่เคยลงฟอนต์ก็ยังถูก</li>
+      <li><code>parallax-logo-editable.svg</code> ปล่อยตัวอักษรเป็นตัวอักษรไว้ให้แก้ใน Figma
+          หรือ Illustrator — เครื่องนั้นต้องมี IBM Plex Sans Thai (โหลดฟรีจาก Google Fonts)</li>
+      <li>ทุกไฟล์ตัดพอดีหมึก ไม่มีขอบว่างในตัวไฟล์ ระยะปลอดภัยเป็นสิ่งที่คนวางต้องเว้นเอง</li>
+      <li>บนเว็บ เครื่องหมายขยับขึ้นเล็กน้อยเมื่อเอาเมาส์ชี้ —
+          วัตถุดูเหมือนเลื่อนเมื่อผู้มองเปลี่ยนตำแหน่ง ซึ่งคือนิยามของคำว่า parallax
+          <b>เก็บพฤติกรรมนี้ไว้</b> ถ้าเขียนโลโก้ใหม่ที่อื่น</li>
     </ul>
   </section>
 </div>
+
+<footer>
+  <div class="shell">parallax · brand v1 · สร้างจาก scripts/gen-brand.mjs</div>
+</footer>

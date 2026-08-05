@@ -1,14 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1222.3 137.06" width="1222.3" height="137.06" role="img" aria-label="PARALLAX">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1203.06 137.06" width="1203.06" height="137.06" role="img" aria-label="PARALLAX">
   <title>PARALLAX</title>
-  <g transform="translate(0 23.83)">
-    <path d="M23.56 108.91 L94.25 -8.91 L164.94 108.91"
+  
+  <g transform="translate(-19.24 18.53)">
+    <path d="M23.56 114.21 L94.25 -3.61 L164.94 114.21"
           fill="none" stroke="#0a1633" stroke-width="8.64" stroke-linecap="round"/>
-    <path d="M23.56 108.91 L164.94 108.91"
+    <path d="M23.56 114.21 L164.94 114.21"
           fill="none" stroke="#0a1633" stroke-width="8.64" stroke-linecap="round" opacity="0.35"/>
-    <circle cx="94.25" cy="-8.91" r="14.92" fill="#0a1633"/>
+    <circle cx="94.25" cy="-3.61" r="14.92" fill="#0a1633"/>
     <text x="282.76" y="100" fill="#0a1633"
-          font-family="IBM Plex Sans Thai, IBM Plex Sans, Helvetica Neue, Arial, sans-serif"
-          font-weight="500" font-size="143.27" letter-spacing="34.38"
+          font-family="IBM Plex Sans Thai, IBM Plex Sans, Helvetica Neue, Arial, sans-serif" font-weight="500"
+          font-size="143.27" letter-spacing="34.38"
           xml:space="preserve">PARALLAX</text>
   </g>
 </svg>

@@ -1,10 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150.02 137.06" width="150.02" height="137.06" role="img" aria-label="PARALLAX">
   <title>PARALLAX</title>
-  <g transform="translate(-19.24 23.83)">
-    <path d="M23.56 108.91 L94.25 -8.91 L164.94 108.91"
+  <g transform="translate(-19.24 -20.42)">
+    <path d="M23.56 153.16 L94.25 35.35 L164.94 153.16"
           fill="none" stroke="#0047ff" stroke-width="8.64" stroke-linecap="round"/>
-    <path d="M23.56 108.91 L164.94 108.91"
+    <path d="M23.56 153.16 L164.94 153.16"
           fill="none" stroke="#0047ff" stroke-width="8.64" stroke-linecap="round" opacity="0.35"/>
-    <circle cx="94.25" cy="-8.91" r="14.92" fill="#0047ff"/>
+    <circle cx="94.25" cy="35.35" r="14.92" fill="#0047ff"/>
   </g>
 </svg>
