@@ -118,11 +118,15 @@ export async function usageFor(
   const identified = await identifiedCount(tenantId);
 
   /* COUNT และ SUM คืน bigint/numeric จาก Postgres — แปลงทั้งคู่ ไม่งั้น
-     ยอดข้อความจะเป็นสตริงแล้วการบวกกลายเป็นการต่อข้อความ */
+     ยอดข้อความจะเป็นสตริงแล้วการบวกกลายเป็นการต่อข้อความ
+
+     แถว 'simulated' ไม่ใช่การใช้งาน: ยังไม่มีอะไรถูกส่งและไม่ได้ตัดเครดิต
+     (ดู DELIVERY_CONNECTED ใน dispatch.ts) — นับเข้าไปแล้วหน้าบิลจะบอกว่า
+     ใช้ข้อความไปหลายพันทั้งที่ลูกค้าไม่ได้รับสักข้อความ */
   const msgRaw = await get<{ n: number | string; c: number | string }>(
     `SELECT COUNT(*) AS n, COALESCE(SUM(m.cost), 0) AS c
      FROM messages m JOIN campaigns c2 ON c2.id = m.campaign_id
-     WHERE c2.tenant_id = ? AND m.sent_at >= ?`,
+     WHERE c2.tenant_id = ? AND m.sent_at >= ? AND m.status <> 'simulated'`,
     tenantId,
     startIso,
   );
@@ -132,7 +136,8 @@ export async function usageFor(
     (
       await get<{ n: number | string }>(
         `SELECT COUNT(*) AS n FROM messages m
-         JOIN campaigns c2 ON c2.id = m.campaign_id WHERE c2.tenant_id = ?`,
+         JOIN campaigns c2 ON c2.id = m.campaign_id
+         WHERE c2.tenant_id = ? AND m.status <> 'simulated'`,
         tenantId,
       )
     )?.n ?? 0,

@@ -229,6 +229,16 @@ export async function sendAction(
     };
   }
 
+  /* ยังไม่ได้เชื่อม LINE — ห้ามพูดว่า "ส่งแล้ว" และไม่มีเครดิตให้รายงาน */
+  if (res.simulated) {
+    const again = res.skippedAlreadySent > 0 ? ` · ${num(res.skippedAlreadySent)} คนบันทึกไว้ก่อนแล้ว` : "";
+    return {
+      ok:
+        `จำลองการส่ง ${num(res.sent)} คน${again} — ยังไม่ได้เชื่อม LINE OA ` +
+        `จึงยังไม่มีข้อความออกไปถึงลูกค้า และไม่ตัดเครดิต`,
+    };
+  }
+
   if (res.sent === 0 && res.skippedAlreadySent > 0) {
     return {
       ok: `Everyone already had this message — ${num(res.skippedAlreadySent)} recipients, nothing sent twice.`,

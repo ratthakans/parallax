@@ -4,7 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { playById } from "@/lib/shared/plays";
 import { loadAttributions } from "@/lib/engine/proof";
-import { armFor, renderForCustomer } from "@/lib/engine/dispatch";
+import { armFor, DELIVERY_CONNECTED, renderForCustomer } from "@/lib/engine/dispatch";
 
 import { profileFor } from "@/lib/shared/tenants";
 import type { Verdict } from "@/lib/shared/types";
@@ -142,12 +142,17 @@ export default async function CampaignDetail({
               fullySent ? "text-[var(--c-good)]" : "text-[var(--c-accent)]"
             }`}
           >
-            {fullySent ? "Sent — waiting on results" : "One step left"}
+            {fullySent
+              ? DELIVERY_CONNECTED
+                ? "Sent — waiting on results"
+                : "จำลองการส่งแล้ว — ยังไม่มีข้อความออกไปจริง"
+              : "One step left"}
           </p>
           <p className="c-thai mt-2 max-w-3xl text-[0.88rem] leading-relaxed text-[var(--c-text-2)]">
             {fullySent ? (
               <>
-                {num(sentCount)} sent · {num(camp.holdout_size)} held back
+                {num(sentCount)} {DELIVERY_CONNECTED ? "sent" : "บันทึกไว้ (ยังไม่ได้เชื่อม LINE OA)"} ·{" "}
+                {num(camp.holdout_size)} held back
                 {camp.holdout_size > 0 ? (
                   <>
                     {" "}— first readable around {dueDate(30)}, fully concluded{" "}
@@ -157,10 +162,15 @@ export default async function CampaignDetail({
                   <> — no control group here, so the result indicates direction only</>
                 )}
               </>
-            ) : (
+            ) : DELIVERY_CONNECTED ? (
               <>
                 The list is frozen and nobody has received anything yet. Press “Send”
                 below to finish — pressing twice does not send twice.
+              </>
+            ) : (
+              <>
+                ล็อกรายชื่อแล้ว ยังไม่ได้เชื่อม LINE OA ปุ่มด้านล่างจึงแค่บันทึกว่าใครอยู่ในกลุ่มที่ได้รับ
+                เพื่อเริ่มนับผล — ไม่มีข้อความออกไปถึงลูกค้า และไม่ตัดเครดิต
               </>
             )}
           </p>
@@ -177,10 +187,14 @@ export default async function CampaignDetail({
               fields={{ tenantId, campaignId: camp.id }}
               label={
                 fullySent
-                  ? `All sent · ${num(sentCount)}`
-                  : `Send — ${num(remaining)} recipients`
+                  ? DELIVERY_CONNECTED
+                    ? `All sent · ${num(sentCount)}`
+                    : `จำลองครบแล้ว · ${num(sentCount)}`
+                  : DELIVERY_CONNECTED
+                    ? `Send — ${num(remaining)} recipients`
+                    : `จำลองการส่ง — ${num(remaining)} คน`
               }
-              pendingLabel={`Sending to ${num(remaining)}…`}
+              pendingLabel={DELIVERY_CONNECTED ? `Sending to ${num(remaining)}…` : `กำลังบันทึก ${num(remaining)} คน…`}
               variant={fullySent ? "ghost" : "primary"}
               disabled={fullySent}
             />
@@ -204,9 +218,9 @@ export default async function CampaignDetail({
           tone="muted"
         />
         <Metric
-          label="Messages sent"
+          label={DELIVERY_CONNECTED ? "Messages sent" : "จำลองการส่ง"}
           value={num(sentCount)}
-          sub="Pressing send again adds none"
+          sub={DELIVERY_CONNECTED ? "Pressing send again adds none" : "ยังไม่ได้ส่งจริง · ไม่ตัดเครดิต"}
         />
       </Panel>
 

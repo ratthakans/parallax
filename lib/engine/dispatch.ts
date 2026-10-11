@@ -1,4 +1,4 @@
-import { all, get, tx } from "@/lib/engine/sql";
+import { all, get, insertMany, tx } from "@/lib/engine/sql";
 import { logActivity } from "@/lib/engine/db";
 import { createHash, randomUUID } from "node:crypto";
 import { effectiveGuards, getTenant, getTenantPlays, pickMeasurement } from "@/lib/engine/match";
@@ -219,9 +219,30 @@ export async function approveCampaign(
 
 /* ── ส่งจริง — idempotent ───────────────────────────────────── */
 
+/* ── ยังไม่มีช่องทางส่งจริง ───────────────────────────────────
+
+   ระบบยังไม่ได้เชื่อม LINE Messaging API หรือช่องทางใดเลย ทั้ง repo ไม่มีการเรียก
+   API ส่งข้อความสักจุด แต่ของเดิมบันทึกว่า "sent" ตัดเครดิต แล้วหน้าจอขึ้นว่า
+   "Sent 70 · 446 credits left" — บอกเจ้าของร้านว่าส่งแล้ว และเก็บเงินค่าส่ง
+   ทั้งที่ไม่มีลูกค้าคนไหนได้รับอะไรเลย
+
+   ตอนนี้ทุกการส่งคือการจำลอง และพูดตรง ๆ ว่าจำลอง:
+     — บันทึกว่าใครอยู่ในกลุ่มที่ได้รับ (status = 'simulated') เพื่อให้เพดาน
+       ความถี่ การล็อกกลุ่ม และการวัดผลยังทำงานเหมือนเดิม
+     — ไม่ตัดเครดิต เพราะไม่มีอะไรถูกส่ง
+     — หน้าจอบอกว่าจำลอง ไม่ใช่ "ส่งแล้ว"
+
+   ค่านี้เป็นค่าคงที่ ไม่ใช่ตัวแปรสภาพแวดล้อม โดยตั้งใจ: การตั้ง token ไม่ได้ทำให้
+   มีโค้ดส่ง วันที่ต่อ LINE จริง ให้เปลี่ยนเป็น true พร้อมกับโค้ดที่ส่งจริง
+   แล้วเส้นทางเดิมด้านล่าง (ตัดเครดิตตามที่ส่งสำเร็จ) จะกลับมาทำงาน */
+export const DELIVERY_CONNECTED = false as boolean;
+
 export type SendResult = {
   attempted: number;
+  /** จำนวนที่บันทึกเข้ากลุ่มที่ได้รับรอบนี้ — ส่งจริงก็ต่อเมื่อ simulated = false */
   sent: number;
+  /** ยังไม่มีช่องทางส่งจริง: บันทึกไว้แต่ไม่มีข้อความออกไป และไม่ตัดเครดิต */
+  simulated: boolean;
   skippedAlreadySent: number;
   skippedQuietHours: boolean;
   /** ถูกข้ามเพราะเครดิตข้อความไม่พอ */
@@ -284,9 +305,42 @@ export async function sendCampaign(
     return {
       attempted: targets.length,
       sent: 0,
+      simulated: !DELIVERY_CONNECTED,
       skippedAlreadySent: 0,
       skippedQuietHours: true,
       skippedNoCredit: 0,
+      creditsLeft: tenant.message_credits,
+    };
+  }
+
+  if (!DELIVERY_CONNECTED) {
+    /* แทรกเป็นก้อนเดียว — เส้นทางเดิมแทรกทีละคน ซึ่งบน Postgres ที่โตเกียว
+       คือหนึ่งรอบไปกลับต่อผู้รับ: 1,470 ข้อความใช้ราว 30 นาที */
+    const nowIso = new Date().toISOString();
+    const recorded = await tx(async (q) => {
+      const n = await insertMany(
+        q,
+        "messages",
+        ["tenant_id", "campaign_id", "customer_id", "channel", "status", "cost", "sent_at"],
+        targets.map((t) => [camp.tenant_id, campaignId, t.customer_id, "line", "simulated", MESSAGE_COST_BAHT, nowIso]),
+        { onConflict: "ON CONFLICT(campaign_id, customer_id) DO NOTHING" },
+      );
+      await q.run("UPDATE campaigns SET status = 'measuring' WHERE id = ?", campaignId);
+      return n;
+    });
+    await logActivity(
+      camp.tenant_id,
+      "system",
+      "simulate_send",
+      `${camp.play_id} · recorded ${recorded} · already ${targets.length - recorded} · no message delivered`,
+    );
+    return {
+      attempted: targets.length,
+      sent: recorded,
+      simulated: true,
+      skippedAlreadySent: targets.length - recorded,
+      skippedNoCredit: 0,
+      skippedQuietHours: false,
       creditsLeft: tenant.message_credits,
     };
   }
@@ -363,6 +417,7 @@ export async function sendCampaign(
   return {
     attempted: targets.length,
     sent,
+    simulated: false,
     skippedAlreadySent: skipped,
     skippedNoCredit: noCredit,
     skippedQuietHours: false,

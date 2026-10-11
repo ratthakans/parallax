@@ -4,7 +4,7 @@ import "./isolate.mts";
 import { ensureReady } from "@/lib/engine/bootstrap";
 import { runMatch } from "@/lib/engine/match";
 import { roiSummary } from "@/lib/engine/proof";
-import { approveCampaign, sendCampaign } from "@/lib/engine/dispatch";
+import { approveCampaign, DELIVERY_CONNECTED, sendCampaign } from "@/lib/engine/dispatch";
 import { TENANT_PROFILES } from "@/lib/shared/tenants";
 import {
   billingPeriod,
@@ -223,7 +223,12 @@ for (const p of TENANT_PROFILES) {
   );
 }
 
-/* ── 8 · เครดิตหมดต้องหยุดส่ง ไม่ใช่ติดลบ ─────────────────────── */
+/* ── 8 · เครดิตหมดต้องหยุดส่ง ไม่ใช่ติดลบ ───────────────────────
+
+   ตอนที่ยังไม่ได้เชื่อม LINE (DELIVERY_CONNECTED = false) ไม่มีอะไรถูกส่ง
+   จึงไม่มีอะไรต้องตัดเครดิต: ทุกคนในกลุ่มที่ได้รับถูกบันทึก เครดิตเท่าเดิม
+   และหน้าบิลไม่นับเป็นการใช้งาน — ข้อที่ห้ามพลาดคือบอกว่า "ส่งแล้ว"
+   หรือเก็บเงินค่าส่งทั้งที่ลูกค้าไม่ได้รับอะไร */
 
 const T2 = TENANT_PROFILES[1].id;
 const { candidates: c2 } = await runMatch(T2);
@@ -247,12 +252,26 @@ if (big) {
       c: number;
     }>("SELECT message_credits c FROM tenants WHERE id=?", T2)
   )!.c;
-  ok(send.sent === allowance, `ส่งได้เท่าเครดิตที่มี ${send.sent}/${allowance}`);
-  ok(
-    send.skippedNoCredit === r.treated - send.sent,
-    `รายงานคนที่ยังไม่ได้รับตรงจำนวน ${send.skippedNoCredit}`,
-  );
-  ok(left >= 0, `เครดิตไม่ติดลบหลังส่งเกิน (${left})`);
+  if (DELIVERY_CONNECTED) {
+    ok(send.sent === allowance, `ส่งได้เท่าเครดิตที่มี ${send.sent}/${allowance}`);
+    ok(
+      send.skippedNoCredit === r.treated - send.sent,
+      `รายงานคนที่ยังไม่ได้รับตรงจำนวน ${send.skippedNoCredit}`,
+    );
+    ok(left >= 0, `เครดิตไม่ติดลบหลังส่งเกิน (${left})`);
+  } else {
+    const usage = await usageFor(T2);
+    ok(send.simulated, "ยังไม่ได้เชื่อม LINE — ผลการส่งบอกว่าเป็นการจำลอง");
+    ok(send.sent === r.treated, `บันทึกครบทุกคนในกลุ่มที่ได้รับ ${send.sent}/${r.treated}`);
+    ok(send.skippedNoCredit === 0, "เครดิตไม่ใช่ตัวกั้น เพราะไม่มีอะไรถูกส่ง");
+    ok(left === allowance, `ไม่ตัดเครดิตตอนจำลอง (${left}/${allowance})`);
+    ok(
+      usage.messagesThisPeriod === 0 && usage.messageCostThisPeriod === 0,
+      `หน้าบิลไม่นับการจำลองเป็นการใช้งาน (${usage.messagesThisPeriod} ข้อความ · ฿${usage.messageCostThisPeriod})`,
+    );
+    const again = await sendCampaign(r.campaignId);
+    ok(again.sent === 0 && again.skippedAlreadySent === r.treated, "กดซ้ำไม่บันทึกซ้ำ");
+  }
 } else {
   ok(false, "หาแคมเปญมาทดสอบเครดิตหมดไม่ได้");
 }
