@@ -79,6 +79,14 @@ export async function travelForward(
    แล้วค่อยเลื่อนวันย้อนหลังและวัดผล
    ───────────────────────────────────────────────────────────── */
 
+/* id ของแคมเปญเดโมคงที่ต่อ (บัญชี, ลำดับ) — id เป็นตัวแบ่ง arm จึงเป็นตัว
+   กำหนดว่าใครอยู่กลุ่มควบคุม ถ้าสุ่มใหม่ ทุก reseed จะได้ผลพิสูจน์คนละชุด
+   รูปแบบเหมือน UUID เพื่อให้ URL ของแคมเปญเดโมไม่ต่างจากของจริง */
+function demoCampaignId(tenantId: string, n: number) {
+  const h = createHash("sha256").update(`demo-campaign:${tenantId}:${n}`).digest("hex");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-a${h.slice(17, 20)}-${h.slice(20, 32)}`;
+}
+
 export async function seedCampaignHistory(tenantId: string) {
   const { runMatch } = await import("./match");
   const { approveCampaign, sendCampaign } = await import("./dispatch");
@@ -139,6 +147,7 @@ export async function seedCampaignHistory(tenantId: string) {
       tenantId,
       playId: pick.play.id,
       approvedBy: "demo",
+      campaignId: demoCampaignId(tenantId, created),
     });
     try {
       await sendCampaign(r.campaignId, { ignoreQuietHours: true, tenantId });

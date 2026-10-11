@@ -90,6 +90,10 @@ export type ApproveInput = {
   dryRun?: boolean;
   /** ให้ผู้ใช้ทับ holdout ที่ระบบแนะนำได้ แต่ยังบังคับกติกาตามขนาด */
   holdoutPct?: number;
+  /** เฉพาะประวัติเดโม — id กำหนด arm ทุกคน (H2) ถ้าสุ่มใหม่ทุก reseed
+      กลุ่มควบคุมจะเปลี่ยนทุกครั้ง แล้วยอดเพิ่มของเดโมแกว่ง 3%–35%
+      ฟอร์มในหน้าจอไม่ส่งค่านี้มา */
+  campaignId?: string;
 };
 
 export type ApproveResult = {
@@ -132,7 +136,7 @@ export async function approveCampaign(
       ? Math.min(input.holdoutPct, rule.holdout_pct === 0 ? 0 : 30)
       : rule.holdout_pct;
 
-  const campaignId = randomUUID();
+  const campaignId = input.campaignId ?? randomUUID();
 
   /* F3 — เรียกเขียนข้อความหนึ่งครั้งต่อแคมเปญ ไม่ใช่ต่อคน
      ผลถูก cache ด้วย hash ของ (play, ส่วนลด, ขนาดกลุ่ม) */
