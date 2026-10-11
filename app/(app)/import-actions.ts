@@ -97,4 +97,11 @@ export async function commitCsv(
   }
 }
 
-export type { ImportField, ColumnMapping };
+/* ห้าม re-export ชนิดข้อมูลจากไฟล์ "use server" ด้วย `export type { … }`
+
+   ตัวตรวจ server action ของ Next 16 นับชื่อใน export specifier เป็นค่าที่ต้อง
+   มีอยู่จริงตอนรัน แล้วโยน "ReferenceError: ImportField is not defined" ตอน
+   โหลดโมดูล หน้า /app/import จึงพังทั้งหน้า ทั้งที่ typecheck และ build ผ่าน
+   และไม่มีชุดตรวจไหนจับได้ เพราะทุกชุดเรียก commitImport ตรง ๆ ไม่ผ่าน action
+
+   ใครต้องการชนิดเหล่านี้ให้ import จาก @/lib/shared/ingest-types */

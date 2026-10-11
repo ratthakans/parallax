@@ -23,7 +23,14 @@ export function Importer() {
   const [mapping, setMapping] = useState<ColumnMapping | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ customers: number; transactions: number; products: number; rejected: number } | null>(null);
-  const [replace, setReplace] = useState(true);
+  /* ค่าตั้งต้นต้องเป็น "ไม่แทนที่"
+
+     เดิมเป็น true — กดนำเข้าโดยไม่ได้สังเกตช่องติ๊ก ลูกค้า ธุรกรรม และแคมเปญ
+     ทั้งบัญชีถูกลบแล้วเหลือแค่แถวในไฟล์ใหม่ (เกิดขึ้นจริงตอนทดสอบ 2026-10-11:
+     ไฟล์รายชื่อ 2 คน ลบลูกค้า 1,240 คนของบัญชีตัวอย่าง)
+     อันตรายขึ้นอีกตั้งแต่ไฟล์รายชื่ออย่างเดียวนำเข้าได้ — รายชื่อจากงานอีเวนต์
+     20 คนไม่ควรลบประวัติการซื้อทั้งร้าน การลบทั้งบัญชีต้องเป็นสิ่งที่ตั้งใจเลือก */
+  const [replace, setReplace] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [pending, start] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);

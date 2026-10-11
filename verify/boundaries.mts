@@ -122,6 +122,30 @@ const rel = (f: string) => relative(ROOT, f);
     fails.push("directive ไม่ได้อยู่บนสุด:\n    " + [...new Set(bad)].join("\n    "));
 }
 
+/* ── 3.6 · ไฟล์ "use server" export ได้แค่ฟังก์ชัน ──────────────
+
+   Next 16 อ่านทุกชื่อใน export specifier ของไฟล์ "use server" เป็น action
+   ที่ต้องมีค่าจริงตอนรัน `export type { ImportField }` จึงกลายเป็น
+   "ReferenceError: ImportField is not defined" ตอนโหลดโมดูล — หน้านำเข้า
+   พังทั้งหน้ามาตั้งแต่ commit แรก โดยที่ typecheck และ build ผ่านทั้งคู่
+
+   การประกาศ `export type X = …` ไม่เป็นปัญหา (Next ข้ามให้) ที่พังคือรูป
+   specifier `export { … }` / `export type { … }` และ export ค่าที่ไม่ใช่ฟังก์ชัน */
+{
+  const bad: string[] = [];
+  for (const f of files) {
+    const src = read(f);
+    if (src.split("\n")[0].trim() !== '"use server";') continue;
+    src.split("\n").forEach((l, i) => {
+      if (/^export\s+(type\s+)?\{/.test(l) || /^export\s+(const|let|var|class|default)\b/.test(l)) {
+        bad.push(`${rel(f)}:${i + 1}  ${l.trim().slice(0, 60)}`);
+      }
+    });
+  }
+  checks.push('ไฟล์ "use server" export ได้แค่ async function และการประกาศชนิด');
+  if (bad.length) fails.push('ไฟล์ "use server" export สิ่งที่ไม่ใช่ action:\n    ' + bad.join("\n    "));
+}
+
 /* ── 4 · คอนโซลห้ามดึงไลบรารีคอมโพเนนต์ของฝั่งการตลาด ──
 
    components/ui.tsx เป็นของเว็บการตลาด (PageHero · Quote · CTA ·
