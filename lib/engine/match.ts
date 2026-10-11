@@ -303,13 +303,13 @@ async function loadPosteriors(): Promise<Posteriors> {
     const a = Number(r.a);
     const b = Number(r.b);
     add(pooled, r.play_id, a, b);
-    add(byShape, `${r.cycle_shape} ${r.play_id}`, a, b);
+    add(byShape, `${r.cycle_shape}|${r.play_id}`, a, b);
   }
 
   return (playId, cycleShape, fallback) => {
     // ยังไม่มีสถิติของวงจรนี้ — รวมทุกวงจรเป็นค่าประมาณกว้าง ๆ ดีกว่าไม่มีอะไรเลย
     const [a, b] =
-      byShape.get(`${cycleShape} ${playId}`) ?? pooled.get(playId) ?? [0, 0];
+      byShape.get(`${cycleShape}|${playId}`) ?? pooled.get(playId) ?? [0, 0];
     return a && b ? a / (a + b) : fallback;
   };
 }
