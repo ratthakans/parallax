@@ -101,6 +101,11 @@ export async function ensureSchema(): Promise<void> {
       PRIMARY KEY (tenant_id, user_id)
     );
 
+    /* ฐานบนเครื่องพัฒนาที่สร้างก่อน 2026-10-11 ยังมีตาราง identities อยู่
+       CREATE TABLE IF NOT EXISTS ไม่ลบของเดิม จึงต้องลบเองให้ตรงกับ
+       supabase/migrations/0004_drop_identities.sql */
+    DROP TABLE IF EXISTS identities;
+
     /* ── ตัวระบุและช่องทางติดต่อทุกช่องทางของลูกค้า ──
        หนึ่งคนมีได้หลายเบอร์ หลายอีเมล หลายที่อยู่ รวมรหัสสมาชิก
        แทนตาราง identities เดิม ซึ่ง hash ค่าเดียวกันซ้ำกับตารางนี้ทุกตัว
