@@ -109,6 +109,53 @@ export async function ensureSchema(): Promise<void> {
       PRIMARY KEY (customer_id, type)
     );
 
+    /* ── ช่องทางติดต่อทุกช่องทางของลูกค้า ──
+       หนึ่งคนมีได้หลายเบอร์ หลายอีเมล หลายที่อยู่ — identities เก็บได้
+       ประเภทละหนึ่ง จึงยังเป็นตัวจับคู่ ส่วนตารางนี้เก็บค่าจริงทั้งหมด
+       value_enc เข้ารหัสด้วย lib/engine/pii.ts · value_hmac ใช้ตรวจซ้ำ */
+    CREATE TABLE IF NOT EXISTS contact_points (
+      id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      customer_id TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      label TEXT,
+      value_enc TEXT NOT NULL,
+      value_hmac TEXT NOT NULL,
+      value_masked TEXT NOT NULL,
+      is_primary INTEGER NOT NULL DEFAULT 0,
+      source TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      UNIQUE (customer_id, kind, value_hmac)
+    );
+    CREATE INDEX IF NOT EXISTS ix_cp_tenant ON contact_points (tenant_id);
+    CREATE INDEX IF NOT EXISTS ix_cp_match ON contact_points (tenant_id, kind, value_hmac);
+
+    /* ── ข้อมูลประวัติของลูกค้า ──
+       แยกจาก customers เพื่อให้ฐาน sqlite ที่มีอยู่แล้วได้ตารางนี้ด้วย
+       CREATE TABLE IF NOT EXISTS โดยไม่ต้อง ALTER ตารางเดิม
+
+       ⚠ ไม่มีฟิลด์ข้อมูลอ่อนไหวตาม PDPA มาตรา 26 โดยตั้งใจ — ศาสนา เชื้อชาติ
+       สุขภาพ ความคิดเห็นทางการเมือง ประวัติอาชญากรรม ข้อมูลชีวภาพ ฯลฯ
+       และไม่มีเลขบัตรประชาชน ซึ่ง CRM ไม่จำเป็นต้องใช้ */
+    CREATE TABLE IF NOT EXISTS contact_profiles (
+      customer_id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      first_name TEXT,
+      last_name TEXT,
+      nickname TEXT,
+      gender TEXT,
+      birthday TEXT,
+      company TEXT,
+      job_title TEXT,
+      subdistrict TEXT,
+      district TEXT,
+      province TEXT,
+      postcode TEXT,
+      note TEXT,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS ix_cprof_tenant ON contact_profiles (tenant_id);
+
     CREATE TABLE IF NOT EXISTS products (
       id TEXT PRIMARY KEY,
       tenant_id TEXT NOT NULL,

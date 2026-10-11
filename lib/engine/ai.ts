@@ -254,6 +254,40 @@ const RULES: Rule[] = [
   { field: "customer_name", re: /(customer.?name|ชื่อลูกค้า|ชื่อ-?นามสกุล|full.?name)/i, score: 10 },
   { field: "customer_name", re: /(ชื่อ|name)/i, score: 4 },
 
+  /* ── ข้อมูลของคน ──
+     นามสกุลต้องเป็นคำเดี่ยว ไม่งั้นคอลัมน์ "ชื่อ-นามสกุล" ซึ่งเป็นชื่อเต็ม
+     จะถูก last_name (11) แย่งไปจาก customer_name (10) */
+  { field: "first_name", re: /(first.?name|given.?name|ชื่อจริง)/i, score: 11 },
+  { field: "last_name", re: /^\s*(last.?name|surname|family.?name|นามสกุล)\s*$/i, score: 11 },
+  { field: "nickname", re: /(nick.?name|ชื่อเล่น)/i, score: 12 },
+  { field: "gender", re: /(gender|^\s*sex\s*$|เพศ)/i, score: 10 },
+  // "birth date" ต้องเป็นวันเกิด ไม่ใช่วันที่ซื้อ — 11 ชนะ occurred_at (6)
+  { field: "birthday", re: /(birth|dob|วันเกิด|เกิดวันที่)/i, score: 11 },
+  { field: "company", re: /(company|organi[sz]ation|business.?name|บริษัท|องค์กร|หน่วยงาน)/i, score: 10 },
+  { field: "job_title", re: /(job.?title|position|^\s*title\s*$|ตำแหน่ง)/i, score: 10 },
+
+  /* ── ช่องทางติดต่อ ──
+     เบอร์ (9) ชนะ customer_ref แบบกว้าง (6) คอลัมน์เบอร์จึงถูกเก็บเป็นช่องทาง
+     ติดต่อ และยังใช้เป็นตัวระบุลูกค้าแทนได้เมื่อไฟล์ไม่มีรหัสลูกค้า
+     "ที่อยู่อีเมล" เป็นอีเมล (10) ไม่ใช่ที่อยู่ (9) */
+  { field: "phone_alt", re: /((phone|tel|mobile).?2|เบอร์.?2|เบอร์.?สำรอง|โทร.?สำรอง|เบอร์บ้าน|เบอร์ที่ทำงาน|(office|home|work).?(phone|tel))/i, score: 11 },
+  { field: "phone", re: /(mobile|cell|มือถือ|เบอร์|โทร|phone|^\s*tel)/i, score: 9 },
+  { field: "email", re: /(e-?mail|อีเมล|อีเมล์)/i, score: 10 },
+  // "line" เปล่า ๆ ชนกับ line_total · line item จึงรับเฉพาะคำที่ชัด
+  { field: "line_id", re: /(line.?id|ไลน์|ไอดี.?ไลน์|^\s*line\s*$)/i, score: 10 },
+  { field: "facebook", re: /(facebook|เฟซบุ๊ก|เฟสบุ๊ค|เฟสบุ๊ก|^\s*fb\s*$)/i, score: 10 },
+  { field: "instagram", re: /(instagram|ไอจี|^\s*ig\s*$)/i, score: 10 },
+  { field: "tiktok", re: /(tik.?tok|ติ๊กต็อก|ติ๊กต๊อก)/i, score: 10 },
+  { field: "website", re: /(web.?site|เว็บไซต์|homepage|^\s*url\s*$)/i, score: 10 },
+
+  // ── ที่อยู่ — ตำบล (11) ชนะอำเภอ (10) เมื่อหัวคอลัมน์เป็น "sub-district" ──
+  { field: "address", re: /(address|ที่อยู่)/i, score: 9 },
+  { field: "subdistrict", re: /(sub.?district|ตำบล|แขวง|tambon)/i, score: 11 },
+  { field: "district", re: /(district|อำเภอ|เขต|amphoe|amphur)/i, score: 10 },
+  { field: "province", re: /(province|จังหวัด|changwat)/i, score: 11 },
+  { field: "postcode", re: /(post.?code|postal|zip|รหัสไปรษณีย์|ไปรษณีย์)/i, score: 11 },
+  { field: "note", re: /(note|remark|comment|หมายเหตุ|โน้ต)/i, score: 9 },
+
   { field: "occurred_at", re: /(occurred|invoice.?date|order.?date|วันที่ซื้อ|วันที่ขาย|วันที่ทำรายการ)/i, score: 10 },
   { field: "occurred_at", re: /(date|วันที่|เวลา|time)/i, score: 6 },
 

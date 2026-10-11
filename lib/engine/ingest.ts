@@ -5,6 +5,15 @@ import { deriveFeatures } from "@/lib/engine/derive";
 import { guessProductRoles } from "@/lib/engine/ai";
 import { contactCapBlockedReason } from "@/lib/engine/billing";
 import {
+  contactStorageReady,
+  encryptContact,
+  maskContact,
+  matchKey,
+  normaliseContact,
+  type ContactKind,
+} from "@/lib/engine/pii";
+import {
+  hasPurchases,
   missingRequired,
   type ColumnMapping,
   type ImportField,
@@ -201,6 +210,110 @@ function rowMoney(
   return { total, unitNet, listUnit, discount, qty };
 }
 
+/* ── อ่านแถวเดียว: เป็นใคร · ติดต่อทางไหน · ประวัติ ────────────────
+   ใช้ทั้งพรีวิวและตอนนำเข้าจริง ตัวเลขที่เห็นก่อนกดจึงตรงกับที่เข้าฐาน */
+
+type At = (f: ImportField) => string;
+
+/** ตัวระบุลูกค้า — รหัสก่อน แล้วค่อยเบอร์ อีเมล LINE */
+function identityOf(at: At): { type: string; value: string } | null {
+  const ref = normaliseRef(at("customer_ref"));
+  if (ref) {
+    // ใช้รูปแบบเดียวกับคอลัมน์เบอร์/อีเมล ไม่งั้นคนเดียวกันที่มาจากสองไฟล์
+    // (ไฟล์หนึ่งใส่เบอร์ในช่องรหัส อีกไฟล์ใส่ในช่องเบอร์) จะกลายเป็นสองคน
+    if (ref.type === "phone" || ref.type === "email") {
+      const v = normaliseContact(ref.type, ref.value);
+      if (v) return { type: ref.type, value: v };
+    }
+    return ref;
+  }
+  const order: [ImportField, ContactKind][] = [
+    ["phone", "phone"], ["email", "email"], ["line_id", "line"], ["phone_alt", "phone"],
+  ];
+  for (const [f, kind] of order) {
+    const v = normaliseContact(kind, at(f));
+    if (v) return { type: kind, value: v };
+  }
+  return null;
+}
+
+const CHANNEL_FIELDS: { field: ImportField; kind: ContactKind; label: string | null }[] = [
+  { field: "phone", kind: "phone", label: "มือถือ" },
+  { field: "phone_alt", kind: "phone", label: "เบอร์อื่น" },
+  { field: "email", kind: "email", label: null },
+  { field: "line_id", kind: "line", label: null },
+  { field: "facebook", kind: "facebook", label: null },
+  { field: "instagram", kind: "instagram", label: null },
+  { field: "tiktok", kind: "tiktok", label: null },
+  { field: "website", kind: "website", label: null },
+];
+
+/** ทุกช่องทางติดต่อในแถว จัดรูปแบบแล้ว ไม่ซ้ำกันเอง */
+function channelsOf(at: At): { kind: ContactKind; label: string | null; value: string }[] {
+  const out: { kind: ContactKind; label: string | null; value: string }[] = [];
+  const seen = new Set<string>();
+  const push = (kind: ContactKind, label: string | null, raw: string) => {
+    const value = normaliseContact(kind, raw);
+    if (!value || seen.has(`${kind}|${value}`)) return;
+    seen.add(`${kind}|${value}`);
+    out.push({ kind, label, value });
+  };
+  for (const c of CHANNEL_FIELDS) push(c.kind, c.label, at(c.field));
+  // เบอร์หรืออีเมลที่อยู่ในช่องรหัสลูกค้าก็เป็นช่องทางติดต่อเหมือนกัน
+  const ref = normaliseRef(at("customer_ref"));
+  if (ref?.type === "phone" || ref?.type === "email") push(ref.type, null, ref.value);
+  /* ที่อยู่รวมเป็นค่าเดียว — แยกเก็บตำบล/อำเภอ/จังหวัดแบบอ่านได้ไว้ใน
+     contact_profiles ด้วย เพราะต้องใช้กรองกลุ่ม ส่วนบ้านเลขที่และถนนคือ
+     ส่วนที่ระบุตัวคนได้จริง จึงอยู่ในค่าที่เข้ารหัสเท่านั้น */
+  const street = at("address").trim();
+  if (street) {
+    // ต่อตำบล/อำเภอ/จังหวัดท้ายบ้านเลขที่ เว้นแต่ช่องที่อยู่มีคำนั้นอยู่แล้ว
+    const extra = [at("subdistrict"), at("district"), at("province"), at("postcode")]
+      .map((x) => x.trim())
+      .filter((x) => x && !street.includes(x));
+    push("address", null, [street, ...extra].join(" "));
+  }
+  return out;
+}
+
+type Profile = {
+  first_name: string | null; last_name: string | null; nickname: string | null;
+  gender: string | null; birthday: string | null; company: string | null;
+  job_title: string | null; subdistrict: string | null; district: string | null;
+  province: string | null; postcode: string | null; note: string | null;
+};
+
+function genderOf(v: string): string | null {
+  const t = v.trim().toLowerCase();
+  if (!t) return null;
+  if (/^(ชาย|male|m|นาย|ผู้ชาย)$/.test(t)) return "male";
+  if (/^(หญิง|female|f|นาง|นางสาว|น\.ส\.|ผู้หญิง)$/.test(t)) return "female";
+  return t;
+}
+
+/** ประวัติของคน — คืน null ถ้าไฟล์ไม่มีข้อมูลประวัติเลย */
+function profileOf(at: At): Profile | null {
+  const txt = (f: ImportField) => at(f).trim() || null;
+  const born = normaliseDate(at("birthday"));
+  const p: Profile = {
+    first_name: txt("first_name"), last_name: txt("last_name"), nickname: txt("nickname"),
+    gender: genderOf(at("gender")), birthday: born ? born.slice(0, 10) : null,
+    company: txt("company"), job_title: txt("job_title"), subdistrict: txt("subdistrict"),
+    district: txt("district"), province: txt("province"), postcode: txt("postcode"),
+    note: txt("note"),
+  };
+  return Object.values(p).some((x) => x != null) ? p : null;
+}
+
+const UNNAMED = "ลูกค้าไม่ระบุชื่อ";
+
+function displayName(at: At): string {
+  const full = at("customer_name").trim();
+  if (full) return full;
+  const parts = [at("first_name").trim(), at("last_name").trim()].filter(Boolean).join(" ");
+  return parts || at("nickname").trim() || UNNAMED;
+}
+
 /* ── นำเข้าจริง ───────────────────────────────────────────────── */
 
 export function buildPreview(
@@ -221,34 +334,39 @@ export function buildPreview(
     return i == null ? "" : (row[i] ?? "");
   };
 
+  const purchases = hasPurchases((f) => byField.has(f));
   const rejected = [...parsed.rejected];
   const refs = new Set<string>();
   const products = new Map<string, { category: string; price: number }>();
   const dates: number[] = [];
   let usable = 0;
   let discounted = 0;
+  let contactPoints = 0;
 
   parsed.rows.forEach((row, i) => {
-    const ref = normaliseRef(at(row, "customer_ref"));
-    const when = normaliseDate(at(row, "occurred_at"));
-    const money = rowMoney(row, at);
-    if (!ref) {
-      rejected.push({ line: i + 2, reason: "ไม่มีตัวระบุลูกค้า" });
+    const get: At = (f) => at(row, f);
+    const ident = identityOf(get);
+    if (!ident) {
+      rejected.push({ line: i + 2, reason: "ไม่มีตัวระบุลูกค้า (รหัส · เบอร์ · อีเมล · LINE)" });
       return;
     }
-    if (!when) {
+    const when = normaliseDate(at(row, "occurred_at"));
+    const money = rowMoney(row, at);
+    if (purchases && !when) {
       rejected.push({ line: i + 2, reason: "อ่านวันที่ไม่ได้" });
       return;
     }
-    if (!money) {
+    if (purchases && !money) {
       rejected.push({ line: i + 2, reason: "อ่านยอดเงินไม่ได้" });
       return;
     }
     usable++;
-    refs.add(`${ref.type}:${ref.value}`);
+    refs.add(`${ident.type}:${ident.value}`);
+    contactPoints += channelsOf(get).length;
+    if (!purchases || !when || !money) return;
+
     dates.push(Date.parse(when));
     if (money.discount > 0) discounted++;
-
     const pname = at(row, "product_name").trim();
     if (pname && !products.has(pname)) {
       products.set(pname, {
@@ -263,7 +381,7 @@ export function buildPreview(
     usableRows: usable,
     rejected: rejected.slice(0, 25),
     customers: refs.size,
-    transactions: usable,
+    transactions: purchases ? usable : 0,
     products: [...products.entries()].map(([name, v]) => ({ name, ...v })),
     dateRange: dates.length
       ? {
@@ -273,6 +391,7 @@ export function buildPreview(
       : null,
     missing,
     discountRowShare: usable ? discounted / usable : 0,
+    contactPoints,
   };
 }
 
@@ -282,6 +401,13 @@ export async function commitImport(
   mapping: ColumnMapping,
   opts: { replace: boolean },
 ): Promise<ImportResult> {
+  /* ID ลูกค้าคำนวณจากกุญแจ HMAC และช่องทางติดต่อต้องเข้ารหัส — ไม่มีกุญแจ
+     คือหยุดตรงนี้ ก่อนที่ไฟล์จะเข้าไปครึ่งทางแล้วพังกลางธุรกรรม */
+  if (!contactStorageReady()) {
+    throw new Error(
+      "ยังไม่ได้ตั้งกุญแจเข้ารหัสข้อมูลติดต่อ (PII_KEY · PII_HMAC_KEY) — ระบบจึงยังไม่รับไฟล์",
+    );
+  }
   const preview = buildPreview(parsed, mapping);
   if (preview.missing.length) {
     throw new Error(
@@ -366,7 +492,10 @@ export async function commitImport(
           tenantId,
         );
       }
-      for (const t of ["campaigns", "customer_features", "customers", "products"]) {
+      for (const t of [
+        "campaigns", "customer_features", "contact_points", "contact_profiles",
+        "customers", "products",
+      ]) {
         await q.run(`DELETE FROM ${t} WHERE tenant_id = ?`, tenantId);
       }
     }
@@ -384,49 +513,104 @@ export async function commitImport(
     const bufProduct: Param[][] = [];
     const bufTxn: Param[][] = [];
     const bufLine: Param[][] = [];
+    const bufPoint: Param[][] = [];
+    const profiles = new Map<string, Profile>();
 
     const idFor = (s: string) =>
       createHash("sha256").update(s).digest("hex").slice(0, 20);
 
+    /* ── ID ลูกค้าผูกกับร้าน และถอดกลับเป็นเบอร์ไม่ได้ ──
+
+       เดิมคือ c- + sha256("phone:เบอร์") ซึ่งมีปัญหาสองชั้น:
+       — ไม่มีรหัสร้าน: สองร้านนำเข้าเบอร์เดียวกันได้แถวเดียว ร้านที่สอง
+         เขียนชื่อทับลูกค้าของร้านแรก และธุรกรรมของร้านที่สองหายเงียบ
+         (ทดสอบแล้ว: ระบบรายงานว่านำเข้าสำเร็จ)
+       — sha256 ของเบอร์ถอดกลับได้ในไม่กี่นาที ID ลูกค้าจึงเท่ากับเบอร์โทร
+         ที่โผล่ใน URL · log · ไฟล์ส่งออก
+       HMAC ที่มีรหัสร้านปิดทั้งสองช่อง และยังคงเดิมทุกครั้งที่นำเข้าซ้ำ */
+    const customerId = (type: string, value: string) =>
+      `c-${matchKey(tenantId, type, value).slice(0, 24)}`;
+
     const seenCustomers = new Set<string>();
+    const seenIdentity = new Set<string>();
     const seenProducts = new Set<string>();
+    const purchases = hasPurchases((f) => byField.has(f));
+    const nowIso = new Date().toISOString();
     let txnSeq = 0;
     let customers = 0;
     let transactions = 0;
+    let contactPoints = 0;
 
     for (const row of parsed.rows) {
-      const ref = normaliseRef(at(row, "customer_ref"));
+      const get: At = (f) => at(row, f);
+      const ident = identityOf(get);
+      if (!ident) continue;
       const when = normaliseDate(at(row, "occurred_at"));
       // ตรรกะเงินตัวเดียวกับตอนพรีวิว ตัวเลขที่เห็นก่อนกดจึงตรงกับที่นำเข้า
       const money = rowMoney(row, at);
-      if (!ref || !when || !money) continue;
+      if (purchases && (!when || !money)) continue;
 
-      const cid = `c-${idFor(`${ref.type}:${ref.value}`)}`;
+      const cid = customerId(ident.type, ident.value);
       if (!seenCustomers.has(cid)) {
         seenCustomers.add(cid);
         customers++;
-        bufCustomer.push([
-          cid,
-          tenantId,
-          at(row, "customer_name").trim() || "ลูกค้าไม่ระบุชื่อ",
-          when,
-        ]);
-        // ตัวระบุถูก hash ก่อนเก็บ — ไม่มีเบอร์หรืออีเมลดิบในระบบ
-        bufIdentity.push([
-          tenantId, cid,
-          ref.type,
-          createHash("sha256").update(ref.value).digest("hex"),
-        ]);
+        bufCustomer.push([cid, tenantId, displayName(get), when ?? nowIso]);
         /* ไฟล์ POS ไม่มีข้อมูลความยินยอม จึงตั้งเป็น "ยังไม่ยินยอม"
            คนกลุ่มนี้จะไม่ถูกส่งและไม่ถูกส่งออกจนกว่าร้านจะเก็บ
-           ความยินยอมจริง — ปลอดภัยกว่าการเดาว่ายินยอม */
+           ความยินยอมจริง — ปลอดภัยกว่าการเดาว่ายินยอม
+
+           การมีเบอร์ไม่ใช่การได้รับอนุญาตให้ส่ง — เก็บข้อมูลติดต่อได้มาก
+           แค่ไหนก็ตาม การส่งยังผูกกับความยินยอมเหมือนเดิมทุกประการ */
         bufConsent.push([tenantId, cid, "marketing", null, null, "csv_import"]);
       }
+
+      /* identities = ตัวจับคู่ ประเภทละหนึ่งต่อคน — derive ใช้ type = 'line'
+         ตัดสินว่าทักทาง LINE ได้ไหม ส่วนค่าจริงทุกตัวอยู่ใน contact_points */
+      const pointsHere = channelsOf(get);
+      const idents: { type: string; value: string }[] = [
+        ident,
+        ...pointsHere.filter((c) => c.kind === "phone" || c.kind === "email" || c.kind === "line")
+          .map((c) => ({ type: c.kind, value: c.value })),
+      ];
+      for (const id of idents) {
+        const k = `${cid}|${id.type}`;
+        if (seenIdentity.has(k)) continue;
+        seenIdentity.add(k);
+        bufIdentity.push([tenantId, cid, id.type, matchKey(tenantId, id.type, id.value)]);
+      }
+
+      const firstOfKind = new Set<string>();
+      for (const c of pointsHere) {
+        const hmac = matchKey(tenantId, c.kind, c.value);
+        bufPoint.push([
+          `cp-${matchKey(tenantId, "point", `${cid}|${c.kind}|${hmac}`).slice(0, 24)}`,
+          tenantId, cid, c.kind, c.label,
+          encryptContact(tenantId, c.kind, c.value),
+          hmac,
+          maskContact(c.kind, c.value),
+          firstOfKind.has(c.kind) ? 0 : 1,
+          "csv_import",
+          nowIso,
+        ]);
+        firstOfKind.add(c.kind);
+        contactPoints++;
+      }
+
+      // หลายแถวของคนเดียวกันรวมเป็นประวัติเดียว แถวหลังเติมช่องที่ยังว่าง
+      const prof = profileOf(get);
+      if (prof) {
+        const prev = profiles.get(cid);
+        if (!prev) profiles.set(cid, prof);
+        else for (const k of Object.keys(prof) as (keyof Profile)[]) prev[k] ??= prof[k];
+      }
+
+      if (!purchases || !when || !money) continue;
 
       const pname = at(row, "product_name").trim();
       let pid: string | null = null;
       if (pname) {
-        pid = `p-${idFor(pname)}`;
+        // ผูกกับร้านด้วยเหตุผลเดียวกับ ID ลูกค้า — ชื่อสินค้าซ้ำข้ามร้านเป็นเรื่องปกติ
+        pid = `p-${idFor(`${tenantId}:${pname}`)}`;
         if (!seenProducts.has(pid)) {
           seenProducts.add(pid);
           const meta = preview.products.find((p) => p.name === pname);
@@ -456,13 +640,36 @@ export async function commitImport(
         bufLine.push([tenantId, txnId, pid, money.qty, money.unitNet, money.listUnit]);
     }
 
+    const PROFILE_COLS: (keyof Profile)[] = [
+      "first_name", "last_name", "nickname", "gender", "birthday", "company",
+      "job_title", "subdistrict", "district", "province", "postcode", "note",
+    ];
+    const bufProfile: Param[][] = [...profiles].map(([cid, p]) => [
+      cid, tenantId, ...PROFILE_COLS.map((c) => p[c]), nowIso,
+    ]);
+
     /* ── แทรกทุกถัง ──
        ลำดับตามความสัมพันธ์: customers และ products ก่อน แล้ว transactions
        แล้วจึง line_items — Postgres บังคับ foreign key ทันที */
+    /* ไฟล์รายชื่อที่ไม่มีคอลัมน์ชื่อต้องไม่ลบชื่อที่มีอยู่แล้ว
+       ทิ้งเป็น "ลูกค้าไม่ระบุชื่อ" ทับชื่อจริงจากไฟล์ก่อนหน้า */
     await insertMany(q, "customers", ["id", "tenant_id", "name", "created_at"], bufCustomer,
-      { onConflict: "ON CONFLICT(id) DO UPDATE SET name = excluded.name" });
+      { onConflict: `ON CONFLICT(id) DO UPDATE SET name =
+          CASE WHEN excluded.name = '${UNNAMED}' THEN customers.name ELSE excluded.name END` });
     await insertMany(q, "identities", ["tenant_id", "customer_id", "type", "value_hash"], bufIdentity,
       { onConflict: "ON CONFLICT(customer_id, type) DO NOTHING" });
+    await insertMany(q, "contact_points",
+      ["id", "tenant_id", "customer_id", "kind", "label", "value_enc", "value_hmac",
+       "value_masked", "is_primary", "source", "created_at"],
+      bufPoint, { onConflict: "ON CONFLICT DO NOTHING" });
+    // ช่องที่ไฟล์นี้ไม่มีข้อมูล ต้องคงค่าจากไฟล์ก่อนหน้าไว้ ไม่ใช่ล้างเป็นว่าง
+    await insertMany(q, "contact_profiles",
+      ["customer_id", "tenant_id", ...PROFILE_COLS, "updated_at"],
+      bufProfile, {
+        onConflict: `ON CONFLICT(customer_id) DO UPDATE SET ${PROFILE_COLS
+          .map((c) => `${c} = COALESCE(excluded.${c}, contact_profiles.${c})`)
+          .join(", ")}, updated_at = excluded.updated_at`,
+      });
     await insertMany(q, "consents", ["tenant_id", "customer_id", "purpose", "granted_at", "revoked_at", "source"], bufConsent,
       { onConflict: "ON CONFLICT(customer_id, purpose) DO NOTHING" });
     await insertMany(q, "products", ["id", "tenant_id", "name", "category", "group_role", "list_price"], bufProduct,
@@ -475,7 +682,7 @@ export async function commitImport(
       tenantId,
       "owner",
       "import_csv",
-      `${customers} customers · ${transactions} transactions`,
+      `${customers} customers · ${transactions} transactions · ${contactPoints} contact points`,
     );
 
     // DERIVE ทันทีเพื่อให้เห็น insight ภายในสามนาที
@@ -484,6 +691,7 @@ export async function commitImport(
     return {
       customers,
       transactions,
+      contactPoints,
       products: seenProducts.size,
       rejected: preview.rejected.length,
       roleSource: roleGuess.source,

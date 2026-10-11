@@ -108,6 +108,8 @@ async function wipeTenant(q: Sql, tenantId: string) {
   }
   for (const tbl of [
     "campaigns", "tenant_plays", "customer_features",
+    // ก่อน customers — Postgres บังคับ foreign key ของสองตารางนี้
+    "contact_points", "contact_profiles",
     "customers", "products", "brief_opens", "activity_log",
     "credit_purchases",
   ]) {

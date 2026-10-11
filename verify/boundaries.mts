@@ -192,6 +192,31 @@ const rel = (f: string) => relative(ROOT, f);
     fails.push("เรียกฟังก์ชัน async โดยไม่ await:\n    " + bad.join("\n    "));
 }
 
+/* ── 4.6 · ถอดรหัสข้อมูลติดต่อได้ที่เดียว ──────────────────────
+
+   ค่าจริงของเบอร์ อีเมล ที่อยู่ ถูกเข้ารหัสใน lib/engine/pii.ts และถอดได้
+   ผ่าน revealContactPoint ซึ่งบันทึกทุกครั้งว่าใครเปิดดู ถ้ามีไฟล์อื่น
+   เรียก createDecipheriv เอง การเปิดดูนั้นจะไม่มีร่องรอย
+
+   และห้ามมีคอลัมน์ value_enc ในหน้าจอหรือ component — ค่าที่เข้ารหัส
+   ไม่ควรเดินทางไปถึงชั้นที่แสดงผลเลย แม้จะยังอ่านไม่ออกก็ตาม */
+{
+  const bad: string[] = [];
+  for (const f of files) {
+    const r = rel(f);
+    if (r.startsWith("verify/")) continue;
+    const src = read(f);
+    if (r !== "lib/engine/pii.ts" && /createDecipheriv\s*\(/.test(src)) {
+      bad.push(`${r} → createDecipheriv`);
+    }
+    if ((r.startsWith("app/") || r.startsWith("components/")) && /value_enc/.test(src)) {
+      bad.push(`${r} → value_enc`);
+    }
+  }
+  checks.push("ถอดรหัสข้อมูลติดต่อได้ที่ pii.ts เท่านั้น · หน้าจอไม่แตะ value_enc");
+  if (bad.length) fails.push("ข้อมูลติดต่อหลุดออกนอกทางที่บันทึกได้:\n    " + bad.join("\n    "));
+}
+
 /* ── 5 · ไม่มีไฟล์ตกค้างใน lib/ ชั้นบนสุด ──
    ไฟล์ที่ไม่ได้อยู่ใน shared หรือ engine คือไฟล์ที่ยังไม่มีใครตัดสินว่า
    มันแตะข้อมูลลูกค้าหรือเปล่า ซึ่งเป็นสถานะที่ไม่ควรมี */
