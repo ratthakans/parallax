@@ -451,7 +451,7 @@ function collectImport(
   const profiles = new Map<string, Profile>();
   const purchases = hasPurchases(has);
   const nowIso = new Date().toISOString();
-  let txnSeq = 0;
+  const seenRows = new Map<string, number>();
 
   for (const row of parsed.rows) {
     const get: At = (f) => at(row, f);
@@ -503,7 +503,20 @@ function collectImport(
       }
     }
 
-    const txnId = `t-${idFor(`${cid}:${when}:${++txnSeq}`)}`;
+    /* ── ID ธุรกรรมมาจากเนื้อหาของแถว ไม่ใช่ลำดับแถว ──
+
+       เดิมคือ cid + วันที่ + ลำดับแถวในไฟล์ ไฟล์เดียวกันที่เรียงต่างกัน หรือ
+       ไฟล์เดือนใหม่ที่แถวใหม่อยู่บนสุด (ซึ่งคือรูปแบบปกติของ POS) จึงได้ ID ใหม่
+       ทั้งไฟล์ แล้วธุรกรรมเดิมเข้าไปซ้ำ — ทดสอบแล้ว: สลับแถวได้ยอดสองเท่า
+       ยอดซื้อ มูลค่าลูกค้า และผลการวัดทั้งหมดเพี้ยนขึ้นเงียบ ๆ
+
+       ตัวนับ occurrence แยกการซื้อที่เหมือนกันทุกอย่างในไฟล์เดียว (สองชิ้น
+       ราคาเดียวกันวันเดียวกัน) ให้ยังเป็นสองรายการ — นำเข้าซ้ำกี่รอบก็ได้ ID เดิม */
+    const content = [cid, when, money.total, money.discount, money.qty, money.unitNet, pname,
+      at(row, "channel").trim()].join("|");
+    const occurrence = (seenRows.get(content) ?? 0) + 1;
+    seenRows.set(content, occurrence);
+    const txnId = `t-${idFor(`${tenantId}|${content}|${occurrence}`)}`;
     b.txns.push([tenantId, txnId, cid, when, money.total, money.discount, at(row, "channel").trim() || "pos"]);
     // unit_price ต้องเป็นราคาต่อหน่วย ไม่ใช่ยอดรวมของแถว
     if (pid) b.lines.push([tenantId, txnId, pid, money.qty, money.unitNet, money.listUnit]);
@@ -513,8 +526,22 @@ function collectImport(
   return b;
 }
 
+/** id ไหนในรายการนี้มีอยู่แล้ว — ถามเป็นก้อน ไม่ใช่ทีละแถว */
+async function existingIds(q: Sql, table: "transactions", ids: string[]): Promise<Set<string>> {
+  const out = new Set<string>();
+  for (let i = 0; i < ids.length; i += 1000) {
+    const chunk = ids.slice(i, i + 1000);
+    const rows = await q.all<{ id: string }>(
+      `SELECT id FROM ${table} WHERE id IN (${chunk.map(() => "?").join(",")})`,
+      ...chunk,
+    );
+    for (const r of rows) out.add(r.id);
+  }
+  return out;
+}
+
 /** เขียนทุกตารางในธุรกรรมเดียว — ลำดับตามความสัมพันธ์ เพราะ Postgres บังคับ foreign key ทันที */
-async function writeImport(q: Sql, b: ImportBatch): Promise<void> {
+async function writeImport(q: Sql, b: ImportBatch): Promise<number> {
   /* ไฟล์รายชื่อที่ไม่มีคอลัมน์ชื่อต้องไม่ลบชื่อที่มีอยู่แล้ว
      ทิ้งเป็น "ลูกค้าไม่ระบุชื่อ" ทับชื่อจริงจากไฟล์ก่อนหน้า */
   await insertMany(q, "customers", ["id", "tenant_id", "name", "created_at"], b.customers, {
@@ -533,9 +560,16 @@ async function writeImport(q: Sql, b: ImportBatch): Promise<void> {
     { onConflict: "ON CONFLICT(customer_id, purpose) DO NOTHING" });
   await insertMany(q, "products", ["id", "tenant_id", "name", "category", "group_role", "list_price"], b.products,
     { onConflict: "ON CONFLICT(id) DO UPDATE SET group_role = excluded.group_role" });
-  await insertMany(q, "transactions", ["tenant_id", "id", "customer_id", "occurred_at", "total", "discount_total", "channel"], b.txns,
+  /* ── รายการสินค้าเพิ่มเฉพาะธุรกรรมที่เพิ่งเข้ามาใหม่ ──
+     line_items ไม่มี key กันซ้ำ เดิมธุรกรรมที่มีอยู่แล้วถูกข้ามด้วย ON CONFLICT
+     แต่รายการสินค้าของมันถูกเพิ่มซ้ำทุกครั้งที่นำเข้าไฟล์เดิม */
+  const known = await existingIds(q, "transactions", b.txns.map((t) => String(t[1])));
+  const freshTxns = b.txns.filter((t) => !known.has(String(t[1])));
+  await insertMany(q, "transactions", ["tenant_id", "id", "customer_id", "occurred_at", "total", "discount_total", "channel"], freshTxns,
     { onConflict: "ON CONFLICT(id) DO NOTHING" });
-  await insertMany(q, "line_items", ["tenant_id", "txn_id", "product_id", "qty", "unit_price", "unit_list_price"], b.lines);
+  await insertMany(q, "line_items", ["tenant_id", "txn_id", "product_id", "qty", "unit_price", "unit_list_price"],
+    b.lines.filter((l) => !known.has(String(l[1]))));
+  return freshTxns.length;
 }
 
 export async function commitImport(
@@ -573,18 +607,19 @@ export async function commitImport(
   const batch = collectImport(tenantId, parsed, read, preview, roleByName);
 
   return tx(async (q) => {
-    await writeImport(q, batch);
+    const newTxns = await writeImport(q, batch);
     await logActivity(
       tenantId,
       "owner",
       "import_csv",
-      `${batch.customers.length} customers · ${batch.txns.length} transactions · ${batch.points.length} contact points`,
+      `${batch.customers.length} customers · ${newTxns} new transactions · ${batch.points.length} contact points`,
     );
     // DERIVE ทันทีเพื่อให้เห็น insight ภายในสามนาที
     await deriveFeatures(tenantId);
     return {
       customers: batch.customers.length,
-      transactions: batch.txns.length,
+      // นับเฉพาะที่เพิ่มเข้ามาจริง — ไฟล์เดิมนำเข้าซ้ำต้องบอกว่า 0 ไม่ใช่จำนวนแถว
+      transactions: newTxns,
       contactPoints: batch.points.length,
       products: batch.products.length,
       rejected: preview.rejected.length,

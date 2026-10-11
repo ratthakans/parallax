@@ -170,6 +170,35 @@ ok(lineReach > 0, `ทักทาง LINE ได้ตัดสินจาก 
 ok(!(await all<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'identities'")).length,
   "ไม่มีตาราง identities แล้ว");
 
+// ── 10.35 · นำเข้าซ้ำต้องไม่ทำให้ยอดซื้อซ้ำ ──
+{
+  const H = "เบอร์มือถือ,ชื่อลูกค้า,วันที่ซื้อ,ยอดสุทธิ,ชื่อสินค้า,จำนวน\n";
+  const jan = "0811110001,คุณทดสอบซ้ำ,2026-01-10,1000,ถุงมือ,1\n";
+  const feb = "0811110001,คุณทดสอบซ้ำ,2026-02-10,2000,ลูกกอล์ฟ,2\n";
+  const mar = "0811110001,คุณทดสอบซ้ำ,2026-03-10,3000,ร่ม,1\n";
+  const run = async (body: string) => { const x = parseCsv(H + body); return commitImport(A, x, mapColumnsHeuristic(x.headers)); };
+  const [who] = [await (async () => { await run(jan + feb); return (await findCustomersByContact(A, "phone", "0811110001"))[0]; })()];
+  const totals = async () => {
+    const t = await all<{ total: number }>("SELECT total FROM transactions WHERE customer_id = ? ORDER BY occurred_at", who);
+    const li = Number((await get<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM line_items WHERE txn_id IN (SELECT id FROM transactions WHERE customer_id = ?)", who))!.n);
+    return `${t.map((r) => Number(r.total)).join("+")} · รายการสินค้า ${li}`;
+  };
+  const base = await totals();
+  const again = await run(jan + feb);
+  ok(await totals() === base && again.transactions === 0, `ไฟล์เดิมนำเข้าซ้ำ: ${await totals()} (ใหม่ ${again.transactions})`);
+  await run(feb + jan);
+  ok(await totals() === base, `ไฟล์เดิมสลับลำดับแถว ไม่ซ้ำ: ${await totals()}`);
+  const next = await run(mar + jan + feb);
+  ok(await totals() === "1000+2000+3000 · รายการสินค้า 3" && next.transactions === 1,
+    `ไฟล์เดือนใหม่ที่แถวใหม่อยู่บนสุด เพิ่มแค่แถวใหม่: ${await totals()} (ใหม่ ${next.transactions})`);
+  const twins = "0811110002,คุณซื้อสองชิ้น,2026-04-01,500,หมวก,1\n".repeat(2);
+  await run(twins); await run(twins);
+  const [w2] = await findCustomersByContact(A, "phone", "0811110002");
+  const n2 = Number((await get<{ n: number }>("SELECT COUNT(*) AS n FROM transactions WHERE customer_id = ?", w2))!.n);
+  ok(n2 === 2, `ซื้อของเหมือนกันสองชิ้นวันเดียวกัน ยังเป็นสองรายการ และนำเข้าซ้ำไม่เป็นสี่ (${n2})`);
+}
+
 // ── 10.4 · ล้างข้อมูลลูกค้าทั้งบัญชี ──
 const logBefore = Number((await get<{ n: number }>("SELECT COUNT(*) AS n FROM activity_log WHERE tenant_id = ?", A))!.n);
 const bBefore = Number((await get<{ n: number }>("SELECT COUNT(*) AS n FROM customers WHERE tenant_id = ?", B))!.n);
