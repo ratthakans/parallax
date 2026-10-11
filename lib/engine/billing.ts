@@ -69,7 +69,7 @@ export async function identifiedCount(tenantId: string): Promise<number> {
   const row = await get<{ n: number | string }>(
     `SELECT COUNT(*) AS n FROM customers c
      WHERE c.tenant_id = ?
-       AND EXISTS (SELECT 1 FROM identities i WHERE i.customer_id = c.id)`,
+       AND EXISTS (SELECT 1 FROM contact_points cp WHERE cp.customer_id = c.id)`,
     tenantId,
   );
   return Number(row?.n ?? 0);

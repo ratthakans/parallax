@@ -16,6 +16,11 @@ import {
   contactStorageReady, decryptContact, encryptContact, maskContact, matchKey, normaliseContact,
 } from "@/lib/engine/pii";
 import { findCustomersByContact, listContactPoints, revealContactPoint } from "@/lib/engine/contacts";
+import { IMPORT_FIELDS, IMPORT_FIELD_GROUPS } from "@/lib/shared/ingest-types";
+import { identifiedCount } from "@/lib/engine/billing";
+import { loadFeatures } from "@/lib/engine/derive";
+import { wipeCustomerData } from "@/lib/engine/tenant-data";
+import { tx } from "@/lib/engine/sql";
 
 const out: string[] = [];
 const ok = (c: boolean, m: string) => out.push(`${c ? "PASS" : "FAIL"}  ${m}`);
@@ -76,7 +81,7 @@ ok(preview.customers === 2 && preview.transactions === 0, `พรีวิว: $
 // สมชาย 6 (มือถือ · บ้าน · อีเมล · LINE · Facebook · ที่อยู่) + สมหญิง 2 (มือถือ · อีเมล)
 // สมหญิงมีแค่จังหวัด ไม่มีบ้านเลขที่ จึงไม่เกิดช่องที่อยู่ — จังหวัดอยู่ในประวัติแทน
 ok(preview.contactPoints === 8, `พรีวิว: ช่องทางติดต่อ ${preview.contactPoints} ช่อง (คาด 8)`);
-const res = await commitImport(A, parsed, mapping, { replace: false });
+const res = await commitImport(A, parsed, mapping);
 ok(res.customers === 2 && res.contactPoints === 8, `นำเข้า: ${res.customers} คน · ${res.contactPoints} ช่องทาง`);
 
 const [somchai] = await findCustomersByContact(A, "phone", "0812345678");
@@ -103,7 +108,7 @@ ok(await revealContactPoint(B, phone.id, "verify") === null, "อีกร้า
 
 // ── 7 · นำเข้าซ้ำ: ไม่เพิ่มซ้ำ ไม่ล้างของเดิม ──
 const again = parseCsv(`เบอร์มือถือ,ชื่อเล่น\n0812345678,\n`);
-await commitImport(A, again, mapColumnsHeuristic(again.headers), { replace: false });
+await commitImport(A, again, mapColumnsHeuristic(again.headers));
 ok((await listContactPoints(A, somchai)).length === pts.length, "นำเข้าซ้ำไม่เพิ่มช่องทางซ้ำ");
 const nameNow = (await get<{ name: string }>("SELECT name FROM customers WHERE id = ?", somchai))!.name;
 ok(nameNow === "สมชาย ใจดี", `ไฟล์ที่ไม่มีชื่อไม่ลบชื่อเดิม (${nameNow})`);
@@ -115,7 +120,7 @@ const sale = (name: string, total: number) =>
   parseCsv(`เบอร์มือถือ,ชื่อลูกค้า,วันที่ซื้อ,ยอดสุทธิ,ชื่อสินค้า\n081-234-5678,${name},2026-09-01,${total},ลูกกอล์ฟ\n`);
 for (const [t, name, total] of [[A, "สมชาย (กอล์ฟ)", 4200], [B, "สมชาย (แท็กซี่)", 350]] as const) {
   const p = sale(name, total);
-  await commitImport(t, p, mapColumnsHeuristic(p.headers), { replace: false });
+  await commitImport(t, p, mapColumnsHeuristic(p.headers));
 }
 const [inA] = await findCustomersByContact(A, "phone", "0812345678");
 const [inB] = await findCustomersByContact(B, "phone", "0812345678");
@@ -139,13 +144,52 @@ const leaks = ["0812345678", "+66812345678", "812345678", "somchai@example.com",
   "somchai_line", "99/1 ถนนสุขุมวิท"].filter((v) => raw.includes(Buffer.from(v, "utf8")));
 ok(leaks.length === 0, `ค้นไฟล์ฐานข้อมูลทั้งไฟล์ไม่พบค่าจริง${leaks.length ? " · พบ: " + leaks.join(", ") : ""}`);
 
+// ── 10.1 · เมนูเลือกคอลัมน์: ทุก field อยู่ในกลุ่มเดียวพอดี ──
+const grouped = IMPORT_FIELD_GROUPS.flatMap((g) => g.fields);
+const missingFromMenu = IMPORT_FIELDS.filter((f) => f !== "ignore" && !grouped.includes(f));
+const dupInMenu = grouped.filter((f, i) => grouped.indexOf(f) !== i);
+ok(missingFromMenu.length === 0 && dupInMenu.length === 0,
+  `เมนูจัดกลุ่มครบ ${grouped.length} field${missingFromMenu.length ? " · หายไป: " + missingFromMenu : ""}${dupInMenu.length ? " · ซ้ำ: " + dupInMenu : ""}`);
+
+// ── 10.2 · รหัสสมาชิกเป็นตัวระบุใน contact_points ──
+const member = parseCsv(`รหัสลูกค้า,ชื่อลูกค้า\nM-00042,คุณสมาชิก\n`);
+await commitImport(A, member, mapColumnsHeuristic(member.headers));
+await commitImport(A, member, mapColumnsHeuristic(member.headers));
+const memberRows = await all<{ customer_id: string; value_enc: string }>(
+  "SELECT customer_id, value_enc FROM contact_points WHERE tenant_id = ? AND kind = 'member_no'", A);
+ok(memberRows.length === 1 && !memberRows[0].value_enc.includes("M-00042"),
+  `ไฟล์ที่มีแค่รหัสสมาชิกได้ลูกค้าหนึ่งคน นำเข้าซ้ำไม่ซ้ำ และรหัสถูกเข้ารหัส (${memberRows.length} แถว)`);
+
+// ── 10.3 · ผู้อ่านที่ย้ายจาก identities มา contact_points ──
+const seededIdentified = await identifiedCount("brc-golf");
+const seededPeople = Number((await get<{ n: number }>("SELECT COUNT(*) AS n FROM customers WHERE tenant_id = ?", "brc-golf"))!.n);
+ok(seededIdentified === seededPeople && seededPeople > 0,
+  `นับคนที่ระบุตัวได้จาก contact_points (${seededIdentified}/${seededPeople})`);
+const lineReach = (await loadFeatures("brc-golf")).filter((f) => f.reachable_by === "line").length;
+ok(lineReach > 0, `ทักทาง LINE ได้ตัดสินจาก contact_points (${lineReach} คน)`);
+ok(!(await all<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'identities'")).length,
+  "ไม่มีตาราง identities แล้ว");
+
+// ── 10.4 · ล้างข้อมูลลูกค้าทั้งบัญชี ──
+const logBefore = Number((await get<{ n: number }>("SELECT COUNT(*) AS n FROM activity_log WHERE tenant_id = ?", A))!.n);
+const bBefore = Number((await get<{ n: number }>("SELECT COUNT(*) AS n FROM customers WHERE tenant_id = ?", B))!.n);
+await tx((q) => wipeCustomerData(q, A));
+const left = async (t: string) => Number((await get<{ n: number }>(`SELECT COUNT(*) AS n FROM ${t} WHERE tenant_id = ?`, A))!.n);
+const leftovers = [];
+for (const t of ["customers", "contact_points", "contact_profiles", "transactions", "campaigns", "products", "customer_features"])
+  if (await left(t)) leftovers.push(`${t}=${await left(t)}`);
+ok(leftovers.length === 0, `ล้างแล้วไม่เหลือข้อมูลลูกค้าของร้านนี้${leftovers.length ? " · เหลือ " + leftovers.join(", ") : ""}`);
+ok(await left("activity_log") === logBefore, "บันทึกการใช้งานไม่ถูกลบไปด้วย");
+ok(Number((await get<{ n: number }>("SELECT COUNT(*) AS n FROM customers WHERE tenant_id = ?", B))!.n) === bBefore,
+  "ร้านอื่นไม่โดนลบ");
+
 // ── 11 · production ที่ไม่มีกุญแจ = ไม่รับ ──
 const saved = { NODE_ENV: process.env.NODE_ENV, PII_KEY: process.env.PII_KEY, PII_HMAC_KEY: process.env.PII_HMAC_KEY };
 (process.env as Record<string, string | undefined>).NODE_ENV = "production";
 delete process.env.PII_KEY; delete process.env.PII_HMAC_KEY;
 const readyInProd = contactStorageReady();
 let refused = "";
-try { await commitImport(A, again, mapColumnsHeuristic(again.headers), { replace: false }); }
+try { await commitImport(A, again, mapColumnsHeuristic(again.headers)); }
 catch (e) { refused = (e as Error).message; }
 for (const [k2, v] of Object.entries(saved)) {
   if (v === undefined) delete (process.env as Record<string, string | undefined>)[k2];

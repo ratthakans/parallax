@@ -101,18 +101,10 @@ export async function ensureSchema(): Promise<void> {
       PRIMARY KEY (tenant_id, user_id)
     );
 
-    CREATE TABLE IF NOT EXISTS identities (
-      customer_id TEXT NOT NULL,
-      tenant_id TEXT NOT NULL,
-      type TEXT NOT NULL,
-      value_hash TEXT NOT NULL,
-      PRIMARY KEY (customer_id, type)
-    );
-
-    /* ── ช่องทางติดต่อทุกช่องทางของลูกค้า ──
-       หนึ่งคนมีได้หลายเบอร์ หลายอีเมล หลายที่อยู่ — identities เก็บได้
-       ประเภทละหนึ่ง จึงยังเป็นตัวจับคู่ ส่วนตารางนี้เก็บค่าจริงทั้งหมด
-       value_enc เข้ารหัสด้วย lib/engine/pii.ts · value_hmac ใช้ตรวจซ้ำ */
+    /* ── ตัวระบุและช่องทางติดต่อทุกช่องทางของลูกค้า ──
+       หนึ่งคนมีได้หลายเบอร์ หลายอีเมล หลายที่อยู่ รวมรหัสสมาชิก
+       แทนตาราง identities เดิม ซึ่ง hash ค่าเดียวกันซ้ำกับตารางนี้ทุกตัว
+       value_enc เข้ารหัสด้วย lib/engine/pii.ts · value_hmac ใช้จับคู่และตรวจซ้ำ */
     CREATE TABLE IF NOT EXISTS contact_points (
       id TEXT PRIMARY KEY,
       tenant_id TEXT NOT NULL,

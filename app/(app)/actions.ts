@@ -4,7 +4,8 @@ import { activeTenantId } from "@/app/(app)/tenant";
 import { currentUser } from "@/lib/shared/session";
 import { membershipEnforced, tenantsForUser } from "@/lib/engine/access";
 
-import { all, get, run } from "@/lib/engine/sql";
+import { all, get, run, tx } from "@/lib/engine/sql";
+import { wipeCustomerData } from "@/lib/engine/tenant-data";
 import { logActivity } from "@/lib/engine/db";
 
 import { revalidatePath } from "next/cache";
@@ -397,6 +398,49 @@ export async function travelAction(
   return {
     ok: `Moved ${days} days back in time · ${num(res.campaigns)} campaign(s) shifted · ${num(res.measured)} re-measured.`,
   };
+}
+
+/* ── ล้างข้อมูลลูกค้าทั้งบัญชี ──────────────────────────────────
+
+   ย้ายมาจากช่องติ๊ก "แทนที่ข้อมูลเดิม" ในหน้านำเข้า ซึ่งติ๊กครั้งเดียวแล้ว
+   กดนำเข้า ลูกค้า ธุรกรรม และแคมเปญทั้งบัญชีหายไป (เกิดจริง: ไฟล์ 2 คน
+   ลบลูกค้า 1,240 คน)
+
+   ที่นี่ต้องผ่านสามด่าน: พิมพ์ชื่อร้านให้ตรง · กดปุ่มสองครั้ง (ActionForm
+   confirm) · และบนระบบจริงต้องเป็นเจ้าของบัญชี ไม่ใช่พนักงาน — ตรวจที่นี่
+   ไม่ใช่แค่ซ่อนปุ่ม เพราะ Server Action ยิงตรงได้โดยไม่ผ่านหน้าจอ
+
+   ไม่ลบ activity_log · credit_purchases · tenant_plays (ดู tenant-data.ts)
+   การล้างครั้งนี้เองจึงยังอยู่ในบันทึกหลังจากล้างเสร็จ */
+export async function wipeCustomerDataAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const tenantId = await currentTenant(formData);
+  const tenant = await getTenant(tenantId);
+  if (!tenant) return { error: "ไม่พบบัญชีนี้" };
+
+  const typed = String(formData.get("confirmName") ?? "").trim();
+  if (typed !== tenant.name) {
+    return { error: `พิมพ์ชื่อร้าน "${tenant.name}" ให้ตรงก่อน — ยังไม่มีอะไรถูกลบ` };
+  }
+
+  if (membershipEnforced()) {
+    const user = await currentUser();
+    const role = user
+      ? (await get<{ role: string }>(
+          "SELECT role FROM tenant_users WHERE user_id = ? AND tenant_id = ?",
+          user.userId,
+          tenantId,
+        ))?.role
+      : undefined;
+    if (role !== "owner") return { error: "เฉพาะเจ้าของบัญชีเท่านั้นที่ล้างข้อมูลได้" };
+  }
+
+  await tx((q) => wipeCustomerData(q, tenantId));
+  await logActivity(tenantId, ACTOR, "wipe_customer_data", tenant.name);
+  revalidateConsole();
+  return { ok: "ล้างแล้ว — นำเข้าไฟล์ใหม่ได้ที่หน้านำเข้าข้อมูล" };
 }
 
 export async function clearAiCacheAction(

@@ -47,6 +47,28 @@ export const IMPORT_FIELDS = [
 
 export type ImportField = (typeof IMPORT_FIELDS)[number];
 
+/* ── กลุ่มในเมนูเลือกคอลัมน์ ──
+   33 ตัวเลือกเรียงยาวรายการเดียวคือการให้คนไล่หาเอง จัดกลุ่มตามคำถาม
+   ที่คนถามตัวเองตอนดูหัวคอลัมน์: เป็นข้อมูลของคน · ติดต่อทางไหน · อยู่ที่ไหน · ซื้ออะไร
+   ทุก field ต้องอยู่ในกลุ่มเดียวพอดี — verify:contacts ตรวจให้ */
+export const IMPORT_FIELD_GROUPS: { label: string; fields: ImportField[] }[] = [
+  {
+    label: "ข้อมูลของคน",
+    fields: ["customer_ref", "customer_name", "first_name", "last_name", "nickname",
+      "gender", "birthday", "company", "job_title", "note"],
+  },
+  {
+    label: "ช่องทางติดต่อ",
+    fields: ["phone", "phone_alt", "email", "line_id", "facebook", "instagram", "tiktok", "website"],
+  },
+  { label: "ที่อยู่", fields: ["address", "subdistrict", "district", "province", "postcode"] },
+  {
+    label: "การซื้อ",
+    fields: ["occurred_at", "total", "unit_price", "list_price", "discount",
+      "product_name", "product_category", "qty", "channel"],
+  },
+];
+
 export const FIELD_LABEL: Record<ImportField, string> = {
   customer_ref: "รหัสลูกค้า (หรือใช้เบอร์ · อีเมล · LINE แทนได้)",
   customer_name: "ชื่อลูกค้า (ชื่อเต็ม)",

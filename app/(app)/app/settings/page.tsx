@@ -12,6 +12,7 @@ import { Metric, PageHead, Panel, num } from "@/components/console/ui";
 import {
   clearAiCacheAction,
   reseedAction,
+  wipeCustomerDataAction,
   travelAction,
   updateLimitsAction,
 } from "../../actions";
@@ -386,6 +387,38 @@ export default async function SettingsPage() {
           คอนโซลนี้ยังไม่มีระบบเข้าสู่ระบบ ทุกการกระทำจึงถูกบันทึกเป็น owner —
           ต้องเพิ่มการยืนยันตัวตนก่อนใช้งานจริง
         </p>
+      </Panel>
+
+      {/* ── ล้างข้อมูลลูกค้าทั้งบัญชี ──
+          ย้ายมาจากช่องติ๊กในหน้านำเข้า ซึ่งติ๊กครั้งเดียวเคยลบลูกค้าทั้งบัญชี
+          ที่นี่ต้องพิมพ์ชื่อร้านให้ตรงแล้วกดสองครั้ง — การกระทำที่ย้อนกลับไม่ได้
+          ต้องทำยากกว่าการกดพลาด */}
+      <Panel className="mt-6 border-l-2 border-[var(--c-bad)] p-5 md:p-6">
+        <p className="c-label-th text-[var(--c-bad)]">ล้างข้อมูลลูกค้าทั้งบัญชี</p>
+        <p className="c-thai mt-2.5 max-w-2xl text-[0.84rem] leading-relaxed text-[var(--c-text-2)]">
+          ลบลูกค้า ช่องทางติดต่อ ประวัติการซื้อ สินค้า และแคมเปญทั้งหมดของ{" "}
+          {tenant?.name ?? profile.name} เพื่อนำเข้าใหม่ตั้งแต่ต้น ย้อนกลับไม่ได้ —
+          บันทึกการใช้งานและประวัติการชำระเงินยังอยู่
+        </p>
+        <ActionForm
+          action={wipeCustomerDataAction}
+          fields={{ tenantId }}
+          label="ล้างข้อมูลลูกค้า"
+          pendingLabel="กำลังล้าง…"
+          variant="danger"
+          size="sm"
+          confirm={`ยืนยัน — ลบทั้งหมดของ ${tenant?.name ?? profile.name}`}
+          className="mt-4 flex flex-wrap items-center gap-2.5"
+        >
+          <input
+            name="confirmName"
+            required
+            autoComplete="off"
+            aria-label="พิมพ์ชื่อร้านเพื่อยืนยัน"
+            placeholder={`พิมพ์ "${tenant?.name ?? profile.name}" เพื่อยืนยัน`}
+            className="c-input max-w-xs"
+          />
+        </ActionForm>
       </Panel>
     </>
   );

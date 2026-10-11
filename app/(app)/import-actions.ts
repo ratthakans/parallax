@@ -74,14 +74,15 @@ export type CommitOutcome =
   | { ok: true; result: ImportResult }
   | { ok: false; error: string };
 
+/* ไม่มีพารามิเตอร์ replace แล้ว — การนำเข้าเพิ่มและเติมได้อย่างเดียว
+   การล้างทั้งบัญชีอยู่ที่ wipeCustomerDataAction ในหน้าตั้งค่า */
 export async function commitCsv(
   csvText: string,
   mapping: ColumnMapping,
-  replace: boolean,
 ): Promise<CommitOutcome> {
   try {
     const parsed = parseCsv(csvText);
-    const result = await commitImport(await activeTenantId(), parsed, mapping, { replace });
+    const result = await commitImport(await activeTenantId(), parsed, mapping);
     for (const p of [
       "/app", "/app/plays", "/app/campaigns", "/app/proof",
       "/app/customers", "/app/import",

@@ -1,3 +1,5 @@
+import { wipeCustomerData } from "@/lib/engine/tenant-data";
+import { CONTACT_POINT_COLUMNS, contactPointRow } from "@/lib/engine/pii";
 import { get, insertMany, tx, type Param, type Sql } from "@/lib/engine/sql";
 import { ALL_PLAYS } from "@/lib/shared/plays";
 import {
@@ -78,41 +80,11 @@ export async function isTenantSeeded(tenantId: string): Promise<boolean> {
    (จะเปลี่ยนเป็นลบตรงด้วย tenant_id ก็ได้ แต่ยังไม่ทำในรอบนี้ —
     การย้ายไป async ควรเปลี่ยนเรื่องเดียวต่อรอบ)
    ───────────────────────────────────────────────────────────── */
+/* ล้างบัญชีตัวอย่างทั้งบัญชี = ข้อมูลลูกค้า (ที่เดียวกับปุ่มในหน้าตั้งค่า)
+   + สิ่งที่บัญชีตัวอย่างต้องเริ่มใหม่ด้วย ซึ่งบัญชีจริงต้องเก็บไว้ */
 async function wipeTenant(q: Sql, tenantId: string) {
-  for (const tbl of ["campaign_audience", "messages", "attributions"]) {
-    await q.run(
-      `DELETE FROM ${tbl} WHERE campaign_id IN
-         (SELECT id FROM campaigns WHERE tenant_id = ?)`,
-      tenantId,
-    );
-  }
-  await q.run(
-    `DELETE FROM line_items WHERE txn_id IN (
-       SELECT tx.id FROM transactions tx
-       JOIN customers c ON c.id = tx.customer_id
-       WHERE c.tenant_id = ?)`,
-    tenantId,
-  );
-  for (const tbl of [
-    "events",
-    "consents",
-    "memberships",
-    "identities",
-    "transactions",
-  ]) {
-    await q.run(
-      `DELETE FROM ${tbl} WHERE customer_id IN
-         (SELECT id FROM customers WHERE tenant_id = ?)`,
-      tenantId,
-    );
-  }
-  for (const tbl of [
-    "campaigns", "tenant_plays", "customer_features",
-    // ก่อน customers — Postgres บังคับ foreign key ของสองตารางนี้
-    "contact_points", "contact_profiles",
-    "customers", "products", "brief_opens", "activity_log",
-    "credit_purchases",
-  ]) {
+  await wipeCustomerData(q, tenantId);
+  for (const tbl of ["tenant_plays", "brief_opens", "activity_log", "credit_purchases"]) {
     await q.run(`DELETE FROM ${tbl} WHERE tenant_id = ?`, tenantId);
   }
 }
@@ -194,7 +166,7 @@ async function seedTenant(q: Sql, p: TenantProfile, now: Date) {
      สะสมลง array แล้วส่งผ่าน insertMany ครั้งเดียวต่อตาราง
      วัดจริงบน Postgres: 10,000 แถว 1.63 วินาที (เทียบกับ ~35 นาที) */
   const bufCustomer: Param[][] = [];
-  const bufIdentity: Param[][] = [];
+  const bufPoint: Param[][] = [];
   const bufTxn: Param[][] = [];
   const bufLine: Param[][] = [];
   const bufConsent: Param[][] = [];
@@ -248,7 +220,11 @@ async function seedTenant(q: Sql, p: TenantProfile, now: Date) {
       ? oldest + 20 + Math.floor(rnd() * 120)
       : 5 + Math.floor(rnd() * 80);
     bufCustomer.push([id, p.id, name, iso(daysAgo(now, signupDays))]);
-    bufIdentity.push([p.id, id, "phone", `ph_${id}_${Math.floor(rnd() * 1e9)}`]);
+    /* เบอร์สมมุติที่หน้าตาเหมือนเบอร์จริง เก็บแบบเดียวกับข้อมูลที่นำเข้า
+       ⚠ ต้องเรียก rnd() ครั้งเดียวตรงนี้เหมือนเดิม — ลำดับการสุ่มกำหนดตัวเลข
+       ทุกตัวของบัญชีตัวอย่าง เรียกเพิ่มหรือขาดหนึ่งครั้ง บรีฟทั้งหน้าเปลี่ยน */
+    const fakePhone = `+668${String(Math.floor(rnd() * 1e9) % 1e8).padStart(8, "0")}`;
+    bufPoint.push(contactPointRow(p.id, id, "phone", fakePhone, "มือถือ", true, "seed"));
 
     /* ── ความยินยอมและช่องทางที่ทักถึง ──
        คนที่ถอนความยินยอมคือคนที่ Keep ยอมแพ้ และไม่มีสิทธิ์ถูกส่ง
@@ -263,7 +239,8 @@ async function seedTenant(q: Sql, p: TenantProfile, now: Date) {
         rnd() > 0.5 ? "signup_form" : "line_oa",
       ]);
     }
-    if (rnd() < p.lineShare) bufIdentity.push([p.id, id, "line", `line_${id}`]);
+    if (rnd() < p.lineShare)
+      bufPoint.push(contactPointRow(p.id, id, "line", `line_${id}`, null, true, "seed"));
 
     /* ── สมาชิกที่มีวันหมดอายุ — ป้อนให้ play กลุ่ม expiry ──
 
@@ -384,10 +361,10 @@ async function seedTenant(q: Sql, p: TenantProfile, now: Date) {
   }
 
   /* ── แทรกทุกถัง ──
-     ลำดับสำคัญ: customers ก่อน identities/consents/... และ transactions
+     ลำดับสำคัญ: customers ก่อน contact_points/consents/... และ transactions
      ก่อน line_items เพราะ Postgres บังคับ foreign key ทันที */
   await insertMany(q, "customers", ["id", "tenant_id", "name", "created_at"], bufCustomer);
-  await insertMany(q, "identities", ["tenant_id", "customer_id", "type", "value_hash"], bufIdentity);
+  await insertMany(q, "contact_points", CONTACT_POINT_COLUMNS, bufPoint);
   await insertMany(q, "consents", ["tenant_id", "customer_id", "purpose", "granted_at", "revoked_at", "source"], bufConsent);
   await insertMany(q, "memberships", ["tenant_id", "customer_id", "kind", "started_at", "expires_at"], bufMembership);
   await insertMany(q, "events", ["tenant_id", "customer_id", "type", "occurred_at", "meta"], bufEvent);

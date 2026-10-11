@@ -1,4 +1,5 @@
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes } from "node:crypto";
+import type { Param } from "@/lib/engine/sql";
 
 /* ── ข้อมูลติดต่อของลูกค้า: เก็บค่าจริง แต่ไม่เก็บแบบอ่านได้ ──────
 
@@ -17,8 +18,11 @@ import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes }
    กฎ boundary: createDecipheriv ถูกเรียกได้ที่ไฟล์นี้เท่านั้น
    ───────────────────────────────────────────────────────────── */
 
+/* member_no ไม่ใช่ช่องทางติดต่อ แต่เป็นตัวระบุตัวคน — อยู่ตารางเดียวกันเพราะ
+   ทำหน้าที่เดียวกัน: บอกว่าแถวในไฟล์ใหม่คือคนเดิมคนไหน เดิมตัวระบุแยกไปอยู่
+   ตาราง identities ซึ่ง hash ค่าเดียวกันซ้ำกับตารางนี้ทุกตัว */
 export const CONTACT_KINDS = [
-  "phone", "email", "line", "facebook", "instagram", "tiktok", "website", "address",
+  "phone", "email", "line", "facebook", "instagram", "tiktok", "website", "address", "member_no",
 ] as const;
 export type ContactKind = (typeof CONTACT_KINDS)[number];
 
@@ -139,6 +143,8 @@ export function normaliseContact(kind: ContactKind, raw: string): string | null 
     }
     case "address":
       return v.replace(/\s+/g, " ");
+    case "member_no":
+      return v;
   }
 }
 
@@ -165,4 +171,37 @@ export function maskContact(kind: ContactKind, normalised: string): string {
     default:
       return normalised.length > 3 ? `${normalised.slice(0, 2)}•••${normalised.slice(-1)}` : "•••";
   }
+}
+
+/* ── แถวหนึ่งของ contact_points ──
+   ที่เดียวที่ประกอบค่าที่ปิดผนึกแล้ว — การนำเข้าและข้อมูลตัวอย่างใช้ตัวเดียวกัน
+   จึงไม่มีทางที่ทางหนึ่งเก็บแบบอ่านได้ ส่วนอีกทางเข้ารหัส
+
+   id อ่านออกตรง ๆ: ลูกค้า · ชนิด · กุญแจจับคู่ 16 ตัวแรก (ถอดกลับไม่ได้)
+   คนในบัญชีเดียวกันใช้เบอร์ร่วมกันได้ (เบอร์บ้าน) id จึงต้องมีรหัสลูกค้าด้วย */
+export const CONTACT_POINT_COLUMNS = [
+  "id", "tenant_id", "customer_id", "kind", "label", "value_enc", "value_hmac",
+  "value_masked", "is_primary", "source", "created_at",
+];
+
+export function contactPointRow(
+  tenantId: string,
+  customerId: string,
+  kind: ContactKind,
+  normalised: string,
+  label: string | null,
+  isPrimary: boolean,
+  source: string,
+): Param[] {
+  const hmac = matchKey(tenantId, kind, normalised);
+  return [
+    `${customerId}:${kind}:${hmac.slice(0, 16)}`,
+    tenantId, customerId, kind, label,
+    encryptContact(tenantId, kind, normalised),
+    hmac,
+    maskContact(kind, normalised),
+    isPrimary ? 1 : 0,
+    source,
+    new Date().toISOString(),
+  ];
 }

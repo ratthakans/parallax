@@ -1,18 +1,19 @@
-import { insertMany, tx, type Param } from "@/lib/engine/sql";
+import { insertMany, tx, type Param, type Sql } from "@/lib/engine/sql";
 import { logActivity } from "@/lib/engine/db";
 import { createHash } from "node:crypto";
 import { deriveFeatures } from "@/lib/engine/derive";
 import { guessProductRoles } from "@/lib/engine/ai";
 import { contactCapBlockedReason } from "@/lib/engine/billing";
 import {
+  CONTACT_POINT_COLUMNS,
+  contactPointRow,
   contactStorageReady,
-  encryptContact,
-  maskContact,
   matchKey,
   normaliseContact,
   type ContactKind,
 } from "@/lib/engine/pii";
 import {
+  FIELD_LABEL,
   hasPurchases,
   missingRequired,
   type ColumnMapping,
@@ -260,8 +261,11 @@ function channelsOf(at: At): { kind: ContactKind; label: string | null; value: s
   };
   for (const c of CHANNEL_FIELDS) push(c.kind, c.label, at(c.field));
   // เบอร์หรืออีเมลที่อยู่ในช่องรหัสลูกค้าก็เป็นช่องทางติดต่อเหมือนกัน
+  /* ค่าในช่องรหัสลูกค้า: เบอร์หรืออีเมลเป็นช่องทางติดต่อ ส่วนรหัสสมาชิก
+     เป็นตัวระบุ — ทั้งหมดอยู่ใน contact_points ที่เดียว ไม่แยกตารางแล้ว */
   const ref = normaliseRef(at("customer_ref"));
   if (ref?.type === "phone" || ref?.type === "email") push(ref.type, null, ref.value);
+  else if (ref) push("member_no", null, ref.value);
   /* ที่อยู่รวมเป็นค่าเดียว — แยกเก็บตำบล/อำเภอ/จังหวัดแบบอ่านได้ไว้ใน
      contact_profiles ด้วย เพราะต้องใช้กรองกลุ่ม ส่วนบ้านเลขที่และถนนคือ
      ส่วนที่ระบุตัวคนได้จริง จึงอยู่ในค่าที่เข้ารหัสเท่านั้น */
@@ -316,25 +320,29 @@ function displayName(at: At): string {
 
 /* ── นำเข้าจริง ───────────────────────────────────────────────── */
 
-export function buildPreview(
-  parsed: ParsedCsv,
-  mapping: ColumnMapping,
-): ImportPreview {
+/* อ่านค่าของแต่ละ field ตามการจับคู่คอลัมน์ — พรีวิวกับนำเข้าจริงใช้ตัวเดียวกัน
+   เดิมเขียนซ้ำสองชุด ซึ่งคือที่ที่ตัวเลขก่อนกดกับหลังกดจะเริ่มไม่ตรงกัน */
+function fieldReader(parsed: ParsedCsv, mapping: ColumnMapping) {
   const byField = new Map<ImportField, number>();
   mapping.mappings.forEach((m) => {
     const idx = parsed.headers.indexOf(m.column);
-    if (idx >= 0 && m.field !== "ignore" && !byField.has(m.field)) {
-      byField.set(m.field, idx);
-    }
+    if (idx >= 0 && m.field !== "ignore" && !byField.has(m.field)) byField.set(m.field, idx);
   });
-
-  const missing = missingRequired((f) => byField.has(f));
   const at = (row: string[], f: ImportField) => {
     const i = byField.get(f);
     return i == null ? "" : (row[i] ?? "");
   };
+  return { has: (f: ImportField) => byField.has(f), at };
+}
 
-  const purchases = hasPurchases((f) => byField.has(f));
+export function buildPreview(
+  parsed: ParsedCsv,
+  mapping: ColumnMapping,
+): ImportPreview {
+  const { has, at } = fieldReader(parsed, mapping);
+  const missing = missingRequired(has);
+
+  const purchases = hasPurchases(has);
   const rejected = [...parsed.rejected];
   const refs = new Set<string>();
   const products = new Map<string, { category: string; price: number }>();
@@ -395,11 +403,145 @@ export function buildPreview(
   };
 }
 
+/* ── นำเข้าจริง: อ่าน → รวบรวม → เขียน ─────────────────────────
+
+   ไม่มีตัวเลือก "แทนที่ข้อมูลเดิม" แล้ว การนำเข้าจึงทำได้อย่างเดียวคือ
+   เพิ่มและเติม — คนเดิมไม่ซ้ำ ช่องที่ว่างในไฟล์ใหม่ไม่ลบข้อมูลเดิม
+   การล้างทั้งบัญชีย้ายไปเป็นปุ่มในหน้าตั้งค่า (wipeCustomerData)
+   เพราะติ๊กครั้งเดียวในหน้านำเข้าเคยลบลูกค้า 1,240 คนไปจริง */
+
+type ImportBatch = {
+  customers: Param[][];
+  points: Param[][];
+  profiles: Param[][];
+  consents: Param[][];
+  products: Param[][];
+  txns: Param[][];
+  lines: Param[][];
+};
+
+const PROFILE_COLS: (keyof Profile)[] = [
+  "first_name", "last_name", "nickname", "gender", "birthday", "company",
+  "job_title", "subdistrict", "district", "province", "postcode", "note",
+];
+
+/** แปลงทุกแถวเป็นแถวของแต่ละตาราง — ไม่แตะฐานข้อมูล */
+function collectImport(
+  tenantId: string,
+  parsed: ParsedCsv,
+  read: ReturnType<typeof fieldReader>,
+  preview: ImportPreview,
+  roleByName: Map<string, GroupRole>,
+): ImportBatch {
+  const { at, has } = read;
+  const b: ImportBatch = {
+    customers: [], points: [], profiles: [], consents: [], products: [], txns: [], lines: [],
+  };
+  const idFor = (x: string) => createHash("sha256").update(x).digest("hex").slice(0, 20);
+
+  /* ── ID ลูกค้าผูกกับร้าน และถอดกลับเป็นเบอร์ไม่ได้ ──
+     เดิมคือ c- + sha256("phone:เบอร์") ไม่มีรหัสร้าน: สองร้านนำเข้าเบอร์เดียวกัน
+     ได้แถวเดียว ร้านที่สองเขียนชื่อทับและธุรกรรมของร้านที่สองหายเงียบ (ทดสอบแล้ว)
+     และ sha256 ของเบอร์ถอดกลับได้ในไม่กี่นาที ID จึงเท่ากับเบอร์โทร */
+  const customerId = (type: string, value: string) =>
+    `c-${matchKey(tenantId, type, value).slice(0, 24)}`;
+
+  const seenCustomers = new Set<string>();
+  const seenProducts = new Set<string>();
+  const profiles = new Map<string, Profile>();
+  const purchases = hasPurchases(has);
+  const nowIso = new Date().toISOString();
+  let txnSeq = 0;
+
+  for (const row of parsed.rows) {
+    const get: At = (f) => at(row, f);
+    const ident = identityOf(get);
+    if (!ident) continue;
+    const when = normaliseDate(at(row, "occurred_at"));
+    // ตรรกะเงินตัวเดียวกับตอนพรีวิว ตัวเลขที่เห็นก่อนกดจึงตรงกับที่นำเข้า
+    const money = rowMoney(row, at);
+    if (purchases && (!when || !money)) continue;
+
+    const cid = customerId(ident.type, ident.value);
+    if (!seenCustomers.has(cid)) {
+      seenCustomers.add(cid);
+      b.customers.push([cid, tenantId, displayName(get), when ?? nowIso]);
+      /* ไฟล์ไม่มีข้อมูลความยินยอม จึงตั้งเป็น "ยังไม่ยินยอม" — การมีเบอร์
+         ไม่ใช่การได้รับอนุญาตให้ส่ง ไม่ว่าจะเก็บข้อมูลติดต่อได้มากแค่ไหน */
+      b.consents.push([tenantId, cid, "marketing", null, null, "csv_import"]);
+    }
+
+    // แถวหลังของคนเดียวกันเพิ่มช่องทางที่ยังไม่มี ส่วนที่ซ้ำ ON CONFLICT ข้ามให้
+    const firstOfKind = new Set<string>();
+    for (const c of channelsOf(get)) {
+      b.points.push(contactPointRow(tenantId, cid, c.kind, c.value, c.label, !firstOfKind.has(c.kind), "csv_import"));
+      firstOfKind.add(c.kind);
+    }
+
+    // หลายแถวของคนเดียวกันรวมเป็นประวัติเดียว แถวหลังเติมช่องที่ยังว่าง
+    const prof = profileOf(get);
+    if (prof) {
+      const prev = profiles.get(cid);
+      if (!prev) profiles.set(cid, prof);
+      else for (const k of PROFILE_COLS) prev[k] ??= prof[k];
+    }
+
+    if (!purchases || !when || !money) continue;
+
+    const pname = at(row, "product_name").trim();
+    let pid: string | null = null;
+    if (pname) {
+      // ผูกกับร้านด้วยเหตุผลเดียวกับ ID ลูกค้า — ชื่อสินค้าซ้ำข้ามร้านเป็นเรื่องปกติ
+      pid = `p-${idFor(`${tenantId}:${pname}`)}`;
+      if (!seenProducts.has(pid)) {
+        seenProducts.add(pid);
+        const meta = preview.products.find((x) => x.name === pname);
+        b.products.push([
+          pid, tenantId, pname, meta?.category ?? "ทั่วไป",
+          roleByName.get(pname) ?? "attachment", meta?.price ?? money.listUnit,
+        ]);
+      }
+    }
+
+    const txnId = `t-${idFor(`${cid}:${when}:${++txnSeq}`)}`;
+    b.txns.push([tenantId, txnId, cid, when, money.total, money.discount, at(row, "channel").trim() || "pos"]);
+    // unit_price ต้องเป็นราคาต่อหน่วย ไม่ใช่ยอดรวมของแถว
+    if (pid) b.lines.push([tenantId, txnId, pid, money.qty, money.unitNet, money.listUnit]);
+  }
+
+  b.profiles = [...profiles].map(([cid, p]) => [cid, tenantId, ...PROFILE_COLS.map((c) => p[c]), nowIso]);
+  return b;
+}
+
+/** เขียนทุกตารางในธุรกรรมเดียว — ลำดับตามความสัมพันธ์ เพราะ Postgres บังคับ foreign key ทันที */
+async function writeImport(q: Sql, b: ImportBatch): Promise<void> {
+  /* ไฟล์รายชื่อที่ไม่มีคอลัมน์ชื่อต้องไม่ลบชื่อที่มีอยู่แล้ว
+     ทิ้งเป็น "ลูกค้าไม่ระบุชื่อ" ทับชื่อจริงจากไฟล์ก่อนหน้า */
+  await insertMany(q, "customers", ["id", "tenant_id", "name", "created_at"], b.customers, {
+    onConflict: `ON CONFLICT(id) DO UPDATE SET name =
+      CASE WHEN excluded.name = '${UNNAMED}' THEN customers.name ELSE excluded.name END`,
+  });
+  await insertMany(q, "contact_points", CONTACT_POINT_COLUMNS, b.points,
+    { onConflict: "ON CONFLICT DO NOTHING" });
+  // ช่องที่ไฟล์นี้ไม่มีข้อมูล ต้องคงค่าจากไฟล์ก่อนหน้าไว้ ไม่ใช่ล้างเป็นว่าง
+  await insertMany(q, "contact_profiles", ["customer_id", "tenant_id", ...PROFILE_COLS, "updated_at"], b.profiles, {
+    onConflict: `ON CONFLICT(customer_id) DO UPDATE SET ${PROFILE_COLS
+      .map((c) => `${c} = COALESCE(excluded.${c}, contact_profiles.${c})`)
+      .join(", ")}, updated_at = excluded.updated_at`,
+  });
+  await insertMany(q, "consents", ["tenant_id", "customer_id", "purpose", "granted_at", "revoked_at", "source"], b.consents,
+    { onConflict: "ON CONFLICT(customer_id, purpose) DO NOTHING" });
+  await insertMany(q, "products", ["id", "tenant_id", "name", "category", "group_role", "list_price"], b.products,
+    { onConflict: "ON CONFLICT(id) DO UPDATE SET group_role = excluded.group_role" });
+  await insertMany(q, "transactions", ["tenant_id", "id", "customer_id", "occurred_at", "total", "discount_total", "channel"], b.txns,
+    { onConflict: "ON CONFLICT(id) DO NOTHING" });
+  await insertMany(q, "line_items", ["tenant_id", "txn_id", "product_id", "qty", "unit_price", "unit_list_price"], b.lines);
+}
+
 export async function commitImport(
   tenantId: string,
   parsed: ParsedCsv,
   mapping: ColumnMapping,
-  opts: { replace: boolean },
 ): Promise<ImportResult> {
   /* ID ลูกค้าคำนวณจากกุญแจ HMAC และช่องทางติดต่อต้องเข้ารหัส — ไม่มีกุญแจ
      คือหยุดตรงนี้ ก่อนที่ไฟล์จะเข้าไปครึ่งทางแล้วพังกลางธุรกรรม */
@@ -408,291 +550,43 @@ export async function commitImport(
       "ยังไม่ได้ตั้งกุญแจเข้ารหัสข้อมูลติดต่อ (PII_KEY · PII_HMAC_KEY) — ระบบจึงยังไม่รับไฟล์",
     );
   }
+  const read = fieldReader(parsed, mapping);
   const preview = buildPreview(parsed, mapping);
   if (preview.missing.length) {
-    throw new Error(
-      `Required columns are missing — ${preview.missing.join(", ")}`,
-    );
+    throw new Error(`ยังขาดคอลัมน์ — ${preview.missing.map((f) => FIELD_LABEL[f]).join(" · ")}`);
   }
 
-  /* เพดานจำนวนคนของแผนบังคับที่นี่ ก่อนแตะฐานข้อมูล
-
-     ราคาคิดตามจำนวนคนที่ระบุตัวตนได้ ถ้าไม่ตรวจตรงจุดที่คนเพิ่มเข้ามา
-     เพดานบนหน้าราคาก็เป็นแค่ตัวเลขในตาราง ตรวจตอนนำเข้าดีกว่าตอนส่ง
-     เพราะร้านยังแก้ไฟล์หรืออัปเกรดได้ก่อนที่ข้อมูลจะเข้าไปครึ่งทาง
-
-     replace = true คือแทนที่ทั้งฐาน ไม่ใช่เพิ่มเข้าไป จึงนับจากศูนย์ */
-  const capBlock = await contactCapBlockedReason(
-    tenantId,
-    preview.customers,
-    { replacing: opts.replace },
-  );
+  /* เพดานจำนวนคนของแผนบังคับก่อนแตะฐานข้อมูล — ร้านยังแก้ไฟล์หรืออัปเกรด
+     ได้ทัน ก่อนที่ข้อมูลจะเข้าไปครึ่งทาง */
+  const capBlock = await contactCapBlockedReason(tenantId, preview.customers);
   if (capBlock) throw new Error(capBlock);
-
-  const byField = new Map<ImportField, number>();
-  mapping.mappings.forEach((m) => {
-    const idx = parsed.headers.indexOf(m.column);
-    if (idx >= 0 && m.field !== "ignore" && !byField.has(m.field)) {
-      byField.set(m.field, idx);
-    }
-  });
-  const at = (row: string[], f: ImportField) => {
-    const i = byField.get(f);
-    return i == null ? "" : (row[i] ?? "");
-  };
 
   /* A6 — ให้ AI เดาบทบาทสินค้า แล้วร้านยืนยันได้ทีหลัง
      group_role คือสิ่งที่ทำให้ K3 K4 R2 ทำงานได้ */
   const roleGuess = preview.products.length
     ? await guessProductRoles(
-        preview.products.slice(0, 60).map((p) => ({
-          name: p.name,
-          price: p.price,
-          category: p.category,
-        })),
+        preview.products.slice(0, 60).map((x) => ({ name: x.name, price: x.price, category: x.category })),
       )
     : { value: { products: [] }, source: "fallback" as const };
-  const roleByName = new Map<string, GroupRole>(
-    roleGuess.value.products.map((p) => [p.name, p.role]),
-  );
+  const roleByName = new Map<string, GroupRole>(roleGuess.value.products.map((x) => [x.name, x.role]));
+
+  const batch = collectImport(tenantId, parsed, read, preview, roleByName);
 
   return tx(async (q) => {
-    if (opts.replace) {
-      /* ── ต้องลบเฉพาะบัญชีนี้ ──
-
-         เดิมทุกตารางที่ไม่มีคอลัมน์ tenant_id ถูกลบด้วย
-         `DELETE FROM <table>` เปล่า ๆ ซึ่งไม่ได้ลบข้อมูลของบัญชีที่
-         กำลังนำเข้า แต่ลบของทุกบัญชีในระบบ — ร้านหนึ่งติ๊ก
-         "แทนที่ข้อมูลเดิม" แล้วธุรกรรม ความยินยอม แคมเปญ และผลการวัด
-         ของอีกสามบัญชีหายไปด้วย โดยไม่มีข้อความใดบอก
-
-         ลบจากลูกไปหาแม่ตามลำดับเดียวกับ wipeTenant ใน lib/seed.ts
-         ตารางที่ไม่มี tenant_id เข้าถึงผ่าน subquery ของ campaigns
-         หรือ customers ของบัญชีนี้เท่านั้น */
-      for (const t of ["campaign_audience", "messages", "attributions"]) {
-        await q.run(
-          `DELETE FROM ${t} WHERE campaign_id IN
-             (SELECT id FROM campaigns WHERE tenant_id = ?)`,
-          tenantId,
-        );
-      }
-      await q.run(
-        `DELETE FROM line_items WHERE txn_id IN (
-           SELECT tx.id FROM transactions tx
-           JOIN customers c ON c.id = tx.customer_id
-           WHERE c.tenant_id = ?)`,
-        tenantId,
-      );
-      for (const t of [
-        "events", "consents", "memberships", "identities", "transactions",
-      ]) {
-        await q.run(
-          `DELETE FROM ${t} WHERE customer_id IN
-             (SELECT id FROM customers WHERE tenant_id = ?)`,
-          tenantId,
-        );
-      }
-      for (const t of [
-        "campaigns", "customer_features", "contact_points", "contact_profiles",
-        "customers", "products",
-      ]) {
-        await q.run(`DELETE FROM ${t} WHERE tenant_id = ?`, tenantId);
-      }
-    }
-
-    /* ── สะสมก่อน แทรกทีเดียว ──
-
-       เดิมแต่ละแถวของ CSV ยิงคำสั่งแยกกันห้าตัว ซึ่งบน sqlite ไม่รู้สึก
-       แต่บน Postgres แต่ละคำสั่งคือการไปกลับข้ามเครือข่าย วัดได้ 213ms
-       ต่อคำสั่ง — ไฟล์หมื่นแถวจึงกลายเป็นหลายชั่วโมง
-
-       นี่ไม่ใช่แค่เรื่องเดโม: นี่คือเส้นทางที่ลูกค้าจริงอัปโหลดข้อมูลเข้ามา */
-    const bufCustomer: Param[][] = [];
-    const bufIdentity: Param[][] = [];
-    const bufConsent: Param[][] = [];
-    const bufProduct: Param[][] = [];
-    const bufTxn: Param[][] = [];
-    const bufLine: Param[][] = [];
-    const bufPoint: Param[][] = [];
-    const profiles = new Map<string, Profile>();
-
-    const idFor = (s: string) =>
-      createHash("sha256").update(s).digest("hex").slice(0, 20);
-
-    /* ── ID ลูกค้าผูกกับร้าน และถอดกลับเป็นเบอร์ไม่ได้ ──
-
-       เดิมคือ c- + sha256("phone:เบอร์") ซึ่งมีปัญหาสองชั้น:
-       — ไม่มีรหัสร้าน: สองร้านนำเข้าเบอร์เดียวกันได้แถวเดียว ร้านที่สอง
-         เขียนชื่อทับลูกค้าของร้านแรก และธุรกรรมของร้านที่สองหายเงียบ
-         (ทดสอบแล้ว: ระบบรายงานว่านำเข้าสำเร็จ)
-       — sha256 ของเบอร์ถอดกลับได้ในไม่กี่นาที ID ลูกค้าจึงเท่ากับเบอร์โทร
-         ที่โผล่ใน URL · log · ไฟล์ส่งออก
-       HMAC ที่มีรหัสร้านปิดทั้งสองช่อง และยังคงเดิมทุกครั้งที่นำเข้าซ้ำ */
-    const customerId = (type: string, value: string) =>
-      `c-${matchKey(tenantId, type, value).slice(0, 24)}`;
-
-    const seenCustomers = new Set<string>();
-    const seenIdentity = new Set<string>();
-    const seenProducts = new Set<string>();
-    const purchases = hasPurchases((f) => byField.has(f));
-    const nowIso = new Date().toISOString();
-    let txnSeq = 0;
-    let customers = 0;
-    let transactions = 0;
-    let contactPoints = 0;
-
-    for (const row of parsed.rows) {
-      const get: At = (f) => at(row, f);
-      const ident = identityOf(get);
-      if (!ident) continue;
-      const when = normaliseDate(at(row, "occurred_at"));
-      // ตรรกะเงินตัวเดียวกับตอนพรีวิว ตัวเลขที่เห็นก่อนกดจึงตรงกับที่นำเข้า
-      const money = rowMoney(row, at);
-      if (purchases && (!when || !money)) continue;
-
-      const cid = customerId(ident.type, ident.value);
-      if (!seenCustomers.has(cid)) {
-        seenCustomers.add(cid);
-        customers++;
-        bufCustomer.push([cid, tenantId, displayName(get), when ?? nowIso]);
-        /* ไฟล์ POS ไม่มีข้อมูลความยินยอม จึงตั้งเป็น "ยังไม่ยินยอม"
-           คนกลุ่มนี้จะไม่ถูกส่งและไม่ถูกส่งออกจนกว่าร้านจะเก็บ
-           ความยินยอมจริง — ปลอดภัยกว่าการเดาว่ายินยอม
-
-           การมีเบอร์ไม่ใช่การได้รับอนุญาตให้ส่ง — เก็บข้อมูลติดต่อได้มาก
-           แค่ไหนก็ตาม การส่งยังผูกกับความยินยอมเหมือนเดิมทุกประการ */
-        bufConsent.push([tenantId, cid, "marketing", null, null, "csv_import"]);
-      }
-
-      /* identities = ตัวจับคู่ ประเภทละหนึ่งต่อคน — derive ใช้ type = 'line'
-         ตัดสินว่าทักทาง LINE ได้ไหม ส่วนค่าจริงทุกตัวอยู่ใน contact_points */
-      const pointsHere = channelsOf(get);
-      const idents: { type: string; value: string }[] = [
-        ident,
-        ...pointsHere.filter((c) => c.kind === "phone" || c.kind === "email" || c.kind === "line")
-          .map((c) => ({ type: c.kind, value: c.value })),
-      ];
-      for (const id of idents) {
-        const k = `${cid}|${id.type}`;
-        if (seenIdentity.has(k)) continue;
-        seenIdentity.add(k);
-        bufIdentity.push([tenantId, cid, id.type, matchKey(tenantId, id.type, id.value)]);
-      }
-
-      const firstOfKind = new Set<string>();
-      for (const c of pointsHere) {
-        const hmac = matchKey(tenantId, c.kind, c.value);
-        bufPoint.push([
-          `cp-${matchKey(tenantId, "point", `${cid}|${c.kind}|${hmac}`).slice(0, 24)}`,
-          tenantId, cid, c.kind, c.label,
-          encryptContact(tenantId, c.kind, c.value),
-          hmac,
-          maskContact(c.kind, c.value),
-          firstOfKind.has(c.kind) ? 0 : 1,
-          "csv_import",
-          nowIso,
-        ]);
-        firstOfKind.add(c.kind);
-        contactPoints++;
-      }
-
-      // หลายแถวของคนเดียวกันรวมเป็นประวัติเดียว แถวหลังเติมช่องที่ยังว่าง
-      const prof = profileOf(get);
-      if (prof) {
-        const prev = profiles.get(cid);
-        if (!prev) profiles.set(cid, prof);
-        else for (const k of Object.keys(prof) as (keyof Profile)[]) prev[k] ??= prof[k];
-      }
-
-      if (!purchases || !when || !money) continue;
-
-      const pname = at(row, "product_name").trim();
-      let pid: string | null = null;
-      if (pname) {
-        // ผูกกับร้านด้วยเหตุผลเดียวกับ ID ลูกค้า — ชื่อสินค้าซ้ำข้ามร้านเป็นเรื่องปกติ
-        pid = `p-${idFor(`${tenantId}:${pname}`)}`;
-        if (!seenProducts.has(pid)) {
-          seenProducts.add(pid);
-          const meta = preview.products.find((p) => p.name === pname);
-          bufProduct.push([
-            pid,
-            tenantId,
-            pname,
-            meta?.category ?? "ทั่วไป",
-            roleByName.get(pname) ?? "attachment",
-            meta?.price ?? money.listUnit,
-          ]);
-        }
-      }
-
-      const txnId = `t-${idFor(`${cid}:${when}:${++txnSeq}`)}`;
-      bufTxn.push([
-        tenantId, txnId,
-        cid,
-        when,
-        money.total,
-        money.discount,
-        at(row, "channel").trim() || "pos",
-      ]);
-      transactions++;
-      // unit_price ต้องเป็นราคาต่อหน่วย ไม่ใช่ยอดรวมของแถว
-      if (pid)
-        bufLine.push([tenantId, txnId, pid, money.qty, money.unitNet, money.listUnit]);
-    }
-
-    const PROFILE_COLS: (keyof Profile)[] = [
-      "first_name", "last_name", "nickname", "gender", "birthday", "company",
-      "job_title", "subdistrict", "district", "province", "postcode", "note",
-    ];
-    const bufProfile: Param[][] = [...profiles].map(([cid, p]) => [
-      cid, tenantId, ...PROFILE_COLS.map((c) => p[c]), nowIso,
-    ]);
-
-    /* ── แทรกทุกถัง ──
-       ลำดับตามความสัมพันธ์: customers และ products ก่อน แล้ว transactions
-       แล้วจึง line_items — Postgres บังคับ foreign key ทันที */
-    /* ไฟล์รายชื่อที่ไม่มีคอลัมน์ชื่อต้องไม่ลบชื่อที่มีอยู่แล้ว
-       ทิ้งเป็น "ลูกค้าไม่ระบุชื่อ" ทับชื่อจริงจากไฟล์ก่อนหน้า */
-    await insertMany(q, "customers", ["id", "tenant_id", "name", "created_at"], bufCustomer,
-      { onConflict: `ON CONFLICT(id) DO UPDATE SET name =
-          CASE WHEN excluded.name = '${UNNAMED}' THEN customers.name ELSE excluded.name END` });
-    await insertMany(q, "identities", ["tenant_id", "customer_id", "type", "value_hash"], bufIdentity,
-      { onConflict: "ON CONFLICT(customer_id, type) DO NOTHING" });
-    await insertMany(q, "contact_points",
-      ["id", "tenant_id", "customer_id", "kind", "label", "value_enc", "value_hmac",
-       "value_masked", "is_primary", "source", "created_at"],
-      bufPoint, { onConflict: "ON CONFLICT DO NOTHING" });
-    // ช่องที่ไฟล์นี้ไม่มีข้อมูล ต้องคงค่าจากไฟล์ก่อนหน้าไว้ ไม่ใช่ล้างเป็นว่าง
-    await insertMany(q, "contact_profiles",
-      ["customer_id", "tenant_id", ...PROFILE_COLS, "updated_at"],
-      bufProfile, {
-        onConflict: `ON CONFLICT(customer_id) DO UPDATE SET ${PROFILE_COLS
-          .map((c) => `${c} = COALESCE(excluded.${c}, contact_profiles.${c})`)
-          .join(", ")}, updated_at = excluded.updated_at`,
-      });
-    await insertMany(q, "consents", ["tenant_id", "customer_id", "purpose", "granted_at", "revoked_at", "source"], bufConsent,
-      { onConflict: "ON CONFLICT(customer_id, purpose) DO NOTHING" });
-    await insertMany(q, "products", ["id", "tenant_id", "name", "category", "group_role", "list_price"], bufProduct,
-      { onConflict: "ON CONFLICT(id) DO UPDATE SET group_role = excluded.group_role" });
-    await insertMany(q, "transactions", ["tenant_id", "id", "customer_id", "occurred_at", "total", "discount_total", "channel"], bufTxn,
-      { onConflict: "ON CONFLICT(id) DO NOTHING" });
-    await insertMany(q, "line_items", ["tenant_id", "txn_id", "product_id", "qty", "unit_price", "unit_list_price"], bufLine);
-
+    await writeImport(q, batch);
     await logActivity(
       tenantId,
       "owner",
       "import_csv",
-      `${customers} customers · ${transactions} transactions · ${contactPoints} contact points`,
+      `${batch.customers.length} customers · ${batch.txns.length} transactions · ${batch.points.length} contact points`,
     );
-
     // DERIVE ทันทีเพื่อให้เห็น insight ภายในสามนาที
     await deriveFeatures(tenantId);
-
     return {
-      customers,
-      transactions,
-      contactPoints,
-      products: seenProducts.size,
+      customers: batch.customers.length,
+      transactions: batch.txns.length,
+      contactPoints: batch.points.length,
+      products: batch.products.length,
       rejected: preview.rejected.length,
       roleSource: roleGuess.source,
     };

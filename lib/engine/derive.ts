@@ -104,9 +104,8 @@ export async function deriveFeatures(tenantId: string) {
   const lineIdentities = new Set(
     (
       await all<{ customer_id: string }>(
-        `SELECT i.customer_id FROM identities i
-         JOIN customers c ON c.id = i.customer_id
-         WHERE c.tenant_id = ? AND i.type = 'line'`,
+        `SELECT DISTINCT cp.customer_id FROM contact_points cp
+         WHERE cp.tenant_id = ? AND cp.kind = 'line'`,
         tenantId,
       )
     ).map((r) => r.customer_id),

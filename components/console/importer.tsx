@@ -5,7 +5,7 @@ import Link from "next/link";
 import { analyseCsv, commitCsv, repreview } from "@/app/(app)/import-actions";
 import type { AnalyseResult } from "@/app/(app)/import-actions";
 import type { ColumnMapping, ImportField, ImportPreview } from "@/lib/shared/ingest-types";
-import { FIELD_LABEL, IMPORT_FIELDS } from "@/lib/shared/ingest-types";
+import { FIELD_LABEL, IMPORT_FIELD_GROUPS } from "@/lib/shared/ingest-types";
 import { Panel, num } from "./ui";
 
 /* ลากไฟล์วาง → AI แม็ปคอลัมน์ → ยืนยัน → เห็น insight
@@ -22,15 +22,7 @@ export function Importer() {
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [mapping, setMapping] = useState<ColumnMapping | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ customers: number; transactions: number; products: number; rejected: number } | null>(null);
-  /* ค่าตั้งต้นต้องเป็น "ไม่แทนที่"
-
-     เดิมเป็น true — กดนำเข้าโดยไม่ได้สังเกตช่องติ๊ก ลูกค้า ธุรกรรม และแคมเปญ
-     ทั้งบัญชีถูกลบแล้วเหลือแค่แถวในไฟล์ใหม่ (เกิดขึ้นจริงตอนทดสอบ 2026-10-11:
-     ไฟล์รายชื่อ 2 คน ลบลูกค้า 1,240 คนของบัญชีตัวอย่าง)
-     อันตรายขึ้นอีกตั้งแต่ไฟล์รายชื่ออย่างเดียวนำเข้าได้ — รายชื่อจากงานอีเวนต์
-     20 คนไม่ควรลบประวัติการซื้อทั้งร้าน การลบทั้งบัญชีต้องเป็นสิ่งที่ตั้งใจเลือก */
-  const [replace, setReplace] = useState(false);
+  const [result, setResult] = useState<{ customers: number; transactions: number; contactPoints: number; products: number; rejected: number } | null>(null);
   const [dragging, setDragging] = useState(false);
   const [pending, start] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -72,7 +64,7 @@ export function Importer() {
     if (!mapping) return;
     setError(null);
     start(async () => {
-      const res = await commitCsv(csv, mapping, replace);
+      const res = await commitCsv(csv, mapping);
       if (!res.ok) {
         setError(res.error);
         return;
@@ -102,6 +94,7 @@ export function Importer() {
         <div className="mt-7 grid grid-cols-2 gap-x-6 gap-y-7 md:grid-cols-4">
           {[
             ["Customers", num(result.customers)],
+            ["ช่องทางติดต่อ", num(result.contactPoints)],
             ["Transactions", num(result.transactions)],
             ["Products", num(result.products)],
             ["Unusable rows", num(result.rejected)],
@@ -165,6 +158,7 @@ export function Importer() {
           <div className="mt-6 grid grid-cols-2 gap-x-6 gap-y-7 md:grid-cols-4">
             {[
               ["Customers found", num(preview.customers)],
+              ["ช่องทางติดต่อ", num(preview.contactPoints)],
               ["Usable rows", `${num(preview.usableRows)}/${num(preview.totalRows)}`],
               ["Products", num(preview.products.length)],
               [
@@ -230,10 +224,15 @@ export function Importer() {
                           value={m.field}
                           onChange={(e) => changeField(m.column, e.target.value as ImportField)}
                         >
-                          {IMPORT_FIELDS.map((f) => (
-                            <option key={f} value={f}>
-                              {FIELD_LABEL[f]}
-                            </option>
+                          <option value="ignore">{FIELD_LABEL.ignore}</option>
+                          {IMPORT_FIELD_GROUPS.map((g) => (
+                            <optgroup key={g.label} label={g.label}>
+                              {g.fields.map((f) => (
+                                <option key={f} value={f}>
+                                  {FIELD_LABEL[f]}
+                                </option>
+                              ))}
+                            </optgroup>
                           ))}
                         </select>
                       </td>
@@ -282,14 +281,11 @@ export function Importer() {
           <button type="button" onClick={reset} className="c-btn c-btn-ghost">
             Start over
           </button>
-          <label className="c-thai flex items-center gap-2 text-[0.82rem] text-[var(--c-text-2)]">
-            <input
-              type="checkbox"
-              checked={replace}
-              onChange={(e) => setReplace(e.target.checked)}
-            />
-            Replace all existing data
-          </label>
+          {/* ไม่มีช่อง "แทนที่ข้อมูลเดิม" แล้ว — ติ๊กครั้งเดียวเคยลบลูกค้าทั้งบัญชี
+              การล้างทั้งบัญชีย้ายไปเป็นปุ่มที่ต้องพิมพ์ชื่อร้านในหน้าตั้งค่า */}
+          <span className="c-thai text-[0.78rem] text-[var(--c-text-4)]">
+            นำเข้าซ้ำได้เสมอ — คนเดิมไม่ซ้ำ และช่องที่ว่างในไฟล์ไม่ลบข้อมูลเดิม
+          </span>
         </div>
       </div>
     );
@@ -354,12 +350,17 @@ export function Importer() {
       )}
 
       <Panel flat className="p-5 md:p-6">
-        <p className="c-label">three required columns</p>
+        {/* เดิมบอกว่าต้องมีสามคอลัมน์และประวัติหกเดือน ซึ่งไม่จริงแล้วตั้งแต่ไฟล์
+            รายชื่ออย่างเดียวนำเข้าได้ — ข้อความที่บอกว่าทำไม่ได้ ทำให้คนไม่ลองทำ */}
+        <p className="c-label-th">ขาดไม่ได้แค่อย่างเดียว</p>
+        <p className="c-thai mt-2.5 text-[0.86rem] text-[var(--c-text-2)]">
+          รหัสลูกค้า เบอร์โทร อีเมล หรือ LINE อย่างใดอย่างหนึ่ง เพื่อให้ระบบรู้ว่าเป็นใคร
+          ที่เหลือมีคอลัมน์ไหนก็นำเข้าคอลัมน์นั้น
+        </p>
         <ul className="mt-4 flex flex-col gap-2.5">
           {[
-            ["Customer identifier", "Phone, email or member ID — any one will do"],
-            ["Purchase date", "Both Gregorian and Buddhist years are accepted"],
-            ["Amount paid", "A list price alongside it is ideal — that reveals who waits for discounts"],
+            ["รายชื่อลูกค้า", "ชื่อ เบอร์ อีเมล LINE โซเชียล ที่อยู่ วันเกิด บริษัท — ไม่ต้องมียอดขาย"],
+            ["ยอดขายจาก POS", "เพิ่มวันที่ซื้อและยอดที่จ่าย · รองรับทั้งปี พ.ศ. และ ค.ศ."],
           ].map(([k, v]) => (
             <li key={k} className="c-thai text-[0.84rem] text-[var(--c-text-2)]">
               <span className="text-[var(--c-cyan)]">{k}</span>
@@ -368,7 +369,8 @@ export function Importer() {
           ))}
         </ul>
         <p className="c-thai mt-5 text-[0.8rem] text-[var(--c-text-4)]">
-          At least six months of history is required before each customer's cycle can be computed
+          เบอร์ อีเมล และที่อยู่ถูกเข้ารหัสก่อนเก็บ · ยิ่งมีประวัติการซื้อนาน
+          ระบบยิ่งคำนวณรอบการกลับมาของแต่ละคนได้แม่น
         </p>
       </Panel>
     </div>
