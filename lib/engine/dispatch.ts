@@ -186,10 +186,14 @@ export async function approveCampaign(
       candidate.estimated_cost,
     );
 
-    const INS_AUDIENCE =
-      "INSERT INTO campaign_audience (tenant_id, campaign_id, customer_id, arm) VALUES (?,?,?,?)";
-    for (const a of arms)
-      await t.run(INS_AUDIENCE, input.tenantId, campaignId, a.cid, a.arm);
+    /* ก้อนเดียว ไม่ใช่ทีละคน — กลุ่ม 2,000 คนบน Postgres ที่โตเกียวคือ
+       2,000 รอบไปกลับระหว่างที่ธุรกรรมเปิดค้าง */
+    await insertMany(
+      t,
+      "campaign_audience",
+      ["tenant_id", "campaign_id", "customer_id", "arm"],
+      arms.map((a) => [input.tenantId, campaignId, a.cid, a.arm]),
+    );
   });
 
   await logActivity(

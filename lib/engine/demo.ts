@@ -1,4 +1,4 @@
-import { all, get, tx } from "@/lib/engine/sql";
+import { all, get, insertMany, tx, type Param } from "@/lib/engine/sql";
 import { logActivity } from "@/lib/engine/db";
 import { createHash, randomUUID } from "node:crypto";
 import { playById } from "@/lib/shared/plays";
@@ -218,8 +218,7 @@ export async function injectCampaignEffect(tenantId: string) {
   // ขนาดกลุ่มที่ได้รับข้อความ ใช้หาอัตราฐานของแคมเปญนี้
   const TREATED_COUNT =
     "SELECT COUNT(*) AS n FROM campaign_audience WHERE campaign_id = ? AND arm = 'treated'";
-  const INS_TXN = `INSERT INTO transactions (tenant_id, id, customer_id, occurred_at, total, discount_total, channel)
-     VALUES (?,?,?,?,?,?,?)`;
+  const TXN_COLUMNS = ["tenant_id", "id", "customer_id", "occurred_at", "total", "discount_total", "channel"];
 
   let added = 0;
   await tx(async (q) => {
@@ -248,14 +247,14 @@ export async function injectCampaignEffect(tenantId: string) {
           : 0;
       if (uplift <= 0) continue;
 
+      const effect: Param[][] = [];
       for (const r of rows) {
         // ตัดสินด้วย hash จึงได้ผลเดิมทุกครั้งที่ reseed
         const h = createHash("sha256").update(`${c.id}:${r.id}:effect`).digest();
         if (h.readUInt16BE(0) / 65535 >= uplift) continue;
         const dayOffset = 1 + (h.readUInt16BE(2) % 75); // ซื้อภายใน 76 วันแรก
         const valueMul = 0.55 + (h.readUInt16BE(4) / 65535) * 0.9;
-        await q.run(
-          INS_TXN,
+        effect.push([
           tenantId,
           randomUUID(),
           r.id,
@@ -263,9 +262,9 @@ export async function injectCampaignEffect(tenantId: string) {
           Math.round(aov * valueMul),
           0,
           "campaign",
-        );
-        added++;
+        ]);
       }
+      added += await insertMany(q, "transactions", TXN_COLUMNS, effect);
     }
   });
 
