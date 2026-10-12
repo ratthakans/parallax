@@ -21,6 +21,18 @@ export type Session = { userId: string; email: string };
 
 /** คนที่ล็อกอินอยู่ หรือ null ถ้ายังไม่ได้ล็อกอิน */
 export const currentUser = cache(async (): Promise<Session | null> => {
+  /* ยังไม่ได้ตั้งค่า Supabase Auth = ไม่มีใครล็อกอินได้ ตอบ null เหมือน
+     proxy.ts ที่ปล่อยผ่าน ไม่ใช่โยน error จนทุกหน้าใน /app ล้ม
+
+     ไม่ใช่ทางลัดข้ามสิทธิ์: บน Postgres resolveTenant ยังปฏิเสธคนที่ไม่มี
+     session อยู่ดี โหมดไม่ล็อกอินจึงเปิดได้แค่บน SQLite ซึ่งเป็นข้อมูลเดโม
+     ทั้งก้อน — คือ deploy ทดสอบที่ไม่เชื่อมอะไรเลย */
+  if (
+    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+  ) {
+    return null;
+  }
   const sb = await supabaseServer();
   /* getUser() ตรวจ token กับเซิร์ฟเวอร์ Supabase จริง
      ต่างจาก getSession() ที่อ่านจากคุกกี้เฉย ๆ ซึ่งปลอมได้ */
