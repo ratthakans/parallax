@@ -70,6 +70,20 @@ export default async function BriefPage() {
     (f) => f.reachable_by === "paid_only" || f.reachable_by === "none",
   ).length;
   const blocked = candidates.filter((c) => c.blocked).length;
+
+  /* ── บรีฟว่างเพราะยังไม่มีใครยินยอม ไม่ใช่เพราะไม่มีอะไรทำ ──
+     ไฟล์ POS ไม่มีข้อมูลความยินยอม คนที่นำเข้ามาจึงเริ่มที่ "ยังไม่ยินยอม" ทุกคน
+     เดิมบรีฟบอกว่า "อาจเพราะเพิ่งส่งไป หรือกลุ่มเล็กเกินไป" ซึ่งไม่ใช่สาเหตุ
+     ร้านที่เพิ่งนำเข้าไฟล์จริงจึงเห็นหน้าว่างโดยไม่รู้ว่าต้องทำอะไรต่อ */
+  const noConsent = features.filter((f) => !f.consent_marketing).length;
+  const waitingOnConsent = candidates
+    .map((c) => ({
+      play: c.play,
+      count: c.filtered.find((f) => f.reason === "No marketing consent")?.count ?? 0,
+    }))
+    .filter((x) => x.count > 0)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 3);
   const totalValue = three.reduce((s, c) => s + c.expected_value, 0);
 
   const summary = await summariseBrief({
@@ -171,10 +185,38 @@ export default async function BriefPage() {
           ))}
         </div>
       ) : (
-        <Empty>
-          วันนี้ยังไม่มีอะไรคุ้มค่าส่ง — อาจเพราะเพิ่งส่งไป หรือกลุ่มเล็กเกินกว่าจะวัดผลได้
-          ระบบจะไม่เสนอสิ่งที่พิสูจน์ไม่ได้ พรุ่งนี้มาดูใหม่
-        </Empty>
+        waitingOnConsent.length > 0 && noConsent > features.length / 2 ? (
+          <Panel className="p-5 md:p-6">
+            <h2 className="c-h2 text-[var(--c-text)]">
+              มีงานให้ทำ แต่{v.th.people} {num(noConsent)} คนยังไม่ได้บันทึกความยินยอม
+            </h2>
+            <p className="c-thai mt-2 max-w-3xl text-[0.88rem] text-[var(--c-text-2)]">
+              ระบบวิเคราะห์ข้อมูลแล้ว แต่จะไม่เสนอให้ส่งข้อความหาคนที่ยังไม่ยินยอม — ไฟล์จาก POS
+              ส่วนใหญ่ไม่มีข้อมูลนี้ ทุกคนที่นำเข้าจึงเริ่มที่ "ยังไม่ยินยอม"
+            </p>
+            <ul className="mt-4 flex flex-col gap-2">
+              {waitingOnConsent.map((w) => (
+                <li key={w.play.id} className="c-thai text-[0.9rem] text-[var(--c-text)]">
+                  {w.play.nameTh ?? w.play.name} —{" "}
+                  <span className="text-[var(--c-text-3)]">{num(w.count)} คนเข้าเกณฑ์ แต่ยังไม่ยินยอม</span>
+                </li>
+              ))}
+            </ul>
+            <p className="c-thai mt-4 text-[0.84rem] text-[var(--c-text-3)]">
+              วิธีบันทึกความยินยอม: นำเข้าไฟล์รายชื่อที่มีคอลัมน์ความยินยอม · ติ๊กยืนยันตอนนำเข้า
+              ถ้าทุกคนในไฟล์ยินยอมกับร้านแล้ว · หรือบันทึกทีละคนในหน้าของเขา
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Link href="/app/import" className="c-btn c-btn-primary c-btn-sm">นำเข้าไฟล์ความยินยอม</Link>
+              <Link href="/app/customers?filter=no_consent" className="c-btn c-btn-ghost c-btn-sm">ดูคนที่ยังไม่ยินยอม</Link>
+            </div>
+          </Panel>
+        ) : (
+          <Empty>
+            วันนี้ยังไม่มีอะไรคุ้มค่าส่ง — อาจเพราะเพิ่งส่งไป หรือกลุ่มเล็กเกินกว่าจะวัดผลได้
+            ระบบจะไม่เสนอสิ่งที่พิสูจน์ไม่ได้ พรุ่งนี้มาดูใหม่
+          </Empty>
+        )
       )}
 
       {/* ── ตัวเลขสถานะฐาน ── */}

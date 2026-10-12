@@ -146,6 +146,9 @@ export type CustomerFeature = {
   discount_share: number;
   predicted_next_date: string;
   reachable_by: ReachableBy;
+  /** ช่องทางที่จะทักได้ถ้าคนนี้ยินยอม — ใช้นับว่ามีกี่คนที่เข้าเกณฑ์แต่ติดแค่ความยินยอม
+      ไม่มีในข้อมูลที่คำนวณก่อน 2026-10-12 */
+  reachable_if_consented?: ReachableBy;
   monetary_percentile: number;
   ltv_decile: number;
   bought_groups: GroupRole[];

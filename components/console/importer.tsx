@@ -7,12 +7,28 @@ import type { AnalyseResult } from "@/app/(app)/import-actions";
 import type { ColumnMapping, ImportField, ImportPreview } from "@/lib/shared/ingest-types";
 import { FIELD_LABEL, IMPORT_FIELD_GROUPS } from "@/lib/shared/ingest-types";
 import { Panel, num } from "./ui";
+import { thaiDate } from "@/lib/shared/format";
 
 /* ลากไฟล์วาง → AI แม็ปคอลัมน์ → ยืนยัน → เห็น insight
    ขั้นตอนถูกย่อให้เหลือสามช่อง เพราะเจ้าของร้านต้องทำได้เองโดย
    ไม่มีคนสอน (I6) */
 
 type Step = "drop" | "review" | "done";
+
+/* ── อ่านไฟล์ให้ถูกรหัสอักษร ──
+   Excel บน Windows ภาษาไทยบันทึก CSV เป็น Windows-874 (TIS-620) ไม่ใช่ UTF-8
+   file.text() อ่านเป็น UTF-8 เสมอ ชื่อลูกค้าทั้งไฟล์จึงกลายเป็น "�����"
+   และ "Unicode Text" ของ Excel คือ UTF-16 — ดูจาก BOM แล้วถอดให้ถูกตัว */
+async function readText(file: File): Promise<string> {
+  const buf = new Uint8Array(await file.arrayBuffer());
+  if (buf[0] === 0xff && buf[1] === 0xfe) return new TextDecoder("utf-16le").decode(buf);
+  if (buf[0] === 0xfe && buf[1] === 0xff) return new TextDecoder("utf-16be").decode(buf);
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(buf);
+  } catch {
+    return new TextDecoder("windows-874").decode(buf);
+  }
+}
 
 export function Importer() {
   const [step, setStep] = useState<Step>("drop");
@@ -22,8 +38,9 @@ export function Importer() {
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [mapping, setMapping] = useState<ColumnMapping | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ customers: number; transactions: number; contactPoints: number; products: number; rejected: number } | null>(null);
+  const [result, setResult] = useState<{ customers: number; transactions: number; contactPoints: number; products: number; rejected: number; consented?: number } | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [consentAll, setConsentAll] = useState(false);
   const [pending, start] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -33,7 +50,7 @@ export function Importer() {
       setError("File is over 4MB — split it and import in parts");
       return;
     }
-    const text = await file.text();
+    const text = await readText(file);
     setCsv(text);
     setFileName(file.name);
     start(async () => {
@@ -64,7 +81,7 @@ export function Importer() {
     if (!mapping) return;
     setError(null);
     start(async () => {
-      const res = await commitCsv(csv, mapping);
+      const res = await commitCsv(csv, mapping, { consentAll });
       if (!res.ok) {
         setError(res.error);
         return;
@@ -108,11 +125,18 @@ export function Importer() {
         <p className="c-thai mt-7 text-[0.85rem] text-[var(--c-text-3)]">
           Each customer's cycle has been computed. Open the Morning Brief to see who to contact first.
         </p>
-        <p className="c-thai mt-3 text-[0.8rem] text-[var(--c-warn)]">
-          A POS export carries no consent data, so every imported customer starts as
-            “no consent” — they will not be messaged or exported until real consent is
-            captured. That is a safe default, not a defect.
-        </p>
+        {!(result.consented ?? 0) && (
+          <p className="c-thai mt-3 text-[0.8rem] text-[var(--c-warn)]">
+            A POS export carries no consent data, so every imported customer starts as
+              “no consent” — they will not be messaged or exported until real consent is
+              captured. That is a safe default, not a defect.
+          </p>
+        )}
+        {(result.consented ?? 0) > 0 && (
+          <p className="c-thai mt-3 text-[0.85rem] text-[var(--c-good)]">
+            บันทึกความยินยอมจากไฟล์นี้ {num(result.consented ?? 0)} คน — คนเหล่านี้เข้าเกณฑ์ของบรีฟแล้ว
+          </p>
+        )}
         <div className="mt-8 flex flex-wrap gap-2.5">
           <Link href="/app" className="c-btn c-btn-primary">
             Open the Morning Brief
@@ -164,7 +188,7 @@ export function Importer() {
               [
                 "Date range",
                 preview.dateRange
-                  ? `${preview.dateRange.from} → ${preview.dateRange.to}`
+                  ? `${thaiDate(preview.dateRange.from)} → ${thaiDate(preview.dateRange.to)}`
                   : "—",
               ],
             ].map(([k, v]) => (
@@ -173,6 +197,57 @@ export function Importer() {
                 <p className="c-num mt-2 text-[1.35rem] text-[var(--c-text)]">{v}</p>
               </div>
             ))}
+          </div>
+
+          {/* ── สิ่งที่ระบบจะทำกับไฟล์นี้ ก่อนกดนำเข้า ── */}
+          {preview.transactions > 0 && (
+            <p className="c-thai mt-6 text-[0.86rem] text-[var(--c-text-2)]">
+              นับเป็นการซื้อ {num(preview.transactions)} ครั้ง จาก {num(preview.usableRows)} แถว —
+              {mapping.mappings.some((m) => m.field === "order_id")
+                ? " หลายแถวที่เลขบิลเดียวกันนับเป็นการซื้อครั้งเดียว"
+                : " ไม่มีคอลัมน์เลขที่บิล หลายแถวของคนเดียวกันในวันเดียวกันจึงนับเป็นการซื้อครั้งเดียว"}
+              {preview.dateOrder === "mdy" && " · วันที่ในไฟล์นี้เขียนแบบ เดือน/วัน/ปี (Excel ภาษาอังกฤษ)"}
+            </p>
+          )}
+          {preview.cancelledRows > 0 && (
+            <p className="c-thai mt-2 text-[0.86rem] text-[var(--c-text-2)]">
+              ข้าม {num(preview.cancelledRows)} แถวที่ถูกยกเลิกหรือคืนเงิน — ไม่นับเป็นยอดขาย
+            </p>
+          )}
+          {preview.rejectedRows > 0 && (
+            <details className="mt-2">
+              <summary className="c-thai cursor-pointer text-[0.86rem] text-[var(--c-warn)]">
+                ใช้ไม่ได้ {num(preview.rejectedRows)} แถว — ดูเหตุผล
+              </summary>
+              <ul className="c-thai mt-2 flex flex-col gap-1 text-[0.8rem] text-[var(--c-text-3)]">
+                {preview.rejected.map((r) => (
+                  <li key={r.line}>แถว {num(r.line)}: {r.reason}</li>
+                ))}
+              </ul>
+            </details>
+          )}
+
+          <div className="mt-6 border-l-2 border-[var(--c-line-2)] pl-4">
+            <p className="c-thai text-[0.86rem] text-[var(--c-text-2)]">
+              {preview.consent.yes + preview.consent.no > 0
+                ? `คอลัมน์ความยินยอม: ยินยอม ${num(preview.consent.yes)} คน · ไม่ยินยอม ${num(preview.consent.no)} คน — คนที่ไม่ระบุยังถือว่าไม่ยินยอม`
+                : "ไฟล์นี้ไม่มีคอลัมน์ความยินยอม ทุกคนจะเริ่มที่ \"ยังไม่ยินยอม\" และระบบจะไม่เสนอให้ส่งข้อความหา"}
+            </p>
+            <label className="c-thai mt-3 flex items-start gap-2.5 text-[0.86rem] text-[var(--c-text)]">
+              <input
+                type="checkbox"
+                checked={consentAll}
+                onChange={(e) => setConsentAll(e.target.checked)}
+                className="mt-1"
+              />
+              <span>
+                ทุกคนในไฟล์นี้ให้ความยินยอมรับข่าวสารจากร้านแล้ว
+                <span className="block text-[0.78rem] text-[var(--c-text-4)]">
+                  เช่น รายชื่อสมาชิกที่สมัครผ่านฟอร์มที่มีข้อความขอความยินยอม — ระบบบันทึกว่าคุณเป็นคนยืนยัน
+                  และไม่ทับคนที่เคยถอนความยินยอมไว้แล้ว
+                </span>
+              </span>
+            </label>
           </div>
 
           {blocking && (

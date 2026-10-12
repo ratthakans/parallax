@@ -120,12 +120,20 @@ export function normaliseContact(kind: ContactKind, raw: string): string | null 
   if (!v) return null;
   switch (kind) {
     case "phone": {
+      /* เลขที่ Excel แปลงเป็นวิทยาศาสตร์แล้ว (8.12346E+08) เสียหลักท้ายไปแล้ว
+         และเบอร์ที่ปิดบางส่วน (******1234 จากมาร์เก็ตเพลส) ไม่ใช่เบอร์ —
+         เดิมทั้งสองแบบผ่านออกมาเป็น "+81234608" ซึ่งคือเบอร์ญี่ปุ่นของคนอื่น */
+      if (/\d[.,]?\d*e\+?\d/i.test(v) || /[*x•]{3,}/i.test(v)) return null;
       const plus = v.startsWith("+");
       let d = v.replace(/[^\d]/g, "");
       if (!d) return null;
-      if (!plus && d.startsWith("0") && (d.length === 9 || d.length === 10)) d = `66${d.slice(1)}`;
-      else if (!plus && d.length === 9 && !d.startsWith("66")) d = `66${d}`;
-      return d.length >= 8 && d.length <= 15 ? `+${d}` : null;
+      if (plus) return d.length >= 8 && d.length <= 15 ? `+${d}` : null;
+      /* ไม่มี + = เบอร์ไทยเท่านั้น: 0 นำหน้า 9–10 หลัก · หรือ 9 หลักที่ Excel ตัดศูนย์ทิ้ง
+         · หรือ 66 นำหน้า เลขแบบอื่นเดาประเทศไม่ได้ จึงไม่รับ แทนที่จะเดาผิด */
+      if (d.startsWith("0") && (d.length === 9 || d.length === 10)) d = `66${d.slice(1)}`;
+      else if (d.length === 9 && !d.startsWith("66")) d = `66${d}`;
+      else if (d.length === 8 && /^[2-7]/.test(d)) d = `66${d}`;
+      return d.startsWith("66") && (d.length === 10 || d.length === 11) ? `+${d}` : null;
     }
     case "email": {
       const e = v.toLowerCase();

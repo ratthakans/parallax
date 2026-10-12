@@ -42,6 +42,11 @@ export const IMPORT_FIELDS = [
   "product_category",
   "qty",
   "channel",
+  // ── บิลและสถานะ — ไฟล์ POS ส่วนใหญ่มีหนึ่งแถวต่อสินค้า ไม่ใช่ต่อบิล ──
+  "order_id",
+  "order_status",
+  // ── ความยินยอมรับข่าวสาร ──
+  "consent",
   "ignore",
 ] as const;
 
@@ -55,7 +60,7 @@ export const IMPORT_FIELD_GROUPS: { label: string; fields: ImportField[] }[] = [
   {
     label: "ข้อมูลของคน",
     fields: ["customer_ref", "customer_name", "first_name", "last_name", "nickname",
-      "gender", "birthday", "company", "job_title", "note"],
+      "gender", "birthday", "company", "job_title", "note", "consent"],
   },
   {
     label: "ช่องทางติดต่อ",
@@ -64,7 +69,7 @@ export const IMPORT_FIELD_GROUPS: { label: string; fields: ImportField[] }[] = [
   { label: "ที่อยู่", fields: ["address", "subdistrict", "district", "province", "postcode"] },
   {
     label: "การซื้อ",
-    fields: ["occurred_at", "total", "unit_price", "list_price", "discount",
+    fields: ["occurred_at", "order_id", "order_status", "total", "unit_price", "list_price", "discount",
       "product_name", "product_category", "qty", "channel"],
   },
 ];
@@ -102,6 +107,9 @@ export const FIELD_LABEL: Record<ImportField, string> = {
   product_category: "หมวดสินค้า",
   qty: "จำนวน",
   channel: "ช่องทาง",
+  order_id: "เลขที่บิล / เลขที่คำสั่งซื้อ",
+  order_status: "สถานะคำสั่งซื้อ (ยกเลิก · คืนเงิน จะไม่ถูกนับ)",
+  consent: "ยินยอมรับข่าวสาร (ใช่ / ไม่)",
   ignore: "ไม่ใช้คอลัมน์นี้",
 };
 
@@ -169,7 +177,9 @@ export type ColumnMapping = {
 export type ImportPreview = {
   totalRows: number;
   usableRows: number;
+  /** ตัวอย่าง 25 แถวแรกที่ใช้ไม่ได้ — จำนวนจริงอยู่ที่ rejectedRows */
   rejected: { line: number; reason: string }[];
+  rejectedRows: number;
   customers: number;
   transactions: number;
   products: { name: string; category: string; price: number }[];
@@ -178,6 +188,12 @@ export type ImportPreview = {
   discountRowShare: number;
   /** ช่องทางติดต่อที่อ่านได้ทั้งไฟล์ — เบอร์ อีเมล LINE โซเชียล ที่อยู่ */
   contactPoints: number;
+  /** แถวที่ถูกข้ามเพราะคำสั่งซื้อถูกยกเลิกหรือคืนเงิน */
+  cancelledRows: number;
+  /** จำนวนคนที่คอลัมน์ความยินยอมบอกว่า ใช่ / ไม่ */
+  consent: { yes: number; no: number };
+  /** วันที่ในไฟล์อ่านแบบ วัน/เดือน หรือ เดือน/วัน (ไฟล์จาก Excel ภาษาอังกฤษ) */
+  dateOrder: "dmy" | "mdy";
 };
 
 export type ImportResult = {
@@ -187,6 +203,8 @@ export type ImportResult = {
   products: number;
   rejected: number;
   roleSource: string;
+  /** คนที่บันทึกว่ายินยอมรับข่าวสารจากไฟล์นี้ */
+  consented: number;
 };
 
 /* ── คอลัมน์สรุปในไฟล์ที่ระบบส่งออกเอง ──

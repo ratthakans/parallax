@@ -354,6 +354,7 @@ export async function deriveFeatures(tenantId: string) {
           .toISOString()
           .slice(0, 10),
         reachable_by: reachableBy,
+        reachable_if_consented: hasLine ? "line" : "paid_only",
         monetary_percentile: monetaryPercentile,
         ltv_decile: ltvDecile,
         bought_groups: e ? [...e.groups] : [],

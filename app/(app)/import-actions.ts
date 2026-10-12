@@ -79,10 +79,13 @@ export type CommitOutcome =
 export async function commitCsv(
   csvText: string,
   mapping: ColumnMapping,
+  opts: { consentAll?: boolean } = {},
 ): Promise<CommitOutcome> {
   try {
     const parsed = parseCsv(csvText);
-    const result = await commitImport(await activeTenantId(), parsed, mapping);
+    const result = await commitImport(await activeTenantId(), parsed, mapping, {
+      consentAll: opts.consentAll === true,
+    });
     for (const p of [
       "/app", "/app/plays", "/app/campaigns", "/app/proof",
       "/app/customers", "/app/import",

@@ -372,6 +372,19 @@ export async function runMatch(tenantId: string): Promise<MatchResult> {
     const audience: string[] = [];
 
     for (const f of features) {
+      /* คนที่ยังไม่ยินยอมไม่เข้ากลุ่มเสมอ — แต่ต้องนับว่ามีกี่คนที่เข้าเกณฑ์ถ้ายินยอม
+         เดิมเงื่อนไขของ play (consent_marketing · reachable_by) ตัดคนเหล่านี้ทิ้งก่อน
+         ถึงตัวนับ ร้านที่เพิ่งนำเข้าไฟล์ POS (ไม่มีใครยินยอมเลย) จึงเห็นบรีฟว่าง
+         และระบบบอกไม่ได้ว่าว่างเพราะความยินยอม ไม่ใช่เพราะไม่มีอะไรทำ */
+      if (!f.consent_marketing) {
+        const ifConsented = {
+          ...f,
+          consent_marketing: true,
+          reachable_by: f.reachable_if_consented ?? ("paid_only" as const),
+        };
+        if (matchesSelector(ifConsented, play.selector)) noConsent++;
+        continue;
+      }
       if (!matchesSelector(f, play.selector)) continue;
 
       /* กรองความยินยอมที่ชั้น dispatch ไม่ใช่ชั้นหน้าจอ (B8)

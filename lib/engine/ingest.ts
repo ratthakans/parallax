@@ -116,27 +116,72 @@ export function normaliseRef(v: string): { type: string; value: string } | null 
   return { type: "member_no", value: t };
 }
 
-/** รับได้ทั้ง ค.ศ. และ พ.ศ. เพราะไฟล์จาก POS ไทยมีทั้งสองแบบ */
-export function normaliseDate(v: string): string | null {
+export type DateOrder = "dmy" | "mdy";
+
+/* วันที่ต้องมีจริง — Date.UTC(2025, 15, 8) ไม่ error แต่ล้นไปเป็นเมษายนปีถัดไป
+   เดิม "8/16/2025" จากไฟล์ Excel ภาษาอังกฤษจึงกลายเป็น 8 เม.ย. 2026 เงียบ ๆ */
+function utcDate(year: number, month: number, day: number): string | null {
+  if (year > 2400) year -= 543; // พ.ศ. → ค.ศ.
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  const d = new Date(Date.UTC(year, month - 1, day));
+  return d.getUTCMonth() === month - 1 && d.getUTCDate() === day ? d.toISOString() : null;
+}
+
+/** รับได้ทั้ง ค.ศ. และ พ.ศ. เพราะไฟล์จาก POS ไทยมีทั้งสองแบบ
+ *  order: ไฟล์นี้เขียน วัน/เดือน (ไทย) หรือ เดือน/วัน (Excel ภาษาอังกฤษ) — ดู detectDateOrder */
+export function normaliseDate(v: string, order: DateOrder = "dmy"): string | null {
   const t = v.trim();
   if (!t) return null;
 
   const dmy = t.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/);
   if (dmy) {
-    let year = Number(dmy[3]);
-    if (year > 2400) year -= 543; // พ.ศ. → ค.ศ.
-    const d = new Date(Date.UTC(year, Number(dmy[2]) - 1, Number(dmy[1])));
-    return Number.isNaN(d.getTime()) ? null : d.toISOString();
+    const a = Number(dmy[1]), b = Number(dmy[2]);
+    // เลขที่เกิน 12 บอกเองว่าเป็นวัน — เชื่อตัวเลขก่อนเชื่อลำดับของไฟล์
+    const monthFirst = a > 12 ? false : b > 12 ? true : order === "mdy";
+    return monthFirst ? utcDate(Number(dmy[3]), a, b) : utcDate(Number(dmy[3]), b, a);
   }
   const ymd = t.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
-  if (ymd) {
-    let year = Number(ymd[1]);
-    if (year > 2400) year -= 543;
-    const d = new Date(Date.UTC(year, Number(ymd[2]) - 1, Number(ymd[3])));
-    return Number.isNaN(d.getTime()) ? null : d.toISOString();
-  }
+  if (ymd) return utcDate(Number(ymd[1]), Number(ymd[2]), Number(ymd[3]));
   const parsed = new Date(t);
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
+/** ทั้งคอลัมน์เขียนแบบไหน — นับแถวที่ตัดสินได้เอง (มีเลขเกิน 12) แล้วใช้กับแถวที่กำกวม */
+export function detectDateOrder(values: string[]): DateOrder {
+  let dmy = 0, mdy = 0;
+  for (const v of values) {
+    const m = v.trim().match(/^(\d{1,2})[/-](\d{1,2})[/-]\d{4}/);
+    if (!m) continue;
+    if (Number(m[1]) > 12) dmy++;
+    else if (Number(m[2]) > 12) mdy++;
+  }
+  return mdy > dmy ? "mdy" : "dmy";
+}
+
+/* ── สถานะคำสั่งซื้อที่ไม่ใช่การซื้อจริง ──
+   ไฟล์จากมาร์เก็ตเพลสมีออเดอร์ที่ยกเลิก คืนเงิน คืนสินค้าปนอยู่ด้วยเสมอ
+   นับเข้าไปแล้วยอดขายและความถี่สูงเกินจริง */
+const CANCELLED = /(cancel|ยกเลิก|refund|คืนเงิน|return|คืนสินค้า|failed|ไม่สำเร็จ|void|unpaid|ยังไม่ชำระ)/i;
+
+/* ── ค่าในคอลัมน์ความยินยอม ── */
+const CONSENT_YES = /^(y|yes|true|1|✓|✔|ยินยอม|ให้ความยินยอม|ใช่|ตกลง|รับ|รับข่าวสาร|opt.?in|agree[d]?|subscribed)$/i;
+const CONSENT_NO = /^(n|no|false|0|✗|✘|ไม่ยินยอม|ไม่|ไม่รับ|ไม่รับข่าวสาร|opt.?out|ปฏิเสธ|unsubscribed)$/i;
+function consentOf(v: string): "yes" | "no" | null {
+  const t = v.trim();
+  return CONSENT_YES.test(t) ? "yes" : CONSENT_NO.test(t) ? "no" : null;
+}
+
+/* ── หนึ่งการซื้อ = หนึ่งบิล ไม่ใช่หนึ่งแถว ──
+   ไฟล์ POS ส่วนใหญ่มีหนึ่งแถวต่อสินค้า บิลที่มีสามชิ้นจึงเป็นสามแถว เดิมระบบนับ
+   เป็นสามครั้งที่ซื้อ ห่างกันศูนย์วัน รอบการซื้อของทุกคนจึงออกมา 7 วัน (ค่าต่ำสุด)
+   และยอดต่อครั้งเหลือราคาของชิ้นเดียว — ทดสอบกับไฟล์ POS แล้ว: 3 บิลกลายเป็น 7 ครั้ง
+
+   มีเลขที่บิล → รวมตามเลขบิล · ไม่มี → รวมแถวของคนเดียวกันในวันเดียวกัน (เวลาไทย)
+   ซึ่งคือ "การมาร้านหนึ่งครั้ง" ที่การวิเคราะห์รอบการซื้อต้องการ */
+function purchaseKey(cid: string, when: string, orderId: string): string {
+  if (orderId) return `${cid}|o|${orderId}`;
+  const day = new Date(Date.parse(when) + 7 * 3600_000).toISOString().slice(0, 10);
+  return `${cid}|d|${day}`;
 }
 
 export function normaliseMoney(v: string): number | null {
@@ -298,9 +343,8 @@ function genderOf(v: string): string | null {
 }
 
 /** ประวัติของคน — คืน null ถ้าไฟล์ไม่มีข้อมูลประวัติเลย */
-function profileOf(at: At): Profile | null {
+function profileOf(at: At, born: string | null): Profile | null {
   const txt = (f: ImportField) => at(f).trim() || null;
-  const born = normaliseDate(at("birthday"));
   const p: Profile = {
     first_name: txt("first_name"), last_name: txt("last_name"), nickname: txt("nickname"),
     gender: genderOf(at("gender")), birthday: born ? born.slice(0, 10) : null,
@@ -315,7 +359,10 @@ const UNNAMED = "ลูกค้าไม่ระบุชื่อ";
 
 function displayName(at: At): string {
   const full = at("customer_name").trim();
-  if (full) return full;
+  const last = at("last_name").trim();
+  /* ไฟล์รายชื่อไทยมักแยก "ชื่อ" กับ "นามสกุล" — "ชื่อ" ถูกจับเป็นชื่อลูกค้า
+     ทั้งที่เป็นแค่ชื่อต้น เดิมจึงได้ "สมชาย" แทน "สมชาย ใจดี" */
+  if (full) return last && !full.includes(last) ? `${full} ${last}` : full;
   const parts = [at("first_name").trim(), at("last_name").trim()].filter(Boolean).join(" ");
   return parts || at("nickname").trim() || UNNAMED;
 }
@@ -334,14 +381,22 @@ function fieldReader(parsed: ParsedCsv, mapping: ColumnMapping) {
     const i = byField.get(f);
     return i == null ? "" : (row[i] ?? "");
   };
-  return { has: (f: ImportField) => byField.has(f), at };
+  const orders = new Map<ImportField, DateOrder>();
+  const dateOrder = (f: ImportField): DateOrder => {
+    if (!orders.has(f)) orders.set(f, detectDateOrder(parsed.rows.map((r) => at(r, f))));
+    return orders.get(f)!;
+  };
+  /** วันที่ของแถวนี้ อ่านตามลำดับที่ทั้งคอลัมน์ใช้ */
+  const date = (row: string[], f: ImportField) => normaliseDate(at(row, f), dateOrder(f));
+  return { has: (f: ImportField) => byField.has(f), at, date, dateOrder };
 }
 
 export function buildPreview(
   parsed: ParsedCsv,
   mapping: ColumnMapping,
 ): ImportPreview {
-  const { has, at } = fieldReader(parsed, mapping);
+  const read = fieldReader(parsed, mapping);
+  const { has, at } = read;
   const missing = missingRequired(has);
 
   const purchases = hasPurchases(has);
@@ -351,16 +406,34 @@ export function buildPreview(
   const dates: number[] = [];
   let usable = 0;
   let discounted = 0;
-  let contactPoints = 0;
+  let cancelledRows = 0;
+  const uniquePoints = new Set<string>();
+  const purchaseKeys = new Set<string>();
+  const consentBy = new Map<string, "yes" | "no">();
 
   parsed.rows.forEach((row, i) => {
     const get: At = (f) => at(row, f);
     const ident = identityOf(get);
     if (!ident) {
-      rejected.push({ line: i + 2, reason: "ไม่มีตัวระบุลูกค้า (รหัส · เบอร์ · อีเมล · LINE)" });
+      const raw = at(row, "phone");
+      rejected.push({
+        line: i + 2,
+        reason: /e\+?\d/i.test(raw)
+          ? `เบอร์ถูก Excel แปลงเป็นเลขวิทยาศาสตร์ (${raw.trim()}) — ตัวเลขหายไปแล้ว ต้องแก้ในไฟล์ต้นทาง`
+          : /[*x•]{3,}/i.test(raw)
+            ? "เบอร์ถูกปิดบางส่วน (เช่น จากมาร์เก็ตเพลส) — ใช้ชื่อผู้ใช้หรือรหัสลูกค้าแทน"
+            : "ไม่มีตัวระบุลูกค้า (รหัส · เบอร์ · อีเมล · LINE)",
+      });
       return;
     }
-    const when = normaliseDate(at(row, "occurred_at"));
+    if (CANCELLED.test(at(row, "order_status"))) {
+      cancelledRows++;
+      rejected.push({ line: i + 2, reason: `คำสั่งซื้อ${at(row, "order_status").trim()} — ไม่นับเป็นการซื้อ` });
+      return;
+    }
+    const c = consentOf(at(row, "consent"));
+    if (c) consentBy.set(`${ident.type}:${ident.value}`, c);
+    const when = read.date(row, "occurred_at");
     const money = rowMoney(row, at);
     if (purchases && !when) {
       rejected.push({ line: i + 2, reason: "อ่านวันที่ไม่ได้" });
@@ -372,10 +445,11 @@ export function buildPreview(
     }
     usable++;
     refs.add(`${ident.type}:${ident.value}`);
-    contactPoints += channelsOf(get).length;
+    for (const c of channelsOf(get)) uniquePoints.add(`${ident.type}:${ident.value}|${c.kind}|${c.value}`);
     if (!purchases || !when || !money) return;
 
     dates.push(Date.parse(when));
+    purchaseKeys.add(purchaseKey(`${ident.type}:${ident.value}`, when, at(row, "order_id").trim()));
     if (money.discount > 0) discounted++;
     const pname = at(row, "product_name").trim();
     if (pname && !products.has(pname)) {
@@ -390,8 +464,16 @@ export function buildPreview(
     totalRows: parsed.rows.length,
     usableRows: usable,
     rejected: rejected.slice(0, 25),
+    rejectedRows: rejected.length,
     customers: refs.size,
-    transactions: purchases ? usable : 0,
+    contactPoints: uniquePoints.size,
+    transactions: purchases ? purchaseKeys.size : 0,
+    cancelledRows,
+    consent: {
+      yes: [...consentBy.values()].filter((x) => x === "yes").length,
+      no: [...consentBy.values()].filter((x) => x === "no").length,
+    },
+    dateOrder: read.dateOrder("occurred_at"),
     products: [...products.entries()].map(([name, v]) => ({ name, ...v })),
     dateRange: dates.length
       ? {
@@ -401,7 +483,6 @@ export function buildPreview(
       : null,
     missing,
     discountRowShare: usable ? discounted / usable : 0,
-    contactPoints,
   };
 }
 
@@ -420,6 +501,9 @@ type ImportBatch = {
   products: Param[][];
   txns: Param[][];
   lines: Param[][];
+  /** คอลัมน์ความยินยอม (หรือการยืนยันของเจ้าของร้านตอนนำเข้า) บอกว่าใช่ / ไม่ */
+  consentYes: string[];
+  consentNo: string[];
 };
 
 const PROFILE_COLS: (keyof Profile)[] = [
@@ -465,10 +549,12 @@ function collectImport(
   preview: ImportPreview,
   roleByName: Map<string, GroupRole>,
   known: Map<string, string>,
+  opts: ImportOptions,
 ): ImportBatch {
   const { at, has } = read;
   const b: ImportBatch = {
     customers: [], points: [], profiles: [], consents: [], products: [], txns: [], lines: [],
+    consentYes: [], consentNo: [],
   };
   const idFor = (x: string) => createHash("sha256").update(x).digest("hex").slice(0, 20);
 
@@ -483,21 +569,33 @@ function collectImport(
   const profiles = new Map<string, Profile>();
   const purchases = hasPurchases(has);
   const nowIso = new Date().toISOString();
-  const seenRows = new Map<string, number>();
+  // การซื้อหนึ่งครั้ง (บิล · หรือวันเดียวกันของคนเดียวกัน) → แถวใน b.txns
+  const purchaseRow = new Map<string, Param[]>();
+  const customerRow = new Map<string, Param[]>();
+  const seenPoints = new Set<string>();
+  const consentBy = new Map<string, "yes" | "no">();
 
   for (const row of parsed.rows) {
     const get: At = (f) => at(row, f);
     const ident = identityOf(get);
     if (!ident) continue;
-    const when = normaliseDate(at(row, "occurred_at"));
+    // ยกเลิก · คืนเงิน ไม่ใช่การซื้อ และไม่ใช่หลักฐานว่าเป็นลูกค้าด้วย
+    if (CANCELLED.test(at(row, "order_status"))) continue;
+    const when = read.date(row, "occurred_at");
     // ตรรกะเงินตัวเดียวกับตอนพรีวิว ตัวเลขที่เห็นก่อนกดจึงตรงกับที่นำเข้า
     const money = rowMoney(row, at);
     if (purchases && (!when || !money)) continue;
 
     const cid = customerId(ident.type, ident.value);
+    const known = customerRow.get(cid);
+    /* ไฟล์ POS เรียงจากใหม่ไปเก่า แถวแรกของคนหนึ่งจึงเป็นการซื้อล่าสุด — เดิมใช้เป็น
+       วันที่เริ่มเป็นลูกค้า คนที่ซื้อมา 18 เดือนจึงขึ้นว่า "เพิ่มเมื่อ 3 วันก่อน" */
+    if (known && when && when < String(known[3])) known[3] = when;
     if (!seenCustomers.has(cid)) {
       seenCustomers.add(cid);
-      b.customers.push([cid, tenantId, displayName(get), when ?? nowIso]);
+      const row: Param[] = [cid, tenantId, displayName(get), when ?? nowIso];
+      customerRow.set(cid, row);
+      b.customers.push(row);
       /* ไฟล์ไม่มีข้อมูลความยินยอม จึงตั้งเป็น "ยังไม่ยินยอม" — การมีเบอร์
          ไม่ใช่การได้รับอนุญาตให้ส่ง ไม่ว่าจะเก็บข้อมูลติดต่อได้มากแค่ไหน */
       b.consents.push([tenantId, cid, "marketing", null, null, "csv_import"]);
@@ -506,12 +604,19 @@ function collectImport(
     // แถวหลังของคนเดียวกันเพิ่มช่องทางที่ยังไม่มี ส่วนที่ซ้ำ ON CONFLICT ข้ามให้
     const firstOfKind = new Set<string>();
     for (const c of channelsOf(get)) {
+      const pointKey = `${cid}|${c.kind}|${c.value}`;
+      if (seenPoints.has(pointKey)) { firstOfKind.add(c.kind); continue; }
+      seenPoints.add(pointKey);
       b.points.push(contactPointRow(tenantId, cid, c.kind, c.value, c.label, !firstOfKind.has(c.kind), "csv_import"));
       firstOfKind.add(c.kind);
     }
 
     // หลายแถวของคนเดียวกันรวมเป็นประวัติเดียว แถวหลังเติมช่องที่ยังว่าง
-    const prof = profileOf(get);
+    const said = opts.consentAll ? "yes" : consentOf(at(row, "consent"));
+    // "ไม่" ชนะ "ใช่" ถ้าคนเดียวกันมีทั้งสองแบบในไฟล์เดียว
+    if (said && consentBy.get(cid) !== "no") consentBy.set(cid, said);
+
+    const prof = profileOf(get, read.date(row, "birthday"));
     if (prof) {
       const prev = profiles.get(cid);
       if (!prev) profiles.set(cid, prof);
@@ -535,26 +640,30 @@ function collectImport(
       }
     }
 
-    /* ── ID ธุรกรรมมาจากเนื้อหาของแถว ไม่ใช่ลำดับแถว ──
+    /* ── ID ของการซื้อมาจากบิล ไม่ใช่ลำดับแถว ──
 
-       เดิมคือ cid + วันที่ + ลำดับแถวในไฟล์ ไฟล์เดียวกันที่เรียงต่างกัน หรือ
-       ไฟล์เดือนใหม่ที่แถวใหม่อยู่บนสุด (ซึ่งคือรูปแบบปกติของ POS) จึงได้ ID ใหม่
-       ทั้งไฟล์ แล้วธุรกรรมเดิมเข้าไปซ้ำ — ทดสอบแล้ว: สลับแถวได้ยอดสองเท่า
-       ยอดซื้อ มูลค่าลูกค้า และผลการวัดทั้งหมดเพี้ยนขึ้นเงียบ ๆ
-
-       ตัวนับ occurrence แยกการซื้อที่เหมือนกันทุกอย่างในไฟล์เดียว (สองชิ้น
-       ราคาเดียวกันวันเดียวกัน) ให้ยังเป็นสองรายการ — นำเข้าซ้ำกี่รอบก็ได้ ID เดิม */
-    const content = [cid, when, money.total, money.discount, money.qty, money.unitNet, pname,
-      at(row, "channel").trim()].join("|");
-    const occurrence = (seenRows.get(content) ?? 0) + 1;
-    seenRows.set(content, occurrence);
-    const txnId = `t-${idFor(`${tenantId}|${content}|${occurrence}`)}`;
-    b.txns.push([tenantId, txnId, cid, when, money.total, money.discount, at(row, "channel").trim() || "pos"]);
+       เดิม ID มาจากลำดับแถว แล้วต่อมาจากเนื้อหาของแถว — ทั้งสองแบบนับหนึ่งแถว
+       เป็นหนึ่งการซื้อ ตอนนี้ ID มาจาก (คน · เลขบิล) หรือ (คน · วัน) ไฟล์เดิมที่
+       นำเข้าซ้ำ หรือเรียงแถวต่างกัน จึงได้ ID เดิมและไม่ถูกนับซ้ำเหมือนเดิม
+       ส่วนหลายแถวของบิลเดียวรวมเป็นการซื้อเดียว ยอดเป็นผลรวมของทุกแถว */
+    const key = purchaseKey(cid, when, at(row, "order_id").trim());
+    const txnId = `t-${idFor(`${tenantId}|${key}`)}`;
+    const existing = purchaseRow.get(key);
+    if (existing) {
+      existing[4] = Number(existing[4]) + money.total;
+      existing[5] = Number(existing[5]) + money.discount;
+      if (when < String(existing[3])) existing[3] = when;
+    } else {
+      const txn: Param[] = [tenantId, txnId, cid, when, money.total, money.discount, at(row, "channel").trim() || "pos"];
+      purchaseRow.set(key, txn);
+      b.txns.push(txn);
+    }
     // unit_price ต้องเป็นราคาต่อหน่วย ไม่ใช่ยอดรวมของแถว
     if (pid) b.lines.push([tenantId, txnId, pid, money.qty, money.unitNet, money.listUnit]);
   }
 
   b.profiles = [...profiles].map(([cid, p]) => [cid, tenantId, ...PROFILE_COLS.map((c) => p[c]), nowIso]);
+  for (const [cid, v] of consentBy) (v === "yes" ? b.consentYes : b.consentNo).push(cid);
   return b;
 }
 
@@ -578,7 +687,9 @@ async function writeImport(q: Sql, b: ImportBatch): Promise<number> {
      ทิ้งเป็น "ลูกค้าไม่ระบุชื่อ" ทับชื่อจริงจากไฟล์ก่อนหน้า */
   await insertMany(q, "customers", ["id", "tenant_id", "name", "created_at"], b.customers, {
     onConflict: `ON CONFLICT(id) DO UPDATE SET name =
-      CASE WHEN excluded.name = '${UNNAMED}' THEN customers.name ELSE excluded.name END`,
+      CASE WHEN excluded.name = '${UNNAMED}' THEN customers.name ELSE excluded.name END,
+      created_at = CASE WHEN excluded.created_at < customers.created_at
+        THEN excluded.created_at ELSE customers.created_at END`,
   });
   await insertMany(q, "contact_points", CONTACT_POINT_COLUMNS, b.points,
     { onConflict: "ON CONFLICT DO NOTHING" });
@@ -590,6 +701,22 @@ async function writeImport(q: Sql, b: ImportBatch): Promise<number> {
   });
   await insertMany(q, "consents", ["tenant_id", "customer_id", "purpose", "granted_at", "revoked_at", "source"], b.consents,
     { onConflict: "ON CONFLICT(customer_id, purpose) DO NOTHING" });
+  /* ความยินยอมจากไฟล์: "ใช่" บันทึกได้เฉพาะคนที่ยังไม่เคยถอน — คนที่บอกร้านให้หยุดส่ง
+     (ถอนในหน้าของเขา) ต้องไม่กลับมาได้รับเพราะไฟล์เก่าที่บอกว่าเคยยินยอม
+     "ไม่" ถอนคนที่ยินยอมอยู่ ทั้งสองแบบเก็บวันที่ไว้เป็นหลักฐาน */
+  const nowIso = new Date().toISOString();
+  const tenantId = String(b.customers[0]?.[1] ?? "");
+  for (const [ids, sql] of [
+    [b.consentYes, `UPDATE consents SET granted_at = ?, source = 'csv_import'
+      WHERE tenant_id = ? AND purpose = 'marketing' AND granted_at IS NULL AND revoked_at IS NULL AND customer_id IN `],
+    [b.consentNo, `UPDATE consents SET revoked_at = ?
+      WHERE tenant_id = ? AND purpose = 'marketing' AND granted_at IS NOT NULL AND revoked_at IS NULL AND customer_id IN `],
+  ] as const) {
+    for (let i = 0; i < ids.length; i += 500) {
+      const chunk = ids.slice(i, i + 500);
+      await q.run(`${sql}(${chunk.map(() => "?").join(",")})`, nowIso, tenantId, ...chunk);
+    }
+  }
   await insertMany(q, "products", ["id", "tenant_id", "name", "category", "group_role", "list_price"], b.products,
     { onConflict: "ON CONFLICT(id) DO UPDATE SET group_role = excluded.group_role" });
   /* ── รายการสินค้าเพิ่มเฉพาะธุรกรรมที่เพิ่งเข้ามาใหม่ ──
@@ -604,10 +731,17 @@ async function writeImport(q: Sql, b: ImportBatch): Promise<number> {
   return freshTxns.length;
 }
 
+export type ImportOptions = {
+  /** เจ้าของร้านยืนยันตอนนำเข้าว่าทุกคนในไฟล์ให้ความยินยอมกับร้านแล้ว
+      (เช่น รายชื่อสมาชิกที่สมัครผ่านฟอร์มที่มีข้อความขอความยินยอม) */
+  consentAll?: boolean;
+};
+
 export async function commitImport(
   tenantId: string,
   parsed: ParsedCsv,
   mapping: ColumnMapping,
+  opts: ImportOptions = {},
 ): Promise<ImportResult> {
   /* ID ลูกค้าคำนวณจากกุญแจ HMAC และช่องทางติดต่อต้องเข้ารหัส — ไม่มีกุญแจ
      คือหยุดตรงนี้ ก่อนที่ไฟล์จะเข้าไปครึ่งทางแล้วพังกลางธุรกรรม */
@@ -636,7 +770,7 @@ export async function commitImport(
     : { value: { products: [] }, source: "fallback" as const };
   const roleByName = new Map<string, GroupRole>(roleGuess.value.products.map((x) => [x.name, x.role]));
 
-  const batch = collectImport(tenantId, parsed, read, preview, roleByName, await knownCustomers(tenantId, parsed, read));
+  const batch = collectImport(tenantId, parsed, read, preview, roleByName, await knownCustomers(tenantId, parsed, read), opts);
 
   return tx(async (q) => {
     const newTxns = await writeImport(q, batch);
@@ -646,6 +780,14 @@ export async function commitImport(
       "import_csv",
       `${batch.customers.length} customers · ${newTxns} new transactions · ${batch.points.length} contact points`,
     );
+    if (batch.consentYes.length || batch.consentNo.length) {
+      await logActivity(
+        tenantId,
+        "owner",
+        opts.consentAll ? "import_consent_attested" : "import_consent_column",
+        `${batch.consentYes.length} consented · ${batch.consentNo.length} withdrew`,
+      );
+    }
     // DERIVE ทันทีเพื่อให้เห็น insight ภายในสามนาที
     await deriveFeatures(tenantId);
     return {
@@ -654,8 +796,9 @@ export async function commitImport(
       transactions: newTxns,
       contactPoints: batch.points.length,
       products: batch.products.length,
-      rejected: preview.rejected.length,
+      rejected: preview.rejectedRows,
       roleSource: roleGuess.source,
+      consented: batch.consentYes.length,
     };
   });
 }

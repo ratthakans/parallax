@@ -195,8 +195,14 @@ ok(!(await all<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 't
   const twins = "0811110002,คุณซื้อสองชิ้น,2026-04-01,500,หมวก,1\n".repeat(2);
   await run(twins); await run(twins);
   const [w2] = await findCustomersByContact(A, "phone", "0811110002");
-  const n2 = Number((await get<{ n: number }>("SELECT COUNT(*) AS n FROM transactions WHERE customer_id = ?", w2))!.n);
-  ok(n2 === 2, `ซื้อของเหมือนกันสองชิ้นวันเดียวกัน ยังเป็นสองรายการ และนำเข้าซ้ำไม่เป็นสี่ (${n2})`);
+  const t2 = (await get<{ n: number; s: number }>(
+    "SELECT COUNT(*) AS n, SUM(total) AS s FROM transactions WHERE customer_id = ?", w2))!;
+  const li2 = Number((await get<{ n: number }>(
+    "SELECT COUNT(*) AS n FROM line_items WHERE txn_id IN (SELECT id FROM transactions WHERE customer_id = ?)", w2))!.n);
+  /* สองแถวเหมือนกันในวันเดียวกัน = มาร้านครั้งเดียว ซื้อสองชิ้น — ยอดยังเป็นของทั้งสองแถว
+     (ไม่หายครึ่ง) สินค้ายังเป็นสองรายการ และนำเข้าซ้ำไม่เพิ่มอะไร */
+  ok(Number(t2.n) === 1 && Number(t2.s) === 1000 && li2 === 2,
+    `สองชิ้นวันเดียวกันเป็นการซื้อครั้งเดียว ยอดครบ ${t2.s} สินค้า ${li2} รายการ และนำเข้าซ้ำไม่เพิ่ม (${t2.n})`);
 }
 
 // ── 10.4 · ล้างข้อมูลลูกค้าทั้งบัญชี ──

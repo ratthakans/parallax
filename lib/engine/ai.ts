@@ -252,7 +252,13 @@ const RULES: Rule[] = [
   { field: "customer_ref", re: /(customer.?(id|code|no)|cust.?no|รหัสลูกค้า|รหัสสมาชิก|member.?(id|no)|เลขสมาชิก)/i, score: 10 },
   { field: "customer_ref", re: /(phone|tel|mobile|เบอร์|โทร|email|อีเมล|e-?mail)/i, score: 6 },
 
+  /* มาร์เก็ตเพลสปิดเบอร์ผู้ซื้อ (******1234) ชื่อผู้ใช้จึงเป็นตัวระบุเดียวที่เหลือ */
+  { field: "customer_ref", re: /(user.?name|ชื่อผู้ใช้|buyer.?(id|user))/i, score: 11 },
+
   { field: "customer_name", re: /(customer.?name|ชื่อลูกค้า|ชื่อ-?นามสกุล|full.?name)/i, score: 10 },
+  // หัวคอลัมน์คำเดียว "Customer" / "ลูกค้า" คือชื่อ ไม่ใช่รหัส
+  { field: "customer_name", re: /^\s*(customer|client|buyer|ลูกค้า|ผู้ซื้อ)\s*$/i, score: 9 },
+  { field: "customer_name", re: /(receiver|recipient|ผู้รับ)/i, score: 8 },
   { field: "customer_name", re: /(ชื่อ|name)/i, score: 4 },
 
   /* ── ข้อมูลของคน ──
@@ -298,6 +304,7 @@ const RULES: Rule[] = [
   { field: "total", re: /(ยอด)/i, score: 5 },
 
   { field: "unit_price", re: /(ราคาต่อหน่วย|ราคา\/หน่วย|ราคาต่อชิ้น|unit.?price|price.?per.?unit)/i, score: 12 },
+  { field: "unit_price", re: /(deal.?price|selling.?price|ราคาขาย)/i, score: 11 },
 
   { field: "list_price", re: /(list.?price|ราคาป้าย|ราคาปก|ราคาเต็ม|msrp|full.?price|ก่อนลด|before.?discount)/i, score: 12 },
 
@@ -312,6 +319,12 @@ const RULES: Rule[] = [
   { field: "qty", re: /(จำนวน)/i, score: 6 },
 
   { field: "channel", re: /(channel|ช่องทาง|sales.?channel)/i, score: 10 },
+
+  /* ── บิล · สถานะ · ความยินยอม ──
+     "invoice date" เป็นวันที่ (occurred_at) ไม่ใช่เลขบิล จึงรับเฉพาะ no · number · id */
+  { field: "order_id", re: /(order.?(id|no|number|sn)|invoice.?(no|number|id)|receipt.?(no|number)|bill.?(no|number)|transaction.?id|เลขที่บิล|เลขบิล|เลขที่ใบเสร็จ|เลขที่ใบกำกับ|เลขที่คำสั่งซื้อ|หมายเลขคำสั่งซื้อ|เลขที่เอกสาร)/i, score: 12 },
+  { field: "order_status", re: /(order.?status|payment.?status|^\s*status\s*$|สถานะ(คำสั่งซื้อ|การสั่งซื้อ|รายการ|ออเดอร์)?$)/i, score: 10 },
+  { field: "consent", re: /(consent|ยินยอม|pdpa|opt.?in|รับข่าวสาร|marketing.?permission|subscribe)/i, score: 12 },
   { field: "channel", re: /(source|สาขา|branch|store)/i, score: 6 },
 ];
 
