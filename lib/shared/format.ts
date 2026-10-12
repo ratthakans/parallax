@@ -22,3 +22,41 @@ export function ciLabel(low: number, high: number): string {
   if (!Number.isFinite(low) || !Number.isFinite(high)) return "No control group";
   return `${low.toFixed(1)} to ${high.toFixed(1)}%`;
 }
+
+/* ── วันที่แบบไทย ปี พ.ศ. ชุดเดียวทั้งคอนโซล ──────────────────
+
+   หน้าจอเดียวเคยมีวันที่สามแบบ: "MONDAY 12 OCTOBER" · "11/10/69" ·
+   "2025-10-30" ซึ่งอย่างหลังเป็นค่าดิบจากฐานข้อมูลที่หลุดออกมาตรง ๆ
+   และคนอ่านต้องแปลงปีเองว่าเป็น ค.ศ. หรือ พ.ศ.
+
+   timeZone ตั้งเป็นกรุงเทพตายตัว เพราะเซิร์ฟเวอร์บน Vercel ใช้ UTC —
+   ซื้อตอนตีหนึ่งเวลาไทยจะกลายเป็นเมื่อวานถ้าปล่อยให้ใช้โซนของเครื่อง */
+const TH_DATE = new Intl.DateTimeFormat("th-TH", {
+  day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Bangkok",
+});
+const TH_DATE_TIME = new Intl.DateTimeFormat("th-TH", {
+  day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
+  timeZone: "Asia/Bangkok",
+});
+
+export function thaiDate(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const t = Date.parse(iso);
+  return Number.isNaN(t) ? "—" : TH_DATE.format(t);
+}
+
+export function thaiDateTime(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const t = Date.parse(iso);
+  return Number.isNaN(t) ? "—" : TH_DATE_TIME.format(t);
+}
+
+/** "วันนี้" · "เมื่อวาน" · "12 วันก่อน" — นับเป็นวันเต็ม ไม่ใช่ 24 ชั่วโมงล่าสุด */
+export function daysAgoLabel(iso: string | null | undefined, now = Date.now()): string {
+  if (!iso) return "—";
+  const d = Math.floor((now - Date.parse(iso)) / 86400000);
+  if (Number.isNaN(d)) return "—";
+  if (d <= 0) return "วันนี้";
+  if (d === 1) return "เมื่อวาน";
+  return `${num(d)} วันก่อน`;
+}

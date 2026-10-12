@@ -104,6 +104,17 @@ export function matchKey(tenantId: string, kind: string, normalised: string): st
 /* ── จัดรูปแบบก่อนเก็บ ──
    ค่าเดียวกันต้องได้ข้อความเดียวกันเสมอ ไม่งั้น matchKey จะต่างกันแล้ว
    คนเดียวกันกลายเป็นสองคน: "081-234-5678" · "+66 81 234 5678" · "0812345678" */
+/* ── ID ลูกค้าผูกกับร้าน และถอดกลับเป็นเบอร์ไม่ได้ ──
+   ที่เดียวที่สร้าง ID จากตัวระบุ ทั้งการนำเข้าไฟล์และการเพิ่มลูกค้าเองในหน้าจอ
+   ใช้ฟังก์ชันนี้ คนที่พิมพ์เพิ่มไว้ก่อนจึงเป็นคนเดียวกับแถวในไฟล์ที่นำเข้าทีหลัง
+
+   เดิมคือ c- + sha256("phone:เบอร์") ไม่มีรหัสร้าน: สองร้านนำเข้าเบอร์เดียวกัน
+   ได้แถวเดียว ร้านที่สองเขียนชื่อทับและธุรกรรมของร้านที่สองหายเงียบ (ทดสอบแล้ว)
+   และ sha256 ของเบอร์ถอดกลับได้ในไม่กี่นาที ID จึงเท่ากับเบอร์โทร */
+export function customerIdFor(tenantId: string, kind: string, normalised: string): string {
+  return `c-${matchKey(tenantId, kind, normalised).slice(0, 24)}`;
+}
+
 export function normaliseContact(kind: ContactKind, raw: string): string | null {
   const v = raw.trim();
   if (!v) return null;

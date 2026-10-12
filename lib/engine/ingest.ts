@@ -8,7 +8,7 @@ import {
   CONTACT_POINT_COLUMNS,
   contactPointRow,
   contactStorageReady,
-  matchKey,
+  customerIdFor,
   normaliseContact,
   type ContactKind,
 } from "@/lib/engine/pii";
@@ -439,12 +439,7 @@ function collectImport(
   };
   const idFor = (x: string) => createHash("sha256").update(x).digest("hex").slice(0, 20);
 
-  /* ── ID ลูกค้าผูกกับร้าน และถอดกลับเป็นเบอร์ไม่ได้ ──
-     เดิมคือ c- + sha256("phone:เบอร์") ไม่มีรหัสร้าน: สองร้านนำเข้าเบอร์เดียวกัน
-     ได้แถวเดียว ร้านที่สองเขียนชื่อทับและธุรกรรมของร้านที่สองหายเงียบ (ทดสอบแล้ว)
-     และ sha256 ของเบอร์ถอดกลับได้ในไม่กี่นาที ID จึงเท่ากับเบอร์โทร */
-  const customerId = (type: string, value: string) =>
-    `c-${matchKey(tenantId, type, value).slice(0, 24)}`;
+  const customerId = (type: string, value: string) => customerIdFor(tenantId, type, value);
 
   const seenCustomers = new Set<string>();
   const seenProducts = new Set<string>();
