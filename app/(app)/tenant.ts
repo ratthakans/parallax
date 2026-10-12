@@ -4,7 +4,8 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import { TENANT_COOKIE } from "@/lib/shared/active-tenant";
 import { currentUser } from "@/lib/shared/session";
-import { resolveTenant, switchableTenants } from "@/lib/engine/access";
+import { membershipEnforced, resolveTenant, switchableTenants } from "@/lib/engine/access";
+import { redirect } from "next/navigation";
 import { enterIdentity } from "@/lib/engine/sql";
 
 /* ── บัญชีที่เปิดอยู่ ประกอบจากสามอย่าง ──────────────────────────
@@ -36,6 +37,11 @@ export const activeTenantId = cache(async (): Promise<string> => {
      ทั้ง 39 ข้อทำงาน — ลืมเติม WHERE tenant_id = ได้ศูนย์แถว
      ไม่ใช่ได้ข้อมูลของคนอื่น */
   if (user) enterIdentity(user.userId);
+
+  /* ไม่มีผู้ใช้บนฐานที่บังคับสมาชิก = ไปล็อกอิน ไม่ใช่หน้า error
+     proxy.ts ปล่อยคำขอที่มีคุกกี้ session ผ่านมาแม้ตรวจไม่ผ่าน (กันการเด้งตอนต่ออายุ token)
+     ที่นี่จึงเป็นด่านที่ตัดสินจริง และ resolveTenant จะไม่ต้องโยน "ต้องล็อกอินก่อน" */
+  if (!user && membershipEnforced()) redirect("/login");
 
   return resolveTenant(user?.userId ?? null, wanted);
 });

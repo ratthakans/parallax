@@ -51,7 +51,17 @@ export default async function proxy(req: NextRequest) {
   const path = req.nextUrl.pathname;
   const needsAuth = path === "/app" || path.startsWith("/app/");
 
-  if (needsAuth && !user) {
+  /* ── เด้งไปล็อกอินเฉพาะคนที่ไม่มี session เลย ──
+
+     เดิมเด้งทุกครั้งที่ getUser() ไม่ได้ผู้ใช้ แต่ตอน token ใกล้หมดอายุ เมนูของคอนโซล
+     prefetch หลายหน้าพร้อมกัน ทุกคำขอพยายามต่ออายุด้วย refresh token ตัวเดียวกัน
+     ตัวที่แพ้ได้ "ไม่มีผู้ใช้" แล้วถูกเด้งไปหน้าล็อกอินทั้งที่ยังล็อกอินอยู่ — เห็นจริง
+     ระหว่างทดสอบ: ทุกหน้าในคอนโซลเด้งไปล็อกอินราวสองนาทีแล้วกลับมาเอง
+
+     มีคุกกี้ session แต่ตรวจไม่ผ่าน (แพ้การต่ออายุ · Supabase ตอบช้า) ให้ผ่านไปก่อน
+     ด่านจริงคือ activeTenantId (app/(app)/tenant.ts) ซึ่งเด้งไปล็อกอินเองเมื่อไม่มีผู้ใช้ */
+  const hasSession = req.cookies.getAll().some((c) => /^sb-.+-auth-token/.test(c.name));
+  if (needsAuth && !user && !hasSession) {
     const to = new URL("/login", req.nextUrl);
     /* จำไว้ว่าเขาจะไปไหน ล็อกอินเสร็จจะได้ไปต่อ ไม่ใช่โยนกลับหน้าแรก */
     to.searchParams.set("next", path);
