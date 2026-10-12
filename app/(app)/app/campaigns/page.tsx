@@ -2,6 +2,7 @@ import { activeTenantId } from "@/app/(app)/tenant";
 import { all } from "@/lib/engine/sql";
 import Link from "next/link";
 import { playById } from "@/lib/shared/plays";
+import { DELIVERY_CONNECTED } from "@/lib/engine/dispatch";
 
 import type { Verdict } from "@/lib/shared/types";
 import {
@@ -62,7 +63,7 @@ export default async function CampaignsPage() {
     <>
       <PageHead
         label="แคมเปญ"
-        title="อนุมัติแล้ว · ส่งแล้ว · รอผล"
+        title={DELIVERY_CONNECTED ? "อนุมัติแล้ว · ส่งแล้ว · รอผล" : "อนุมัติแล้ว · จำลองการส่ง · รอผล"}
         lead="Approval freezes the list immediately — nobody can be added or removed after, because a list that can change makes the measurement worthless. Send from the button on each row."
         actions={
           <ActionForm
@@ -111,7 +112,7 @@ export default async function CampaignsPage() {
           sub="มุมที่สองของการวัด"
           tone="muted"
         />
-        <Metric label="Messages sent" value={num(totalSent)} />
+        <Metric label={DELIVERY_CONNECTED ? "Messages sent" : "จำลองการส่ง"} value={num(totalSent)} />
       </Panel>
 
       {rows.length === 0 ? (
@@ -129,7 +130,7 @@ export default async function CampaignsPage() {
                   <th>กลุ่ม</th>
                   <th>ส่ง / กันไว้</th>
                   <th>วิธีวัด</th>
-                  <th>ส่งแล้ว</th>
+                  <th>{DELIVERY_CONNECTED ? "ส่งแล้ว" : "จำลองส่ง"}</th>
                   <th>ค่าใช้จ่าย</th>
                   <th>สถานะ</th>
                   <th />
