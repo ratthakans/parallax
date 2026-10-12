@@ -1,4 +1,4 @@
-import { insertMany, tx, type Param, type Sql } from "@/lib/engine/sql";
+import { all, insertMany, tx, type Param, type Sql } from "@/lib/engine/sql";
 import { logActivity } from "@/lib/engine/db";
 import { createHash } from "node:crypto";
 import { deriveFeatures } from "@/lib/engine/derive";
@@ -9,12 +9,14 @@ import {
   contactPointRow,
   contactStorageReady,
   customerIdFor,
+  matchKey,
   normaliseContact,
   type ContactKind,
 } from "@/lib/engine/pii";
 import {
   FIELD_LABEL,
   hasPurchases,
+  isSummaryColumn,
   missingRequired,
   type ColumnMapping,
   type ImportField,
@@ -326,7 +328,7 @@ function fieldReader(parsed: ParsedCsv, mapping: ColumnMapping) {
   const byField = new Map<ImportField, number>();
   mapping.mappings.forEach((m) => {
     const idx = parsed.headers.indexOf(m.column);
-    if (idx >= 0 && m.field !== "ignore" && !byField.has(m.field)) byField.set(m.field, idx);
+    if (idx >= 0 && m.field !== "ignore" && !isSummaryColumn(m.column) && !byField.has(m.field)) byField.set(m.field, idx);
   });
   const at = (row: string[], f: ImportField) => {
     const i = byField.get(f);
@@ -425,6 +427,36 @@ const PROFILE_COLS: (keyof Profile)[] = [
   "job_title", "subdistrict", "district", "province", "postcode", "note",
 ];
 
+/** ตัวระบุในไฟล์ที่ตรงกับช่องทางติดต่อของคนที่มีอยู่แล้ว: "ชนิด:กุญแจ" → รหัสลูกค้า */
+async function knownCustomers(
+  tenantId: string,
+  parsed: ParsedCsv,
+  read: ReturnType<typeof fieldReader>,
+): Promise<Map<string, string>> {
+  const keys = new Map<string, { kind: string; hmac: string }>();
+  for (const row of parsed.rows) {
+    const ident = identityOf((f) => read.at(row, f));
+    if (!ident) continue;
+    const hmac = matchKey(tenantId, ident.type, ident.value);
+    keys.set(`${ident.type}:${hmac}`, { kind: ident.type, hmac });
+  }
+  const found = new Map<string, string>();
+  const list = [...keys.values()];
+  const kinds = [...new Set(list.map((k) => k.kind))];
+  for (let i = 0; i < list.length; i += 500) {
+    const chunk = list.slice(i, i + 500);
+    const rows = await all<{ kind: string; value_hmac: string; customer_id: string }>(
+      `SELECT kind, value_hmac, MIN(customer_id) AS customer_id FROM contact_points
+       WHERE tenant_id = ? AND kind IN (${kinds.map(() => "?").join(",")})
+         AND value_hmac IN (${chunk.map(() => "?").join(",")})
+       GROUP BY kind, value_hmac`,
+      tenantId, ...kinds, ...chunk.map((k) => k.hmac),
+    );
+    for (const r of rows) found.set(`${r.kind}:${r.value_hmac}`, r.customer_id);
+  }
+  return found;
+}
+
 /** แปลงทุกแถวเป็นแถวของแต่ละตาราง — ไม่แตะฐานข้อมูล */
 function collectImport(
   tenantId: string,
@@ -432,6 +464,7 @@ function collectImport(
   read: ReturnType<typeof fieldReader>,
   preview: ImportPreview,
   roleByName: Map<string, GroupRole>,
+  known: Map<string, string>,
 ): ImportBatch {
   const { at, has } = read;
   const b: ImportBatch = {
@@ -439,7 +472,11 @@ function collectImport(
   };
   const idFor = (x: string) => createHash("sha256").update(x).digest("hex").slice(0, 20);
 
-  const customerId = (type: string, value: string) => customerIdFor(tenantId, type, value);
+  /* คนที่มีอยู่แล้วต้องหาจากช่องทางติดต่อก่อน ไม่ใช่คำนวณ ID ใหม่จากค่าในไฟล์
+     ID ของคนที่ถูกรวมเข้ากับอีกคน หรือคนที่เพิ่มเองด้วยอีเมลแล้วไฟล์มีแต่เบอร์
+     คำนวณจากค่าในไฟล์ไม่ได้ — คำนวณแล้วจะได้คนที่ถูกรวมไปแล้วกลับมาอีกคน */
+  const customerId = (type: string, value: string) =>
+    known.get(`${type}:${matchKey(tenantId, type, value)}`) ?? customerIdFor(tenantId, type, value);
 
   const seenCustomers = new Set<string>();
   const seenProducts = new Set<string>();
@@ -599,7 +636,7 @@ export async function commitImport(
     : { value: { products: [] }, source: "fallback" as const };
   const roleByName = new Map<string, GroupRole>(roleGuess.value.products.map((x) => [x.name, x.role]));
 
-  const batch = collectImport(tenantId, parsed, read, preview, roleByName);
+  const batch = collectImport(tenantId, parsed, read, preview, roleByName, await knownCustomers(tenantId, parsed, read));
 
   return tx(async (q) => {
     const newTxns = await writeImport(q, batch);

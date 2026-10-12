@@ -134,6 +134,14 @@ export default async function CustomersPage({
             <Link href="/app/import" className="c-btn c-btn-ghost">
               นำเข้าไฟล์
             </Link>
+            {/* <a> ไม่ใช่ <Link> — เป็นการดาวน์โหลดไฟล์ ไม่ใช่การเปลี่ยนหน้า */}
+            <a
+              href={hrefFor(state, { page: undefined }).replace("/app/customers", "/app/customers/export")}
+              className="c-btn c-btn-ghost"
+              download
+            >
+              ส่งออก CSV
+            </a>
           </>
         }
       />
@@ -174,7 +182,8 @@ export default async function CustomersPage({
           )}
         </form>
         <p className="c-thai mt-2 text-[0.76rem] text-[var(--c-text-4)]">
-          ชื่อค้นได้บางส่วนของคำ · เบอร์ อีเมล และรหัสต้องพิมพ์ครบ เพราะเก็บแบบเข้ารหัส
+          ชื่อค้นได้บางส่วนของคำ · เบอร์ อีเมล และรหัสต้องพิมพ์ครบ เพราะเก็บแบบเข้ารหัส ·
+          ส่งออก CSV ได้ตามที่กรองอยู่ — เบอร์และอีเมลส่งออกเฉพาะคนที่ยินยอมรับข่าวสาร
         </p>
 
         <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-3">

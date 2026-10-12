@@ -7,10 +7,12 @@ import {
   contactPointRow,
   contactStorageReady,
   customerIdFor,
+  decryptContact,
   normaliseContact,
   type ContactKind,
 } from "@/lib/engine/pii";
 import { IDENTITY_KINDS } from "@/lib/shared/contact-kinds";
+import { SUMMARY_COLUMN_PREFIX } from "@/lib/shared/ingest-types";
 import { playById } from "@/lib/shared/plays";
 
 /* ── จัดการฐานลูกค้าทีละคน ─────────────────────────────────────
@@ -546,4 +548,221 @@ export async function deleteCustomer(tenantId: string, id: string, actor: string
   });
   await logActivity(tenantId, actor, "delete_customer", id);
   return { ok: true, name: c.name };
+}
+
+/* ── คนที่อาจเป็นคนเดียวกัน ─────────────────────────────────────
+
+   สองแบบที่เกิดจริงบ่อยที่สุด: ชื่อเดียวกันแต่ไฟล์หนึ่งใส่เบอร์ อีกไฟล์ใส่อีเมล
+   (ระบบจึงเห็นเป็นสองคน) และใช้ช่องทางเดียวกัน (เบอร์บ้าน · อีเมลบริษัท)
+   แบบหลังไม่จำเป็นต้องเป็นคนเดียวกัน หน้าจอจึงแสดงเหตุผลให้ร้านตัดสินเอง
+   ไม่รวมให้อัตโนมัติ */
+export type DuplicateCandidate = { id: string; name: string; reason: string };
+
+export async function findDuplicates(tenantId: string, id: string): Promise<DuplicateCandidate[]> {
+  const me = await get<{ name: string }>("SELECT name FROM customers WHERE tenant_id = ? AND id = ?", tenantId, id);
+  if (!me) return [];
+  const [sameName, sharedContact] = await Promise.all([
+    me.name === "ลูกค้าไม่ระบุชื่อ"
+      ? Promise.resolve([] as { id: string; name: string }[])
+      : all<{ id: string; name: string }>(
+          "SELECT id, name FROM customers WHERE tenant_id = ? AND id <> ? AND LOWER(name) = LOWER(?) LIMIT 10",
+          tenantId, id, me.name,
+        ),
+    all<{ id: string; name: string; kind: string }>(
+      `SELECT DISTINCT c.id, c.name, o.kind FROM contact_points mine
+       JOIN contact_points o ON o.tenant_id = mine.tenant_id AND o.kind = mine.kind
+         AND o.value_hmac = mine.value_hmac AND o.customer_id <> mine.customer_id
+       JOIN customers c ON c.id = o.customer_id
+       WHERE mine.tenant_id = ? AND mine.customer_id = ? LIMIT 10`,
+      tenantId, id,
+    ),
+  ]);
+  const out = new Map<string, DuplicateCandidate>();
+  for (const r of sameName) out.set(r.id, { id: r.id, name: r.name, reason: "ชื่อเดียวกัน" });
+  const kindLabel: Record<string, string> = { phone: "เบอร์", email: "อีเมล", line: "LINE", member_no: "รหัสสมาชิก" };
+  for (const r of sharedContact) {
+    const why = `ใช้${kindLabel[r.kind] ?? "ช่องทาง"}เดียวกัน`;
+    const prev = out.get(r.id);
+    out.set(r.id, { id: r.id, name: r.name, reason: prev ? `${prev.reason} · ${why}` : why });
+  }
+  return [...out.values()];
+}
+
+/* ── รวมสองคนเป็นคนเดียว ──────────────────────────────────────
+
+   ย้ายทุกอย่างของ drop มาที่ keep แล้วลบ drop ทิ้ง:
+     การซื้อ · การเข้าชม · สมาชิกภาพ   ย้ายทั้งหมด
+     ช่องทางติดต่อ                     ย้าย เว้นตัวที่ keep มีอยู่แล้ว (id ของแถวมีรหัสลูกค้าอยู่ข้างใน จึงต้องเปลี่ยนด้วย)
+     ประวัติส่วนตัว                     เติมเฉพาะช่องที่ keep ยังว่าง ไม่ทับของ keep
+     แคมเปญ                            ย้าย เว้นแคมเปญที่ทั้งคู่อยู่ด้วยกัน (ใช้แถวของ keep)
+     ความยินยอม                        ยินยอมได้ก็ต่อเมื่อมีฝั่งหนึ่งยินยอม และไม่มีฝั่งไหนถอน —
+                                       คนที่เคยบอกร้านว่าให้หยุดส่ง ต้องไม่กลับมาได้รับเพราะการรวม
+
+   หลังรวม การนำเข้าไฟล์ครั้งถัดไปที่มีเบอร์ของ drop จะเจอ keep ผ่านช่องทางติดต่อ
+   (knownCustomers ใน ingest.ts) ไม่สร้าง drop กลับมา */
+export async function mergeCustomers(
+  tenantId: string,
+  keepId: string,
+  dropId: string,
+  actor: string,
+): Promise<Result<{ moved: number }>> {
+  if (keepId === dropId) return { ok: false, error: "เลือกคนเดียวกัน" };
+  const [keep, drop] = await Promise.all([
+    get<{ id: string }>("SELECT id FROM customers WHERE tenant_id = ? AND id = ?", tenantId, keepId),
+    get<{ id: string }>("SELECT id FROM customers WHERE tenant_id = ? AND id = ?", tenantId, dropId),
+  ]);
+  if (!keep || !drop) return { ok: false, error: "ไม่พบลูกค้าคนใดคนหนึ่งในบัญชีนี้" };
+
+  const moved = await tx(async (q) => {
+    let n = 0;
+    for (const t of ["transactions", "events", "memberships"]) {
+      n += (await q.run(`UPDATE ${t} SET customer_id = ? WHERE tenant_id = ? AND customer_id = ?`, keepId, tenantId, dropId)).changes;
+    }
+
+    await q.run(
+      `DELETE FROM contact_points WHERE tenant_id = ? AND customer_id = ? AND EXISTS (
+         SELECT 1 FROM contact_points k WHERE k.customer_id = ? AND k.kind = contact_points.kind
+           AND k.value_hmac = contact_points.value_hmac)`,
+      tenantId, dropId, keepId,
+    );
+    await q.run(
+      `UPDATE contact_points SET customer_id = ?, id = ? || substr(id, ?), is_primary = 0
+       WHERE tenant_id = ? AND customer_id = ?`,
+      keepId, keepId, dropId.length + 1, tenantId, dropId,
+    );
+    /* ชนิดที่ keep ยังไม่มีตัวหลัก (เพราะได้มาจาก drop ทั้งหมด) ให้ตัวแรกเป็นตัวหลัก */
+    const kinds = await q.all<{ kind: string }>(
+      `SELECT kind FROM contact_points WHERE tenant_id = ? AND customer_id = ?
+       GROUP BY kind HAVING MAX(is_primary) = 0`,
+      tenantId, keepId,
+    );
+    for (const k of kinds) {
+      const first = await q.get<{ id: string }>(
+        "SELECT id FROM contact_points WHERE tenant_id = ? AND customer_id = ? AND kind = ? ORDER BY created_at, id LIMIT 1",
+        tenantId, keepId, k.kind,
+      );
+      if (first) await q.run("UPDATE contact_points SET is_primary = 1 WHERE tenant_id = ? AND id = ?", tenantId, first.id);
+    }
+
+    const [pk, pd] = await Promise.all([
+      q.get<Profile>(`SELECT ${PROFILE_FIELDS.join(", ")} FROM contact_profiles WHERE tenant_id = ? AND customer_id = ?`, tenantId, keepId),
+      q.get<Profile>(`SELECT ${PROFILE_FIELDS.join(", ")} FROM contact_profiles WHERE tenant_id = ? AND customer_id = ?`, tenantId, dropId),
+    ]);
+    if (pd) {
+      const merged = Object.fromEntries(PROFILE_FIELDS.map((f) => [f, pk?.[f] ?? pd[f]])) as Profile;
+      await upsertProfile(q, tenantId, keepId, merged);
+      await q.run("DELETE FROM contact_profiles WHERE tenant_id = ? AND customer_id = ?", tenantId, dropId);
+    }
+
+    const consents = await q.all<{ customer_id: string; granted_at: string | null; revoked_at: string | null }>(
+      "SELECT customer_id, granted_at, revoked_at FROM consents WHERE tenant_id = ? AND purpose = 'marketing' AND customer_id IN (?, ?)",
+      tenantId, keepId, dropId,
+    );
+    if (consents.some((c) => c.customer_id === dropId)) {
+      const revokedAt = consents.map((c) => c.revoked_at).filter(Boolean).sort().pop() ?? null;
+      const grantedAt = consents.map((c) => c.granted_at).filter(Boolean).sort()[0] ?? null;
+      await q.run(
+        `INSERT INTO consents (tenant_id, customer_id, purpose, granted_at, revoked_at, source)
+         VALUES (?, ?, 'marketing', ?, ?, 'merge')
+         ON CONFLICT (customer_id, purpose) DO UPDATE SET
+           granted_at = excluded.granted_at, revoked_at = excluded.revoked_at, source = excluded.source`,
+        tenantId, keepId, grantedAt, revokedAt,
+      );
+      await q.run("DELETE FROM consents WHERE tenant_id = ? AND customer_id = ?", tenantId, dropId);
+    }
+
+    for (const t of ["campaign_audience", "messages"]) {
+      await q.run(
+        `UPDATE ${t} SET customer_id = ? WHERE tenant_id = ? AND customer_id = ?
+         AND campaign_id NOT IN (SELECT campaign_id FROM ${t} WHERE customer_id = ?)`,
+        keepId, tenantId, dropId, keepId,
+      );
+      await q.run(`DELETE FROM ${t} WHERE tenant_id = ? AND customer_id = ?`, tenantId, dropId);
+    }
+    await q.run("DELETE FROM customer_features WHERE tenant_id = ? AND customer_id = ?", tenantId, dropId);
+    await q.run("DELETE FROM customers WHERE tenant_id = ? AND id = ?", tenantId, dropId);
+    return n;
+  });
+  await logActivity(tenantId, actor, "merge_customers", `${dropId} → ${keepId}`);
+  return { ok: true, moved };
+}
+
+/* ── ส่งออกเป็นไฟล์ ─────────────────────────────────────────────
+
+   หัวคอลัมน์ตั้งให้ตัวนำเข้าจับคู่เองได้ ไฟล์ที่ส่งออกไปแก้ใน Excel แล้ว
+   นำเข้ากลับมาจึงเติมให้คนเดิม ไม่สร้างคนใหม่
+
+   ช่องทางติดต่อส่งออกเฉพาะคนที่ยินยอมรับข่าวสาร — คนที่ไม่ยินยอมยังอยู่ในไฟล์
+   (ชื่อ ยอดซื้อ) แต่ช่องเบอร์และอีเมลว่าง กติกาเดียวกับที่หน้าจอบอกไว้ว่า
+   "ยังไม่ยินยอม — ส่งหรือส่งออกไม่ได้" */
+export const EXPORT_HEADERS = [
+  "รหัสสมาชิก", "ชื่อลูกค้า", "เบอร์มือถือ", "อีเมล", "LINE ID", "จังหวัด",
+  ...["จำนวนครั้งที่ซื้อ", "ยอดซื้อรวม (บาท)", "ซื้อล่าสุด", "ยินยอมรับข่าวสาร", "เพิ่มเมื่อ"]
+    .map((h) => `${SUMMARY_COLUMN_PREFIX} ${h}`),
+];
+
+const csvCell = (v: string | number | null) => {
+  const s = v == null ? "" : String(v);
+  /* ค่าที่ขึ้นต้นด้วย = + - @ ถูก Excel อ่านเป็นสูตร — ใส่ ' นำหน้ากันไว้ */
+  const safe = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
+  return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+};
+
+/* เบอร์ไทยออกเป็น 081-234-5678 ไม่ใช่ +66812345678 หรือ 0812345678:
+   "+" ทำให้ Excel อ่านเป็นสูตร (ตัวกันสูตรจะใส่ ' นำหน้าให้เห็นในเซลล์)
+   ส่วนเลขล้วนขึ้นต้นด้วย 0 ถูก Excel ตัดศูนย์ทิ้งกลายเป็นตัวเลข
+   มีขีดคั่นจึงเป็นข้อความเสมอ และนำเข้ากลับมาจัดรูปแบบเป็นเบอร์เดิมได้ */
+function phoneForSheet(e164: string): string {
+  const m = /^\+66(\d{1,2})(\d{3})(\d{4})$/.exec(e164);
+  return m ? `0${m[1]}-${m[2]}-${m[3]}` : e164;
+}
+
+export async function exportCustomersCsv(
+  tenantId: string,
+  opts: { q?: string; filter?: CustomerFilter; sort?: CustomerSort },
+  actor: string,
+): Promise<{ csv: string; rows: number }> {
+  const lines = [EXPORT_HEADERS.map(csvCell).join(",")];
+  let page = 1;
+  let total = 0;
+  for (;;) {
+    const res = await searchCustomers(tenantId, { ...opts, page });
+    if (!res.rows.length) break;
+    const ids = res.rows.map((r) => r.id);
+    const marks = ids.map(() => "?").join(",");
+    const [points, provinces] = await Promise.all([
+      all<{ customer_id: string; kind: ContactKind; value_enc: string }>(
+        `SELECT customer_id, kind, value_enc FROM contact_points
+         WHERE tenant_id = ? AND is_primary = 1 AND kind IN ('phone', 'email', 'line', 'member_no')
+           AND customer_id IN (${marks})`,
+        tenantId, ...ids,
+      ),
+      all<{ customer_id: string; province: string | null }>(
+        `SELECT customer_id, province FROM contact_profiles WHERE tenant_id = ? AND customer_id IN (${marks})`,
+        tenantId, ...ids,
+      ),
+    ]);
+    const byCustomer = new Map<string, Partial<Record<ContactKind, string>>>();
+    for (const p of points) {
+      const m = byCustomer.get(p.customer_id) ?? {};
+      m[p.kind] = decryptContact(tenantId, p.kind, p.value_enc);
+      byCustomer.set(p.customer_id, m);
+    }
+    const prov = new Map(provinces.map((p) => [p.customer_id, p.province]));
+    for (const r of res.rows) {
+      const c = r.consent ? byCustomer.get(r.id) ?? {} : {};
+      lines.push([
+        byCustomer.get(r.id)?.member_no ?? "", r.name, c.phone ? phoneForSheet(c.phone) : "", c.email ?? "", c.line ?? "",
+        prov.get(r.id) ?? "", r.orders, Math.round(r.spent), r.lastAt ? r.lastAt.slice(0, 10) : "",
+        r.consent ? "ยินยอม" : "ไม่ยินยอม", r.createdAt.slice(0, 10),
+      ].map(csvCell).join(","));
+      total++;
+    }
+    if (page >= res.pages) break;
+    page++;
+  }
+  // บันทึกว่ามีการส่งออกกี่แถว ไม่บันทึกค่าใด ๆ ในไฟล์
+  await logActivity(tenantId, actor, "export_customers", `${total} rows`);
+  /* BOM ทำให้ Excel บน Windows เปิดภาษาไทยถูกโดยไม่ต้องเลือก encoding เอง */
+  return { csv: "﻿" + lines.join("\r\n") + "\r\n", rows: total };
 }

@@ -188,3 +188,10 @@ export type ImportResult = {
   rejected: number;
   roleSource: string;
 };
+
+/* ── คอลัมน์สรุปในไฟล์ที่ระบบส่งออกเอง ──
+   ไฟล์ส่งออกมี "ยอดซื้อรวม" "จำนวนครั้งที่ซื้อ" ซึ่งตัวจับคู่คอลัมน์อ่านเป็นยอดของ
+   รายการซื้อหนึ่งครั้งได้ทันที — แก้ไฟล์ใน Excel แล้วนำเข้ากลับ ยอดขายทั้งปีจะถูก
+   บันทึกซ้ำเป็นการซื้อใหม่หนึ่งครั้ง คอลัมน์ที่ขึ้นต้นด้วยป้ายนี้จึงไม่ถูกอ่านเลย */
+export const SUMMARY_COLUMN_PREFIX = "[สรุป]";
+export const isSummaryColumn = (header: string) => header.trim().startsWith(SUMMARY_COLUMN_PREFIX);

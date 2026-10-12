@@ -12,6 +12,7 @@ import {
   addContact,
   createCustomer,
   deleteCustomer,
+  mergeCustomers,
   removeContact,
   setConsent,
   updateCustomer,
@@ -133,4 +134,18 @@ export async function deleteCustomerAction(_prev: ActionState, fd: FormData): Pr
   refresh(id);
   // ไม่ใส่ชื่อใน URL — ชื่อคือข้อมูลส่วนบุคคล และ URL ไปอยู่ใน log กับประวัติเบราว์เซอร์
   redirect("/app/customers?deleted=1");
+}
+
+/* รวมอีกคนเข้ามาที่คนนี้ — คนที่เปิดหน้าอยู่คือคนที่เหลือ อีกคนหายไป */
+export async function mergeCustomerAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  const { tenantId, actor } = await scope(fd);
+  const keepId = field(fd, "customerId");
+  const dropId = field(fd, "otherId");
+  const res = await mergeCustomers(tenantId, keepId, dropId, actor);
+  if (!res.ok) return { error: res.error };
+  refresh(keepId);
+  revalidatePath(`/app/customers/${dropId}`);
+  /* กลับมาหน้าเดิมพร้อมป้ายบอก — ส่วน "อาจเป็นคนเดียวกัน" หายไปหลังรวม
+     ข้อความผลลัพธ์ของปุ่มจึงหายตามไปด้วย ผู้ใช้จะไม่รู้ว่ารวมสำเร็จ */
+  redirect(`/app/customers/${keepId}?merged=${res.moved}`);
 }

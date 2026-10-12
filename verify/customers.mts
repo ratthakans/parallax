@@ -15,8 +15,8 @@ import { mapColumnsHeuristic } from "@/lib/engine/ai";
 import { customerIdFor, normaliseContact } from "@/lib/engine/pii";
 import { revealContactPoint } from "@/lib/engine/contacts";
 import {
-  addContact, createCustomer, deleteCustomer, getCustomer, removeContact, searchCustomers,
-  setConsent, updateCustomer,
+  addContact, createCustomer, deleteCustomer, exportCustomersCsv, findDuplicates, getCustomer,
+  mergeCustomers, removeContact, searchCustomers, setConsent, updateCustomer,
 } from "@/lib/engine/customers";
 import { runMatch } from "@/lib/engine/match";
 import { approveCampaign, sendCampaign } from "@/lib/engine/dispatch";
@@ -161,6 +161,56 @@ for (const t of tables) {
 ok(left.length === 0, `ลบแล้วไม่เหลือเศษในตารางไหน${left.length ? ` (เหลือ ${left.join(", ")})` : ""}`);
 ok((await getCustomer(A, neighbour)) !== null, "คนอื่นไม่ถูกแตะ");
 ok((await getCustomer(B, otherShop.ok ? otherShop.id : "")) !== null, "คนเบอร์เดียวกันในอีกร้านยังอยู่");
+
+
+// ── 8 · คนเดียวกันสองแถว → รวม ──
+const X = await createCustomer(A, { name: "มานพ ซ้ำซ้อน", contacts: [{ kind: "phone", value: "0861112222" }], profile: {}, consent: true }, "test");
+const Y = await createCustomer(A, { name: "มานพ ซ้ำซ้อน", contacts: [{ kind: "email", value: "manop@example.com" }], profile: { company: "บริษัทมานพ" }, consent: false }, "test");
+const xId = X.ok ? X.id : "", yId = Y.ok ? Y.id : "";
+const csvY = parseCsv("email,name,date,total\nmanop@example.com,มานพ ซ้ำซ้อน,2026-08-01,1500\n");
+await commitImport(A, csvY, mapColumnsHeuristic(csvY.headers));
+const dupes = await findDuplicates(A, xId);
+ok(dupes.some((d) => d.id === yId && d.reason.includes("ชื่อเดียวกัน")), "เจอคนชื่อเดียวกันที่อาจเป็นคนเดียวกัน");
+const mg = await mergeCustomers(A, xId, yId, "test");
+const xRec = await getCustomer(A, xId);
+ok(mg.ok && (await getCustomer(A, yId)) === null, "รวมแล้วอีกคนหายไป");
+ok(xRec?.stats.orders === 1 && xRec.contacts.some((c) => c.kind === "email") && xRec.contacts.some((c) => c.kind === "phone"),
+  "การซื้อและอีเมลของอีกคนย้ายมาครบ");
+ok(xRec?.profile?.company === "บริษัทมานพ", "ช่องประวัติที่ว่างถูกเติมจากอีกคน");
+ok(xRec?.consent.granted === true, "รวมกับคนที่ยังไม่เคยให้/ถอนความยินยอม ความยินยอมเดิมยังอยู่");
+ok(xRec!.contacts.filter((c) => c.kind === "email").filter((c) => c.isPrimary).length === 1, "อีเมลที่ย้ายมามีตัวหลักหนึ่งตัว");
+
+const cBefore = Number((await get<{ n: number }>("SELECT COUNT(*) AS n FROM customers WHERE tenant_id = ?", A))!.n);
+const csvAgain = parseCsv("email,name,date,total\nmanop@example.com,มานพ ซ้ำซ้อน,2026-09-15,900\n");
+await commitImport(A, csvAgain, mapColumnsHeuristic(csvAgain.headers));
+const cAfter = Number((await get<{ n: number }>("SELECT COUNT(*) AS n FROM customers WHERE tenant_id = ?", A))!.n);
+ok(cAfter === cBefore && (await getCustomer(A, xId))?.stats.orders === 2, "นำเข้าไฟล์ที่มีอีเมลของคนที่ถูกรวมไป → เติมให้คนที่เหลือ ไม่สร้างคนเดิมกลับมา");
+
+// ── 9 · ส่งออก ──
+const evil = await createCustomer(A, { name: "=HYPERLINK(\"x\")", contacts: [{ kind: "phone", value: "0869990000" }], profile: {}, consent: false }, "test");
+const ex = await exportCustomersCsv(A, { q: "ซ้ำซ้อน" }, "test");
+const exLines = ex.csv.replace(/^\uFEFF/, "").trim().split("\r\n");
+ok(ex.csv.startsWith("\uFEFF") && ex.rows === 1 && exLines.length === 2, "ส่งออกตามคำค้น มี BOM ให้ Excel อ่านไทยถูก");
+ok(exLines[1].includes(",086-111-2222,") && exLines[1].includes("manop@example.com"), "คนที่ยินยอมแล้ว ส่งออกเบอร์ (แบบมีขีด Excel ไม่ตัดศูนย์) และอีเมล");
+const exEvil = await exportCustomersCsv(A, { q: "HYPERLINK" }, "test");
+ok(exEvil.csv.includes("'=HYPERLINK") && !exEvil.csv.includes("086-999-0000"), "ชื่อที่ขึ้นต้นด้วย = ไม่กลายเป็นสูตร และคนที่ยังไม่ยินยอมไม่มีเบอร์ในไฟล์");
+const mapped = mapColumnsHeuristic(parseCsv(ex.csv.replace(/^\uFEFF/, "")).headers).mappings;
+ok(mapped.filter((m) => m.column.startsWith("[สรุป]")).every((m) => m.field === "ignore"), "คอลัมน์สรุปในไฟล์ส่งออกถูกตั้งเป็น ไม่ใช้");
+const txBefore = Number((await get<{ n: number }>("SELECT COUNT(*) AS n FROM transactions WHERE tenant_id = ?", A))!.n);
+const back = parseCsv(ex.csv.replace(/^\uFEFF/, ""));
+const forced = { mappings: mapColumnsHeuristic(back.headers).mappings.map((m) =>
+  m.column.includes("ยอดซื้อรวม") ? { ...m, field: "total" as const } : m.column.includes("ซื้อล่าสุด") ? { ...m, field: "occurred_at" as const } : m) };
+await commitImport(A, back, forced);
+const txAfter = Number((await get<{ n: number }>("SELECT COUNT(*) AS n FROM transactions WHERE tenant_id = ?", A))!.n);
+const cRound = Number((await get<{ n: number }>("SELECT COUNT(*) AS n FROM customers WHERE tenant_id = ?", A))!.n);
+ok(txAfter === txBefore && cRound === cAfter + 1, "นำไฟล์ส่งออกกลับเข้ามา (แม้จับคู่คอลัมน์สรุปเอง) ไม่สร้างการซื้อปลอม ไม่สร้างคนซ้ำ");
+
+const Z = await createCustomer(A, { name: "มานพ คนที่ถอน", contacts: [{ kind: "phone", value: "0863334444" }], profile: {}, consent: true }, "test");
+const zId = Z.ok ? Z.id : "";
+await setConsent(A, zId, false, "test");
+await mergeCustomers(A, xId, zId, "test");
+ok((await getCustomer(A, xId))?.consent.granted === false, "รวมกับคนที่เคยถอนความยินยอม → ผลรวมถือว่าถอน");
+ok(!(await mergeCustomers(B, xId, evil.ok ? evil.id : "", "test")).ok, "อีกร้านรวมคนของร้านนี้ไม่ได้");
 
 for (const l of out) console.log(l);
 const fails = out.filter((l) => l.startsWith("FAIL"));

@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { activeTenantId } from "@/app/(app)/tenant";
-import { getCustomer, type TimelineItem } from "@/lib/engine/customers";
+import { findDuplicates, getCustomer, type TimelineItem } from "@/lib/engine/customers";
 import { profileFor } from "@/lib/shared/tenants";
 import { CONTACT_KIND_LABEL, CONTACT_KIND_ORDER } from "@/lib/shared/contact-kinds";
 import { FIELD_LABEL } from "@/lib/shared/ingest-types";
@@ -12,6 +12,7 @@ import { ActionForm } from "@/components/console/action-form";
 import {
   addContactAction,
   deleteCustomerAction,
+  mergeCustomerAction,
   removeContactAction,
   revealContactAction,
   setConsentAction,
@@ -136,7 +137,8 @@ export default async function CustomerPage({
 }) {
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   const tenantId = await activeTenantId();
-  const c = await getCustomer(tenantId, decodeURIComponent(id));
+  const cid = decodeURIComponent(id);
+  const [c, dupes] = await Promise.all([getCustomer(tenantId, cid), findDuplicates(tenantId, cid)]);
   if (!c) notFound();
   const v = profileFor(tenantId).vocab.th;
 
@@ -167,6 +169,12 @@ export default async function CustomerPage({
       {sp.created === "1" && (
         <p role="status" className="c-msg c-msg-ok mt-4">
           เพิ่ม{v.person}แล้ว — ไฟล์ที่นำเข้าทีหลังซึ่งมีเบอร์ อีเมล หรือรหัสเดียวกัน จะเติมประวัติให้คนนี้
+        </p>
+      )}
+
+      {typeof sp.merged === "string" && (
+        <p role="status" className="c-msg c-msg-ok mt-4">
+          รวมแล้ว · ย้ายประวัติมา {num(Number(sp.merged) || 0)} รายการ — บรีฟจะเห็นข้อมูลที่รวมแล้วหลังคำนวณข้อมูลลูกค้ารอบถัดไป
         </p>
       )}
 
@@ -387,6 +395,36 @@ export default async function CustomerPage({
               </p>
             )}
           </Panel>
+
+          {dupes.length > 0 && (
+            <Panel className="p-5 md:p-6">
+              <h2 className="c-h2 text-[var(--c-text)]">อาจเป็นคนเดียวกัน</h2>
+              <p className="c-thai mt-1 text-[0.8rem] text-[var(--c-text-3)]">
+                ถ้าใช่ กด "รวมเข้าคนนี้" — ประวัติ{v.purchase} ช่องทางติดต่อ และแคมเปญของอีกคนจะย้ายมาที่นี่
+                แล้วอีกคนจะหายไป ถ้าฝั่งใดเคยถอนความยินยอม ผลรวมจะยังถือว่าถอน
+              </p>
+              <ul className="mt-3 flex flex-col divide-y divide-[var(--c-line)]">
+                {dupes.map((d) => (
+                  <li key={d.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+                    <div className="min-w-0">
+                      <Link href={`/app/customers/${d.id}`} className="text-[var(--c-text)] underline-offset-4 hover:underline">
+                        {d.name}
+                      </Link>
+                      <p className="c-thai text-[0.78rem] text-[var(--c-text-4)]">{d.reason}</p>
+                    </div>
+                    <ActionForm
+                      action={mergeCustomerAction}
+                      fields={{ tenantId, customerId: c.id, otherId: d.id }}
+                      label="รวมเข้าคนนี้"
+                      confirm={`กดอีกครั้งเพื่อรวม ${d.name} เข้ากับ ${c.name}`}
+                      pendingLabel="กำลังรวม…"
+                      size="sm"
+                    />
+                  </li>
+                ))}
+              </ul>
+            </Panel>
+          )}
 
           <Panel flat className="border-[var(--c-bad)]/40 p-5">
             <h2 className="c-h2 text-[var(--c-text)]">ลบ{v.person}คนนี้</h2>

@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import type { Play } from "@/lib/shared/types";
 import {
   IMPORT_FIELDS,
+  isSummaryColumn,
   type ColumnMapping,
   type ImportField,
 } from "@/lib/shared/ingest-types";
@@ -318,6 +319,7 @@ export function mapColumnsHeuristic(headers: string[]): ColumnMapping {
   // คะแนนสูงสุดของแต่ละคู่ (คอลัมน์ × field)
   const scored: { col: number; field: ImportField; score: number }[] = [];
   headers.forEach((column, col) => {
+    if (isSummaryColumn(column)) return;
     const best = new Map<ImportField, number>();
     for (const r of RULES) {
       if (!r.re.test(column)) continue;
