@@ -251,6 +251,8 @@ export type SendResult = {
   sent: number;
   /** ยังไม่มีช่องทางส่งจริง: บันทึกไว้แต่ไม่มีข้อความออกไป และไม่ตัดเครดิต */
   simulated: boolean;
+  /** อยู่ในกลุ่มที่ได้รับตอนอนุมัติ แต่ถอนความยินยอมก่อนกดส่ง — ข้ามไป */
+  skippedNoConsent: number;
   skippedAlreadySent: number;
   skippedQuietHours: boolean;
   /** ถูกข้ามเพราะเครดิตข้อความไม่พอ */
@@ -303,17 +305,34 @@ export async function sendCampaign(
     !opts.ignoreQuietHours &&
     (qs > qe ? hour >= qs || hour < qe : hour >= qs && hour < qe);
 
-  const targets = await all<{ customer_id: string }>(
-    `SELECT customer_id FROM campaign_audience
-     WHERE campaign_id = ? AND arm = 'treated'`,
-    campaignId,
-  );
+  /* ── ความยินยอมตรวจซ้ำตอนส่ง ไม่ใช่แค่ตอนอนุมัติ ──
+
+     ตอนอนุมัติ ระบบเลือกคนจาก customer_features ซึ่งคำนวณไว้ล่วงหน้าเป็นรอบ
+     ถ้าลูกค้าถอนความยินยอมหลังจากนั้น — โทรมาบอกร้าน แล้วร้านกดถอนในหน้า
+     ของเขา — ค่าที่คำนวณไว้ยังบอกว่ายินยอมอยู่ และเดิมข้อความก็จะออกไปหาเขา
+     ทั้งที่เพิ่งขอให้หยุด ตรงนี้อ่านจากตาราง consents ตอนกดส่งจริง
+     คนที่ถอนแล้วจึงถูกข้ามเสมอ ไม่ว่าจะถอนตอนไหน */
+  const [targets, treatedRow] = await Promise.all([
+    all<{ customer_id: string }>(
+      `SELECT a.customer_id FROM campaign_audience a
+       WHERE a.campaign_id = ? AND a.arm = 'treated'
+         AND EXISTS (SELECT 1 FROM consents s WHERE s.customer_id = a.customer_id
+           AND s.purpose = 'marketing' AND s.granted_at IS NOT NULL AND s.revoked_at IS NULL)`,
+      campaignId,
+    ),
+    get<{ n: number | string }>(
+      "SELECT COUNT(*) AS n FROM campaign_audience WHERE campaign_id = ? AND arm = 'treated'",
+      campaignId,
+    ),
+  ]);
+  const skippedNoConsent = Number(treatedRow?.n ?? 0) - targets.length;
 
   if (inQuiet) {
     return {
       attempted: targets.length,
       sent: 0,
       simulated: !DELIVERY_CONNECTED,
+      skippedNoConsent,
       skippedAlreadySent: 0,
       skippedQuietHours: true,
       skippedNoCredit: 0,
@@ -346,6 +365,7 @@ export async function sendCampaign(
       attempted: targets.length,
       sent: recorded,
       simulated: true,
+      skippedNoConsent,
       skippedAlreadySent: targets.length - recorded,
       skippedNoCredit: 0,
       skippedQuietHours: false,
@@ -426,6 +446,7 @@ export async function sendCampaign(
     attempted: targets.length,
     sent,
     simulated: false,
+    skippedNoConsent,
     skippedAlreadySent: skipped,
     skippedNoCredit: noCredit,
     skippedQuietHours: false,

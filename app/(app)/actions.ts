@@ -231,7 +231,9 @@ export async function sendAction(
 
   /* ยังไม่ได้เชื่อม LINE — ห้ามพูดว่า "ส่งแล้ว" และไม่มีเครดิตให้รายงาน */
   if (res.simulated) {
-    const again = res.skippedAlreadySent > 0 ? ` · ${num(res.skippedAlreadySent)} คนบันทึกไว้ก่อนแล้ว` : "";
+    const again =
+      (res.skippedAlreadySent > 0 ? ` · ${num(res.skippedAlreadySent)} คนบันทึกไว้ก่อนแล้ว` : "") +
+      (res.skippedNoConsent > 0 ? ` · ข้าม ${num(res.skippedNoConsent)} คนที่ถอนความยินยอมแล้ว` : "");
     return {
       ok:
         `จำลองการส่ง ${num(res.sent)} คน${again} — ยังไม่ได้เชื่อม LINE OA ` +
@@ -246,6 +248,7 @@ export async function sendAction(
   }
 
   const parts = [`Sent ${num(res.sent)}`];
+  if (res.skippedNoConsent > 0) parts.push(`ข้าม ${num(res.skippedNoConsent)} คนที่ถอนความยินยอมแล้ว`);
   if (res.skippedAlreadySent > 0) {
     parts.push(`${num(res.skippedAlreadySent)} already had it`);
   }
