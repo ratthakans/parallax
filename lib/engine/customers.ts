@@ -177,7 +177,7 @@ export type Profile = Record<ProfileField, string | null>;
 
 export type TimelineItem =
   | { kind: "purchase"; at: string; total: number; discount: number; channel: string; items: string[] }
-  | { kind: "message"; at: string; play: string; campaignId: string; status: string }
+  | { kind: "message"; at: string; play: string; campaignId: string; status: string; engine: "keep" | "reach" }
   | { kind: "holdout"; at: string; play: string; campaignId: string }
   | { kind: "event"; at: string; type: string; meta: string | null }
   | { kind: "consent"; at: string; granted: boolean; source: string }
@@ -279,6 +279,7 @@ export async function getCustomer(tenantId: string, id: string): Promise<Custome
     })),
     ...msgs.filter((m) => m.sent_at).map((m): TimelineItem => ({
       kind: "message", at: m.sent_at!, play: playName(m.play_id), campaignId: m.campaign_id, status: m.status,
+      engine: playById(m.play_id)?.engine ?? "keep",
     })),
     ...holdouts.map((h): TimelineItem => ({
       kind: "holdout", at: h.approved_at, play: playName(h.play_id), campaignId: h.campaign_id,

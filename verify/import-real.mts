@@ -159,6 +159,15 @@ ok(attested.result.consented === 400 && open.candidates.some((c) => !c.blocked &
 const log = await all<{ action: string }>("SELECT action FROM activity_log WHERE tenant_id = ? AND action LIKE 'import_consent%'", T);
 ok(log.some((l) => l.action === "import_consent_attested"), "การยืนยันความยินยอมตอนนำเข้าถูกบันทึกว่าใครเป็นคนยืนยัน");
 
+// ── 7 · play ที่ปิดไว้ต้องยังอยู่ในรายการ ไม่งั้นเปิดกลับไม่ได้ ──
+const target = open.candidates.find((c) => !c.blocked)!;
+await tx((q) => q.run(`INSERT INTO tenant_plays (tenant_id, play_id, enabled) VALUES (?,?,0)
+  ON CONFLICT(tenant_id, play_id) DO UPDATE SET enabled = 0`, T, target.play.id));
+const off = (await runMatch(T)).candidates.find((c) => c.play.id === target.play.id);
+ok(off?.blocked === "Turned off for this account", "play ที่ปิดไว้ยังอยู่ในรายการ (มีปุ่มเปิดกลับ) แต่ไม่ถูกเสนอ");
+await tx((q) => q.run("UPDATE tenant_plays SET enabled = 1 WHERE tenant_id = ? AND play_id = ?", T, target.play.id));
+ok(!(await runMatch(T)).candidates.find((c) => c.play.id === target.play.id)?.blocked, "เปิดกลับแล้วถูกเสนอได้อีก");
+
 for (const l of out) console.log(l);
 const fails = out.filter((l) => l.startsWith("FAIL"));
 console.log(fails.length ? `\n=== มี FAIL ${fails.length} ข้อ ===` : `\n=== ผ่านทั้งหมด ${out.length} ข้อ ===`);

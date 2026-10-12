@@ -2,7 +2,7 @@ import { activeTenantId } from "@/app/(app)/tenant";
 import { all, get } from "@/lib/engine/sql";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { playById } from "@/lib/shared/plays";
+import { notConnectedTh, playById } from "@/lib/shared/plays";
 import { loadAttributions } from "@/lib/engine/proof";
 import { armFor, DELIVERY_CONNECTED, renderForCustomer } from "@/lib/engine/dispatch";
 
@@ -57,6 +57,7 @@ export default async function CampaignDetail({
   if (!camp) notFound();
 
   const play = playById(camp.play_id);
+  const nc = notConnectedTh(play?.engine ?? "keep");
   const copy = JSON.parse(camp.copy_snapshot) as {
     tone: string;
     body: string;
@@ -147,7 +148,7 @@ export default async function CampaignDetail({
           <p className="c-thai mt-2 max-w-3xl text-[0.88rem] leading-relaxed text-[var(--c-text-2)]">
             {fullySent ? (
               <>
-                {num(sentCount)} {DELIVERY_CONNECTED ? "sent" : "บันทึกไว้ (ยังไม่ได้เชื่อม LINE OA)"} ·{" "}
+                {num(sentCount)} {DELIVERY_CONNECTED ? "sent" : `บันทึกไว้ (ยังไม่ได้เชื่อม${nc.channel})`} ·{" "}
                 {num(camp.holdout_size)} held back
                 {camp.holdout_size > 0 ? (
                   <>
@@ -165,8 +166,8 @@ export default async function CampaignDetail({
               </>
             ) : (
               <>
-                ล็อกรายชื่อแล้ว ยังไม่ได้เชื่อม LINE OA ปุ่มด้านล่างจึงแค่บันทึกว่าใครอยู่ในกลุ่มที่ได้รับ
-                เพื่อเริ่มนับผล — ไม่มีข้อความออกไปถึงลูกค้า และไม่ตัดเครดิต
+                ล็อกรายชื่อแล้ว ยังไม่ได้เชื่อม{nc.channel} ปุ่มด้านล่างจึงแค่บันทึกว่าใครอยู่ในกลุ่มที่ได้รับ
+                เพื่อเริ่มนับผล — {nc.nothingSent} และไม่ตัดเครดิต
               </>
             )}
           </p>

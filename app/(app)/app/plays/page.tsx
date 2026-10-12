@@ -3,6 +3,7 @@ import { all } from "@/lib/engine/sql";
 import { effectiveGuards, getTenantPlays, runMatch } from "@/lib/engine/match";
 
 import { profileFor } from "@/lib/shared/tenants";
+import { ALL_PLAYS } from "@/lib/shared/plays";
 import { CYCLE_LABEL } from "@/lib/shared/types";
 import {
   EnginePill,
@@ -35,8 +36,12 @@ export default async function PlaysPage() {
   ]);
   const perf = new Map(perfRows.map((r) => [r.play_id, r]));
 
-  const keep = candidates.filter((c) => c.play.engine === "keep");
-  const reach = candidates.filter((c) => c.play.engine === "reach");
+  /* เรียงตามลำดับในคลัง ไม่ใช่ตามคะแนนของรอบนี้ — เดิมกดปิดแล้วการ์ดย้ายไปท้ายรายการ
+     ข้อความยืนยันหายไปพร้อมการ์ด และการ์ดถัดไปเลื่อนขึ้นมาอยู่ใต้เมาส์พอดี */
+  const order = new Map(ALL_PLAYS.map((p, i) => [p.id, i]));
+  const byLibrary = [...candidates].sort((a, b) => (order.get(a.play.id) ?? 0) - (order.get(b.play.id) ?? 0));
+  const keep = byLibrary.filter((c) => c.play.engine === "keep");
+  const reach = byLibrary.filter((c) => c.play.engine === "reach");
   const enabledCount = candidates.filter(
     (c) => cfgs.get(c.play.id)?.enabled !== false,
   ).length;
@@ -139,7 +144,7 @@ function PlayGroup({
                   <p className="c-thai mt-1 text-[0.78rem] text-[var(--c-text-4)]">
                     Across industries — {c.play.crossIndustry}
                   </p>
-                  <p className="c-mono mt-2.5 text-[0.7rem] text-[var(--c-text-4)]">
+                  <p className="c-mono mt-2.5 text-[0.75rem] text-[var(--c-text-4)]">
                     {c.play.cycle_shape.map((s) => CYCLE_LABEL[s]).join(" · ")}
                   </p>
                 </div>

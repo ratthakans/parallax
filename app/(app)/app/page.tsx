@@ -185,7 +185,21 @@ export default async function BriefPage() {
           ))}
         </div>
       ) : (
-        waitingOnConsent.length > 0 && noConsent > features.length / 2 ? (
+        features.length === 0 ? (
+          /* บัญชีใหม่ยังไม่มีข้อมูล — เดิมบอกว่า "0 คนกำลังห่างหายไป รอให้กลุ่มโตพอก่อน"
+             ซึ่งทำให้คนที่เพิ่งสมัครคิดว่าต้องรอ ทั้งที่สิ่งเดียวที่ต้องทำคือนำเข้าไฟล์ */
+          <Panel className="p-5 md:p-6">
+            <h2 className="c-h2 text-[var(--c-text)]">เริ่มจากนำเข้าไฟล์{v.th.people}</h2>
+            <p className="c-thai mt-2 max-w-3xl text-[0.88rem] text-[var(--c-text-2)]">
+              ยังไม่มีข้อมูล{v.th.people}ในบัญชีนี้ — ลากไฟล์ยอดขายจาก POS ไฟล์จากมาร์เก็ตเพลส หรือรายชื่อ
+              {v.th.people}เข้ามา ระบบจะคำนวณรอบของแต่ละคนและเสนองานแรกทันทีหลังนำเข้า
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Link href="/app/import" className="c-btn c-btn-primary">นำเข้าไฟล์</Link>
+              <Link href="/app/customers/new" className="c-btn c-btn-ghost">เพิ่ม{v.th.person}ทีละคน</Link>
+            </div>
+          </Panel>
+        ) : waitingOnConsent.length > 0 && noConsent > features.length / 2 ? (
           <Panel className="p-5 md:p-6">
             <h2 className="c-h2 text-[var(--c-text)]">
               มีงานให้ทำ แต่{v.th.people} {num(noConsent)} คนยังไม่ได้บันทึกความยินยอม

@@ -558,3 +558,12 @@ export const ALL_PLAYS: Play[] = [...KEEP_PLAYS, ...REACH_PLAYS];
 export function playById(id: string): Play | undefined {
   return ALL_PLAYS.find((p) => p.id === id);
 }
+
+/* ── ช่องทางที่ยังไม่ได้เชื่อม พูดให้ตรงกับชนิดของ play ──
+   KEEP ส่งข้อความตรงทาง LINE OA · REACH ส่งรายชื่อเป็นกลุ่มเป้าหมายให้แพลตฟอร์มโฆษณา
+   เดิมทุกแคมเปญบอกว่า "ยังไม่ได้เชื่อม LINE OA" รวมถึงแคมเปญโฆษณาที่ไม่เกี่ยวกับ LINE เลย */
+export function notConnectedTh(engine: Play["engine"]): { channel: string; nothingSent: string } {
+  return engine === "reach"
+    ? { channel: "บัญชีโฆษณา", nothingSent: "ยังไม่มีรายชื่อถูกส่งไปแพลตฟอร์มโฆษณา" }
+    : { channel: "LINE OA", nothingSent: "ยังไม่มีข้อความออกไปถึงลูกค้า" };
+}

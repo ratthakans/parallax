@@ -191,7 +191,7 @@ export function ConsoleNav({
                 >
                   <span className="flex min-w-0 flex-col">
                     <span className="truncate">{l.label}</span>
-                    <span className="truncate text-[0.7rem] text-[var(--c-text-4)]">
+                    <span className="truncate text-[0.75rem] text-[var(--c-text-4)]">
                       {l.hint}
                     </span>
                   </span>

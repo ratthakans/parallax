@@ -6,6 +6,7 @@ import { findDuplicates, getCustomer, type TimelineItem } from "@/lib/engine/cus
 import { profileFor } from "@/lib/shared/tenants";
 import { CONTACT_KIND_LABEL, CONTACT_KIND_ORDER } from "@/lib/shared/contact-kinds";
 import { FIELD_LABEL } from "@/lib/shared/ingest-types";
+import { notConnectedTh } from "@/lib/shared/plays";
 import { daysAgoLabel, thaiDate } from "@/lib/shared/format";
 import { Metric, Panel, baht, num } from "@/components/console/ui";
 import { ActionForm } from "@/components/console/action-form";
@@ -68,11 +69,13 @@ function TimelineRow({ item, verb }: { item: Item; verb: string }) {
     case "message":
       dot = "var(--c-cyan)";
       title =
-        item.status === "simulated" ? `จำลองการส่งข้อความ: ${item.play}` : `ได้รับข้อความ: ${item.play}`;
+        item.status === "simulated"
+          ? `จำลองการ${item.engine === "reach" ? "ส่งรายชื่อให้โฆษณา" : "ส่งข้อความ"}: ${item.play}`
+          : `${item.engine === "reach" ? "อยู่ในกลุ่มเป้าหมายโฆษณา" : "ได้รับข้อความ"}: ${item.play}`;
       detail =
         item.status === "simulated" ? (
           <>
-            ยังไม่ได้เชื่อม LINE OA จึงไม่มีข้อความถึงตัวจริง ·{" "}
+            ยังไม่ได้เชื่อม{notConnectedTh(item.engine).channel} จึง{notConnectedTh(item.engine).nothingSent} ·{" "}
             <Link href={`/app/campaigns/${item.campaignId}`} className="underline underline-offset-4">
               ดูแคมเปญ
             </Link>

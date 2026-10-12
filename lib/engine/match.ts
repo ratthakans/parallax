@@ -355,7 +355,9 @@ export async function runMatch(tenantId: string): Promise<MatchResult> {
   for (const play of ALL_PLAYS) {
     if (!play.cycle_shape.includes(shape as never)) continue;
     const cfg = cfgs.get(play.id);
-    if (cfg && !cfg.enabled) continue;
+    /* ปิดไว้ = ไม่ถูกเสนอ แต่ยังต้องอยู่ในรายการ — เดิม continue ทิ้งไป หน้าคลัง play
+       จึงไม่เห็น play นั้นอีกเลย และไม่มีปุ่ม "เปิดกลับ" ให้กด การปิดจึงย้อนกลับไม่ได้ */
+    const turnedOff = Boolean(cfg && !cfg.enabled);
     const guards = effectiveGuards(play, cfg);
 
     // cooldown ระดับ play
@@ -467,7 +469,8 @@ export async function runMatch(tenantId: string): Promise<MatchResult> {
       estimatedCost > 0 ? (expectedValue * priceWeight) / estimatedCost : 0;
 
     let blocked: string | undefined;
-    if (size === 0) blocked = "Nobody qualifies this round";
+    if (turnedOff) blocked = "Turned off for this account";
+    else if (size === 0) blocked = "Nobody qualifies this round";
     else if (size < guards.min_audience)
       blocked = `Cohort below the ${guards.min_audience} minimum`;
     else if (cooldownBlocked)

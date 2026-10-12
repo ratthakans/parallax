@@ -20,6 +20,7 @@ import { resetReady } from "@/lib/engine/bootstrap";
 import { travelForward } from "@/lib/engine/demo";
 import { clearAiCache } from "@/lib/engine/ai";
 import { isKnownTenant } from "@/lib/shared/tenants";
+import { notConnectedTh, playById } from "@/lib/shared/plays";
 import { buyCredits, changePlan, reachBlockedReason } from "@/lib/engine/billing";
 import { CREDIT_PACKS, PLANS, isPlanId } from "@/lib/shared/plans";
 import { TENANT_COOKIE,
@@ -229,15 +230,19 @@ export async function sendAction(
     };
   }
 
-  /* ยังไม่ได้เชื่อม LINE — ห้ามพูดว่า "ส่งแล้ว" และไม่มีเครดิตให้รายงาน */
+  /* ยังไม่ได้เชื่อมช่องทาง — ห้ามพูดว่า "ส่งแล้ว" และไม่มีเครดิตให้รายงาน */
   if (res.simulated) {
+    const camp = await get<{ play_id: string }>(
+      "SELECT play_id FROM campaigns WHERE tenant_id = ? AND id = ?", tenantId, campaignId,
+    );
+    const nc = notConnectedTh(playById(camp?.play_id ?? "")?.engine ?? "keep");
     const again =
       (res.skippedAlreadySent > 0 ? ` · ${num(res.skippedAlreadySent)} คนบันทึกไว้ก่อนแล้ว` : "") +
       (res.skippedNoConsent > 0 ? ` · ข้าม ${num(res.skippedNoConsent)} คนที่ถอนความยินยอมแล้ว` : "");
     return {
       ok:
-        `จำลองการส่ง ${num(res.sent)} คน${again} — ยังไม่ได้เชื่อม LINE OA ` +
-        `จึงยังไม่มีข้อความออกไปถึงลูกค้า และไม่ตัดเครดิต`,
+        `จำลองการส่ง ${num(res.sent)} คน${again} — ยังไม่ได้เชื่อม${nc.channel} ` +
+        `จึง${nc.nothingSent} และไม่ตัดเครดิต`,
     };
   }
 
@@ -507,10 +512,13 @@ export async function buyCreditsAction(
      ไม่งั้นยิงค่าลบมาก็หักเครดิตติดลบได้ และยิงเลขใหญ่มาก็ได้เครดิตฟรี */
   const pack = CREDIT_PACKS.find((p) => p.messages === messages);
   if (!pack) return { error: "No credit pack of that size." };
-  const total = await buyCredits(tenantId, pack.messages, "pack");
+  /* buyCredits คืนราคาที่จ่าย (บาท) ไม่ใช่เครดิตคงเหลือ — เดิมข้อความเอาราคามาพิมพ์
+     เป็นเครดิต ซื้อ 1,000 จาก 2,000 จึงขึ้นว่า "1,500 available now" */
+  const paid = await buyCredits(tenantId, pack.messages, "pack");
+  const left = (await getTenant(tenantId))?.message_credits ?? 0;
   revalidateConsole();
   return {
-    ok: `Added ${num(pack.messages)} credits · ${num(total)} available now.`,
+    ok: `เพิ่ม ${num(pack.messages)} เครดิต (฿${num(paid)}) · คงเหลือ ${num(left)} เครดิต`,
   };
 }
 
