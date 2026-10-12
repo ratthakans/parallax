@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Form from "next/form";
 import { activeTenantId } from "@/app/(app)/tenant";
 import { loadFeatures } from "@/lib/engine/derive";
 import {
@@ -160,8 +161,10 @@ export default async function CustomersPage({
       </Panel>
 
       <Panel className="mb-6 p-5 md:p-6">
-        {/* ฟอร์ม GET ธรรมดา — ผลค้นหาอยู่ใน URL จึงกดย้อนกลับ แชร์ลิงก์ และรีเฟรชได้ */}
-        <form action="/app/customers" className="flex flex-wrap items-center gap-2.5">
+        {/* ผลค้นหาอยู่ใน URL จึงกดย้อนกลับ แชร์ลิงก์ และรีเฟรชได้ — <Form> ของ Next แทน
+            <form> ธรรมดา เพราะ <form> โหลดหน้าใหม่ทั้งหน้าทุกครั้งที่กดค้นหา จอกะพริบ
+            และดาวน์โหลด JavaScript ใหม่หมด ส่วนตัวนี้เปลี่ยนแค่เนื้อหาเหมือนกดลิงก์ */}
+        <Form action="/app/customers" className="flex flex-wrap items-center gap-2.5">
           <input
             type="search"
             name="q"
@@ -180,7 +183,7 @@ export default async function CustomersPage({
               ล้างคำค้น
             </Link>
           )}
-        </form>
+        </Form>
         <p className="c-thai mt-2 text-[0.76rem] text-[var(--c-text-4)]">
           ชื่อค้นได้บางส่วนของคำ · เบอร์ อีเมล และรหัสต้องพิมพ์ครบ เพราะเก็บแบบเข้ารหัส ·
           ส่งออก CSV ได้ตามที่กรองอยู่ — เบอร์และอีเมลส่งออกเฉพาะคนที่ยินยอมรับข่าวสาร

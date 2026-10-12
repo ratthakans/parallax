@@ -1631,3 +1631,30 @@
     max-width: 68ch;
   }
 }
+
+/* ── จอแรกเคลื่อนเข้าด้วย CSS ไม่ใช่ JavaScript ─────────────────
+
+   .reveal เริ่มที่ opacity 0 แล้วรอ JavaScript โหลด + IntersectionObserver
+   ก่อนจะค่อย ๆ ปรากฏ ใช้กับจอแรกแล้วบนมือถือ 4G หัวเรื่องว่างอยู่จน JS
+   ขนาด 164KB โหลดเสร็จ — วัดได้ LCP 3.9 วินาทีบนหน้าแรก
+
+   ตัวนี้เห็นตั้งแต่เฟรมแรก (ไม่แตะ opacity) แค่เลื่อนขึ้นเข้าที่ จึงไม่เลื่อน LCP
+   และไม่ต้องรอ JavaScript ใช้กับเนื้อหาในจอแรกเท่านั้น ส่วนที่ต้องเลื่อนถึงใช้ .reveal ต่อ */
+@keyframes hero-in {
+  from {
+    transform: translateY(14px);
+  }
+  to {
+    transform: none;
+  }
+}
+
+.hero-in {
+  animation: hero-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-in {
+    animation: none;
+  }
+}
