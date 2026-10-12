@@ -1,6 +1,7 @@
 import type { Candidate } from "@/lib/shared/types";
 import { previewCopy, vocabFor } from "@/lib/engine/dispatch";
 import { profileFor } from "@/lib/shared/tenants";
+import { playLogicTh } from "@/lib/shared/plays";
 import { explainPlay } from "@/lib/engine/ai";
 import { approveAction } from "@/app/(app)/actions";
 import { ActionForm } from "./action-form";
@@ -140,7 +141,7 @@ export async function CandidateCard({
       ) : candidate.blocked ? (
         <div className="mt-5">
           <p className="c-thai text-[0.86rem] text-[var(--c-warn)]">
-            ยังส่งไม่ได้ — {candidate.blocked}
+            ยังส่งไม่ได้ — {candidate.blockedTh ?? candidate.blocked}
           </p>
           <p className="c-thai mt-1.5 text-[0.78rem] text-[var(--c-text-4)]">
             เพดานกำลังทำหน้าที่ของมัน ไม่ต้องทำอะไร รอบหน้าจะกลับมาถ้าเงื่อนไขผ่าน
@@ -247,7 +248,7 @@ export async function CandidateCard({
 
         <hr className="c-hair my-6" />
 
-        <p className="c-thai text-[0.82rem] text-[var(--c-text-3)]">{play.logic}</p>
+        <p className="c-thai text-[0.82rem] text-[var(--c-text-3)]">{playLogicTh(play)}</p>
         <div className="mt-4 grid gap-5 md:grid-cols-2">
           <div>
             <p className="c-label">selection criteria · selector</p>

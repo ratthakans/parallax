@@ -195,4 +195,6 @@ export type Candidate = {
   measurement: MeasurementMode;
   holdout_pct: number;
   blocked?: string;
+  /** blocked ในภาษาที่หน้าจอแสดง */
+  blockedTh?: string;
 };

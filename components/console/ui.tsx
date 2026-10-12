@@ -107,9 +107,9 @@ export function EnginePill({ engine }: { engine: "keep" | "reach" }) {
 }
 
 const VERDICT_META: Record<Verdict, { label: string; cls: string }> = {
-  positive: { label: "Worked", cls: "c-pill-good" },
-  no_effect: { label: "No different", cls: "c-pill-bad" },
-  insufficient_data: { label: "Not enough yet", cls: "c-pill-warn" },
+  positive: { label: "ได้ผล", cls: "c-pill-good" },
+  no_effect: { label: "ไม่ต่างจากไม่ส่ง", cls: "c-pill-bad" },
+  insufficient_data: { label: "ยังไม่พอสรุป", cls: "c-pill-warn" },
 };
 
 export function VerdictPill({ verdict }: { verdict: Verdict }) {
@@ -118,9 +118,9 @@ export function VerdictPill({ verdict }: { verdict: Verdict }) {
 }
 
 export const MEASUREMENT_LABEL: Record<string, string> = {
-  per_campaign_holdout: "Per-campaign holdout",
-  pooled_90d_holdout: "Pooled 90-day holdout",
-  time_shifted: "Time-shifted",
+  per_campaign_holdout: "กันกลุ่มควบคุมเฉพาะแคมเปญนี้",
+  pooled_90d_holdout: "รวมกลุ่มควบคุม 90 วันของหลายแคมเปญ",
+  time_shifted: "เทียบกับช่วงเวลาก่อนหน้า (ไม่มีกลุ่มควบคุม)",
 };
 
 export function Meter({ treated, holdout }: { treated: number; holdout: number }) {

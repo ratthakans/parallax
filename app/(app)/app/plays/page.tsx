@@ -3,7 +3,7 @@ import { all } from "@/lib/engine/sql";
 import { effectiveGuards, getTenantPlays, runMatch } from "@/lib/engine/match";
 
 import { profileFor } from "@/lib/shared/tenants";
-import { ALL_PLAYS } from "@/lib/shared/plays";
+import { ALL_PLAYS, playCrossTh, playLogicTh } from "@/lib/shared/plays";
 import { CYCLE_LABEL } from "@/lib/shared/types";
 import {
   EnginePill,
@@ -50,26 +50,26 @@ export default async function PlaysPage() {
   return (
     <>
       <PageHead
-        label="Play library"
-        title="23 moves the system knows, and why some are not offered today"
-        lead="The Morning Brief takes only the three most valuable that clear every limit. The rest are here, each with the reason it was held back — disable the ones you do not want, or set a per-play discount ceiling."
+        label="คลังวิธี"
+        title={`${ALL_PLAYS.length} วิธีที่ระบบรู้จัก และทำไมบางวิธีไม่ถูกเสนอวันนี้`}
+        lead="บรีฟเช้าหยิบเฉพาะสามวิธีที่คุ้มที่สุดซึ่งผ่านทุกเพดาน ที่เหลืออยู่ในหน้านี้พร้อมเหตุผลว่าทำไมยังไม่ถูกเสนอ — ปิดวิธีที่ไม่ต้องการ หรือตั้งเพดานส่วนลดรายวิธีได้"
       />
 
       <Panel flat className="mb-8 grid grid-cols-2 gap-x-6 gap-y-7 p-5 md:grid-cols-4 md:p-6">
-        <Metric label="Plays in library" value={num(candidates.length)} sub="15 KEEP + 8 REACH" />
-        <Metric label="Enabled" value={num(enabledCount)} tone="accent" />
-        <Metric label="Ready this round" value={num(readyCount)} tone="good" />
+        <Metric label="วิธีในคลัง" value={num(candidates.length)} sub={`KEEP ${keep.length} · REACH ${reach.length}`} />
+        <Metric label="เปิดใช้อยู่" value={num(enabledCount)} tone="accent" />
+        <Metric label="พร้อมเสนอรอบนี้" value={num(readyCount)} tone="good" />
         <Metric
-          label="Held back"
+          label="ยังไม่ถูกเสนอ"
           value={num(candidates.length - readyCount)}
-          sub="Cooldown · cohort too small · nobody qualifies"
+          sub="เพิ่งส่งไป · กลุ่มเล็กเกินไป · ไม่มีใครเข้าเกณฑ์ · ปิดไว้"
           tone="muted"
         />
       </Panel>
 
       <PlayGroup
-        heading={`KEEP — act on existing ${v.people}`}
-        note="This side produces messages, and every play enforces marketing consent"
+        heading={`KEEP — ดูแล${v.th.people}ที่มีอยู่`}
+        note="ฝั่งนี้ส่งข้อความหาคนโดยตรง และทุกวิธีส่งเฉพาะคนที่ยินยอมรับข่าวสาร"
         items={keep}
         cfgs={cfgs}
         perf={perf}
@@ -77,8 +77,8 @@ export default async function PlaysPage() {
       />
 
       <PlayGroup
-        heading={`REACH — find new ${v.people}`}
-        note="This side produces audiences, not messages · suppress_existing and suppress_bad_fit save money rather than spend it"
+        heading={`REACH — หา${v.th.people}ใหม่`}
+        note="ฝั่งนี้สร้างกลุ่มเป้าหมายให้โฆษณา ไม่ได้ส่งข้อความ · วิธีตัดลูกค้าเดิมและตัดคนที่ไม่ใช่ออก ช่วยประหยัดค่าโฆษณา"
         items={reach}
         cfgs={cfgs}
         perf={perf}
@@ -129,20 +129,20 @@ function PlayGroup({
                   <div className="flex flex-wrap items-center gap-2">
                     <EnginePill engine={c.play.engine} />
                     <span className="c-pill">{c.play.id}</span>
-                    {!enabled && <span className="c-pill c-pill-bad">Disabled</span>}
+                    {!enabled && <span className="c-pill c-pill-bad">ปิดอยู่</span>}
                     {enabled && c.blocked && (
-                      <span className="c-pill c-pill-warn">Held</span>
+                      <span className="c-pill c-pill-warn">ยังไม่เสนอ</span>
                     )}
                     {enabled && !c.blocked && (
-                      <span className="c-pill c-pill-good">Ready</span>
+                      <span className="c-pill c-pill-good">พร้อม</span>
                     )}
                   </div>
-                  <h3 className="c-h2 mt-3 text-[var(--c-text)]">{c.play.name}</h3>
+                  <h3 className="c-h2 mt-3 text-[var(--c-text)]">{c.play.nameTh}</h3>
                   <p className="c-thai mt-1 text-[0.82rem] text-[var(--c-text-3)]">
-                    {c.play.logic}
+                    {playLogicTh(c.play)}
                   </p>
                   <p className="c-thai mt-1 text-[0.78rem] text-[var(--c-text-4)]">
-                    Across industries — {c.play.crossIndustry}
+                    ใช้ได้กับ — {playCrossTh(c.play)}
                   </p>
                   <p className="c-mono mt-2.5 text-[0.75rem] text-[var(--c-text-4)]">
                     {c.play.cycle_shape.map((s) => CYCLE_LABEL[s]).join(" · ")}
@@ -151,19 +151,19 @@ function PlayGroup({
 
                 <div className="grid shrink-0 grid-cols-3 gap-6 text-right">
                   <div>
-                    <p className="c-label">cohort this round</p>
+                    <p className="c-label">คนเข้าเกณฑ์รอบนี้</p>
                     <p className="c-num mt-2 text-[1.25rem] text-[var(--c-text)]">
                       {num(c.audience.length)}
                     </p>
                   </div>
                   <div>
-                    <p className="c-label">response rate</p>
+                    <p className="c-label">อัตราตอบกลับ</p>
                     <p className="c-num mt-2 text-[1.25rem] text-[var(--c-cyan)]">
                       {(rate * 100).toFixed(1)}%
                     </p>
                   </div>
                   <div>
-                    <p className="c-label">score</p>
+                    <p className="c-label">คะแนน</p>
                     <p className="c-num mt-2 text-[1.25rem] text-[var(--c-text-2)]">
                       {c.score}
                     </p>
@@ -173,7 +173,7 @@ function PlayGroup({
 
               {c.blocked && (
                 <p className="c-thai mt-4 text-[0.8rem] text-[var(--c-warn)]">
-                  {c.blocked}
+                  {c.blockedTh ?? c.blocked}
                 </p>
               )}
 
@@ -186,17 +186,17 @@ function PlayGroup({
                   <ActionForm
                     action={updateGuardsAction}
                     fields={{ tenantId, playId: c.play.id }}
-                    label="Save guards"
+                    label="บันทึกเพดาน"
                     pendingLabel="Saving…"
                     variant="primary"
                     size="sm"
                     className="flex flex-col items-start gap-3"
                   >
-                    <p className="c-label">shop guard overrides</p>
+                    <p className="c-label">เพดานเฉพาะร้านนี้</p>
                     <div className="grid grid-cols-3 gap-3">
                       <label className="flex flex-col gap-1.5">
                         <span className="c-mono text-[0.75rem] text-[var(--c-text-4)]">
-                          min_audience
+                          กลุ่มขั้นต่ำ (คน)
                         </span>
                         <input
                           className="c-input"
@@ -208,7 +208,7 @@ function PlayGroup({
                       </label>
                       <label className="flex flex-col gap-1.5">
                         <span className="c-mono text-[0.75rem] text-[var(--c-text-4)]">
-                          cooldown_days
+                          เว้นระยะ (วัน)
                         </span>
                         <input
                           className="c-input"
@@ -220,7 +220,7 @@ function PlayGroup({
                       </label>
                       <label className="flex flex-col gap-1.5">
                         <span className="c-mono text-[0.75rem] text-[var(--c-text-4)]">
-                          max_discount_pct
+                          ส่วนลดสูงสุด (%)
                         </span>
                         <input
                           className="c-input"
@@ -236,26 +236,26 @@ function PlayGroup({
 
                   <div className="flex flex-col gap-4">
                     <div>
-                      <p className="c-label">prior inherited across accounts</p>
+                      <p className="c-label">ค่าตั้งต้นที่เรียนรู้จากร้านอื่น</p>
                       <p className="c-thai mt-2 text-[0.8rem] text-[var(--c-text-2)]">
                         {p
-                          ? `${num(p.trials)} runs in the same cycle, ${num(p.successes)} responses — so this shop starts at ${(rate * 100).toFixed(1)}% from its first campaign`
-                          : "No posterior yet — using the play's default"}
+                          ? `ใช้มาแล้ว ${num(p.trials)} ครั้งในธุรกิจรอบเดียวกัน ตอบกลับ ${num(p.successes)} คน — ร้านนี้จึงเริ่มที่ ${(rate * 100).toFixed(1)}% ตั้งแต่แคมเปญแรก`
+                          : "ยังไม่มีข้อมูลจากร้านอื่น — ใช้ค่าตั้งต้นของวิธีนี้"}
                       </p>
                       <p className="c-thai mt-2 text-[0.75rem] text-[var(--c-text-4)]">
                         ข้ามบัญชีเฉพาะสถิติรวม ไม่มีแถวลูกค้าออกจากบัญชีเลย
                       </p>
                     </div>
                     <div>
-                      <p className="c-label">measurement rule this round</p>
+                      <p className="c-label">วิธีวัดผลรอบนี้</p>
                       <p className="c-thai mt-2 text-[0.8rem] text-[var(--c-text-2)]">
-                        {MEASUREMENT_LABEL[c.measurement]} · holdout {c.holdout_pct}%
+                        {MEASUREMENT_LABEL[c.measurement]} · กันกลุ่มควบคุม {c.holdout_pct}%
                       </p>
                     </div>
                     <div>
-                      <p className="c-label">estimated cost</p>
+                      <p className="c-label">ต้นทุนโดยประมาณ</p>
                       <p className="c-thai mt-2 text-[0.8rem] text-[var(--c-text-2)]">
-                        {baht(c.estimated_cost)} · expected value {baht(c.expected_value)}
+                        {baht(c.estimated_cost)} · มูลค่าที่คาด {baht(c.expected_value)}
                       </p>
                     </div>
                     <ActionForm
@@ -265,7 +265,7 @@ function PlayGroup({
                         playId: c.play.id,
                         enabled: enabled ? "0" : "1",
                       }}
-                      label={enabled ? "Disable this play" : "Enable this play"}
+                      label={enabled ? "ปิดวิธีนี้" : "เปิดวิธีนี้"}
                       pendingLabel="Saving…"
                       size="sm"
                     />
@@ -273,7 +273,7 @@ function PlayGroup({
                 </div>
 
                 <div className="mt-5">
-                  <p className="c-label">play definition</p>
+                  <p className="c-label">นิยามของวิธี (สำหรับทีมเทคนิค)</p>
                   <pre className="c-code mt-2.5">{toYaml(c.play)}</pre>
                 </div>
               </details>

@@ -30,21 +30,21 @@ export type AnalyseResult = {
 
 export async function analyseCsv(csvText: string): Promise<AnalyseResult> {
   if (!csvText || csvText.trim().length === 0) {
-    return { ok: false, error: "The file is empty" };
+    return { ok: false, error: "ไฟล์ว่างเปล่า" };
   }
   if (csvText.length > MAX_CHARS) {
     return {
       ok: false,
-      error: `File is over ${Math.round(MAX_CHARS / 1_000_000)}MB — split it and import in parts`,
+      error: `ไฟล์ใหญ่เกิน ${Math.round(MAX_CHARS / 1_000_000)}MB — แบ่งไฟล์แล้วนำเข้าทีละส่วน`,
     };
   }
 
   const parsed = parseCsv(csvText);
   if (!parsed.headers.length) {
-    return { ok: false, error: "Could not read the header row — check this is really a CSV" };
+    return { ok: false, error: "อ่านแถวหัวคอลัมน์ไม่ได้ — ตรวจว่าเป็นไฟล์ CSV จริง" };
   }
   if (!parsed.rows.length) {
-    return { ok: false, error: "Headers found, but no data rows" };
+    return { ok: false, error: "เจอหัวคอลัมน์ แต่ไม่มีข้อมูลสักแถว" };
   }
 
   const mapped = await mapColumns(parsed.headers, parsed.rows.slice(0, 3));

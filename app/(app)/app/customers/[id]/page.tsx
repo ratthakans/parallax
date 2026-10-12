@@ -75,7 +75,7 @@ function TimelineRow({ item, verb }: { item: Item; verb: string }) {
       detail =
         item.status === "simulated" ? (
           <>
-            ยังไม่ได้เชื่อม{notConnectedTh(item.engine).channel} จึง{notConnectedTh(item.engine).nothingSent} ·{" "}
+            ยังไม่ได้เชื่อม {notConnectedTh(item.engine).channel} จึง{notConnectedTh(item.engine).nothingSent} ·{" "}
             <Link href={`/app/campaigns/${item.campaignId}`} className="underline underline-offset-4">
               ดูแคมเปญ
             </Link>

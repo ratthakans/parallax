@@ -567,3 +567,36 @@ export function notConnectedTh(engine: Play["engine"]): { channel: string; nothi
     ? { channel: "บัญชีโฆษณา", nothingSent: "ยังไม่มีรายชื่อถูกส่งไปแพลตฟอร์มโฆษณา" }
     : { channel: "LINE OA", nothingSent: "ยังไม่มีข้อความออกไปถึงลูกค้า" };
 }
+
+/* ── คำอธิบายภาษาไทยที่หน้าจอแสดง ──────────────────────────────
+   logic กับ crossIndustry เป็นภาษาอังกฤษโดยตั้งใจ เพราะเป็นข้อมูลที่ส่งเข้า prompt
+   ของ AI ด้วย (lib/engine/ai.ts) ส่วนหน้าจอเคยแสดงตัวอังกฤษตรง ๆ หน้าคลัง play
+   จึงมีภาษาอังกฤษกว่า 600 คำ — ตารางนี้คือฉบับที่คนอ่าน */
+const PLAY_TH: Record<string, { logic: string; crossIndustry: string }> = {
+  vip_care: { logic: "10% แรกที่ใช้จ่ายมากที่สุดตลอดมา", crossIndustry: "แชมป์กอล์ฟ · ผู้ป่วยระดับ VIP" },
+  high_value_slipping: { logic: "ใช้จ่ายสูง แต่เลยรอบปกติของตัวเองไปแล้ว", crossIndustry: "กลุ่มที่มีค่าที่สุด กำลังห่างหายไป" },
+  cross_sell_after_anchor: { logic: "ซื้อ A แล้ว แต่ยังไม่เคยซื้อ B ที่มักตามมา", crossIndustry: "ไดรเวอร์ → ลูกกอล์ฟ · ยาง → ตั้งศูนย์ · ขูดหินปูน → ชุดดูแลฟัน" },
+  service_to_product: { logic: "ใช้บริการแล้ว แต่ยังไม่เคยซื้อสินค้า", crossIndustry: "ฟิตติ้งแล้วแต่ไม่ซื้อไม้ · ทำสปาแต่ไม่ซื้อครีม" },
+  tier_nudge: { logic: "ขาดอีกขั้นเดียวถึงระดับถัดไป", crossIndustry: "อีกหนึ่งออเดอร์ถึงระดับ Platinum" },
+  welcome_no_purchase: { logic: "สมัครแล้ว แต่ยังไม่ซื้อภายใน 30 วัน", crossIndustry: "ทุกธุรกิจ" },
+  affinity_new_arrival: { logic: "ชอบของแบบหนึ่งชัดเจน และมีของใหม่แบบนั้นเข้ามา", crossIndustry: "แฟนแบรนด์ · ผู้ป่วยที่ใช้แบรนด์เดิม" },
+  browser_to_buyer: { logic: "มาบ่อย แต่ใช้จ่ายน้อย", crossIndustry: "แวะบ่อย แต่ไม่เคยซื้อ" },
+  lifecycle_moment: { logic: "วันเกิด วันครบรอบ หรือวันที่สมัคร", crossIndustry: "ทุกธุรกิจ" },
+  dormant_reactivation: { logic: "เงียบไปนานกว่า 2.5 เท่าของรอบปกติของตัวเอง", crossIndustry: "เงียบไปเกินหกเดือน" },
+  replenishment_due: { logic: "ถึงวันที่คาดว่าจะกลับมาซื้อซ้ำ", crossIndustry: "อาหารเสริม · อาหารสัตว์ · กาแฟ" },
+  expiry_approaching: { logic: "สมาชิก คอร์ส หรือกรมธรรม์ใกล้หมดอายุ", crossIndustry: "ฟิตเนส · โรงเรียน · ประกัน" },
+  recall_due: { logic: "ถึงรอบเข้ารับบริการ นับจากครั้งล่าสุด", crossIndustry: "ทำฟัน · เปลี่ยนน้ำมันเครื่อง · วัคซีนสัตว์" },
+  dead_stock_match: { logic: "ของค้างสต๊อก × คนที่ซื้อหมวดนั้นตอนมีส่วนลด", crossIndustry: "ร้านค้าปลีกทุกแบบ" },
+  referral_champion: { logic: "ใช้จ่ายสูง มาบ่อย แต่ยังไม่เคยแนะนำใคร", crossIndustry: "ทุกธุรกิจ" },
+  seed_repeat_full_price: { logic: "ซื้อซ้ำและซื้อเต็มราคา ไม่ใช่กลุ่มที่จ่ายมากที่สุด", crossIndustry: "ทุกรูปแบบการซื้อ" },
+  seed_by_anchor_sku: { logic: "คนที่เริ่มจากสินค้าชิ้นแรกเดียวกัน", crossIndustry: "หาคนที่จะเดินเส้นทางเดียวกัน" },
+  seed_high_ltv: { logic: "เฉพาะ 10% แรกที่ใช้จ่ายมากที่สุด — รายชื่อสั้น แต่คุณภาพดีที่สุดที่คุณมี", crossIndustry: "สำหรับงบโฆษณาจำกัด" },
+  suppress_existing: { logic: "เลิกจ่ายค่าโฆษณาให้คนที่ซื้อไปแล้ว", crossIndustry: "ทุกรูปแบบการซื้อ — วิธีที่ช่วยประหยัด ไม่ใช่ใช้เงินเพิ่ม" },
+  suppress_bad_fit: { logic: "ตัดคนที่คล้ายกลุ่มซื้อครั้งเดียวแล้วหายไปออก", crossIndustry: "ทุกรูปแบบการซื้อ" },
+  recapture_unreachable: { logic: "บล็อก LINE ถอนความยินยอม หรือเงียบเกินกว่าข้อความจะช่วยได้", crossIndustry: "จุดที่ KEEP ทำต่อไม่ได้ แล้ว REACH รับต่อ" },
+  retarget_lapsed_lead: { logic: "กรอกฟอร์มแล้ว แต่ไม่ซื้อในช่วงเวลาที่กำหนด", crossIndustry: "ทุกรูปแบบการซื้อ" },
+  expand_adjacent_category: { logic: "ใช้คนที่ซื้อหมวด A เป็นต้นแบบ เพื่อเปิดหมวด B", crossIndustry: "ทุกรูปแบบการซื้อ" },
+};
+
+export const playLogicTh = (p: Play) => PLAY_TH[p.id]?.logic ?? p.logic;
+export const playCrossTh = (p: Play) => PLAY_TH[p.id]?.crossIndustry ?? p.crossIndustry;

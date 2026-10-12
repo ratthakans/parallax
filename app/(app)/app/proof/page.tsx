@@ -20,14 +20,14 @@ import { ciLabel } from "@/lib/shared/format";
 import { PLANS } from "@/lib/shared/plans";
 import { measureAllAction } from "../../actions";
 import { ActionForm } from "@/components/console/action-form";
-import { demoToolsEnabled } from "@/lib/shared/demo-tools";
+import { hasSyntheticData } from "@/lib/engine/synthetic";
 import { proofBlockedReason } from "@/lib/engine/billing";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProofPage() {
-  const demoTools = demoToolsEnabled();
   const tenantId = await activeTenantId();
+  const synthetic = await hasSyntheticData(tenantId);
   const profile = profileFor(tenantId);
   const v = profile.vocab;
   const [proofBlocked, roi, rows] = await Promise.all([
@@ -82,9 +82,9 @@ export default async function ProofPage() {
           ที่แสดงแทนคือสิ่งที่จะได้เมื่ออัปเกรด ไม่ใช่กำแพงเปล่า ๆ */}
       {proofBlocked ? (
         <Panel flat className="border-l-2 border-[var(--c-warn)] p-6 md:p-7">
-          <p className="c-label text-[var(--c-warn)]">not on this plan</p>
+          <p className="c-label text-[var(--c-warn)]">ยังไม่รวมในแผนนี้</p>
           <h2 className="c-h2 mt-3 text-[var(--c-text)]">
-            Measured proof unlocks on {PLANS.growth.name}
+            การวัดผลจริงเปิดใช้ได้ตั้งแต่แผน {PLANS.growth.name}
           </h2>
           <p className="c-thai mt-3 max-w-2xl text-[0.88rem] leading-relaxed text-[var(--c-text-2)]">
             {proofBlocked}
@@ -112,9 +112,9 @@ export default async function ProofPage() {
           ตัวเลขจะไม่มีมันติดไปด้วย — คำกำกับต้องอยู่ติดกับตัวเลขเอง
 
           ขึ้นเฉพาะบนคอนโซลสาธารณะ ตอนพัฒนาไม่ต้องมี */}
-      {!demoTools && (
+      {synthetic && (
         <Panel flat className="mb-6 border-l-2 border-[var(--c-warn)] p-5">
-          <p className="c-label text-[var(--c-warn)]">synthetic dataset</p>
+          <p className="c-label text-[var(--c-warn)]">ข้อมูลตัวอย่าง</p>
           <p className="c-thai mt-2.5 max-w-3xl text-[0.84rem] leading-relaxed text-[var(--c-text-2)]">
             ตัวเลขทุกตัวข้างล่างคำนวณจริงโดยเครื่องยนต์ — ทั้งกลุ่มที่กันไว้ ส่วนต่าง และช่วงความเชื่อมั่น —
             แต่คำนวณจากชุดข้อมูลที่สร้างขึ้น ไม่ใช่ลูกค้าจริง ยังไม่มีธุรกิจไหนถูกวัดด้วยระบบนี้
@@ -125,7 +125,7 @@ export default async function ProofPage() {
 
       {profile.measurementCaveat && (
         <Panel flat className="mb-6 p-5">
-          <p className="c-label text-[var(--c-warn)]">how to read this account</p>
+          <p className="c-label text-[var(--c-warn)]">วิธีอ่านตัวเลขของบัญชีนี้</p>
           <p className="c-thai mt-2.5 max-w-3xl text-[0.84rem] leading-relaxed text-[var(--c-text-2)]">
             {profile.measurementCaveat}
           </p>
@@ -165,7 +165,7 @@ export default async function ProofPage() {
             }
             sub={
               roi.costPerIncrementalBaht != null
-                ? `฿1 spent returns about ${baht(1 / roi.costPerIncrementalBaht)}`
+                ? `จ่าย ฿1 ได้กลับมาราว ${baht(1 / roi.costPerIncrementalBaht)}`
                 : "ต้นทุนของรายได้ส่วนเพิ่มหนึ่งบาท"
             }
             tone={roi.costPerIncrementalBaht != null ? "plain" : "muted"}
@@ -255,7 +255,7 @@ export default async function ProofPage() {
               </div>
             ) : (
               <p className="c-thai mt-3 text-[0.85rem] text-[var(--c-text-3)]">
-                No measured campaigns yet
+                ยังไม่มีแคมเปญที่วัดผลแล้ว
               </p>
             )}
           </div>
@@ -281,13 +281,13 @@ export default async function ProofPage() {
             <table className="c-table min-w-[62rem]">
               <thead>
                 <tr>
-                  <th>play</th>
+                  <th>วิธี</th>
                   <th>ช่วงเวลา</th>
                   <th>ส่ง / กันไว้</th>
                   <th>ต่อคน · กลุ่มที่ส่ง</th>
                   <th>ต่อคน · กลุ่มที่กันไว้</th>
                   <th>ส่วนต่าง</th>
-                  <th>95% CI</th>
+                  <th>ช่วงที่น่าจะเป็น (95%)</th>
                   <th>ข้อสรุป</th>
                   <th />
                 </tr>
@@ -297,7 +297,7 @@ export default async function ProofPage() {
                   <tr key={`${r.id}-${r.horizon_days}`}>
                     <td>
                       <span className="text-[var(--c-text)]">
-                        {playById(r.play_id)?.name ?? r.play_id}
+                        {playById(r.play_id)?.nameTh ?? r.play_id}
                       </span>
                     </td>
                     <td className="c-mono">T+{r.horizon_days}</td>
@@ -344,7 +344,7 @@ export default async function ProofPage() {
                         href={`/app/campaigns/${r.id}`}
                         className="c-btn c-btn-ghost c-btn-sm"
                       >
-                        Open
+                        เปิด
                       </Link>
                     </td>
                   </tr>

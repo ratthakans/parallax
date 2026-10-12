@@ -113,7 +113,7 @@ export async function approveCampaign(
   input: ApproveInput,
 ): Promise<ApproveResult> {
   const tenant = await getTenant(input.tenantId);
-  if (!tenant) throw new Error("Account not found");
+  if (!tenant) throw new Error("ไม่พบบัญชีนี้");
 
   /* เพดานของแผนต้องบังคับที่นี่ ไม่ใช่ที่หน้าจอ — หน้าจอที่ซ่อนปุ่มไว้
      ไม่ได้ป้องกันการยิง Server Action ตรง ๆ และ Free tier ที่ส่งได้
@@ -292,11 +292,11 @@ export async function sendCampaign(
         )
       : await get<Camp>("SELECT * FROM campaigns WHERE id = ?", campaignId)
   );
-  if (!camp) throw new Error("Campaign not found");
-  if (camp.dry_run) throw new Error("A dry run does not send");
+  if (!camp) throw new Error("ไม่พบแคมเปญนี้");
+  if (camp.dry_run) throw new Error("แคมเปญซ้อมส่งไม่ส่งจริง");
 
   const tenant = await getTenant(camp.tenant_id);
-  if (!tenant) throw new Error("Account not found");
+  if (!tenant) throw new Error("ไม่พบบัญชีนี้");
 
   // ช่วงเวลาห้ามส่ง (F10)
   const hour = new Date().getHours();

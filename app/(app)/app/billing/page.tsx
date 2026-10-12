@@ -1,5 +1,7 @@
 import { activeTenantId } from "@/app/(app)/tenant";
 import Link from "next/link";
+import { demoToolsEnabled } from "@/lib/shared/demo-tools";
+import { hasSyntheticData } from "@/lib/engine/synthetic";
 
 import { profileFor } from "@/lib/shared/tenants";
 import {
@@ -27,6 +29,9 @@ import { ActionForm } from "@/components/console/action-form";
 
 export const dynamic = "force-dynamic";
 
+/* หัวตารางภาษาไทยไม่ใช้ mono ตัวพิมพ์ใหญ่ของ .c-table th (ดู console.css) */
+const TH = "font-sans normal-case tracking-normal text-[0.75rem]";
+
 const date = (iso: string) => thaiDate(iso);
 
 /* แถบวัดที่ต้องอ่านออกว่า "ใกล้เต็มหรือยัง" ไม่ใช่แค่ดูสวย
@@ -40,7 +45,7 @@ function Bar({ pct }: { pct: number }) {
         ? "var(--c-warn)"
         : "var(--c-accent)";
   return (
-    <div className="c-meter mt-3" role="img" aria-label={`${Math.round(p)}% used`}>
+    <div className="c-meter mt-3" role="img" aria-label={`ใช้ไป ${Math.round(p)}%`}>
       <span style={{ width: `${p}%`, background: colour }} />
     </div>
   );
@@ -56,6 +61,8 @@ export default async function BillingPage() {
     roiSummary(tenantId),
   ]);
   const plan = u.plan;
+  const tools = demoToolsEnabled();
+  const synthetic = await hasSyntheticData(tenantId);
 
   const suggested = planForBaseSize(u.identified);
   const packRate = u.messagesThisPeriod > 0 ? u.creditSpendThisPeriod : 0;
@@ -70,17 +77,16 @@ export default async function BillingPage() {
     <>
       <PageHead
         label="ค่าใช้จ่าย"
-        title={`${plan.name} — what you paid, and what came back`}
-        lead={`The subscription is priced on identifiable ${v.people}. Messaging is prepaid credits, never hidden inside the fee.`}
+        title={`แผน ${plan.name} — จ่ายไปเท่าไร ได้อะไรกลับมา`}
+        lead={`ค่าบริการคิดตามจำนวน${v.th.people}ที่ระบุตัวได้ ค่าส่งข้อความเป็นเครดิตจ่ายล่วงหน้า ไม่ซ่อนอยู่ในค่าบริการ`}
       />
 
       {u.overCap && (
         <div className="c-panel-flat mb-6 border-l-2 border-[var(--c-bad)] p-5">
-          <p className="c-label text-[var(--c-bad)]">over the plan cap</p>
+          <p className="c-label text-[var(--c-bad)]">เกินเพดานของแผน</p>
           <p className="c-thai mt-2 max-w-3xl text-[0.87rem] leading-relaxed text-[var(--c-text-2)]">
-            The base holds {num(u.identified)} identifiable {v.people}, past the{" "}
-            {num(plan.contactCap ?? 0)} cap on {plan.name} — the next import will be
-            refused until you upgrade.
+            ฐานมี{v.th.people}ที่ระบุตัวได้ {num(u.identified)} คน เกินเพดาน{" "}
+            {num(plan.contactCap ?? 0)} คนของแผน {plan.name} — การนำเข้าครั้งถัดไปจะถูกปฏิเสธจนกว่าจะเปลี่ยนแผน
           </p>
         </div>
       )}
@@ -89,29 +95,29 @@ export default async function BillingPage() {
       <Panel className="mb-6 p-5 md:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h2 className="c-h2 text-[var(--c-text)]">This billing period</h2>
+            <h2 className="c-h2 text-[var(--c-text)]">รอบบิลนี้</h2>
             <p className="c-mono mt-1.5 text-[0.78rem] text-[var(--c-text-3)]">
               {date(u.period.start.toISOString())} –{" "}
               {date(new Date(u.period.end.getTime() - 1).toISOString())} · {" "}
-              {u.period.daysLeft} days left
+              เหลือ {u.period.daysLeft} วัน
             </p>
           </div>
-          <span className="c-pill c-pill-keep">Cuts on day {u.billingDay}</span>
+          <span className="c-pill c-pill-keep">ตัดรอบทุกวันที่ {u.billingDay}</span>
         </div>
 
         <div className="mt-6 grid gap-x-8 gap-y-6 sm:grid-cols-2 lg:grid-cols-4">
           <Metric
             label="ค่าบริการรายเดือน"
-            value={plan.monthlyBaht == null ? "Let's talk" : baht(plan.monthlyBaht)}
-            sub={`${plan.name} · per month`}
+            value={plan.monthlyBaht == null ? "ตามตกลง" : baht(plan.monthlyBaht)}
+            sub={`${plan.name} · ต่อเดือน`}
           />
           <Metric
             label="เครดิตที่ซื้อรอบนี้"
             value={baht(u.creditSpendThisPeriod)}
             sub={
               u.purchasesThisPeriod.length
-                ? `${u.purchasesThisPeriod.length} purchase(s)`
-                : "Nothing bought yet"
+                ? `ซื้อ ${u.purchasesThisPeriod.length} ครั้ง`
+                : "ยังไม่ได้ซื้อ"
             }
             tone={packRate > 0 ? "plain" : "muted"}
           />
@@ -124,7 +130,7 @@ export default async function BillingPage() {
           <Metric
             label="ค่าส่งที่เกิดขึ้นจริง"
             value={baht(u.messageCostThisPeriod)}
-            sub={`${num(u.messagesThisPeriod)} messages × ฿${MESSAGE_COST_BAHT}`}
+            sub={`${num(u.messagesThisPeriod)} ข้อความ × ฿${MESSAGE_COST_BAHT}`}
             tone="muted"
           />
         </div>
@@ -134,7 +140,7 @@ export default async function BillingPage() {
       <div className="mb-6 grid gap-6 lg:grid-cols-2">
         <Panel className="p-5 md:p-6">
           <div className="flex items-baseline justify-between gap-4">
-            <h2 className="c-h2 text-[var(--c-text)]">Identifiable {v.people}</h2>
+            <h2 className="c-h2 text-[var(--c-text)]">{v.th.people}ที่ระบุตัวได้</h2>
             <span className="c-mono text-[0.8rem] text-[var(--c-text-3)]">
               {num(u.identified)}
               {u.contactCap != null && ` / ${num(u.contactCap)}`}
@@ -143,10 +149,10 @@ export default async function BillingPage() {
           <Bar pct={u.contactPct ?? 0} />
           <p className="c-thai mt-4 text-[0.8rem] leading-relaxed text-[var(--c-text-3)]">
             {u.contactCap == null
-              ? `${plan.name} has no numeric cap — agreed by contract`
+              ? `แผน ${plan.name} ไม่มีเพดานตัวเลข — ตามสัญญา`
               : u.contactPct != null && u.contactPct >= 80
-                ? `${Math.round(u.contactPct)}% of the cap used — room for ${num(u.contactCap - u.identified)} more`
-                : `Room for ${num(Math.max(0, u.contactCap - u.identified))} more before the cap`}
+                ? `ใช้ไป ${Math.round(u.contactPct)}% ของเพดาน — เพิ่มได้อีก ${num(u.contactCap - u.identified)} คน`
+                : `เพิ่มได้อีก ${num(Math.max(0, u.contactCap - u.identified))} คนก่อนถึงเพดาน`}
           </p>
           <p className="c-thai mt-2 text-[0.76rem] text-[var(--c-text-4)]">
             นับคนที่มีตัวระบุอย่างน้อยหนึ่งอย่าง เพื่อให้จับคู่หรือติดต่อได้
@@ -156,9 +162,9 @@ export default async function BillingPage() {
 
         <Panel className="p-5 md:p-6">
           <div className="flex items-baseline justify-between gap-4">
-            <h2 className="c-h2 text-[var(--c-text)]">Message credits</h2>
+            <h2 className="c-h2 text-[var(--c-text)]">เครดิตข้อความ</h2>
             <span className="c-mono text-[0.8rem] text-[var(--c-text-3)]">
-              {num(u.creditsLeft)} left
+              คงเหลือ {num(u.creditsLeft)}
             </span>
           </div>
           <Bar
@@ -169,16 +175,27 @@ export default async function BillingPage() {
             }
           />
           <p className="c-thai mt-4 text-[0.8rem] leading-relaxed text-[var(--c-text-3)]">
-            {num(u.messagesThisPeriod)} messages sent this period
+            รอบนี้ส่งไป {num(u.messagesThisPeriod)} ข้อความ
             {u.creditRunwayDays != null &&
-              ` — at this rate the balance lasts about ${num(u.creditRunwayDays)} more days`}
+              ` — ถ้าส่งในอัตรานี้ เครดิตจะพอใช้อีกราว ${num(u.creditRunwayDays)} วัน`}
           </p>
           <p className="c-thai mt-2 text-[0.76rem] text-[var(--c-text-4)]">
             เครดิตหมดเมื่อไรการส่งหยุดทันที ไม่มีการเรียกเก็บย้อนหลัง ไม่มียอดติดลบ —
             แคมเปญที่ค้างจะรายงานตรง ๆ ว่าเหลือกี่คนที่ยังรออยู่
           </p>
 
-          <div className="mt-6 grid gap-2.5 border-t border-[var(--c-line)] pt-5 sm:grid-cols-3">
+          {/* ยังไม่มีระบบชำระเงิน — บน production ปุ่มซื้อพาไปขอซื้อ ไม่ใช่เพิ่มเครดิตให้ฟรี
+              (เดิมกดแล้วเครดิตเข้าทันทีโดยไม่มีใครจ่าย) ส่วนเครื่องพัฒนาและเดโมยังกดลองได้ */}
+          {!tools && (
+            <p className="c-thai mt-6 border-t border-[var(--c-line)] pt-5 text-[0.84rem] text-[var(--c-text-2)]">
+              ยังไม่เปิดชำระเงินออนไลน์ —{" "}
+              <Link href="/contact" className="text-[var(--c-cyan)] underline underline-offset-4">
+                ขอซื้อเครดิต
+              </Link>{" "}
+              แล้วเราจะเติมให้หลังชำระ
+            </p>
+          )}
+          <div className={`mt-6 grid gap-2.5 border-t border-[var(--c-line)] pt-5 sm:grid-cols-3 ${tools ? "" : "hidden"}`}>
             {CREDIT_PACKS.map((pk) => (
               <ActionForm
                 key={pk.messages}
@@ -190,7 +207,7 @@ export default async function BillingPage() {
                   <>
                     <span className="c-mono text-[0.82rem]">+{num(pk.messages)}</span>
                     <span className="text-[0.75rem] text-[var(--c-text-4)]">
-                      {baht(pk.baht)} · ฿{perMessage(pk).toFixed(2)}/msg
+                      {baht(pk.baht)} · ฿{perMessage(pk).toFixed(2)}/ข้อความ
                     </span>
                   </>
                 }
@@ -202,34 +219,33 @@ export default async function BillingPage() {
 
       {/* ── คุ้มไหม ── */}
       <Panel className="mb-6 p-5 md:p-6">
-        <h2 className="c-h2 text-[var(--c-text)]">Is it paying?</h2>
+        <h2 className="c-h2 text-[var(--c-text)]">คุ้มไหม</h2>
         <p className="c-thai mt-1.5 max-w-3xl text-[0.83rem] text-[var(--c-text-3)]">
-          Actual spend against the lift <em>measured</em> from a control group — not
-          a projection from response rates.
+          ค่าใช้จ่ายจริง เทียบกับยอดเพิ่มที่<em>วัดได้</em>จากกลุ่มควบคุม — ไม่ใช่การคาดการณ์จากอัตราตอบกลับ
         </p>
         <div className="mt-6 grid gap-x-8 gap-y-6 sm:grid-cols-2 lg:grid-cols-4">
           <Metric
             label="ค่าบริการต่อปี"
-            value={yearlyFee > 0 ? baht(yearlyFee) : "Let's talk"}
+            value={yearlyFee > 0 ? baht(yearlyFee) : "ตามตกลง"}
             sub={
               annualBaht(plan) != null
-                ? `Annual ${baht(annualBaht(plan)!)} — saves ${annualDiscountPct}%`
+                ? `จ่ายรายปี ${baht(annualBaht(plan)!)} — ประหยัด ${annualDiscountPct}%`
                 : undefined
             }
           />
           <Metric
             label="ค่าส่งสะสมทั้งหมด"
             value={baht(u.messagesAllTime * MESSAGE_COST_BAHT)}
-            sub={`${num(u.messagesAllTime)} messages since the account opened`}
+            sub={`${num(u.messagesAllTime)} ข้อความตั้งแต่เปิดบัญชี`}
             tone="muted"
           />
           <Metric
             label="ส่วนต่างที่วัดได้"
-            value={measuredLift > 0 ? baht(measuredLift) : "Not measurable yet"}
+            value={measuredLift > 0 ? baht(measuredLift) : "ยังวัดไม่ได้"}
             sub={
               roi.campaigns > 0
-                ? `From ${roi.campaigns} matured campaigns`
-                : "No campaign has matured yet"
+                ? `จาก ${roi.campaigns} แคมเปญที่ครบกำหนด`
+                : "ยังไม่มีแคมเปญที่ครบกำหนด"
             }
             tone={measuredLift > 0 ? "good" : "muted"}
           />
@@ -245,50 +261,52 @@ export default async function BillingPage() {
             }
             sub={
               roi.costPerIncrementalBaht != null
-                ? "The denominator includes discount actually given, not just delivery"
-                : "Needs a conclusive result first"
+                ? "ต้นทุนรวมส่วนลดที่ให้ไปจริง ไม่ใช่แค่ค่าส่ง"
+                : "ต้องมีผลที่สรุปได้ก่อน"
             }
             tone={roi.costPerIncrementalBaht != null ? "accent" : "muted"}
           />
         </div>
         <p className="c-thai mt-6 max-w-3xl text-[0.78rem] leading-relaxed text-[var(--c-text-4)]">
-          “Measured lift” averages every matured campaign, not only the significant
-          ones — averaging only the winners is systematically inflated. Detail at{" "}
+          "ส่วนต่างที่วัดได้" เฉลี่ยจากทุกแคมเปญที่ครบกำหนด ไม่ใช่เฉพาะตัวที่ได้ผล —
+          ถ้าเฉลี่ยเฉพาะตัวที่ชนะ ตัวเลขจะสูงเกินจริงเสมอ ดูรายละเอียดที่{" "}
           <Link href="/app/proof" className="text-[var(--c-cyan)] underline">
-            Proof
+            ผลที่วัดได้
           </Link>
         </p>
         {/* ตัวเลขนี้สูงเกินจริงในบัญชีตัวอย่าง และต้องเขียนไว้ตรงนี้
             ไม่ใช่ปล่อยให้เข้าใจว่าเป็นผลจากร้านจริง — ชุดข้อมูลสังเคราะห์
             ถูกใส่ผลของแคมเปญไว้ที่ +28% ซึ่งสูงกว่าที่คาดจากร้านจริง
             และแคมเปญที่ไม่ให้ส่วนลดจะมีตัวหารเป็นค่าส่งข้อความล้วน ๆ */}
-        <p className="c-thai mt-4 max-w-3xl border-l-2 border-[var(--c-warn)] pl-4 text-[0.78rem] leading-relaxed text-[var(--c-text-3)]">
-          บัญชีนี้ใช้ชุดข้อมูลจำลอง ตัวเลขผลตอบแทนจึงสูงกว่าที่ร้านจริงควรคาดหวังมาก
+        {synthetic && (
+          <p className="c-thai mt-4 max-w-3xl border-l-2 border-[var(--c-warn)] pl-4 text-[0.78rem] leading-relaxed text-[var(--c-text-3)]">
+            บัญชีนี้ใช้ชุดข้อมูลจำลอง ตัวเลขผลตอบแทนจึงสูงกว่าที่ร้านจริงควรคาดหวังมาก
             โดยเฉพาะแคมเปญที่ไม่มีส่วนลด
-        </p>
+          </p>
+        )}
       </Panel>
 
       {/* ── ค่าส่งรายแคมเปญ ── */}
       <Panel className="mb-6 p-5 md:p-6">
-        <h2 className="c-h2 text-[var(--c-text)]">Delivery cost by campaign</h2>
+        <h2 className="c-h2 text-[var(--c-text)]">ค่าส่งรายแคมเปญ</h2>
         <p className="c-thai mt-1.5 max-w-3xl text-[0.83rem] text-[var(--c-text-3)]">
           เรียงล่าสุดก่อน — แถวที่ทำเครื่องหมายไว้นับเข้ารอบบิลนี้ ประวัติของบัญชีตัวอย่างยาวกว่าหนึ่งปี
             ส่วนใหญ่จึงอยู่นอกรอบ
         </p>
         {costs.length === 0 ? (
           <div className="mt-5">
-            <Empty>Nothing has been sent yet</Empty>
+            <Empty>ยังไม่มีอะไรถูกส่ง</Empty>
           </div>
         ) : (
           <div className="c-scroll mt-5">
             <table className="c-table min-w-[34rem]">
               <thead>
                 <tr>
-                  <th>Play</th>
-                  <th>Sent</th>
-                  <th className="text-right">Recipients</th>
-                  <th className="text-right">Cost</th>
-                  <th className="text-right">This period</th>
+                  <th className={TH}>วิธี</th>
+                  <th className={TH}>ส่งเมื่อ</th>
+                  <th className={`${TH} text-right`}>ผู้รับ</th>
+                  <th className={`${TH} text-right`}>ค่าส่ง</th>
+                  <th className={`${TH} text-right`}>รอบนี้</th>
                 </tr>
               </thead>
               <tbody>
@@ -299,7 +317,7 @@ export default async function BillingPage() {
                         href={`/app/campaigns/${c.id}`}
                         className="text-[var(--c-text)] hover:text-[var(--c-cyan)]"
                       >
-                        {playById(c.play_id)?.name ?? c.play_id}
+                        {playById(c.play_id)?.nameTh ?? c.play_id}
                       </Link>
                     </td>
                     <td className="c-mono whitespace-nowrap text-[0.76rem]">
@@ -316,7 +334,7 @@ export default async function BillingPage() {
               <tfoot>
                 <tr>
                   <td colSpan={2} className="c-label">
-                    Total this period
+                    รวมรอบนี้
                   </td>
                   <td className="c-num text-right text-[var(--c-text)]">
                     {num(u.messagesThisPeriod)}
@@ -336,15 +354,15 @@ export default async function BillingPage() {
       <Panel className="p-5 md:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h2 className="c-h2 text-[var(--c-text)]">All plans</h2>
+            <h2 className="c-h2 text-[var(--c-text)]">แผนทั้งหมด</h2>
             <p className="c-thai mt-1.5 max-w-2xl text-[0.83rem] text-[var(--c-text-3)]">
-              This account is on {plan.name}
+              บัญชีนี้อยู่แผน {plan.name}
               {suggested !== plan.id &&
-                ` — a base of ${num(u.identified)} qualifies for at least ${PLANS[suggested].name}`}
+                ` — ฐาน ${num(u.identified)} คนควรใช้แผน ${PLANS[suggested].name} ขึ้นไป`}
             </p>
           </div>
           <Link href="/pricing" className="c-btn c-btn-ghost c-btn-sm">
-            See full pricing
+            ดูราคาทั้งหมด
           </Link>
         </div>
 
@@ -368,28 +386,28 @@ export default async function BillingPage() {
             </thead>
             <tbody>
               <tr>
-                <td className="c-label">monthly subscription</td>
+                <td className="c-label">ค่าบริการรายเดือน</td>
                 {PLAN_ORDER.map((id) => (
                   <td key={id} className="c-num text-[var(--c-text)]">
                     {PLANS[id].monthlyBaht == null
-                      ? "Let's talk"
+                      ? "ตามตกลง"
                       : baht(PLANS[id].monthlyBaht!)}
                     {PLANS[id].priceSuffix ? ` ${PLANS[id].priceSuffix}` : ""}
                   </td>
                 ))}
               </tr>
               <tr>
-                <td className="c-label">identifiable {v.people}</td>
+                <td className="c-label">{v.th.people}ที่ระบุตัวได้</td>
                 {PLAN_ORDER.map((id) => (
                   <td key={id} className="c-num">
                     {PLANS[id].contactCap == null
-                      ? "Let's talk"
+                      ? "ตามตกลง"
                       : num(PLANS[id].contactCap!)}
                   </td>
                 ))}
               </tr>
               <tr>
-                <td className="c-label">welcome credits (one time)</td>
+                <td className="c-label">เครดิตแรกเข้า (ครั้งเดียว)</td>
                 {PLAN_ORDER.map((id) => (
                   <td key={id} className="c-num">
                     {PLANS[id].welcomeCredits > 0
@@ -426,19 +444,28 @@ export default async function BillingPage() {
           </table>
         </div>
 
-        <div className="mt-6 flex flex-wrap gap-2.5 border-t border-[var(--c-line)] pt-5">
+        {!tools && (
+          <p className="c-thai mt-6 border-t border-[var(--c-line)] pt-5 text-[0.84rem] text-[var(--c-text-2)]">
+            อยากเปลี่ยนแผน?{" "}
+            <Link href="/contact" className="text-[var(--c-cyan)] underline underline-offset-4">
+              ติดต่อเรา
+            </Link>{" "}
+            — แผนจะเปลี่ยนหลังตกลงและชำระเงิน
+          </p>
+        )}
+        <div className={`mt-6 flex flex-wrap gap-2.5 border-t border-[var(--c-line)] pt-5 ${tools ? "" : "hidden"}`}>
           {PLAN_ORDER.filter((id) => id !== plan.id).map((id) => (
             <ActionForm
               key={id}
               action={changePlanAction}
               fields={{ tenantId, plan: id }}
-              label={`Move to ${PLANS[id].name}`}
+              label={`เปลี่ยนเป็น ${PLANS[id].name}`}
               pendingLabel="กำลังเปลี่ยน…"
               size="sm"
             />
           ))}
         </div>
-        <p className="c-thai mt-4 max-w-3xl text-[0.76rem] leading-relaxed text-[var(--c-text-4)]">
+        <p className={`c-thai mt-4 max-w-3xl text-[0.76rem] leading-relaxed text-[var(--c-text-4)] ${tools ? "" : "hidden"}`}>
           การสลับแผนเป็นเครื่องมือเดโม — เขียนลงฐานข้อมูลตรง ๆ เพื่อให้เห็นว่าเพดานกัดตรงไหนจริง
             ลองเปลี่ยนเป็น Pilot แล้วกลับไปหน้าบรีฟ
         </p>

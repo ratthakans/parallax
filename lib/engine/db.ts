@@ -314,6 +314,22 @@ export async function ensureSchema(): Promise<void> {
       PRIMARY KEY (tenant_id, opened_on)
     );
 
+    -- ข้อความจากฟอร์มติดต่อของเว็บ ไม่ใช่ข้อมูลของร้านใด (supabase/migrations/0005)
+    CREATE TABLE IF NOT EXISTS contact_leads (
+      id TEXT PRIMARY KEY,
+      received_at TEXT NOT NULL,
+      name TEXT NOT NULL,
+      company TEXT NOT NULL,
+      email TEXT NOT NULL,
+      phone TEXT,
+      topic TEXT,
+      cycle TEXT,
+      base_size TEXT,
+      message TEXT,
+      forwarded INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS ix_leads_received ON contact_leads (received_at);
+
     CREATE TABLE IF NOT EXISTS activity_log (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       tenant_id TEXT NOT NULL,

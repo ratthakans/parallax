@@ -271,7 +271,7 @@ export async function getCustomer(tenantId: string, id: string): Promise<Custome
     }
   }
 
-  const playName = (pid: string) => playById(pid)?.name ?? pid;
+  const playName = (pid: string) => playById(pid)?.nameTh ?? pid;
   const timeline: TimelineItem[] = [
     ...txns.map((t): TimelineItem => ({
       kind: "purchase", at: t.occurred_at, total: Number(t.total), discount: Number(t.discount_total),

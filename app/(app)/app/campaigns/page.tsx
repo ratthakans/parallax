@@ -65,7 +65,7 @@ export default async function CampaignsPage() {
       <PageHead
         label="แคมเปญ"
         title={DELIVERY_CONNECTED ? "อนุมัติแล้ว · ส่งแล้ว · รอผล" : "อนุมัติแล้ว · จำลองการส่ง · รอผล"}
-        lead="Approval freezes the list immediately — nobody can be added or removed after, because a list that can change makes the measurement worthless. Send from the button on each row."
+        lead="อนุมัติแล้วรายชื่อถูกล็อกทันที เพิ่มหรือลดคนไม่ได้อีก เพราะรายชื่อที่เปลี่ยนได้ทำให้การวัดผลไม่มีความหมาย — ส่งได้จากปุ่มในแต่ละแถว"
         actions={
           <ActionForm
             action={measureAllAction}
@@ -78,7 +78,7 @@ export default async function CampaignsPage() {
 
       {pending.length > 0 && (
         <Panel flat className="mb-6 border-l-2 border-[var(--c-accent)] p-5">
-          <p className="c-label text-[var(--c-accent)]">outstanding work</p>
+          <p className="c-label text-[var(--c-accent)]">งานที่ค้างอยู่</p>
           <p className="c-thai mt-2 text-[0.88rem] text-[var(--c-text-2)]">
             {num(pending.length)} approved but unsent — {" "}
               {num(pending.reduce((acc, r) => acc + (r.treated_size - r.sent), 0))} people
@@ -113,12 +113,12 @@ export default async function CampaignsPage() {
           sub="มุมที่สองของการวัด"
           tone="muted"
         />
-        <Metric label={DELIVERY_CONNECTED ? "Messages sent" : "จำลองการส่ง"} value={num(totalSent)} />
+        <Metric label={DELIVERY_CONNECTED ? "ส่งแล้ว" : "จำลองการส่ง"} value={num(totalSent)} />
       </Panel>
 
       {rows.length === 0 ? (
         <Empty>
-          No campaigns yet — approve one from the Morning Brief and the first row appears here
+          ยังไม่มีแคมเปญ — อนุมัติจากบรีฟเช้า แล้วแถวแรกจะขึ้นที่นี่
         </Empty>
       ) : (
         <Panel className="p-5 md:p-6">
@@ -126,7 +126,7 @@ export default async function CampaignsPage() {
             <table className="c-table min-w-[58rem]">
               <thead>
                 <tr>
-                  <th>play</th>
+                  <th>วิธี</th>
                   <th>อนุมัติเมื่อ</th>
                   <th>กลุ่ม</th>
                   <th>ส่ง / กันไว้</th>
@@ -144,7 +144,7 @@ export default async function CampaignsPage() {
                     <tr key={r.id}>
                       <td>
                         <span className="text-[var(--c-text)]">
-                          {play?.name ?? r.play_id}
+                          {play?.nameTh ?? play?.name ?? r.play_id}
                         </span>
                         <span className="c-mono mt-1 block text-[0.75rem] text-[var(--c-text-4)]">
                           {r.play_id}
@@ -187,7 +187,7 @@ export default async function CampaignsPage() {
                         >
                           {!r.dry_run && r.sent < r.treated_size
                             ? "ตรวจเพื่อส่ง"
-                            : "Open"}
+                            : "เปิด"}
                         </Link>
                       </td>
                     </tr>

@@ -30,6 +30,5 @@ export function demoToolsEnabled(): boolean {
 }
 
 export const DEMO_TOOLS_OFF_REASON =
-  "Demo tools are turned off on the public console, so nobody can wipe or " +
-  "time-shift the dataset other visitors are looking at. Set " +
-  "PARALLAX_DEMO_TOOLS=1 to enable them.";
+  "เครื่องมือเดโมปิดอยู่บนระบบที่ใช้งานจริง เพื่อไม่ให้ใครล้างหรือเลื่อนเวลาข้อมูล " +
+  "(เปิดได้ด้วย PARALLAX_DEMO_TOOLS=1)";

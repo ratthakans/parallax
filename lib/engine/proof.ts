@@ -244,8 +244,8 @@ export async function measureCampaign(
         dry_run: number;
       }
     | undefined;
-  if (!camp) throw new Error("Campaign not found");
-  if (camp.dry_run) throw new Error("A dry run has nothing to measure");
+  if (!camp) throw new Error("ไม่พบแคมเปญนี้");
+  if (camp.dry_run) throw new Error("แคมเปญซ้อมส่งไม่มีผลให้วัด");
 
   const out: Attribution[] = [];
   const nowIso = new Date().toISOString();

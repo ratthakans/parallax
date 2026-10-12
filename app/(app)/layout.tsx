@@ -10,6 +10,7 @@ import { getTenant } from "@/lib/engine/match";
 import { planById } from "@/lib/shared/plans";
 import { TENANT_PROFILES, profileFor } from "@/lib/shared/tenants";
 import { featuresComputedAt } from "@/lib/engine/derive";
+import { hasSyntheticData } from "@/lib/engine/synthetic";
 import { switchTenantAction } from "./actions";
 import { signOutAction } from "@/app/login/actions";
 import { myTenants } from "./tenant";
@@ -28,6 +29,8 @@ export default async function ConsoleLayout({
   const tenant = await getTenant(tenantId);
   const profile = profileFor(tenantId);
   const computedAt = await featuresComputedAt(tenantId);
+  /* แถบเดโมขึ้นตามข้อมูลจริงของบัญชี ไม่ใช่ตามสวิตช์เครื่องมือเดโม (ดู lib/engine/synthetic.ts) */
+  const synthetic = await hasSyntheticData(tenantId);
   const allowed = await myTenants();
   const user = await currentUser();
 
@@ -66,7 +69,7 @@ export default async function ConsoleLayout({
 
               บรรทัดเดียว ไม่กินพื้นที่จอ — สิ่งที่หน้านี้ต้องการให้อ่านคือ
               สามการตัดสินใจ ไม่ใช่ป้ายประกาศ */}
-          {!demoToolsEnabled() && (
+          {synthetic && (
             <div className="c-demobar">
               <span>
                 <strong>Demo</strong> · synthetic data, four Thai businesses

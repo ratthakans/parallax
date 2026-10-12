@@ -25,6 +25,9 @@ import { ActionForm } from "@/components/console/action-form";
 
 export const dynamic = "force-dynamic";
 
+/* หัวตารางภาษาไทยไม่ใช้ mono ตัวพิมพ์ใหญ่ของ .c-table th (ดู console.css) */
+const TH = "font-sans normal-case tracking-normal text-[0.75rem]";
+
 export default async function CampaignDetail({
   params,
 }: {
@@ -109,15 +112,15 @@ export default async function CampaignDetail({
     <>
       <PageHead
         label={`campaign · ${camp.play_id}`}
-        title={play?.name ?? camp.play_id}
+        title={play?.nameTh ?? play?.name ?? camp.play_id}
         lead={
           camp.dry_run
-            ? "Dry run — the cohort really is frozen, but nothing sends and it does not count against frequency caps"
+            ? "ซ้อมส่ง — ล็อกรายชื่อจริง แต่ไม่มีอะไรถูกส่ง และไม่นับเข้าเพดานความถี่"
             : `อนุมัติโดย ${camp.approved_by} เมื่อ ${thaiDateTime(camp.approved_at)} · ${ageDays} วันก่อน`
         }
         actions={
           <Link href="/app/campaigns" className="c-btn c-btn-ghost">
-            ← All campaigns
+            ← แคมเปญทั้งหมด
           </Link>
         }
       />
@@ -141,32 +144,31 @@ export default async function CampaignDetail({
           >
             {fullySent
               ? DELIVERY_CONNECTED
-                ? "Sent — waiting on results"
+                ? "ส่งแล้ว — รอผล"
                 : "จำลองการส่งแล้ว — ยังไม่มีข้อความออกไปจริง"
-              : "One step left"}
+              : "เหลืออีกขั้นเดียว"}
           </p>
           <p className="c-thai mt-2 max-w-3xl text-[0.88rem] leading-relaxed text-[var(--c-text-2)]">
             {fullySent ? (
               <>
-                {num(sentCount)} {DELIVERY_CONNECTED ? "sent" : `บันทึกไว้ (ยังไม่ได้เชื่อม${nc.channel})`} ·{" "}
-                {num(camp.holdout_size)} held back
+                {num(sentCount)} {DELIVERY_CONNECTED ? "sent" : `บันทึกไว้ (ยังไม่ได้เชื่อม ${nc.channel})`} ·{" "}
+                กันไว้ {num(camp.holdout_size)} คน
                 {camp.holdout_size > 0 ? (
                   <>
-                    {" "}— first readable around {dueDate(30)}, fully concluded{" "}
+                    {" "}— อ่านผลแรกได้ราว {dueDate(30)} สรุปครบ{" "}
                     {dueDate(90)}
                   </>
                 ) : (
-                  <> — no control group here, so the result indicates direction only</>
+                  <> — แคมเปญนี้ไม่มีกลุ่มควบคุม ผลจึงบอกได้แค่แนวโน้ม</>
                 )}
               </>
             ) : DELIVERY_CONNECTED ? (
               <>
-                The list is frozen and nobody has received anything yet. Press “Send”
-                below to finish — pressing twice does not send twice.
+                ล็อกรายชื่อแล้ว ยังไม่มีใครได้รับ กด "ส่ง" ด้านล่างเพื่อจบขั้นตอน — กดซ้ำก็ไม่ส่งซ้ำ
               </>
             ) : (
               <>
-                ล็อกรายชื่อแล้ว ยังไม่ได้เชื่อม{nc.channel} ปุ่มด้านล่างจึงแค่บันทึกว่าใครอยู่ในกลุ่มที่ได้รับ
+                ล็อกรายชื่อแล้ว ยังไม่ได้เชื่อม {nc.channel} ปุ่มด้านล่างจึงแค่บันทึกว่าใครอยู่ในกลุ่มที่ได้รับ
                 เพื่อเริ่มนับผล — {nc.nothingSent} และไม่ตัดเครดิต
               </>
             )}
@@ -185,20 +187,20 @@ export default async function CampaignDetail({
               label={
                 fullySent
                   ? DELIVERY_CONNECTED
-                    ? `All sent · ${num(sentCount)}`
+                    ? `ส่งครบแล้ว · ${num(sentCount)}`
                     : `จำลองครบแล้ว · ${num(sentCount)}`
                   : DELIVERY_CONNECTED
                     ? `Send — ${num(remaining)} recipients`
                     : `จำลองการส่ง — ${num(remaining)} คน`
               }
-              pendingLabel={DELIVERY_CONNECTED ? `Sending to ${num(remaining)}…` : `กำลังบันทึก ${num(remaining)} คน…`}
+              pendingLabel={DELIVERY_CONNECTED ? `กำลังส่งถึง ${num(remaining)} คน…` : `กำลังบันทึก ${num(remaining)} คน…`}
               variant={fullySent ? "ghost" : "primary"}
               disabled={fullySent}
             />
             <ActionForm
               action={measureAction}
               fields={{ tenantId, campaignId: camp.id }}
-              label="Measure now"
+              label="วัดผลตอนนี้"
               pendingLabel="Measuring…"
             />
           </div>
@@ -206,58 +208,57 @@ export default async function CampaignDetail({
       )}
 
       <Panel flat className="mb-6 grid grid-cols-2 gap-x-6 gap-y-7 p-5 md:grid-cols-4 md:p-6">
-        <Metric label="Frozen cohort" value={num(camp.audience_size)} />
-        <Metric label="Treated" value={num(camp.treated_size)} tone="accent" />
+        <Metric label="รายชื่อที่ล็อกไว้" value={num(camp.audience_size)} />
+        <Metric label="กลุ่มที่ได้รับ" value={num(camp.treated_size)} tone="accent" />
         <Metric
-          label="Held back"
+          label="กลุ่มควบคุม (ไม่ส่ง)"
           value={num(camp.holdout_size)}
-          sub={`${camp.holdout_pct}% of the cohort`}
+          sub={`${camp.holdout_pct}% ของรายชื่อ`}
           tone="muted"
         />
         <Metric
-          label={DELIVERY_CONNECTED ? "Messages sent" : "จำลองการส่ง"}
+          label={DELIVERY_CONNECTED ? "ส่งแล้ว" : "จำลองการส่ง"}
           value={num(sentCount)}
-          sub={DELIVERY_CONNECTED ? "Pressing send again adds none" : "ยังไม่ได้ส่งจริง · ไม่ตัดเครดิต"}
+          sub={DELIVERY_CONNECTED ? "กดส่งซ้ำไม่เพิ่ม" : "ยังไม่ได้ส่งจริง · ไม่ตัดเครดิต"}
         />
       </Panel>
 
       <div className="mb-6">
         <Meter treated={camp.treated_size} holdout={camp.holdout_size} />
         <p className="c-thai mt-2.5 text-[0.78rem] text-[var(--c-text-3)]">
-          {MEASUREMENT_LABEL[camp.measurement]} — these two bars are the two views that
-          make distance calculable. With one view you see revenue but not where it came
-          from.
+          {MEASUREMENT_LABEL[camp.measurement]} — สองแถบนี้คือสองกลุ่มที่ทำให้วัดส่วนต่างได้
+          ถ้ามีแค่กลุ่มเดียว จะเห็นยอดขาย แต่ไม่รู้ว่ามาจากข้อความหรือมาเองอยู่แล้ว
         </p>
       </div>
 
       {/* PROOF */}
       <Panel className="mb-6 p-5 md:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="c-h2 text-[var(--c-text)]">Measured results</h2>
+          <h2 className="c-h2 text-[var(--c-text)]">ผลที่วัดได้</h2>
           {verdict90 && <VerdictPill verdict={verdict90} />}
         </div>
 
         {attributions.length === 0 ? (
           <p className="c-thai mt-4 text-[0.85rem] text-[var(--c-text-3)]">
-            Not measured yet — press measure to compute T+7 / T+30 / T+90
+            ยังไม่ได้วัด — กด "วัดผลตอนนี้" เพื่อคำนวณที่ 7 / 30 / 90 วัน
           </p>
         ) : (
           <div className="c-scroll mt-5">
             <table className="c-table min-w-[46rem]">
               <thead>
                 <tr>
-                  <th>Horizon</th>
-                  <th>Per head · treated</th>
-                  <th>Per head · held</th>
-                  <th>Difference</th>
-                  <th>95% CI</th>
-                  <th>Verdict</th>
+                  <th className={TH}>หลังส่ง</th>
+                  <th className={TH}>ต่อคน · กลุ่มที่ได้รับ</th>
+                  <th className={TH}>ต่อคน · กลุ่มควบคุม</th>
+                  <th className={TH}>ส่วนต่าง</th>
+                  <th className={TH}>ช่วงที่น่าจะเป็น (95%)</th>
+                  <th className={TH}>ข้อสรุป</th>
                 </tr>
               </thead>
               <tbody>
                 {attributions.map((a) => (
                   <tr key={a.horizon_days}>
-                    <td className="c-mono text-[var(--c-text)]">T+{a.horizon_days}</td>
+                    <td className="c-thai text-[var(--c-text)]">{a.horizon_days} วัน</td>
                     <td className="c-mono">{baht(a.rph_treated)}</td>
                     <td className="c-mono">{baht(a.rph_holdout)}</td>
                     <td className="c-mono">
@@ -287,21 +288,21 @@ export default async function CampaignDetail({
 
         <p className="c-thai mt-4 text-[0.78rem] text-[var(--c-text-4)]">
           {camp.measurement === "pooled_90d_holdout"
-            ? "At this size only the pooled T+90 concludes — T+7 and T+30 read as inconclusive by rule, not because anything is broken"
-            : "A confidence interval spanning zero counts as inconclusive, and is shown as such rather than dressed up"}
+            ? "กลุ่มขนาดนี้สรุปได้ที่ 90 วันแบบรวมกลุ่มควบคุมเท่านั้น — ที่ 7 และ 30 วันจึงขึ้นว่ายังไม่พอสรุปตามกติกา ไม่ใช่เพราะระบบพัง"
+            : "ถ้าช่วงที่น่าจะเป็นคร่อมศูนย์ ถือว่ายังสรุปไม่ได้ และแสดงตามนั้น ไม่ปัดให้ดูดีขึ้น"}
         </p>
       </Panel>
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* snapshot ของข้อความ */}
         <Panel className="p-5 md:p-6">
-          <h2 className="c-h2 text-[var(--c-text)]">Copy snapshot</h2>
+          <h2 className="c-h2 text-[var(--c-text)]">ข้อความที่ใช้</h2>
           <p className="c-thai mt-1.5 text-[0.8rem] text-[var(--c-text-3)]">
-            Captured at approval — editing the play later does not touch campaigns already sent
+            บันทึกไว้ตอนอนุมัติ — แก้วิธีทีหลังไม่กระทบแคมเปญที่ส่งไปแล้ว
           </p>
-          <p className="c-label mt-5">chosen tone — {copy.tone}</p>
+          <p className="c-label mt-5">น้ำเสียงที่เลือก — {copy.tone}</p>
           <pre className="c-code mt-2.5">{copy.body}</pre>
-          <p className="c-label mt-5">offer</p>
+          <p className="c-label mt-5">ข้อเสนอ</p>
           <pre className="c-code mt-2.5">
             {Object.entries(offer)
               .map(([k, v]) => `${k}: ${String(v)}`)
@@ -311,17 +312,17 @@ export default async function CampaignDetail({
 
         {/* audience ที่แช่แข็ง */}
         <Panel className="p-5 md:p-6">
-          <h2 className="c-h2 text-[var(--c-text)]">The frozen cohort</h2>
+          <h2 className="c-h2 text-[var(--c-text)]">รายชื่อที่ล็อกไว้</h2>
           <p className="c-thai mt-1.5 text-[0.8rem] text-[var(--c-text-3)]">
-            The arm comes from hash(customer_id + campaign_id) — recomputing always gives the same answer
+            ใครอยู่กลุ่มไหนคำนวณจากรหัสลูกค้ากับรหัสแคมเปญ — คำนวณใหม่กี่ครั้งก็ได้ผลเดิม ตรวจย้อนได้
           </p>
           <div className="c-scroll mt-5">
             <table className="c-table min-w-[26rem]">
               <thead>
                 <tr>
-                  <th>{v.person}</th>
-                  <th>arm</th>
-                  <th>Recheck</th>
+                  <th className={TH}>{v.person}</th>
+                  <th className={TH}>กลุ่ม</th>
+                  <th className={TH}>ตรวจซ้ำ</th>
                 </tr>
               </thead>
               <tbody>
@@ -340,14 +341,14 @@ export default async function CampaignDetail({
                         <span
                           className={`c-pill ${s.arm === "treated" ? "c-pill-reach" : "c-pill-warn"}`}
                         >
-                          {s.arm === "treated" ? "Treated" : "Held"}
+                          {s.arm === "treated" ? "ได้รับ" : "กันไว้"}
                         </span>
                       </td>
                       <td className="c-mono text-[0.75rem]">
                         {ok ? (
-                          <span className="text-[var(--c-good)]">Match</span>
+                          <span className="text-[var(--c-good)]">ตรงกัน</span>
                         ) : (
-                          <span className="text-[var(--c-bad)]">Mismatch</span>
+                          <span className="text-[var(--c-bad)]">ไม่ตรง</span>
                         )}
                       </td>
                     </tr>
@@ -359,11 +360,11 @@ export default async function CampaignDetail({
 
           {sample[0] && (
             <>
-              <p className="c-label mt-6">preview after per-person substitution</p>
+              <p className="c-label mt-6">ตัวอย่างหลังแทนค่ารายคน</p>
               <pre className="c-code mt-2.5">
                 {renderForCustomer(copy.body, {
                   name: sample[0].name,
-                  last_product: sample[0].last_product ?? "a previous purchase",
+                  last_product: sample[0].last_product ?? "สินค้าที่เคยซื้อ",
                 })}
               </pre>
             </>

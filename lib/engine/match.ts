@@ -468,13 +468,22 @@ export async function runMatch(tenantId: string): Promise<MatchResult> {
     const score =
       estimatedCost > 0 ? (expectedValue * priceWeight) / estimatedCost : 0;
 
+    /* blocked เป็นคีย์ที่ชุดตรวจอ่าน · blockedTh คือประโยคที่หน้าจอแสดง (แบบเดียวกับ reasonTh) */
     let blocked: string | undefined;
-    if (turnedOff) blocked = "Turned off for this account";
-    else if (size === 0) blocked = "Nobody qualifies this round";
-    else if (size < guards.min_audience)
+    let blockedTh: string | undefined;
+    if (turnedOff) {
+      blocked = "Turned off for this account";
+      blockedTh = "ปิดไว้ในบัญชีนี้";
+    } else if (size === 0) {
+      blocked = "Nobody qualifies this round";
+      blockedTh = "รอบนี้ยังไม่มีใครเข้าเกณฑ์";
+    } else if (size < guards.min_audience) {
       blocked = `Cohort below the ${guards.min_audience} minimum`;
-    else if (cooldownBlocked)
+      blockedTh = `กลุ่มเล็กกว่าขั้นต่ำ ${guards.min_audience} คน`;
+    } else if (cooldownBlocked) {
       blocked = `Within the ${guards.cooldown_days}-day cooldown`;
+      blockedTh = `เพิ่งส่งวิธีนี้ไป ต้องเว้น ${guards.cooldown_days} วัน`;
+    }
 
     candidates.push({
       play,
@@ -488,6 +497,7 @@ export async function runMatch(tenantId: string): Promise<MatchResult> {
       measurement,
       holdout_pct,
       blocked,
+      blockedTh,
     });
   }
 

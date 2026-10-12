@@ -50,7 +50,7 @@ import {
 const ACTOR = "owner";
 
 function assertTenant(tenantId: string) {
-  if (!isKnownTenant(tenantId)) throw new Error("No such account");
+  if (!isKnownTenant(tenantId)) throw new Error("ไม่พบบัญชีนี้");
 }
 
 /* ── บัญชีที่ทำงานด้วย มาจากฝั่งเซิร์ฟเวอร์เท่านั้น ──
@@ -150,11 +150,11 @@ export async function approveAction(
   if (!candidate) {
     return {
       error:
-        "That play is no longer in today's brief — reload the page to see the current three.",
+        "วิธีนี้ไม่อยู่ในบรีฟของวันนี้แล้ว — โหลดหน้าใหม่เพื่อดูสามอย่างล่าสุด",
     };
   }
   if (candidate.blocked) {
-    return { error: `Cannot approve — ${candidate.blocked}` };
+    return { error: `ยังอนุมัติไม่ได้ — ${candidate.blockedTh ?? candidate.blocked}` };
   }
   if (planBlock && candidate.play.engine === "reach") {
     return { error: planBlock };
@@ -216,17 +216,17 @@ export async function sendAction(
     const t = await getTenant(tenantId);
     return {
       error:
-        `Quiet hours ${t?.quiet_hours_start ?? 21}:00–${t?.quiet_hours_end ?? 9}:00 — ` +
-        `nothing was sent to any of the ${num(res.attempted)} recipients. ` +
-        `The frozen list is untouched; press send again outside the window.`,
+        `อยู่ในช่วงห้ามส่ง ${t?.quiet_hours_start ?? 21}:00–${t?.quiet_hours_end ?? 9}:00 — ` +
+        `ยังไม่มีใครใน ${num(res.attempted)} คนได้รับ รายชื่อที่ล็อกไว้ไม่เปลี่ยน ` +
+        `กดส่งอีกครั้งนอกช่วงเวลานี้`,
     };
   }
 
   if (res.sent === 0 && res.skippedNoCredit > 0) {
     return {
       error:
-        `Out of message credits — nothing sent, ${num(res.skippedNoCredit)} still waiting. ` +
-        `Buy credits on the billing page and press send again.`,
+        `เครดิตข้อความหมด — ยังไม่ได้ส่ง เหลือ ${num(res.skippedNoCredit)} คนที่รออยู่ ` +
+        `ซื้อเครดิตที่หน้าค่าใช้จ่ายแล้วกดส่งอีกครั้ง`,
     };
   }
 
@@ -241,23 +241,23 @@ export async function sendAction(
       (res.skippedNoConsent > 0 ? ` · ข้าม ${num(res.skippedNoConsent)} คนที่ถอนความยินยอมแล้ว` : "");
     return {
       ok:
-        `จำลองการส่ง ${num(res.sent)} คน${again} — ยังไม่ได้เชื่อม${nc.channel} ` +
+        `จำลองการส่ง ${num(res.sent)} คน${again} — ยังไม่ได้เชื่อม ${nc.channel} ` +
         `จึง${nc.nothingSent} และไม่ตัดเครดิต`,
     };
   }
 
   if (res.sent === 0 && res.skippedAlreadySent > 0) {
     return {
-      ok: `Everyone already had this message — ${num(res.skippedAlreadySent)} recipients, nothing sent twice.`,
+      ok: `ทุกคนได้รับข้อความนี้แล้ว — ${num(res.skippedAlreadySent)} คน ไม่มีใครได้ซ้ำ`,
     };
   }
 
-  const parts = [`Sent ${num(res.sent)}`];
+  const parts = [`ส่งแล้ว ${num(res.sent)} คน`];
   if (res.skippedNoConsent > 0) parts.push(`ข้าม ${num(res.skippedNoConsent)} คนที่ถอนความยินยอมแล้ว`);
   if (res.skippedAlreadySent > 0) {
-    parts.push(`${num(res.skippedAlreadySent)} already had it`);
+    parts.push(`${num(res.skippedAlreadySent)} คนได้รับไปแล้ว`);
   }
-  parts.push(`${num(res.creditsLeft)} credits left`);
+  parts.push(`เหลือเครดิต ${num(res.creditsLeft)}`);
 
   return {
     ok: parts.join(" · "),
@@ -289,14 +289,14 @@ export async function measureAction(
 
   if (rows.length === 0) {
     return {
-      ok: "Nothing to conclude yet — the first horizon is T+7, so come back after a week.",
+      ok: "ยังสรุปอะไรไม่ได้ — ผลแรกอ่านได้ที่ 7 วันหลังส่ง กลับมาดูอีกครั้งในหนึ่งสัปดาห์",
     };
   }
   const matured = rows.filter((r) => r.matured).length;
   return {
     ok:
-      `Measured ${rows.length} horizon(s)` +
-      (matured > 0 ? ` · ${matured} now mature` : " · none mature yet"),
+      `วัดผลแล้ว ${rows.length} ช่วงเวลา` +
+      (matured > 0 ? ` · ครบกำหนด ${matured} ช่วง` : " · ยังไม่มีช่วงไหนครบกำหนด"),
   };
 }
 
@@ -313,11 +313,11 @@ export async function measureAllAction(
 
   if (rows.length === 0) {
     return {
-      ok: "Nothing was due — every campaign here is already concluded.",
+      ok: "ไม่มีอะไรถึงกำหนด — ทุกแคมเปญสรุปผลไปแล้ว",
     };
   }
   return {
-    ok: `Re-measured ${num(rows.length)} campaign(s) · ${num(horizons)} horizon(s) updated.`,
+    ok: `วัดผลใหม่ ${num(rows.length)} แคมเปญ · อัปเดต ${num(horizons)} ช่วงเวลา`,
   };
 }
 
@@ -336,8 +336,8 @@ export async function togglePlayAction(
   revalidateConsole();
   return {
     ok: enabled
-      ? "Turned on — it can appear in tomorrow's brief."
-      : "Turned off — it will not be proposed again until you turn it back on.",
+      ? "เปิดแล้ว — วิธีนี้จะกลับมาอยู่ในบรีฟได้ตั้งแต่พรุ่งนี้"
+      : "ปิดแล้ว — ระบบจะไม่เสนอวิธีนี้อีกจนกว่าจะเปิดกลับ",
   };
 }
 
@@ -365,7 +365,7 @@ export async function updateGuardsAction(
       readNum("maxDiscountPct"));
   await logActivity(tenantId, ACTOR, "update_guards", playId);
   revalidateConsole();
-  return { ok: "Saved — it takes effect on the next brief." };
+  return { ok: "บันทึกแล้ว — มีผลกับบรีฟรอบถัดไป" };
 }
 
 /* ── งานระบบ ─────────────────────────────────────────────────── */
@@ -379,7 +379,7 @@ export async function deriveAction(
   const n = (await get<{ n: number }>("SELECT COUNT(*) AS n FROM customer_features WHERE tenant_id = ?", tenantId))!;
   await logActivity(tenantId, ACTOR, "derive_features");
   revalidateConsole();
-  return { ok: `Recomputed — ${num(n.n)} rows in the feature table.` };
+  return { ok: `คำนวณใหม่แล้ว — ข้อมูลลูกค้า ${num(n.n)} คน` };
 }
 
 export async function reseedAction(
@@ -395,7 +395,7 @@ export async function reseedAction(
   await deriveFeatures(tenantId);
   resetReady();
   revalidateConsole();
-  return { ok: "Rebuilt — campaigns and results for this account are gone." };
+  return { ok: "สร้างข้อมูลตัวอย่างใหม่แล้ว — แคมเปญและผลวัดเดิมของบัญชีนี้ถูกแทนที่ด้วยชุดใหม่" };
 }
 
 export async function travelAction(
@@ -410,11 +410,11 @@ export async function travelAction(
   revalidateConsole();
   if (res.campaigns === 0) {
     return {
-      ok: "No campaigns to move — approve and send one first, then travel forward.",
+      ok: "ยังไม่มีแคมเปญให้เลื่อน — อนุมัติและส่งก่อน แล้วค่อยเลื่อนเวลา",
     };
   }
   return {
-    ok: `Moved ${days} days back in time · ${num(res.campaigns)} campaign(s) shifted · ${num(res.measured)} re-measured.`,
+    ok: `เลื่อนเวลาไป ${days} วันแล้ว · ${num(res.campaigns)} แคมเปญ · วัดผลใหม่ ${num(res.measured)} แคมเปญ`,
   };
 }
 
@@ -469,7 +469,7 @@ export async function clearAiCacheAction(
   await clearAiCache();
   await logActivity(tenantId, ACTOR, "clear_ai_cache");
   revalidateConsole();
-  return { ok: "Cleared — the next brief writes its sentences from scratch." };
+  return { ok: "ล้างแล้ว — บรีฟรอบถัดไปจะเขียนข้อความใหม่ทั้งหมด" };
 }
 
 export async function updateLimitsAction(
@@ -495,8 +495,8 @@ export async function updateLimitsAction(
   return {
     ok:
       quietStart === quietEnd
-        ? `Saved — quiet hours are now off entirely, so messages can go out at any hour. Cap ${weeklyCap}/week · discount ceiling ${maxDiscount}%.`
-        : `Saved — quiet hours ${quietStart}:00–${quietEnd}:00 · cap ${weeklyCap}/week · discount ceiling ${maxDiscount}%.`,
+        ? `บันทึกแล้ว — ไม่มีช่วงห้ามส่งแล้ว ข้อความออกได้ทุกชั่วโมง · ไม่เกิน ${weeklyCap} ครั้ง/สัปดาห์ · ส่วนลดสูงสุด ${maxDiscount}%`
+        : `บันทึกแล้ว — ห้ามส่ง ${quietStart}:00–${quietEnd}:00 · ไม่เกิน ${weeklyCap} ครั้ง/สัปดาห์ · ส่วนลดสูงสุด ${maxDiscount}%`,
   };
 }
 
@@ -510,8 +510,11 @@ export async function buyCreditsAction(
   const messages = Number(formData.get("messages") ?? 0);
   /* รับเฉพาะขนาดแพ็กที่มีขายจริง ไม่ใช่เลขอะไรก็ได้ที่ส่งมาในฟอร์ม —
      ไม่งั้นยิงค่าลบมาก็หักเครดิตติดลบได้ และยิงเลขใหญ่มาก็ได้เครดิตฟรี */
+  /* ยังไม่มีระบบชำระเงิน — บน production ห้ามเพิ่มเครดิตโดยไม่มีใครจ่าย
+     (หน้าจอซ่อนปุ่มแล้ว แต่ Server Action ยิงตรงได้) */
+  if (!demoToolsEnabled()) return { error: "ยังไม่เปิดชำระเงินออนไลน์ — ติดต่อเราเพื่อซื้อเครดิต" };
   const pack = CREDIT_PACKS.find((p) => p.messages === messages);
-  if (!pack) return { error: "No credit pack of that size." };
+  if (!pack) return { error: "ไม่มีแพ็กเครดิตขนาดนี้" };
   /* buyCredits คืนราคาที่จ่าย (บาท) ไม่ใช่เครดิตคงเหลือ — เดิมข้อความเอาราคามาพิมพ์
      เป็นเครดิต ซื้อ 1,000 จาก 2,000 จึงขึ้นว่า "1,500 available now" */
   const paid = await buyCredits(tenantId, pack.messages, "pack");
@@ -529,8 +532,9 @@ export async function changePlanAction(
 ): Promise<ActionState> {
   const tenantId = await currentTenant(formData);
   const plan = String(formData.get("plan") ?? "");
-  if (!isPlanId(plan)) return { error: "No such plan." };
+  if (!demoToolsEnabled()) return { error: "การเปลี่ยนแผนต้องตกลงและชำระเงินก่อน — ติดต่อเรา" };
+  if (!isPlanId(plan)) return { error: "ไม่มีแผนนี้" };
   await changePlan(tenantId, plan);
   revalidateConsole();
-  return { ok: `Now on ${PLANS[plan].name}. Caps and limits changed immediately.` };
+  return { ok: `เปลี่ยนเป็นแผน ${PLANS[plan].name} แล้ว — เพดานและข้อจำกัดเปลี่ยนทันที` };
 }

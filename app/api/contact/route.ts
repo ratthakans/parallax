@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { saveLead, markForwarded } from "@/lib/engine/leads";
+import { ensureSchema } from "@/lib/engine/db";
 
 export const runtime = "nodejs";
 
@@ -110,36 +112,44 @@ export async function POST(req: Request) {
      ลง log ของเซิร์ฟเวอร์ ซึ่งขัดกับหน้า /trust ของเราเองที่บอกว่า
      ไม่เก็บข้อมูลส่วนบุคคลไว้เกินจำเป็น ตอนนี้ log บอกแค่ว่ามีคนส่งเข้ามา
      กับหัวข้อที่เขาเลือก ไม่มีตัวระบุบุคคลสักตัว */
-  if (!webhook) {
-    console.error(
-      `[contact] CONTACT_WEBHOOK_URL is not set — refused a submission (topic: ${
-        data.topic || "unspecified"
-      }). Set the variable to start receiving leads.`,
-    );
-    return NextResponse.json(
-      {
-        error:
-          "This form is not connected to an inbox yet, so nothing would reach us. Rather than pretend it went through, we would rather you knew.",
-      },
-      { status: 503 },
-    );
+  /* ── เก็บลงฐานก่อนเสมอ แล้วค่อยส่งต่อ ────────────────────────────
+
+     เดิมไม่มี webhook = ปฏิเสธทุกข้อความ (ดูข้างบน) ซึ่งซื่อตรง แต่หมายความว่า
+     ทุกปุ่ม "ขอทดลองใช้" บนเว็บพาไปทางตัน ตอนนี้ฐานข้อมูลเป็น Supabase จริงแล้ว
+     ข้อความจึงถูกเก็บที่ contact_leads ทุกครั้ง และ webhook เป็นแค่ช่องแจ้งเตือนเพิ่ม
+     ปฏิเสธเฉพาะเมื่อเก็บไม่ได้และไม่มีทางส่งต่อเลย — ยังเป็นหลักเดิม: lead ที่รู้ว่าเสีย
+     ดีกว่า lead ที่เสียโดยไม่มีใครรู้ */
+  let saved: { id: string; receivedAt: string } | null = null;
+  try {
+    await ensureSchema();
+    saved = await saveLead(data);
+  } catch (err) {
+    console.error("[contact] could not store the submission", err);
   }
 
-  const record = { ...data, receivedAt: new Date().toISOString() };
-
-  try {
-    const res = await fetch(webhook, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(record),
-    });
-    if (!res.ok) throw new Error(`webhook responded ${res.status}`);
-  } catch (err) {
-    /* ไม่พิมพ์ record ลง log ด้วยเหตุผลเดียวกับข้างบน */
-    console.error("[contact] forward failed", err);
+  if (webhook) {
+    try {
+      const res = await fetch(webhook, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ...data, receivedAt: saved?.receivedAt ?? new Date().toISOString() }),
+      });
+      if (!res.ok) throw new Error(`webhook responded ${res.status}`);
+      if (saved) await markForwarded(saved.id);
+    } catch (err) {
+      /* ไม่พิมพ์ข้อมูลของผู้ส่งลง log ด้วยเหตุผลเดียวกับข้างบน */
+      console.error("[contact] forward failed", err);
+      if (!saved) {
+        return NextResponse.json(
+          { error: "ส่งไม่สำเร็จ กรุณารอสักครู่แล้วลองอีกครั้ง" },
+          { status: 502 },
+        );
+      }
+    }
+  } else if (!saved) {
     return NextResponse.json(
-      { error: "Could not send. Please try again in a moment." },
-      { status: 502 },
+      { error: "ส่งไม่สำเร็จ กรุณารอสักครู่แล้วลองอีกครั้ง หรือส่งอีเมลหาเราโดยตรง" },
+      { status: 503 },
     );
   }
 
