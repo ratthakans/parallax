@@ -84,7 +84,13 @@ export function Metric({
   return (
     <div className="min-w-0">
       <p className={labelClass(label)}>{label}</p>
-      <p className={`c-num mt-2.5 ${fs} ${color}`}>{value}</p>
+      {/* c-num คือตัวเลขแบบเครื่องวัด — บางและบีบช่องไฟ ใช้กับคำไทยแล้ว "ยังไม่พอสรุป"
+          อ่านเหมือนปุ่มที่กดไม่ได้ คำจึงได้น้ำหนักปกติและช่องไฟปกติ */}
+      <p
+        className={`c-num mt-2.5 ${fs} ${color} ${HAS_THAI.test(value) ? "font-normal tracking-normal leading-snug" : ""}`}
+      >
+        {value}
+      </p>
       {sub && (
         <p className="c-thai mt-1.5 text-[0.78rem] text-[var(--c-text-4)]">{sub}</p>
       )}
@@ -160,7 +166,7 @@ export function AiBadge({
     <span className="inline-flex flex-wrap items-center gap-2">
       <span className={`c-pill ${meta.cls}`}>{meta.label}</span>
       {note && (
-        <span className="c-thai text-[0.74rem] text-[var(--c-text-4)]">{note}</span>
+        <span className="c-thai text-[0.75rem] text-[var(--c-text-4)]">{note}</span>
       )}
     </span>
   );

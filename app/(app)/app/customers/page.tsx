@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
 
 /* หัวตารางภาษาไทย — .c-table th เป็นแบบ mono ตัวพิมพ์ใหญ่ถ่างช่องไฟของภาษาอังกฤษ
    ซึ่งทำให้อักษรไทยแตกเป็นตัว ๆ และตกไปใช้ฟอนต์ของระบบ (ดู console.css) */
-const TH = "font-sans normal-case tracking-normal text-[0.74rem]";
+const TH = "font-sans normal-case tracking-normal text-[0.75rem]";
 
 const REACHABLE_LABEL: Record<ReachableBy, string> = {
   line: "ทักทาง LINE ได้",
@@ -240,7 +240,7 @@ export default async function CustomersPage({
                       >
                         {r.name}
                       </Link>
-                      <span className="c-thai mt-0.5 block text-[0.74rem] text-[var(--c-text-4)]">
+                      <span className="c-thai mt-0.5 block text-[0.75rem] text-[var(--c-text-4)]">
                         เพิ่มเมื่อ {thaiDate(r.createdAt)}
                       </span>
                     </td>
@@ -258,7 +258,7 @@ export default async function CustomersPage({
                       {r.lastAt ? (
                         <>
                           {thaiDate(r.lastAt)}
-                          <span className="block text-[0.74rem] text-[var(--c-text-4)]">
+                          <span className="block text-[0.75rem] text-[var(--c-text-4)]">
                             {daysAgoLabel(r.lastAt)}
                           </span>
                         </>
@@ -398,7 +398,7 @@ export default async function CustomersPage({
                   </td>
                   <td className="c-thai text-[0.84rem]">
                     {num(f.recency_days)} วัน
-                    <span className="block text-[0.74rem] text-[var(--c-text-4)]">
+                    <span className="block text-[0.75rem] text-[var(--c-text-4)]">
                       นานกว่าปกติ {f.churn_risk.toFixed(1)} เท่า
                     </span>
                   </td>

@@ -15,6 +15,7 @@ import {
   baht,
   num,
 } from "@/components/console/ui";
+import { thaiDateTime } from "@/lib/shared/format";
 import { measureAllAction } from "../../actions";
 import { ActionForm } from "@/components/console/action-form";
 
@@ -145,15 +146,12 @@ export default async function CampaignsPage() {
                         <span className="text-[var(--c-text)]">
                           {play?.name ?? r.play_id}
                         </span>
-                        <span className="c-mono mt-1 block text-[0.68rem] text-[var(--c-text-4)]">
+                        <span className="c-mono mt-1 block text-[0.75rem] text-[var(--c-text-4)]">
                           {r.play_id}
                         </span>
                       </td>
                       <td className="c-mono whitespace-nowrap text-[0.76rem]">
-                        {new Date(r.approved_at).toLocaleString("en-GB", {
-                          dateStyle: "short",
-                          timeStyle: "short",
-                        })}
+                        {thaiDateTime(r.approved_at)}
                       </td>
                       <td className="c-mono">{num(r.audience_size)}</td>
                       <td className="c-mono whitespace-nowrap">

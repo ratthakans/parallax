@@ -72,12 +72,12 @@ export async function CandidateCard({
       {/* ── หัวการ์ด ── */}
       <div className="flex flex-wrap items-center gap-2">
         {rank != null && (
-          <span className="c-mono text-[0.68rem] text-[var(--c-text-4)]">
+          <span className="c-mono text-[0.75rem] text-[var(--c-text-4)]">
             {String(rank).padStart(2, "0")}
           </span>
         )}
         <EnginePill engine={play.engine} />
-        <span className="c-thai text-[0.74rem] text-[var(--c-text-4)]">
+        <span className="c-thai text-[0.75rem] text-[var(--c-text-4)]">
           {play.engine === "keep"
             ? `ดึง${v.th.people}เดิมให้กลับมา`
             : `หา${v.th.people}ใหม่ที่คล้ายกลุ่มที่ดีที่สุด`}
@@ -227,11 +227,11 @@ export async function CandidateCard({
         <div className="mt-4">
           <Meter treated={treated} holdout={holdout} />
           <div className="mt-2.5 flex flex-wrap items-center justify-between gap-x-6 gap-y-1">
-            <p className="c-mono text-[0.72rem] text-[var(--c-text-3)]">
+            <p className="c-mono text-[0.75rem] text-[var(--c-text-3)]">
               Treated {num(treated)} · held back {num(holdout)} (
               {candidate.holdout_pct}%)
             </p>
-            <p className="c-mono text-[0.72rem] text-[var(--c-text-4)]">
+            <p className="c-mono text-[0.75rem] text-[var(--c-text-4)]">
               {MEASUREMENT_LABEL[candidate.measurement]}
             </p>
           </div>

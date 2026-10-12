@@ -338,7 +338,7 @@ export function Importer() {
             }}
           />
         </div>
-        <p className="c-mono mt-6 text-[0.72rem] text-[var(--c-text-4)]">
+        <p className="c-mono mt-6 text-[0.75rem] text-[var(--c-text-4)]">
           CSV · TSV · up to 4MB
         </p>
       </div>

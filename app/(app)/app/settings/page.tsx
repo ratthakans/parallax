@@ -138,7 +138,7 @@ export default async function SettingsPage() {
                 max={14}
                 defaultValue={tenant?.max_messages_per_week ?? 2}
               />
-              <span className="c-thai text-[0.74rem] text-[var(--c-text-4)]">
+              <span className="c-thai text-[0.75rem] text-[var(--c-text-4)]">
                 นับรวมทุกแคมเปญ ทั้ง KEEP และ REACH
               </span>
             </label>
@@ -152,7 +152,7 @@ export default async function SettingsPage() {
                 max={23}
                 defaultValue={tenant?.quiet_hours_start ?? 21}
               />
-              <span className="c-thai text-[0.74rem] text-[var(--c-text-4)]">
+              <span className="c-thai text-[0.75rem] text-[var(--c-text-4)]">
                 กดส่งในช่วงนี้จะไม่มีอะไรออกไป
               </span>
             </label>
@@ -166,7 +166,7 @@ export default async function SettingsPage() {
                 max={23}
                 defaultValue={tenant?.quiet_hours_end ?? 9}
               />
-              <span className="c-thai text-[0.74rem] text-[var(--c-text-4)]">
+              <span className="c-thai text-[0.75rem] text-[var(--c-text-4)]">
                 It is currently {new Date().getHours()}:00
               </span>
             </label>
@@ -180,7 +180,7 @@ export default async function SettingsPage() {
                 max={100}
                 defaultValue={tenant?.max_discount_pct ?? 20}
               />
-              <span className="c-thai text-[0.74rem] text-[var(--c-text-4)]">
+              <span className="c-thai text-[0.75rem] text-[var(--c-text-4)]">
                 ทับเพดานของ play เสมอ
               </span>
             </label>
@@ -226,7 +226,7 @@ export default async function SettingsPage() {
                       <span className="c-thai text-[0.85rem] text-[var(--c-text)]">
                         {AI_JOB_LABEL[j.kind]}
                       </span>
-                      <span className="c-mono shrink-0 text-[0.72rem] text-[var(--c-text-4)]">
+                      <span className="c-mono shrink-0 text-[0.75rem] text-[var(--c-text-4)]">
                         {hit ? `${num(hit.n)} cached` : "Never called"}
                       </span>
                     </div>
@@ -367,7 +367,7 @@ export default async function SettingsPage() {
             <tbody>
               {log.map((l, i) => (
                 <tr key={`${l.at}-${i}`}>
-                  <td className="c-mono whitespace-nowrap text-[0.74rem]">
+                  <td className="c-mono whitespace-nowrap text-[0.75rem]">
                     {new Date(l.at).toLocaleString("en-GB", {
                       dateStyle: "short",
                       timeStyle: "short",

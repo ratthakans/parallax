@@ -21,13 +21,13 @@ import {
 import { roiSummary } from "@/lib/engine/proof";
 import { playById } from "@/lib/shared/plays";
 import { Empty, Metric, PageHead, Panel, baht, num } from "@/components/console/ui";
+import { thaiDate } from "@/lib/shared/format";
 import { buyCreditsAction, changePlanAction } from "../../actions";
 import { ActionForm } from "@/components/console/action-form";
 
 export const dynamic = "force-dynamic";
 
-const date = (iso: string) =>
-  new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+const date = (iso: string) => thaiDate(iso);
 
 /* แถบวัดที่ต้องอ่านออกว่า "ใกล้เต็มหรือยัง" ไม่ใช่แค่ดูสวย
    จึงเปลี่ยนสีที่ 80% — จุดที่ยังมีเวลาทำอะไรได้ ไม่ใช่ที่ 100% */
@@ -189,7 +189,7 @@ export default async function BillingPage() {
                 label={
                   <>
                     <span className="c-mono text-[0.82rem]">+{num(pk.messages)}</span>
-                    <span className="text-[0.72rem] text-[var(--c-text-4)]">
+                    <span className="text-[0.75rem] text-[var(--c-text-4)]">
                       {baht(pk.baht)} · ฿{perMessage(pk).toFixed(2)}/msg
                     </span>
                   </>

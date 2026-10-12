@@ -41,7 +41,7 @@ export default function ConsoleError({
         </p>
 
         {error.digest && (
-          <p className="c-mono mt-5 text-[0.74rem] text-[var(--c-text-4)]">
+          <p className="c-mono mt-5 text-[0.75rem] text-[var(--c-text-4)]">
             reference {error.digest}
           </p>
         )}

@@ -177,34 +177,44 @@ export default async function ProofPage() {
         <div className="grid gap-6 md:grid-cols-[1fr_1.4fr]">
           <div>
             <p className="c-label-th">ส่วนต่างเฉลี่ย พร้อมช่วงความเชื่อมั่น</p>
-            <p className="c-thai mt-1.5 text-[0.74rem] text-[var(--c-text-4)]">
+            <p className="c-thai mt-1.5 text-[0.75rem] text-[var(--c-text-4)]">
               เฉลี่ยจากทุกแคมเปญที่วัดผลแล้ว รวมตัวที่ยังสรุปไม่ได้ด้วย — ถ้าเฉลี่ยเฉพาะตัวที่มีนัยสำคัญ
               ตัวเลขจะสูงเกินจริงเสมอ
             </p>
             {roi.avgLiftPct != null ? (
               <>
-                <p className="c-num mt-3 text-[2.2rem] text-[var(--c-good)]">
+                {/* สีเขียวแปลว่า "ได้ผล" — ใช้ได้เฉพาะเมื่อช่วงความเชื่อมั่นไม่คร่อมศูนย์
+                    เดิมเขียว +13.5% ทั้งที่ช่วงคือ -1.7% ถึง 28.7% ในการ์ดเดียวกับที่บอกว่า
+                    "ยังไม่พอสรุป" สีกับคำพูดขัดกันเอง */}
+                <p
+                  className={`c-num mt-3 text-[2.2rem] ${
+                    roi.ciLow! > 0
+                      ? "text-[var(--c-good)]"
+                      : roi.ciHigh! < 0
+                        ? "text-[var(--c-bad)]"
+                        : "text-[var(--c-text)]"
+                  }`}
+                >
                   {roi.avgLiftPct > 0 ? "+" : ""}
                   {pct(roi.avgLiftPct)}
                 </p>
-                <p className="c-mono mt-2 text-[0.78rem] text-[var(--c-text-3)]">
-                  95% CI · {roi.ciLow!.toFixed(1)}% to{" "}
-                  {roi.ciHigh!.toFixed(1)}%
+                <p className="c-thai mt-2 text-[0.82rem] text-[var(--c-text-3)]">
+                  ช่วงที่น่าจะเป็นจริง (95%): {roi.ciLow!.toFixed(1)}% ถึง {roi.ciHigh!.toFixed(1)}%
+                  {roi.ciLow! <= 0 && roi.ciHigh! >= 0 && " — ยังคร่อมศูนย์ จึงยังสรุปไม่ได้ว่าได้ผล"}
                 </p>
               </>
             ) : (
               <p className="c-thai mt-3 text-[0.85rem] text-[var(--c-warn)]">
-                Not enough yet — needs a campaign at 90 days with a large enough holdout
+                ยังไม่พอ — ต้องมีแคมเปญที่ครบ 90 วันและมีกลุ่มควบคุมใหญ่พอ
               </p>
             )}
             {Object.keys(roi.horizonMix).length > 0 && (
               <p className="c-thai mt-3 text-[0.76rem] text-[var(--c-text-4)]">
-                From{" "}
+                วัดจาก{" "}
                 {Object.entries(roi.horizonMix)
-                  .map(([h, n]) => `${num(n)} at T+${h}`)
+                  .map(([h, n]) => `${num(n)} แคมเปญที่ ${h} วัน`)
                   .join(" · ")}{" "}
-                — each campaign is read at the most mature horizon it can support, so a
-              usable T+30 result is not discarded just for being short of 90 days.
+                — แต่ละแคมเปญใช้ผลจากช่วงเวลาที่ยาวที่สุดที่มีให้
               </p>
             )}
           </div>

@@ -19,7 +19,7 @@ import {
   num,
   pct,
 } from "@/components/console/ui";
-import { ciLabel } from "@/lib/shared/format";
+import { ciLabel, thaiDate, thaiDateTime } from "@/lib/shared/format";
 import { measureAction, sendAction } from "../../../actions";
 import { ActionForm } from "@/components/console/action-form";
 
@@ -99,11 +99,7 @@ export default async function CampaignDetail({
   const fullySent = sentCount >= camp.treated_size;
   const remaining = Math.max(0, camp.treated_size - sentCount);
   const dueDate = (h: number) =>
-    new Date(Date.parse(camp.approved_at) + h * 86400000).toLocaleDateString("en-GB", {
-      day: "numeric",
-      month: "short",
-      year: "2-digit",
-    });
+    thaiDate(new Date(Date.parse(camp.approved_at) + h * 86400000).toISOString());
   const verdict90 = attributions.find((a) => a.horizon_days === 90)?.verdict as
     | Verdict
     | undefined;
@@ -116,7 +112,7 @@ export default async function CampaignDetail({
         lead={
           camp.dry_run
             ? "Dry run — the cohort really is frozen, but nothing sends and it does not count against frequency caps"
-            : `Approved by ${camp.approved_by} on ${new Date(camp.approved_at).toLocaleString("en-US")} · ${ageDays} days ago`
+            : `อนุมัติโดย ${camp.approved_by} เมื่อ ${thaiDateTime(camp.approved_at)} · ${ageDays} วันก่อน`
         }
         actions={
           <Link href="/app/campaigns" className="c-btn c-btn-ghost">
@@ -335,7 +331,7 @@ export default async function CampaignDetail({
                     <tr key={s.id}>
                       <td>
                         <span className="text-[var(--c-text)]">{s.name}</span>
-                        <span className="c-mono mt-0.5 block text-[0.66rem] text-[var(--c-text-4)]">
+                        <span className="c-mono mt-0.5 block text-[0.75rem] text-[var(--c-text-4)]">
                           {s.id}
                         </span>
                       </td>
@@ -346,7 +342,7 @@ export default async function CampaignDetail({
                           {s.arm === "treated" ? "Treated" : "Held"}
                         </span>
                       </td>
-                      <td className="c-mono text-[0.72rem]">
+                      <td className="c-mono text-[0.75rem]">
                         {ok ? (
                           <span className="text-[var(--c-good)]">Match</span>
                         ) : (

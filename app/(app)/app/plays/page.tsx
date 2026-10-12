@@ -190,7 +190,7 @@ function PlayGroup({
                     <p className="c-label">shop guard overrides</p>
                     <div className="grid grid-cols-3 gap-3">
                       <label className="flex flex-col gap-1.5">
-                        <span className="c-mono text-[0.68rem] text-[var(--c-text-4)]">
+                        <span className="c-mono text-[0.75rem] text-[var(--c-text-4)]">
                           min_audience
                         </span>
                         <input
@@ -202,7 +202,7 @@ function PlayGroup({
                         />
                       </label>
                       <label className="flex flex-col gap-1.5">
-                        <span className="c-mono text-[0.68rem] text-[var(--c-text-4)]">
+                        <span className="c-mono text-[0.75rem] text-[var(--c-text-4)]">
                           cooldown_days
                         </span>
                         <input
@@ -214,7 +214,7 @@ function PlayGroup({
                         />
                       </label>
                       <label className="flex flex-col gap-1.5">
-                        <span className="c-mono text-[0.68rem] text-[var(--c-text-4)]">
+                        <span className="c-mono text-[0.75rem] text-[var(--c-text-4)]">
                           max_discount_pct
                         </span>
                         <input
@@ -237,7 +237,7 @@ function PlayGroup({
                           ? `${num(p.trials)} runs in the same cycle, ${num(p.successes)} responses — so this shop starts at ${(rate * 100).toFixed(1)}% from its first campaign`
                           : "No posterior yet — using the play's default"}
                       </p>
-                      <p className="c-thai mt-2 text-[0.74rem] text-[var(--c-text-4)]">
+                      <p className="c-thai mt-2 text-[0.75rem] text-[var(--c-text-4)]">
                         ข้ามบัญชีเฉพาะสถิติรวม ไม่มีแถวลูกค้าออกจากบัญชีเลย
                       </p>
                     </div>

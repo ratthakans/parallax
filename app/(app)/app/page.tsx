@@ -21,6 +21,7 @@ import {
   num,
   pct,
 } from "@/components/console/ui";
+import { thaiDateLong } from "@/lib/shared/format";
 import { deriveAction, measureAllAction } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -90,16 +91,12 @@ export default async function BriefPage() {
     vocab: vocabFor(tenantId),
   });
 
-  const dateLabel = new Date().toLocaleDateString("en-GB", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  });
+  const dateLabel = thaiDateLong();
 
   return (
     <>
       <PageHead
-        label={`morning brief · ${dateLabel}`}
+        label={`บรีฟเช้า · ${dateLabel}`}
         title="สามอย่างที่ควรทำวันนี้"
         lead="ไม่มีอะไรต้องตั้งค่า ไม่ต้องเขียนกฎ — อ่านสามอย่างข้างล่าง แล้วอนุมัติหรือไม่อนุมัติ จบ"
       />
@@ -154,7 +151,7 @@ export default async function BriefPage() {
         <div className="mt-4 flex flex-wrap items-center gap-2.5">
           <AiBadge source={summary.source} note={summary.note} />
           {three.length > 0 && (
-            <span className="c-mono text-[0.72rem] text-[var(--c-text-4)]">
+            <span className="c-mono text-[0.75rem] text-[var(--c-text-4)]">
               มูลค่าที่คาดไว้วันนี้ {baht(totalValue)}
             </span>
           )}
@@ -251,7 +248,7 @@ export default async function BriefPage() {
               ให้พื้นที่กดเท่าปุ่ม แม้หน้าตายังเป็นลิงก์ */}
           <Link
             href="/app/settings"
-            className="c-mono -mx-2 inline-flex min-h-11 items-center px-2 text-[0.72rem] text-[var(--c-cyan)]"
+            className="c-mono -mx-2 inline-flex min-h-11 items-center px-2 text-[0.75rem] text-[var(--c-cyan)]"
           >
             แก้ที่หน้าตั้งค่า →
           </Link>

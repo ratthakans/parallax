@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { thaiDateTime } from "@/lib/shared/format";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Mark } from "@/components/brand";
@@ -129,7 +130,7 @@ export function ConsoleNav({
               type="button"
               onClick={() => setPickerOpen((x) => !x)}
               aria-expanded={pickerOpen}
-              className="c-mono -mx-2 inline-flex min-h-9 items-center px-2 text-[0.68rem] text-[var(--c-cyan)]"
+              className="c-mono -mx-2 inline-flex min-h-9 items-center px-2 text-[0.75rem] text-[var(--c-cyan)]"
             >
               {pickerOpen ? "ปิด" : "สลับ"}
             </button>
@@ -137,10 +138,10 @@ export function ConsoleNav({
           <p className="mt-2 text-[0.9rem] leading-snug text-[var(--c-text)]">
             {tenantName}
           </p>
-          <p className="c-thai mt-1 text-[0.72rem] leading-snug text-[var(--c-text-4)]">
+          <p className="c-thai mt-1 text-[0.75rem] leading-snug text-[var(--c-text-4)]">
             {industry}
           </p>
-          <p className="c-mono mt-2 text-[0.72rem] text-[var(--c-text-4)]">
+          <p className="c-mono mt-2 text-[0.75rem] text-[var(--c-text-4)]">
             {planName} · {credits.toLocaleString("en-US")} credits
           </p>
 
@@ -158,14 +159,14 @@ export function ConsoleNav({
                   >
                     <span className="flex min-w-0 flex-col">
                       <span className="truncate">{t.name}</span>
-                      <span className="truncate text-[0.68rem] text-[var(--c-text-4)]">
+                      <span className="truncate text-[0.75rem] text-[var(--c-text-4)]">
                         {t.industry}
                       </span>
                     </span>
                   </button>
                 </form>
               ))}
-              <p className="c-thai mt-2 text-[0.68rem] leading-relaxed text-[var(--c-text-4)]">
+              <p className="c-thai mt-2 text-[0.75rem] leading-relaxed text-[var(--c-text-4)]">
                 All four accounts are synthetic, chosen to cover the four revenue-cycle
                 shapes — so you can see the engine predicting from the cycle rather
                 than the industry.
@@ -179,7 +180,7 @@ export function ConsoleNav({
         <nav className="flex flex-col gap-5 p-3 lg:p-3.5" aria-label="Console">
           {groups.map((g) => (
             <div key={g.title} className="flex flex-col gap-1">
-              <p className="c-label px-3 pb-1.5 text-[0.62rem]">{g.title}</p>
+              <p className="c-label px-3 pb-1.5 text-[0.75rem]">{g.title}</p>
               {g.links.map((l) => (
                 <Link
                   key={l.href}
@@ -204,15 +205,12 @@ export function ConsoleNav({
 
         <div className="p-4 lg:p-5">
           <p className="c-label-th">ตารางข้อมูลลูกค้า</p>
-          <p className="c-mono mt-2 text-[0.72rem] leading-relaxed text-[var(--c-text-3)]">
+          <p className="c-mono mt-2 text-[0.75rem] leading-relaxed text-[var(--c-text-3)]">
             {computedAt
-              ? new Date(computedAt).toLocaleString("th-TH", {
-                  dateStyle: "short",
-                  timeStyle: "short",
-                })
+              ? thaiDateTime(computedAt)
               : "—"}
           </p>
-          <p className="c-thai mt-3 text-[0.72rem] text-[var(--c-text-4)]">
+          <p className="c-thai mt-3 text-[0.75rem] text-[var(--c-text-4)]">
             {computedAt ? "คำนวณล่าสุด" : "ยังไม่ได้คำนวณ"} — ระบบคำนวณไว้ล่วงหน้าเป็นรอบ
             ไม่ได้คำนวณสดตอนเปิดหน้า
           </p>
@@ -228,7 +226,7 @@ export function ConsoleNav({
           <>
             <div className="p-4 lg:p-5">
               <p className="c-label-th">เข้าสู่ระบบในนาม</p>
-              <p className="c-mono mt-2 text-[0.74rem] break-all text-[var(--c-text-2)]">
+              <p className="c-mono mt-2 text-[0.75rem] break-all text-[var(--c-text-2)]">
                 {userEmail}
               </p>
               {signOutAction && (

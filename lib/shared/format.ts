@@ -60,3 +60,10 @@ export function daysAgoLabel(iso: string | null | undefined, now = Date.now()): 
   if (d === 1) return "เมื่อวาน";
   return `${num(d)} วันก่อน`;
 }
+
+/** "วันจันทร์ที่ 12 ตุลาคม 2569" — หัวบรีฟเช้า */
+export function thaiDateLong(d: Date = new Date()): string {
+  return new Intl.DateTimeFormat("th-TH", {
+    weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Bangkok",
+  }).format(d);
+}

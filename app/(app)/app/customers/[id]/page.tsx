@@ -226,7 +226,7 @@ export default async function CustomerPage({
                         {pt.label && ` · ${pt.label}`}
                         {pt.isPrimary && c.contacts.filter((x) => x.kind === pt.kind).length > 1 && " · หลัก"}
                       </span>
-                      <span className="c-thai text-[0.72rem] text-[var(--c-text-4)]">
+                      <span className="c-thai text-[0.75rem] text-[var(--c-text-4)]">
                         {SOURCE_LABEL[pt.source] ?? pt.source}
                       </span>
                     </div>
