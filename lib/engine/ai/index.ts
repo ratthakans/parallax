@@ -300,7 +300,9 @@ const RULES: Rule[] = [
      นามสกุลต้องเป็นคำเดี่ยว ไม่งั้นคอลัมน์ "ชื่อ-นามสกุล" ซึ่งเป็นชื่อเต็ม
      จะถูก last_name (11) แย่งไปจาก customer_name (10) */
   { field: "first_name", re: /(first.?name|given.?name|ชื่อจริง)/i, score: 11 },
-  { field: "last_name", re: /^\s*(last.?name|surname|family.?name|นามสกุล)\s*$/i, score: 11 },
+  /* "Contact Last Name" (CRM ส่งออก) ก็เป็นนามสกุล — เดิมตกไปเป็นชื่อเต็มเพราะต้องตรงทั้งช่อง
+     (verify:resolution จับได้: คนเดียวกันถูกแยกเพราะ "ชื่อ" เหลือแต่นามสกุล) */
+  { field: "last_name", re: /^\s*(?:contact\s+)?(last.?name|surname|family.?name|นามสกุล)\s*$/i, score: 11 },
   { field: "nickname", re: /(nick.?name|ชื่อเล่น)/i, score: 12 },
   { field: "gender", re: /(gender|^\s*sex\s*$|เพศ)/i, score: 10 },
   // "birth date" ต้องเป็นวันเกิด ไม่ใช่วันที่ซื้อ — 11 ชนะ occurred_at (6)

@@ -2,8 +2,8 @@
 
 import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { analyseUploadAction, commitUploadAction } from "@/app/(app)/vault-actions";
-import type { AnalyseOk, CommitResult } from "@/lib/engine/vault/intake";
+import { analyseUploadAction, commitUploadAction, type CommitWithResolve } from "@/app/(app)/vault-actions";
+import type { AnalyseOk } from "@/lib/engine/vault/intake";
 import { IMPORT_ROW_TH, VAULT_FIELD_TH, type ImportRowStatus, type VaultField } from "@/lib/shared/vault";
 import { Panel, num } from "./ui";
 
@@ -18,7 +18,7 @@ export function VaultImporter({ sourceId, allowed }: { sourceId: string; allowed
   const [file, setFile] = useState<File | null>(null);
   const [analysis, setAnalysis] = useState<AnalyseOk | null>(null);
   const [mapping, setMapping] = useState<Record<number, string>>({});
-  const [result, setResult] = useState<Extract<CommitResult, { ok: true }> | null>(null);
+  const [result, setResult] = useState<Extract<CommitWithResolve, { ok: true }> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -78,11 +78,29 @@ export function VaultImporter({ sourceId, allowed }: { sourceId: string; allowed
             <li key={s}>{IMPORT_ROW_TH[s]} <span className="c-mono">{num(result.counts[s])}</span></li>
           ))}
         </ul>
-        <p className="c-thai mt-3 text-[0.82rem] text-[var(--c-text-3)]">
-          แถวที่รอตรวจจะถูกจับคู่เป็นคนและบริษัทในขั้นตรวจตัวตน — ยังไม่มีแถวใดถูกรวมหรือใช้ติดต่อ
+        {result.resolved ? (
+          <p className="c-thai mt-3 text-[0.86rem] text-[var(--c-text-2)]">
+            ตรวจตัวตนแล้ว: <span className="c-mono">{num(result.resolved.people)}</span> คน
+            (ใหม่ <span className="c-mono">{num(result.resolved.newPeople)}</span> · ตรงกับคนเดิม <span className="c-mono">{num(result.resolved.matchedExisting)}</span>)
+            · <span className="c-mono">{num(result.resolved.orgs)}</span> องค์กร
+            {result.resolved.personPairs + result.resolved.orgGroups > 0 && (
+              <> · เข้าคิวให้คนตรวจ <span className="c-mono">{num(result.resolved.personPairs)}</span> คู่
+              {result.resolved.orgGroups > 0 && <> และ <span className="c-mono">{num(result.resolved.orgGroups)}</span> กลุ่มองค์กร</>}</>
+            )}
+          </p>
+        ) : (
+          <p className="c-thai mt-3 text-[0.82rem] text-[var(--c-bad)]">
+            ตรวจตัวตนไม่สำเร็จ{result.resolveError ? ` (${result.resolveError})` : ""} — แถวยังรอตรวจ สั่งตรวจใหม่ได้ที่หน้าคิวตรวจตัวตน
+          </p>
+        )}
+        <p className="c-thai mt-2 text-[0.8rem] text-[var(--c-text-4)]">
+          ชื่อเหมือนหรือโดเมนเดียวกันไม่ถูกรวมเอง — ระบบส่งเข้าคิวให้คนตัดสิน และการรวมทุกครั้งย้อนได้
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           <Link href={`/app/vault/batches/${result.batchId}`} className="c-btn c-btn-primary">ดูรายงานตรวจยอด</Link>
+          {result.resolved && result.resolved.personPairs + result.resolved.orgGroups > 0 && (
+            <Link href="/app/vault/review" className="c-btn c-btn-ghost">ไปที่คิวตรวจ</Link>
+          )}
           <button type="button" onClick={reset} className="c-btn c-btn-ghost">นำเข้าไฟล์อื่น</button>
         </div>
       </Panel>

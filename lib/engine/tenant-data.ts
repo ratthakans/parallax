@@ -50,6 +50,7 @@ export const B2B_DATA_TABLES = [
   "import_rows", "import_batches", "affiliations", "relationship_assertions", "interactions",
   "participations", "opportunity_people", "tasks", "opportunities", "org_domains", "orgs",
   "preferences", "evidence", "record_versions", "merge_log",
+  "review_items", "resolution_overrides", "sample_checks",
 ] as const;
 
 /* ── ทุกที่ที่ข้อมูลของคนหนึ่งคนอยู่ ─────────────────────────────
@@ -80,10 +81,25 @@ export const PERSON_LINKED: { table: string; column: string; where?: string }[] 
   { table: "record_versions", column: "record_id", where: "record_kind = 'person'" },
   { table: "merge_log", column: "survivor_id" },
   { table: "merge_log", column: "merged_id" },
+  { table: "sample_checks", column: "customer_id" },
+  { table: "resolution_overrides", column: "a_id", where: "kind = 'person'" },
+  { table: "resolution_overrides", column: "b_id", where: "kind = 'person'" },
 ];
 
 /** ลบข้อมูลของคนหนึ่งคนจากทุกตารางที่ผูกอยู่ (ยกเว้นตัวแถว customers ซึ่งผู้เรียกลบเอง) */
 export async function deletePersonData(q: Sql, tenantId: string, customerId: string): Promise<void> {
+  /* คนที่เคยถูกรวมเข้ามา: preferences ของเขายังอยู่ใต้รหัสเดิม (ตารางเพิ่มอย่างเดียว ไม่ถูกย้าย) — ลบตามไปด้วย */
+  const ids = [customerId];
+  for (let i = 0; i < ids.length; i++) {
+    for (const r of await q.all<{ merged_id: string }>(
+      "SELECT merged_id FROM merge_log WHERE tenant_id = ? AND survivor_id = ? AND undone_at IS NULL", tenantId, ids[i],
+    )) if (!ids.includes(r.merged_id)) ids.push(r.merged_id);
+  }
+  for (const id of ids.slice(1)) await deleteOneId(q, tenantId, id);
+  await deleteOneId(q, tenantId, customerId);
+}
+
+async function deleteOneId(q: Sql, tenantId: string, customerId: string): Promise<void> {
   await q.run(
     "DELETE FROM line_items WHERE tenant_id = ? AND txn_id IN (SELECT id FROM transactions WHERE tenant_id = ? AND customer_id = ?)",
     tenantId, tenantId, customerId,
@@ -94,4 +110,9 @@ export async function deletePersonData(q: Sql, tenantId: string, customerId: str
       tenantId, customerId,
     );
   }
+  /* คิวตรวจเก็บรหัสคนเป็น JSON array — ลบรายการที่มีคนนี้อยู่ด้วย */
+  await q.run(
+    "DELETE FROM review_items WHERE tenant_id = ? AND kind = 'person_pair' AND subject_ids LIKE ?",
+    tenantId, `%"${customerId}"%`,
+  );
 }

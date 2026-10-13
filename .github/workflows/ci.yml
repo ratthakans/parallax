@@ -120,6 +120,16 @@ jobs:
       - name: Vault intake
         run: npm run verify:intake
 
+      # ── ตรวจตัวตน (B3) ──
+      # precision ของการรวมเอง ≥ 98% · recall ≥ 90% เมื่อรวมคิว บนข้อมูลสมมุติที่มีเฉลย
+      # · ชื่อเหมือน/โดเมนเดียวกันเข้าคิว ไม่รวมเอง · ตรวจซ้ำไม่สร้างคนเพิ่ม
+      - name: Identity resolution
+        run: npm run verify:resolution
+
+      # แยกคืนแล้วทุกแถวกลับเหมือนก่อนรวม · คำตัดสินชนะกฎ · ลบตามคำขอลบคนที่ถูกรวมเข้ามาด้วย
+      - name: Merge and unmerge
+        run: npm run verify:merge
+
       # ── สคีมาสองฝั่งตรงกันไหม ──
       # ต้องมี DATABASE_URL ถึงจะเทียบได้ ไม่มีก็ข้ามโดยไม่ล้มเหลว เพราะ PR
       # จากคนนอกไม่ควรต้องมีรหัสฐานข้อมูล แต่บน push เข้า main ที่ตั้ง secret

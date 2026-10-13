@@ -4,7 +4,7 @@ import { all, get } from "@/lib/engine/sql";
 
    Blueprint 2.0 บท 4: รายงานคุณภาพต้อง "แยกตัวเลขจริงออกจากประมาณการ"
    หน้านี้จึงนับจากตารางตรง ๆ เท่านั้น — ไม่มีคะแนนรวม ไม่มีการเดา
-   ส่วนที่ยังไม่เก็บ (เช่น ซ้ำที่รอตรวจ · ข้อมูลเก่า) ยังไม่แสดง จนกว่าตาราง
+   ส่วนที่ยังไม่เก็บ (เช่น ข้อมูลเก่า · ความแม่นจากการสุ่มตรวจ) ยังไม่แสดง จนกว่าตาราง
    ของระยะ B จะมี ดีกว่าแสดงเลขที่คิดขึ้นมาให้หน้าดูครบ */
 
 export type VaultOverview = {
@@ -19,6 +19,12 @@ export type VaultOverview = {
   sourceRows: number;
   pendingReview: number;
   rejected: number;
+  /** ตรวจตัวตน (B3): องค์กร · คนที่คนตรวจยืนยันแล้ว · รายการรอคนตัดสิน · คนที่รู้แหล่งที่มา */
+  orgs: number;
+  confirmedPeople: number;
+  openPairs: number;
+  openOrgGroups: number;
+  peopleWithSource: number;
 };
 
 type N = { n: number | string | null };
@@ -48,6 +54,19 @@ export async function vaultOverview(tenantId: string): Promise<VaultOverview> {
       tenantId,
     ),
   ]);
+  const [orgs, confirmed, reviews, withSource] = await Promise.all([
+    get<N>("SELECT COUNT(*) AS n FROM orgs WHERE tenant_id = ?", tenantId),
+    get<N>("SELECT COUNT(*) AS n FROM customers WHERE tenant_id = ? AND lifecycle_state = 'confirmed'", tenantId),
+    all<{ kind: string; n: number | string }>(
+      "SELECT kind, COUNT(*) AS n FROM review_items WHERE tenant_id = ? AND status = 'open' GROUP BY kind", tenantId,
+    ),
+    /* รู้ที่มา = มีแหล่งบนตัวคน หรือมีแถวต้นทางจากแหล่งที่ลงทะเบียน */
+    get<N>(
+      `SELECT COUNT(*) AS n FROM customers c WHERE c.tenant_id = ? AND (c.source_id IS NOT NULL
+         OR EXISTS (SELECT 1 FROM import_rows r WHERE r.tenant_id = c.tenant_id AND r.customer_id = c.id))`,
+      tenantId,
+    ),
+  ]);
   const statusN = (s: string) => Number(rowStatus.find((r) => r.status === s)?.n ?? 0);
   return {
     people: num(people),
@@ -60,5 +79,10 @@ export async function vaultOverview(tenantId: string): Promise<VaultOverview> {
     sourceRows: rowStatus.reduce((a, r) => a + Number(r.n), 0),
     pendingReview: statusN("pending_review"),
     rejected: statusN("rejected"),
+    orgs: num(orgs),
+    confirmedPeople: num(confirmed),
+    openPairs: Number(reviews.find((r) => r.kind === "person_pair")?.n ?? 0),
+    openOrgGroups: Number(reviews.find((r) => r.kind === "org_group")?.n ?? 0),
+    peopleWithSource: num(withSource),
   };
 }

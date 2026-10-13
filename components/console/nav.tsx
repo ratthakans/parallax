@@ -33,6 +33,7 @@ function groupsFor(baseLabelTh: string, personLabelTh: string) {
           hint: `ราย${personLabelTh} · ช่องทาง · ที่มา`,
         },
         { href: "/app/vault", label: "แหล่งข้อมูลและนำเข้า", hint: "ลงทะเบียนแหล่ง · Excel หรือ CSV" },
+        { href: "/app/vault/review", label: "คิวตรวจตัวตน", hint: "คู่ที่อาจเป็นคนเดียวกัน · ย้อนการรวม" },
       ],
     },
     {
@@ -79,8 +80,10 @@ export function ConsoleNav({
   const [pickerOpen, setPickerOpen] = useState(false);
   const groups = groupsFor(baseLabel, personLabel);
 
-  const isActive = (href: string) =>
-    href === "/app" ? pathname === "/app" : pathname.startsWith(href);
+  /* ลิงก์ที่ตรงยาวที่สุดชนะ — /app/vault/review ไม่ทำให้ /app/vault ติดสถานะด้วย */
+  const hrefs = groups.flatMap((g) => g.links.map((l) => l.href));
+  const matches = (href: string) => (href === "/app" ? pathname === "/app" : pathname === href || pathname.startsWith(`${href}/`));
+  const isActive = (href: string) => matches(href) && !hrefs.some((h) => h.length > href.length && h.startsWith(href) && matches(h));
 
   return (
     <aside className="c-side">
@@ -153,7 +156,7 @@ export function ConsoleNav({
                   >
                     <span className="flex min-w-0 flex-col">
                       <span className="truncate">{t.name}</span>
-                      <span className="truncate text-[0.75rem] text-[var(--c-text-4)]">
+                      <span className={`truncate text-[0.75rem] ${t.id === tenantId ? "text-[var(--c-text-3)]" : "text-[var(--c-text-4)]"}`}>
                         {t.industry}
                       </span>
                     </span>
@@ -184,7 +187,8 @@ export function ConsoleNav({
                 >
                   <span className="flex min-w-0 flex-col">
                     <span className="truncate">{l.label}</span>
-                    <span className="truncate text-[0.75rem] text-[var(--c-text-4)]">
+                    {/* พื้นของลิงก์ที่เลือกอยู่สว่างกว่า — text-4 บนพื้นนั้นได้ 4.4:1 ไม่ถึง 4.5 */}
+                    <span className={`truncate text-[0.75rem] ${isActive(l.href) ? "text-[var(--c-text-3)]" : "text-[var(--c-text-4)]"}`}>
                       {l.hint}
                     </span>
                   </span>

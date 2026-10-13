@@ -654,6 +654,50 @@ export async function ensureSchema(): Promise<void> {
       hash TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS ix_audit_tenant ON audit_log (tenant_id, at);
+
+    /* ══ คิวตรวจตัวตน (B3) — สเปกเดียวกับ supabase/migrations/0008_review_queue.sql ══ */
+    -- คิวให้คนตรวจ: คู่คนที่อาจเป็นคนเดียวกัน · กลุ่มชื่อองค์กรที่อาจเป็นนิติบุคคลเดียว — ระบบไม่รวมเองจากสัญญาณอ่อน
+    CREATE TABLE IF NOT EXISTS review_items (
+      id TEXT NOT NULL PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      subject_ids TEXT NOT NULL,
+      signals TEXT NOT NULL DEFAULT '[]',
+      confidence REAL NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'open',
+      assigned_to TEXT,
+      due_at TEXT,
+      created_at TEXT NOT NULL,
+      decided_by TEXT,
+      decided_at TEXT,
+      decision_note TEXT
+    );
+    CREATE INDEX IF NOT EXISTS ix_review_open ON review_items (tenant_id, status, kind);
+    CREATE UNIQUE INDEX IF NOT EXISTS ux_review_subject ON review_items (tenant_id, kind, subject_ids);
+    -- สิ่งที่คนตัดสินแล้ว — ชนะกฎเสมอ และการตรวจตัวตนรอบถัดไปไม่เสนอซ้ำ
+    CREATE TABLE IF NOT EXISTS resolution_overrides (
+      id TEXT NOT NULL PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      verdict TEXT NOT NULL,
+      a_id TEXT NOT NULL,
+      b_id TEXT NOT NULL,
+      decided_by TEXT NOT NULL,
+      decided_at TEXT NOT NULL,
+      note TEXT
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS ux_override_pair ON resolution_overrides (tenant_id, kind, a_id, b_id);
+    -- ผลสุ่มตรวจการรวมโดย data steward — ใช้วัดความแม่นจริง ไม่ใช่ความมั่นใจของระบบ
+    CREATE TABLE IF NOT EXISTS sample_checks (
+      id TEXT NOT NULL PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      customer_id TEXT NOT NULL,
+      verdict TEXT NOT NULL,
+      checked_by TEXT NOT NULL,
+      checked_at TEXT NOT NULL,
+      note TEXT
+    );
+    CREATE INDEX IF NOT EXISTS ix_sample_tenant ON sample_checks (tenant_id, checked_at);
     -- กฎอายุข้อมูลต่อประเภท — ไม่มีค่า 'เก็บตลอดไป' เป็นค่าตั้งต้น
     CREATE TABLE IF NOT EXISTS retention_rules (
       id TEXT NOT NULL PRIMARY KEY,

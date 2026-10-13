@@ -1,6 +1,7 @@
 import { all, get, insertMany, tx, type Param, type Sql } from "@/lib/engine/sql";
 import { logActivity } from "@/lib/engine/db";
 import { deletePersonData } from "@/lib/engine/tenant-data";
+import { mergePersons } from "@/lib/engine/vault/merge";
 import { findCustomersByContact, listContactPoints, type ContactPoint } from "@/lib/engine/contacts";
 import {
   CONTACT_KINDS,
@@ -605,6 +606,18 @@ export async function mergeCustomers(
     get<{ id: string }>("SELECT id FROM customers WHERE tenant_id = ? AND id = ?", tenantId, dropId),
   ]);
   if (!keep || !drop) return { ok: false, error: "ไม่พบลูกค้าคนใดคนหนึ่งในบัญชีนี้" };
+
+  /* คนจาก Data Vault (มีแถวต้นทาง) ใช้การรวมที่ย้อนได้ — การรวมแบบเดิมด้านล่างไม่รู้จักสังกัดและแถวต้นทาง จะทิ้งไว้ใต้รหัสที่ถูกลบ */
+  const vault = await get<{ x: number }>(
+    "SELECT 1 AS x FROM import_rows WHERE tenant_id = ? AND customer_id IN (?, ?) LIMIT 1", tenantId, keepId, dropId,
+  );
+  if (vault) {
+    const r = await mergePersons(tenantId, keepId, dropId, actor, "manual", null);
+    if (!r.ok) return r;
+    const log = await get<{ impact: string }>("SELECT impact FROM merge_log WHERE tenant_id = ? AND id = ?", tenantId, r.mergeId);
+    const impact = JSON.parse(log?.impact ?? "{}") as { moved?: Record<string, unknown[]> };
+    return { ok: true, moved: Object.values(impact.moved ?? {}).reduce((a, xs) => a + xs.length, 0) };
+  }
 
   const moved = await tx(async (q) => {
     let n = 0;

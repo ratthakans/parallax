@@ -7,7 +7,10 @@ import { currentUser } from "@/lib/shared/session";
 import { registerSource } from "@/lib/engine/vault/sources";
 import { analyseUpload, commitUpload, type AnalyseResult, type CommitResult } from "@/lib/engine/vault/intake";
 import { MAX_UPLOAD_BYTES } from "@/lib/engine/vault/scan";
-import type { ActionState } from "@/lib/shared/action-state";
+import { resolveTenant, type ResolveStats } from "@/lib/engine/vault/resolve";
+import { decideReview, unmerge } from "@/lib/engine/vault/merge";
+import { recordSample, type SampleVerdict } from "@/lib/engine/vault/sample";
+import { messageOf, type ActionState } from "@/lib/shared/action-state";
 import type { SourceKind } from "@/lib/shared/vault";
 
 /* ── Data Vault (docs/plan.md B2) ─────────────────────────────────
@@ -55,7 +58,9 @@ export async function analyseUploadAction(fd: FormData): Promise<AnalyseResult> 
   return analyseUpload(tenantId, String(fd.get("sourceId") ?? ""), file.bytes, file.name, actor);
 }
 
-export async function commitUploadAction(fd: FormData): Promise<CommitResult> {
+export type CommitWithResolve = CommitResult & { resolved?: ResolveStats | null; resolveError?: string };
+
+export async function commitUploadAction(fd: FormData): Promise<CommitWithResolve> {
   const { tenantId, actor } = await scope();
   const file = await fileOf(fd);
   if (typeof file === "string") return { ok: false, error: file };
@@ -68,6 +73,54 @@ export async function commitUploadAction(fd: FormData): Promise<CommitResult> {
   const res = await commitUpload(
     tenantId, String(fd.get("sourceId") ?? ""), file.bytes, file.name, override, String(fd.get("sha256") ?? ""), actor,
   );
-  if (res.ok) revalidatePath("/app/vault");
-  return res;
+  if (!res.ok) return res;
+  /* ตรวจตัวตนต่อทันที — ถ้าล้ม แถวยังอยู่ในสถานะรอตรวจ และสั่งตรวจใหม่ได้จากหน้าคิวตรวจ */
+  let resolved: ResolveStats | null = null, resolveError: string | undefined;
+  try {
+    resolved = await resolveTenant(tenantId, actor);
+  } catch (err) {
+    resolveError = messageOf(err);
+  }
+  revalidatePath("/app/vault");
+  return { ...res, resolved, resolveError };
+}
+
+export async function resolveNowAction(_prev: ActionState): Promise<ActionState> {
+  const { tenantId, actor } = await scope();
+  try {
+    const s = await resolveTenant(tenantId, actor);
+    revalidatePath("/app/vault");
+    return { ok: s.rows ? `ตรวจ ${s.rows.toLocaleString()} แถว → ${s.people.toLocaleString()} คน · เข้าคิว ${s.personPairs.toLocaleString()} คู่` : "ไม่มีแถวรอตรวจ" };
+  } catch (err) {
+    return { error: messageOf(err) };
+  }
+}
+
+export async function decideReviewAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  const { tenantId, actor } = await scope();
+  const verdict = String(fd.get("verdict") ?? "");
+  if (verdict !== "same" && verdict !== "different") return { error: "คำตัดสินไม่ถูกต้อง" };
+  const res = await decideReview(tenantId, String(fd.get("reviewId") ?? ""), verdict, actor, String(fd.get("note") ?? "") || undefined);
+  if (!res.ok) return { error: res.error };
+  revalidatePath("/app/vault/review");
+  return { ok: verdict === "same" ? "รวมแล้ว — ย้อนได้จากประวัติการรวม" : "บันทึกว่าไม่ใช่คนเดียวกัน — จะไม่เสนอซ้ำ" };
+}
+
+export async function unmergeAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  const { tenantId, actor } = await scope();
+  const res = await unmerge(tenantId, String(fd.get("mergeId") ?? ""), actor);
+  if (!res.ok) return { error: res.error };
+  revalidatePath("/app/vault/review");
+  return { ok: "แยกคืนแล้ว — บันทึกว่าไม่ใช่คนเดียวกัน" };
+}
+
+export async function recordSampleAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  const { tenantId, actor } = await scope();
+  const res = await recordSample(
+    tenantId, String(fd.get("customerId") ?? ""), String(fd.get("verdict") ?? "") as SampleVerdict, actor,
+    String(fd.get("note") ?? "") || undefined,
+  );
+  if (!res.ok) return { error: res.error };
+  revalidatePath("/app/vault/review");
+  return { ok: "บันทึกผลตรวจแล้ว" };
 }

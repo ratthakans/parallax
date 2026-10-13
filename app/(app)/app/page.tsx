@@ -38,7 +38,7 @@ export default async function OverviewPage() {
       />
 
       <Panel flat className="mb-6 grid grid-cols-2 gap-x-6 gap-y-7 p-5 md:grid-cols-4 md:p-6">
-        <Metric label={`${v.people}ในฐาน`} value={num(o.people)} sub="นับตามระเบียนที่มีอยู่ ยังไม่ผ่านการตรวจตัวตน" />
+        <Metric label={`${v.people}ในฐาน`} value={num(o.people)} sub="นับทุกสถานะ — ที่คนตรวจยืนยันแล้วอยู่แถวล่าง" />
         <Metric label="มีช่องทางติดต่ออย่างน้อยหนึ่งช่อง" value={num(o.withContact)} sub={share(o.withContact)} />
         <Metric
           label="ยินยอมรับข่าวสาร (ตามข้อมูลเดิม)"
@@ -59,6 +59,18 @@ export default async function OverviewPage() {
         <Metric label="แถวต้นทางที่รับเข้า" value={num(o.sourceRows)} sub="จากไฟล์ที่นำเข้าผ่าน Data Vault" />
         <Metric label="รอตรวจตัวตน" value={num(o.pendingReview)} sub="ยังไม่รวมเป็นคนหรือบริษัท" tone={o.pendingReview ? "plain" : "muted"} />
         <Metric label="ถูกปฏิเสธ" value={num(o.rejected)} sub="ชี้ไปหาใครไม่ได้ · แถวว่าง" tone="muted" />
+      </Panel>
+
+      <Panel flat className="mb-6 grid grid-cols-2 gap-x-6 gap-y-7 p-5 md:grid-cols-4 md:p-6">
+        <Metric label="องค์กร" value={num(o.orgs)} sub="นิติบุคคลละหนึ่งแถว · ในเครือไม่ถูกรวม" tone={o.orgs ? "plain" : "muted"} />
+        <Metric label={`${v.people}ที่คนตรวจยืนยันแล้ว`} value={num(o.confirmedPeople)} sub={share(o.confirmedPeople)} tone={o.confirmedPeople ? "plain" : "muted"} />
+        <Metric
+          label="รอคนตัดสินในคิวตรวจ"
+          value={num(o.openPairs + o.openOrgGroups)}
+          sub={`${num(o.openPairs)} คู่คน · ${num(o.openOrgGroups)} กลุ่มองค์กร`}
+          tone={o.openPairs + o.openOrgGroups ? "plain" : "muted"}
+        />
+        <Metric label="รู้แหล่งที่มา" value={num(o.peopleWithSource)} sub={share(o.peopleWithSource)} tone={o.peopleWithSource ? "plain" : "muted"} />
       </Panel>
 
       <Panel className="p-5 md:p-6">

@@ -24,7 +24,9 @@
     "verify:vault": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/vault.mts",
     "verify:synthetic": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/synthetic.mts",
     "synthetic": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs scripts/gen-synthetic.mts",
-    "verify:intake": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/intake.mts"
+    "verify:intake": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/intake.mts",
+    "verify:resolution": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/resolution.mts",
+    "verify:merge": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/merge.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
