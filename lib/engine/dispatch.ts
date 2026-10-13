@@ -7,6 +7,7 @@ import { profileFor } from "@/lib/shared/tenants";
 import { MESSAGE_COST_BAHT } from "@/lib/shared/plans";
 import { reachBlockedReason } from "@/lib/engine/billing";
 import type { Candidate, Play } from "@/lib/shared/types";
+import { bangkokHour } from "@/lib/shared/format";
 
 /* ── DISPATCH ──────────────────────────────────────────────────
    สี่อย่างในไฟล์นี้ไม่มีหน้าจอ และลูกค้าไม่มีวันเห็น —
@@ -299,7 +300,8 @@ export async function sendCampaign(
   if (!tenant) throw new Error("ไม่พบบัญชีนี้");
 
   // ช่วงเวลาห้ามส่ง (F10)
-  const hour = new Date().getHours();
+  /* ช่วงห้ามส่งตั้งเป็นเวลาไทย — เครื่องบน Vercel เป็น UTC ถ้าใช้ getHours() จะคลาดเจ็ดชั่วโมง */
+  const hour = bangkokHour();
   const { quiet_hours_start: qs, quiet_hours_end: qe } = tenant;
   const inQuiet =
     !opts.ignoreQuietHours &&

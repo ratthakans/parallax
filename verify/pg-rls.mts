@@ -27,6 +27,7 @@ const { createCustomer, deleteCustomer } = await import("@/lib/engine/customers"
 const { recordPreference } = await import("@/lib/engine/policy/preferences");
 const { appendAudit, verifyAuditChain } = await import("@/lib/engine/audit");
 const { mapColumns, mapColumnsHeuristic, setTestTransport } = await import("@/lib/engine/ai");
+const { tenantRole } = await import("@/lib/engine/access");
 
 const out: string[] = [];
 const ok = (c: boolean, m: string) => out.push(`${c ? "PASS" : "FAIL"}  ${m}`);
@@ -86,6 +87,10 @@ ok(first.source === "ai", `ผล AI ที่สำเร็จถึงผู�
 ok(second.source === "cache" && calls === 1, `ครั้งที่สองมาจากแคช ไม่เรียกโมเดลซ้ำ (${second.source} · เรียก ${calls} ครั้ง)`);
 const ledger = await all<{ outcome: string }>("SELECT outcome FROM ai_ledger WHERE tenant_id = ?", T);
 ok(!ledger.some((l) => l.outcome === "error"), `ledger ไม่นับการเรียกที่สำเร็จเป็น error (${ledger.map((l) => l.outcome).join(", ")})`);
+
+// ── 5 · บทบาทจาก tenant_users (ด่านของ Server Action) ──
+ok(await tenantRole(T, op) === "operator" && await tenantRole(T, randomUUID()) === "viewer" && await tenantRole(T, null) === "viewer",
+  "บทบาทอ่านจาก tenant_users · ไม่พบสมาชิก = viewer (สิทธิ์น้อยสุด) ไม่ใช่ owner");
 
 // เก็บกวาด — บัญชีทดสอบหายพร้อมทุกแถว (on delete cascade)
 await asSystem(() => run("DELETE FROM ai_cache WHERE kind = 'map_columns' AND created_at >= ?", now));

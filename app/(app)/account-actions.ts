@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { viewer } from "@/app/(app)/viewer";
+import { denied, viewer } from "@/app/(app)/viewer";
 import {
   addRelationship, confirmAffiliation, endAffiliation, endRelationship, logInteraction, setAccountOwner,
   setClassification, setParent, updateOrgField, verifyOrg,
@@ -25,6 +25,8 @@ const done = (orgId: string, ok: string, res: { ok: true } | { ok: false; error:
 
 export async function updateOrgFieldAction(_p: ActionState, fd: FormData): Promise<ActionState> {
   const v = await viewer();
+  const no = denied(v, "write");
+  if (no) return { error: no };
   const orgId = str(fd, "orgId");
   const gate = await orgAccess(v.tenantId, orgId, who(v));
   if (!gate.ok) return { error: gate.error };
@@ -33,6 +35,8 @@ export async function updateOrgFieldAction(_p: ActionState, fd: FormData): Promi
 
 export async function setParentAction(_p: ActionState, fd: FormData): Promise<ActionState> {
   const v = await viewer();
+  const no = denied(v, "write");
+  if (no) return { error: no };
   const orgId = str(fd, "orgId");
   const gate = await orgAccess(v.tenantId, orgId, who(v));
   if (!gate.ok) return { error: gate.error };
@@ -41,6 +45,8 @@ export async function setParentAction(_p: ActionState, fd: FormData): Promise<Ac
 
 export async function setClassificationAction(_p: ActionState, fd: FormData): Promise<ActionState> {
   const v = await viewer();
+  const no = denied(v, "write");
+  if (no) return { error: no };
   const orgId = str(fd, "orgId");
   const gate = await orgAccess(v.tenantId, orgId, who(v));
   if (!gate.ok) return { error: gate.error };
@@ -49,6 +55,8 @@ export async function setClassificationAction(_p: ActionState, fd: FormData): Pr
 
 export async function verifyOrgAction(_p: ActionState, fd: FormData): Promise<ActionState> {
   const v = await viewer();
+  const no = denied(v, "write");
+  if (no) return { error: no };
   const orgId = str(fd, "orgId");
   const gate = await orgAccess(v.tenantId, orgId, who(v));
   if (!gate.ok) return { error: gate.error };
@@ -57,6 +65,8 @@ export async function verifyOrgAction(_p: ActionState, fd: FormData): Promise<Ac
 
 export async function claimAccountAction(_p: ActionState, fd: FormData): Promise<ActionState> {
   const v = await viewer();
+  const no = denied(v, "write");
+  if (no) return { error: no };
   const orgId = str(fd, "orgId");
   const release = str(fd, "release") === "1";
   const gate = await orgAccess(v.tenantId, orgId, who(v), release ? "edit" : "claim");
@@ -66,16 +76,22 @@ export async function claimAccountAction(_p: ActionState, fd: FormData): Promise
 
 export async function confirmAffiliationAction(_p: ActionState, fd: FormData): Promise<ActionState> {
   const v = await viewer();
+  const no = denied(v, "write");
+  if (no) return { error: no };
   return done(str(fd, "orgId"), "ยืนยันสังกัดแล้ว", await confirmAffiliation(v.tenantId, str(fd, "affiliationId"), v.actor));
 }
 
 export async function endAffiliationAction(_p: ActionState, fd: FormData): Promise<ActionState> {
   const v = await viewer();
+  const no = denied(v, "write");
+  if (no) return { error: no };
   return done(str(fd, "orgId"), "ปิดช่วงสังกัดแล้ว — ประวัติยังอยู่", await endAffiliation(v.tenantId, str(fd, "affiliationId"), str(fd, "endedOn"), str(fd, "reason"), v.actor));
 }
 
 export async function addRelationshipAction(_p: ActionState, fd: FormData): Promise<ActionState> {
   const v = await viewer();
+  const no = denied(v, "write");
+  if (no) return { error: no };
   const orgId = str(fd, "orgId");
   /* ปลายทางมาในรูป "kind:id" จากตัวเลือกเดียว */
   const [fromKind, ...f] = str(fd, "from").split(":");
@@ -89,11 +105,15 @@ export async function addRelationshipAction(_p: ActionState, fd: FormData): Prom
 
 export async function endRelationshipAction(_p: ActionState, fd: FormData): Promise<ActionState> {
   const v = await viewer();
+  const no = denied(v, "write");
+  if (no) return { error: no };
   return done(str(fd, "orgId"), "ปิดความสัมพันธ์แล้ว", await endRelationship(v.tenantId, str(fd, "relationshipId"), str(fd, "endedOn"), str(fd, "reason"), v.actor));
 }
 
 export async function logInteractionAction(_p: ActionState, fd: FormData): Promise<ActionState> {
   const v = await viewer();
+  const no = denied(v, "write");
+  if (no) return { error: no };
   const orgId = str(fd, "orgId");
   const gate = await orgAccess(v.tenantId, orgId, who(v));
   if (!gate.ok) return { error: gate.error };
@@ -106,6 +126,8 @@ export async function logInteractionAction(_p: ActionState, fd: FormData): Promi
 
 export async function generateBriefAction(_p: ActionState, fd: FormData): Promise<ActionState> {
   const v = await viewer();
+  const no = denied(v, "write");
+  if (no) return { error: no };
   const orgId = str(fd, "orgId");
   const gate = await orgAccess(v.tenantId, orgId, who(v));
   if (!gate.ok) return { error: gate.error };

@@ -2,7 +2,7 @@ import { all, get } from "@/lib/engine/sql";
 import { rowFactsFor } from "@/lib/engine/vault/evidence";
 import { orgIdFor } from "@/lib/engine/vault/resolve";
 import { orgInfo } from "@/lib/shared/identity";
-import { canSee, type InteractionKind, type RelationshipType } from "@/lib/shared/accounts";
+import { CLEARANCE_RANK, canSee, type InteractionKind, type RelationshipType } from "@/lib/shared/accounts";
 import type { Classification } from "@/lib/shared/vault";
 
 /* ── แฟ้มบริษัท (docs/plan.md B4 · Blueprint 2.0 บท 2–3) ─────────────────
@@ -31,11 +31,24 @@ const LIST_SQL = `SELECT o.id, o.name, o.primary_domain, o.lifecycle_state, o.ac
     (SELECT MAX(i.occurred_at) FROM interactions i WHERE i.tenant_id = o.tenant_id AND i.org_id = o.id) AS last_at
   FROM orgs o WHERE o.tenant_id = ?`;
 
+/* ชื่อแทนคนที่ระดับความลับเกินสิทธิ์ผู้อ่าน — ไม่แสดงชื่อ ตำแหน่ง หรือแถวต้นทาง และไม่ส่งให้ AI */
+export const MASKED_PERSON = "บุคคลที่จำกัดการเข้าถึง";
+export const MASKED_ORG = "บริษัทที่จำกัดการเข้าถึง";
+
+/* ระดับที่ผู้อ่านเห็นได้ — ใช้กรองใน SQL ให้ทั้งรายการและตัวนับไม่เผยว่ามีบริษัทที่ถูกจำกัด (plan 9.1) */
+const visibleLevels = (clearance: Classification) =>
+  (Object.keys(CLEARANCE_RANK) as Classification[]).filter((c) => canSee(clearance, c));
+
 export async function listAccounts(
-  tenantId: string, opts: { q?: string; mine?: string; limit?: number; offset?: number } = {},
+  tenantId: string, opts: { q?: string; mine?: string; limit?: number; offset?: number; viewer?: Viewer } = {},
 ): Promise<{ rows: AccountRow[]; total: number }> {
   const where: string[] = [];
   const params: (string | number)[] = [tenantId];
+  if (opts.viewer) {
+    const levels = visibleLevels(opts.viewer.clearance);
+    where.push(`(COALESCE(o.classification, 'confidential') IN (${levels.map(() => "?").join(",")}) OR o.account_owner_id = ? OR o.data_owner_id = ?)`);
+    params.push(...levels, opts.viewer.id, opts.viewer.id);
+  }
   if (opts.q?.trim()) {
     where.push("(o.name LIKE ? OR o.name_en LIKE ? OR o.primary_domain LIKE ?)");
     const like = `%${opts.q.trim()}%`;
@@ -73,17 +86,21 @@ export type Dossier = {
   people: {
     affiliationId: string; personId: string; name: string; title: string | null; department: string | null;
     from: string | null; to: string | null; current: boolean; confirmedBy: string | null; recordedAt: string; rows: RowRef[];
+    /** ระดับของคนเกินสิทธิ์ผู้อ่าน — ชื่อ ตำแหน่ง และแถวต้นทางถูกซ่อน */
+    masked: boolean;
   }[];
   relationships: {
     id: string; type: RelationshipType; fromKind: string; fromId: string; fromName: string; toKind: string; toId: string; toName: string;
     context: string | null; confirmedBy: string | null; confirmedAt: string | null; validFrom: string | null; validTo: string | null;
     lifecycle: string; evidenceNote: string | null;
+    /** ปลายด้านใดด้านหนึ่งเกินสิทธิ์ผู้อ่าน */
+    masked: boolean;
   }[];
   interactions: {
-    id: string; kind: InteractionKind; occurredAt: string; personId: string | null; personName: string | null;
+    id: string; kind: InteractionKind; occurredAt: string; personId: string | null; personName: string | null; personMasked: boolean;
     summary: string | null; outcome: string | null; owner: string | null; classification: Classification; masked: boolean; recordedAt: string;
   }[];
-  participations: { id: string; personName: string | null; program: string; edition: string | null; role: string; occurredAt: string | null }[];
+  participations: { id: string; personName: string | null; program: string; edition: string | null; role: string; occurredAt: string | null; masked: boolean }[];
   opportunities: { id: string; name: string; stage: string; owner: string | null; expectedClose: string | null }[];
   versions: Record<string, Version[]>;
 };
@@ -111,7 +128,7 @@ export async function getDossier(tenantId: string, orgId: string, viewer: Viewer
   const owners = [o.account_owner_id, o.data_owner_id].filter(Boolean);
   const masked = !canSee(viewer.clearance, classification) && !owners.includes(viewer.id);
   const org: Dossier["org"] = {
-    id: o.id!, name: o.name!, nameEn: o.name_en, nameNorm: o.name_norm!, taxId: o.tax_id, branchCode: o.branch_code,
+    id: o.id!, name: masked ? MASKED_ORG : o.name!, nameEn: masked ? null : o.name_en, nameNorm: o.name_norm!, taxId: o.tax_id, branchCode: o.branch_code,
     industry: o.industry, primaryDomain: o.primary_domain, classification, lifecycle: o.lifecycle_state ?? "received",
     accountOwner: o.account_owner_id, dataOwner: o.data_owner_id, createdAt: o.created_at!, recordedAt: o.recorded_at,
     lastVerifiedAt: o.last_verified_at,
@@ -127,8 +144,8 @@ export async function getDossier(tenantId: string, orgId: string, viewer: Viewer
     all<{ id: string; name: string }>("SELECT id, name FROM orgs WHERE tenant_id = ? AND parent_id = ? ORDER BY name", tenantId, orgId),
     all<{ domain: string }>("SELECT domain FROM org_domains WHERE tenant_id = ? AND org_id = ? ORDER BY domain", tenantId, orgId),
     all<{ id: string; customer_id: string; name: string; title: string | null; department: string | null; valid_from: string | null;
-      valid_to: string | null; confirmed_by: string | null; recorded_at: string }>(
-      `SELECT a.id, a.customer_id, c.name, a.title, a.department, a.valid_from, a.valid_to, a.confirmed_by, a.recorded_at
+      valid_to: string | null; confirmed_by: string | null; recorded_at: string; person_class: Classification | null }>(
+      `SELECT a.id, a.customer_id, c.name, c.classification AS person_class, a.title, a.department, a.valid_from, a.valid_to, a.confirmed_by, a.recorded_at
        FROM affiliations a JOIN customers c ON c.id = a.customer_id AND c.tenant_id = a.tenant_id
        WHERE a.tenant_id = ? AND a.org_id = ? ORDER BY (a.valid_to IS NULL) DESC, a.valid_from DESC, c.name`, tenantId, orgId),
     all<Record<string, string | null>>(
@@ -139,10 +156,10 @@ export async function getDossier(tenantId: string, orgId: string, viewer: Viewer
          OR (r.to_kind = 'person' AND r.to_id IN (SELECT customer_id FROM affiliations WHERE tenant_id = ? AND org_id = ?)))
        ORDER BY r.recorded_at DESC`, tenantId, orgId, orgId, tenantId, orgId, tenantId, orgId),
     all<Record<string, string | null>>(
-      `SELECT i.*, c.name AS person_name FROM interactions i LEFT JOIN customers c ON c.id = i.customer_id AND c.tenant_id = i.tenant_id
+      `SELECT i.*, c.name AS person_name, c.classification AS person_class FROM interactions i LEFT JOIN customers c ON c.id = i.customer_id AND c.tenant_id = i.tenant_id
        WHERE i.tenant_id = ? AND i.org_id = ? ORDER BY i.occurred_at DESC, i.recorded_at DESC LIMIT 200`, tenantId, orgId),
     all<Record<string, string | null>>(
-      `SELECT p.id, p.program, p.edition, p.role, p.occurred_at, c.name AS person_name FROM participations p
+      `SELECT p.id, p.program, p.edition, p.role, p.occurred_at, c.name AS person_name, c.classification AS person_class FROM participations p
        LEFT JOIN customers c ON c.id = p.customer_id AND c.tenant_id = p.tenant_id
        WHERE p.tenant_id = ? AND p.org_id = ? ORDER BY p.occurred_at DESC`, tenantId, orgId),
     all<Record<string, string | null>>(
@@ -171,11 +188,19 @@ export async function getDossier(tenantId: string, orgId: string, viewer: Viewer
     if (r.domain) domainRows.set(r.domain, [...(domainRows.get(r.domain) ?? []), { ...ref, asWritten: r.domain }]);
   }
 
-  const peopleById = new Map(affs.map((a) => [a.customer_id, a.name]));
+  /* คนก็มีระดับความลับของตัวเอง — แฟ้มบริษัทระดับลับที่มีคนระดับจำกัดสูงต้องไม่เผยชื่อเขา */
+  const hiddenPerson = (c: string | null | undefined) => !canSee(viewer.clearance, (c ?? "confidential") as Classification);
+  const peopleById = new Map(affs.map((a) => [a.customer_id, hiddenPerson(a.person_class) ? MASKED_PERSON : a.name]));
   const nameOf = async (kind: string | null, id: string | null): Promise<string> => {
     if (!kind || !id) return "ไม่ทราบ";
-    if (kind === "org") return id === orgId ? o.name! : (await get<{ name: string }>("SELECT name FROM orgs WHERE tenant_id = ? AND id = ?", tenantId, id))?.name ?? "ไม่ทราบ";
-    return peopleById.get(id) ?? (await get<{ name: string }>("SELECT name FROM customers WHERE tenant_id = ? AND id = ?", tenantId, id))?.name ?? "ไม่ทราบ";
+    if (kind === "org") {
+      if (id === orgId) return o.name!;
+      const other = await get<{ name: string; classification: string | null }>("SELECT name, classification FROM orgs WHERE tenant_id = ? AND id = ?", tenantId, id);
+      return !other ? "ไม่ทราบ" : canSee(viewer.clearance, (other.classification ?? "confidential") as Classification) ? other.name : MASKED_ORG;
+    }
+    if (peopleById.has(id)) return peopleById.get(id)!;
+    const c = await get<{ name: string; classification: string | null }>("SELECT name, classification FROM customers WHERE tenant_id = ? AND id = ?", tenantId, id);
+    return !c ? "ไม่ทราบ" : hiddenPerson(c.classification) ? MASKED_PERSON : c.name;
   };
   const groupedVersions: Record<string, Version[]> = {};
   for (const v of versions) {
@@ -188,27 +213,35 @@ export async function getDossier(tenantId: string, orgId: string, viewer: Viewer
     subsidiaries: subs,
     domains: domains.map((d) => ({ domain: d.domain, rows: domainRows.get(d.domain) ?? [] })),
     namesAsWritten: [...nameRows].sort((a, b) => b[1].length - a[1].length).map(([name, rows]) => ({ name, rows })),
-    people: affs.map((a) => ({
-      affiliationId: a.id, personId: a.customer_id, name: a.name, title: a.title, department: a.department,
-      from: a.valid_from, to: a.valid_to, current: a.valid_to == null, confirmedBy: a.confirmed_by, recordedAt: a.recorded_at,
-      rows: rowsByPerson.get(a.customer_id) ?? [],
-    })),
+    people: affs.map((a) => {
+      const hidden = hiddenPerson(a.person_class);
+      return {
+        affiliationId: a.id, personId: a.customer_id, name: hidden ? MASKED_PERSON : a.name, title: hidden ? null : a.title,
+        department: hidden ? null : a.department, from: a.valid_from, to: a.valid_to, current: a.valid_to == null,
+        confirmedBy: a.confirmed_by, recordedAt: a.recorded_at, rows: hidden ? [] : rowsByPerson.get(a.customer_id) ?? [], masked: hidden,
+      };
+    }),
     relationships: await Promise.all(rels.map(async (r) => ({
       id: r.id!, type: r.type as RelationshipType, fromKind: r.from_kind!, fromId: r.from_id!, fromName: await nameOf(r.from_kind, r.from_id),
       toKind: r.to_kind!, toId: r.to_id!, toName: await nameOf(r.to_kind, r.to_id), context: r.context, confirmedBy: r.confirmed_by,
       confirmedAt: r.confirmed_at, validFrom: r.valid_from, validTo: r.valid_to, lifecycle: r.lifecycle_state ?? "pending_review",
       evidenceNote: r.evidence_note,
-    }))),
+    }))).then((rs) => rs.map((r) => ({ ...r, masked: r.fromName === MASKED_PERSON || r.toName === MASKED_PERSON || r.fromName === MASKED_ORG || r.toName === MASKED_ORG }))),
     interactions: inter.map((i) => {
       const c = (i.classification ?? "confidential") as Classification;
       const hidden = !canSee(viewer.clearance, c) && i.owner_id !== viewer.id;
+      const personHidden = Boolean(i.customer_id) && hiddenPerson(i.person_class);
       return {
-        id: i.id!, kind: i.kind as InteractionKind, occurredAt: i.occurred_at!, personId: i.customer_id, personName: i.person_name,
+        id: i.id!, kind: i.kind as InteractionKind, occurredAt: i.occurred_at!, personId: i.customer_id,
+        personName: personHidden ? MASKED_PERSON : i.person_name, personMasked: personHidden,
         summary: hidden ? null : i.summary, outcome: hidden ? null : i.outcome, owner: i.owner_id, classification: c, masked: hidden,
         recordedAt: i.recorded_at!,
       };
     }),
-    participations: parts.map((p) => ({ id: p.id!, personName: p.person_name, program: p.program!, edition: p.edition, role: p.role!, occurredAt: p.occurred_at })),
+    participations: parts.map((p) => {
+      const hidden = hiddenPerson(p.person_class);
+      return { id: p.id!, personName: hidden ? MASKED_PERSON : p.person_name, program: p.program!, edition: p.edition, role: p.role!, occurredAt: p.occurred_at, masked: hidden };
+    }),
     opportunities: opps.map((p) => ({ id: p.id!, name: p.name!, stage: p.stage!, owner: p.owner_id, expectedClose: p.expected_close })),
     versions: groupedVersions,
   };

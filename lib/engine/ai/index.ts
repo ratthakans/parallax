@@ -229,6 +229,12 @@ async function ask<T>(opts: AskOptions<T>): Promise<AiResult<T>> {
       cacheReadTokens: res.usage.cache_read_input_tokens ?? 0,
     };
 
+    /* ถูกตัดเพราะเกินเพดานโทเค็น = JSON ไม่ครบ — ทิ้ง ไม่ใช้ครึ่ง ๆ กลาง ๆ และบันทึกแยกให้เห็นว่าเพดานต่ำไป (plan 9.2) */
+    if (res.stop_reason === "max_tokens") {
+      await recordAiCall({ ...usage, outcome: "truncated" });
+      return { value: opts.fallback(), source: "fallback", note: "AI ตอบยาวเกินเพดาน — ใช้สูตรสำเร็จแทน" };
+    }
+
     // ทั้งสายปฏิเสธ (รวมรุ่นสำรอง) — เช็คก่อนอ่าน content เสมอ
     if (res.stop_reason === "refusal") {
       await recordAiCall({ ...usage, outcome: "refused" });
@@ -945,13 +951,15 @@ export async function writeAccountBrief(
   input: { org: string; evidence: BriefEvidence[]; unknowns: string[]; scope: string },
   fallback: () => BriefDraft,
 ): Promise<AiResult<BriefDraft>> {
-  const lines = input.evidence.map((e) => `${e.id}: ${e.text.replace(/</g, "‹")}`).join("\n");
+  /* หนึ่งหลักฐานต่อหนึ่งบรรทัดเสมอ — ขึ้นบรรทัดใหม่ในบันทึกของผู้ใช้ปลอมบรรทัด "E2: ..." ที่อ้างรหัสจริงได้ */
+  const flat = (t: string) => t.replace(/</g, "‹").replace(/[\r\n\u2028\u2029]+/g, " ");
+  const lines = input.evidence.map((e) => `${e.id}: ${flat(e.text)}`).join("\n");
   return ask<BriefDraft>({
     tenantId,
     kind: "account_brief",
     input,
     system: ACCOUNT_BRIEF_SYSTEM,
-    prompt: `บริษัท: ${input.org.replace(/</g, "‹")}\n<evidence>\n${lines}\nU: ไม่ทราบ — ${input.unknowns.join(" · ") || "ไม่มี"}\n</evidence>`,
+    prompt: `บริษัท: ${flat(input.org)}\n<evidence>\n${lines}\nU: ไม่ทราบ — ${input.unknowns.join(" · ") || "ไม่มี"}\n</evidence>`,
     schema: ACCOUNT_BRIEF_SCHEMA,
     fallback,
     maxTokens: 3000,

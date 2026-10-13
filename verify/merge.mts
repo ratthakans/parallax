@@ -13,7 +13,7 @@ import { all, get, run } from "@/lib/engine/sql";
 import { registerSource } from "@/lib/engine/vault/sources";
 import { commitUpload } from "@/lib/engine/vault/intake";
 import { resolveTenant } from "@/lib/engine/vault/resolve";
-import { decideReview, mergePersons, personIdsOf, unmerge } from "@/lib/engine/vault/merge";
+import { decideReview, mergeOrgs, mergePersons, personIdsOf, unmerge } from "@/lib/engine/vault/merge";
 import { listOpenReviews } from "@/lib/engine/vault/review";
 import { createCustomer, deleteCustomer, mergeCustomers } from "@/lib/engine/customers";
 import { recordPreference } from "@/lib/engine/policy/preferences";
@@ -80,12 +80,14 @@ const TABLES: [string, string][] = [
   ["customers", "id"], ["contact_points", "id"], ["contact_profiles", "customer_id"], ["affiliations", "id"],
   ["import_rows", "batch_id, line"], ["interactions", "id"], ["preferences", "id"], ["orgs", "id"], ["org_domains", "domain"],
 ];
-/* lifecycle_state ของคนไม่นับ: แยกคืน = คนตัดสินว่าต่างคน จึงเปลี่ยนจาก "รอตรวจ" เป็น "ยืนยันแล้ว" โดยตั้งใจ (ตรวจแยกด้านล่าง) */
+/* ไม่นับสองช่องของคนที่ตั้งใจให้ต่างหลังแยกคืน (ตรวจแยกด้านล่าง):
+   lifecycle_state — แยกคืน = คนตัดสินว่าต่างคน จึงเปลี่ยนจาก "รอตรวจ" เป็น "ยืนยันแล้ว"
+   restriction_status — ข้อจำกัดที่เข้มกว่าชนะ: ไม่รู้ว่าข้อจำกัดระหว่างรวมเป็นของใคร ทั้งสองคนจึงถือไว้จนคนตรวจ */
 async function snapshot() {
   const s: Record<string, string> = {};
   for (const [t, order] of TABLES) {
     const rows = await all<Record<string, unknown>>(`SELECT * FROM ${t} WHERE tenant_id = ? ORDER BY ${order}`, T);
-    s[t] = JSON.stringify(t === "customers" ? rows.map(({ lifecycle_state: _l, ...r }) => r) : rows);
+    s[t] = JSON.stringify(t === "customers" ? rows.map(({ lifecycle_state: _l, restriction_status: _r, ...r }) => r) : rows);
   }
   return s;
 }
@@ -119,6 +121,9 @@ const diff = TABLES.map(([t]) => t).filter((t) => before[t] !== after[t]);
 ok(diff.length === 0, `หลังแยกคืน ทุกแถวเหมือนก่อนรวม${diff.length ? ` — ต่างที่ ${diff.join(", ")}` : ""}`);
 const states = await all<{ lifecycle_state: string }>("SELECT lifecycle_state FROM customers WHERE tenant_id = ? AND id IN (?, ?)", T, big.id, small.id);
 ok(states.length === 2 && states.every((x) => x.lifecycle_state === "confirmed"), "หลังแยกคืน ทั้งสองคนเป็นสถานะยืนยันแล้ว ไม่ค้างรอตรวจ");
+const strict = await all<{ restriction_status: string }>("SELECT restriction_status FROM customers WHERE tenant_id = ? AND id IN (?, ?)", T, big.id, small.id);
+ok(strict.length === 2 && strict.every((x) => x.restriction_status === "suppressed"),
+  "แยกคืนไม่ทำให้ข้อจำกัดอ่อนลง — ทั้งสองคนยังห้ามติดต่อจนคนตรวจ");
 ok(!(await unmerge(T, mergeId, "steward@verify")).ok, "แยกคืนซ้ำไม่ได้");
 ok((await get("SELECT 1 AS x FROM merge_log WHERE id = ? AND undone_at IS NOT NULL", mergeId)) != null, "ประวัติการรวมยังอยู่ พร้อมเวลาที่แยกคืน");
 
@@ -206,6 +211,8 @@ const hd = await createCustomer(T, { name: "มือสอง ทดสอบ",
 if (!hk.ok || !hd.ok) throw new Error("สร้างคนด้วยมือไม่ได้");
 ok((await recordPreference(T, hd.id, { kind: "objection", evidence: "คัดค้านทางโทรศัพท์ (สมมุติ)" }, "verify")).ok, "บันทึกการคัดค้านของคนที่เพิ่มด้วยมือ");
 const hm = await mergeCustomers(T, hk.id, hd.id, "steward@verify");
+/* ขอจำกัดที่เข้ามาระหว่างที่รวมอยู่ — ไม่รู้ว่าเป็นของใครในสองคน แยกคืนแล้วทั้งสองต้องถือไว้ */
+await recordPreference(T, hk.id, { kind: "restriction", evidence: "ขอระงับระหว่างตรวจ (สมมุติ)" }, "verify");
 const hlog = await get<{ id: string }>("SELECT id FROM merge_log WHERE tenant_id = ? AND survivor_id = ? AND merged_id = ? AND undone_at IS NULL", T, hk.id, hd.id);
 ok(hm.ok && Boolean(hlog), "รวมคนที่เพิ่มด้วยมือแต่มีคำคัดค้าน = ผ่านการรวมที่ย้อนได้ (มี merge_log)");
 ok((await personIdsOf(T, hk.id)).includes(hd.id), "คำคัดค้านใต้รหัสที่ถูกรวมยังถูกนับให้คนที่คงอยู่");
@@ -213,6 +220,40 @@ ok(Boolean(hlog) && (await unmerge(T, hlog!.id, "steward@verify")).ok
   && Boolean(await get("SELECT 1 AS x FROM customers WHERE tenant_id = ? AND id = ?", T, hd.id))
   && Boolean(await get("SELECT 1 AS x FROM consents WHERE tenant_id = ? AND customer_id = ?", T, hd.id))
   && Boolean(await get("SELECT 1 AS x FROM consents WHERE tenant_id = ? AND customer_id = ?", T, hk.id)), "แยกคืนได้ พร้อมสถานะความยินยอมเดิมของทั้งสองคน");
+ok(Boolean(await get("SELECT 1 AS x FROM preferences WHERE tenant_id = ? AND customer_id = ? AND kind = 'restriction'", T, hd.id)),
+  "ข้อจำกัดที่บันทึกระหว่างรวมอยู่ ตามไปกับคนที่ถูกแยกคืนด้วย (ข้อจำกัดที่เข้มกว่าชนะ)");
+
+// ── รวมองค์กร: คนละนิติบุคคลไม่รวม · ไม่เป็นแม่ของตัวเอง · ระดับความลับที่สูงกว่าชนะ ──
+const org = (id: string, name: string, extra: Record<string, string> = {}) => {
+  const cols = { id, tenant_id: T, name, name_norm: name, created_at: now, ...extra };
+  return run(`INSERT INTO orgs (${Object.keys(cols).join(", ")}) VALUES (${Object.keys(cols).map(() => "?").join(", ")})`, ...Object.values(cols));
+};
+await org("o-tax-a", "ทดสอบภาษี เอ", { tax_id: "0105500000001" });
+await org("o-tax-b", "ทดสอบภาษี บี", { tax_id: "0105500000002" });
+const taxed = await mergeOrgs(T, "o-tax-a", "o-tax-b", "steward@verify");
+ok(!taxed.ok && /คนละนิติบุคคล/.test(taxed.ok ? "" : taxed.error), "เลขผู้เสียภาษีต่างกัน = คนละนิติบุคคล รวมไม่ได้");
+await org("o-parent", "ทดสอบแม่", { classification: "restricted_high" });
+await org("o-child", "ทดสอบลูก", { parent_id: "o-parent", classification: "internal" });
+const pc = await mergeOrgs(T, "o-child", "o-parent", "steward@verify");
+const child = await get<{ parent_id: string | null; classification: string }>("SELECT parent_id, classification FROM orgs WHERE tenant_id = ? AND id = 'o-child'", T);
+ok(pc.ok && child?.parent_id !== "o-child", "รวมบริษัทแม่เข้าบริษัทลูก: ไม่กลายเป็นแม่ของตัวเอง");
+ok(child?.classification === "restricted_high", "รวมแฟ้มจำกัดสูงเข้าแฟ้มระดับภายใน: ระดับที่สูงกว่าชนะ");
+if (pc.ok) {
+  ok((await unmerge(T, pc.mergeId, "steward@verify")).ok
+    && (await get<{ parent_id: string }>("SELECT parent_id FROM orgs WHERE tenant_id = ? AND id = 'o-child'", T))?.parent_id === "o-parent",
+    "แยกคืนแล้วบริษัทลูกกลับไปชี้บริษัทแม่เดิม");
+}
+
+// ── กลุ่มสามคน: รวมครบหรือไม่รวมเลย ──
+const g1 = await createCustomer(T, { name: "กลุ่ม หนึ่ง", contacts: [{ kind: "email", value: "g1@merge.example" }], profile: {}, consent: false }, "verify");
+const g2 = await createCustomer(T, { name: "กลุ่ม สอง", contacts: [{ kind: "email", value: "g2@merge.example" }], profile: {}, consent: false }, "verify");
+if (!g1.ok || !g2.ok) throw new Error("สร้างคนในกลุ่มไม่ได้");
+await run("INSERT INTO review_items (id, tenant_id, kind, subject_ids, created_at) VALUES (?,?,?,?,?)",
+  "rv-group", T, "person_pair", JSON.stringify([g1.id, g2.id, "ไม่มีคนนี้"].sort()), now);
+const half = await decideReview(T, "rv-group", "same", "steward@verify");
+const stillTwo = Number((await get<{ n: number }>("SELECT COUNT(*) AS n FROM customers WHERE tenant_id = ? AND id IN (?, ?)", T, g1.id, g2.id))!.n);
+const rv = await get<{ status: string }>("SELECT status FROM review_items WHERE tenant_id = ? AND id = 'rv-group'", T);
+ok(!half.ok && stillTwo === 2 && rv?.status === "open", `รวมกลุ่มไม่สำเร็จกลางทาง: ย้อนทั้งกลุ่ม ไม่ค้างครึ่งหนึ่ง (เหลือ ${stillTwo} คน · ${rv?.status})`);
 
 const chain = await verifyAuditChain(T);
 ok(chain.ok, "บันทึกตรวจสอบต่อเนื่องครบหลังรวม/แยกทุกครั้ง");

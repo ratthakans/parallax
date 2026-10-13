@@ -106,6 +106,8 @@ await recordPreference(T, weera, { kind: "restriction", purposeId: SALES, eviden
 ok((await decide(T, ask(weera, SALES))).status === "suppressed", "ขอจำกัดการใช้ = ห้าม");
 await run("UPDATE customers SET lifecycle_state = 'pending_review' WHERE tenant_id = ? AND id = ?", T, kamon);
 ok((await decide(T, ask(kamon, SALES))).status === "review_required", "ตัวตนที่ยังรอตรวจในคิว = ต้องตรวจก่อน");
+await run("UPDATE customers SET lifecycle_state = 'needs_review' WHERE tenant_id = ? AND id = ?", T, kamon);
+ok((await decide(T, ask(kamon, SALES))).status === "review_required", "ระเบียนที่ถูกส่งกลับมาทบทวน (needs_review) = ต้องตรวจก่อน");
 await run("UPDATE customers SET lifecycle_state = 'confirmed' WHERE tenant_id = ? AND id = ?", T, kamon);
 
 // ── fail closed ──
@@ -177,6 +179,33 @@ if (m.ok) {
     && (await all("SELECT customer_id FROM campaign_targets WHERE tenant_id = ? AND campaign_id = ? AND customer_id IN (?, ?)", T, dup.ok ? dup.id : "", prasert, jira)).length === 2,
     "แยกคืนแล้ว เป้าหมายของฝั่งที่ถูกรวมกลับมาครบ");
 }
+
+// ── เปลี่ยนฐานของวัตถุประสงค์ = งานที่ค้างถูกตรวจซ้ำทันที ไม่รอถึงตอนติดต่อ ──
+const fresh = new TextEncoder().encode([
+  "ชื่อ,นามสกุล,บริษัท,ตำแหน่ง,อีเมล,โทรศัพท์,วันที่",
+  `สมใจ,ใหม่เอี่ยม,บริษัท ดาวเหนือ จำกัด,ผู้จัดการฝ่ายการตลาด,somjai@daonuea.example,081-555-3101,${recent}`,
+].join("\n"));
+const cf = await commitUpload(T, src.id, fresh, "ฐาน.csv", MAP, createHash("sha256").update(fresh).digest("hex"), "verify");
+if (!cf.ok) throw new Error(cf.error);
+await resolveTenant(T, "verify");
+const somjai = (await get<{ id: string }>("SELECT id FROM customers WHERE tenant_id = ? AND name LIKE ?", T, "สมใจ%"))!.id;
+const BASIS = await ensurePurpose(T, "ทดสอบเปลี่ยนฐาน", "verify");
+await setBasis(T, BASIS, { lawfulBasis: "legitimate_interest", liaRef: "LIA-2026-02 (สมมุติ)" }, "dpo@verify");
+const cb = await createCampaign(T, { name: "ทดสอบเปลี่ยนฐาน", purposeId: BASIS, channel: "email", messageKind: "marketing", criteria: { titleKeywords: ["การตลาด"], maxPerOrg: 2 } }, "bd@verify");
+if (!cb.ok) throw new Error(cb.error);
+await buildTargets(T, cb.id, "bd@verify");
+const ts = (await getCampaign(T, cb.id))!.targets.find((t) => t.customerId === somjai)!;
+ok((await assignTarget(T, ts.id, "bd@verify", due, "bd@verify")).ok, "มอบหมายคนที่ใช้ได้ในแคมเปญที่จะเปลี่ยนฐาน");
+await setBasis(T, BASIS, { lawfulBasis: "contract" }, "dpo@verify");
+const tsAfter = (await getCampaign(T, cb.id))!.targets.find((t) => t.id === ts.id)!;
+ok(tsAfter.eligibility === "review_required", `ผลตัดสินของเป้าหมายถูกตรวจซ้ำทันทีหลังเปลี่ยนฐาน (${tsAfter.eligibility})`);
+const rr = await recordOutcome(T, ts.id, { outcome: "contacted", note: "ส่งอีเมลแล้ว" }, "bd@verify");
+ok(!rr.ok, "หลังเปลี่ยนฐาน บันทึกว่าติดต่อแล้วไม่ได้");
+
+// ── วันและชั่วโมงตามเวลาไทย (เซิร์ฟเวอร์เป็น UTC) ──
+const { bangkokDay, bangkokHour } = await import("@/lib/shared/format");
+ok(bangkokDay(Date.parse("2026-10-13T18:30:00Z")) === "2026-10-14" && bangkokHour(Date.parse("2026-10-13T18:30:00Z")) === 1,
+  "ตีหนึ่งครึ่งเวลาไทยนับเป็นวันใหม่ — งานครบกำหนดเมื่อวานขึ้นว่าเลยกำหนด และช่วงห้ามส่งไม่คลาดเจ็ดชั่วโมง");
 
 // ── ไม่คัดลอกข้อมูลส่วนบุคคลลงผลตัดสิน ──
 const stored = await all<{ eligibility_reasons: string; policy_version: string }>("SELECT eligibility_reasons, policy_version FROM campaign_targets WHERE tenant_id = ?", T);

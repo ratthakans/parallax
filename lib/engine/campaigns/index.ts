@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { all, get, run, tx, type Sql } from "@/lib/engine/sql";
 import { logActivity } from "@/lib/engine/db";
+import { bangkokDay } from "@/lib/shared/format";
 import { decide, type Decision } from "@/lib/engine/policy";
 import { personIdsOf } from "@/lib/engine/vault/merge";
 import {
@@ -154,6 +155,11 @@ export async function buildTargets(tenantId: string, campaignId: string, actor: 
           `UPDATE campaign_targets SET org_id = ?, reasons = ?, eligibility = ?, eligibility_reasons = ?, policy_version = ?, checked_at = ?, updated_at = ?
            WHERE tenant_id = ? AND id = ?`,
           m.orgId, JSON.stringify(m.reasons), d.status, JSON.stringify(d.reasons), d.policyVersion, at, at, tenantId, prev.id);
+        /* เป้าหมายที่มอบหมายแล้วแต่ตอนนี้ถูกระงับ: ยกเลิกพร้อมงานค้าง แบบเดียวกับ recheckTargetsFor — ไม่ใช่แค่เปลี่ยนป้าย */
+        if (d.status === "suppressed" && prev.status !== "open" && !FINAL.includes(prev.status as TargetStatus)) {
+          await q.run("UPDATE campaign_targets SET status = 'cancelled', outcome = ? WHERE tenant_id = ? AND id = ?", d.reasons.join(" · "), tenantId, prev.id);
+          await q.run("UPDATE tasks SET status = 'cancelled', outcome = ?, done_at = ? WHERE tenant_id = ? AND target_id = ? AND status = 'open'", "ยกเลิกตามนโยบาย", at, tenantId, prev.id);
+        }
       } else {
         await q.run(
           `INSERT INTO campaign_targets (id, tenant_id, campaign_id, org_id, customer_id, reasons, eligibility, eligibility_reasons, policy_version, checked_at, assigned_to, status, outcome, created_at, updated_at)
@@ -250,7 +256,7 @@ export async function recordOutcome(
       await q.run(
         `INSERT INTO interactions (id, tenant_id, kind, occurred_at, org_id, customer_id, opportunity_id, summary, outcome, owner_id, source_id, classification, recorded_at)
          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-        randomUUID(), tenantId, kind, at.slice(0, 10), t.org_id, t.customer_id, null, `${c.name}: ${note}`, TARGET_STATUS_TH[outcome], actor, null, "confidential", at);
+        randomUUID(), tenantId, kind, bangkokDay(Date.parse(at)), t.org_id, t.customer_id, null, `${c.name}: ${note}`, TARGET_STATUS_TH[outcome], actor, null, "confidential", at);
       await q.run("DELETE FROM account_briefs WHERE tenant_id = ? AND org_id = ?", tenantId, t.org_id);
     }
     await q.run("UPDATE tasks SET status = 'done', outcome = ?, done_at = ? WHERE tenant_id = ? AND target_id = ? AND status = 'open'", TARGET_STATUS_TH[outcome], at, tenantId, targetId);
@@ -357,7 +363,7 @@ export async function getCampaign(tenantId: string, id: string) {
 
 /* ── ทบทวนรายสัปดาห์ (plan หัวข้อ 3.3) ── นับกิจกรรมที่มีผล ไม่นับ login และไม่นับทีม PARALLAX */
 export async function weeklyReview(tenantId: string, since = new Date(Date.now() - 7 * 864e5).toISOString()) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = bangkokDay();
   const [byCampaign, overdue, opps, activity, moves] = await Promise.all([
     all<{ id: string; name: string; status: string; n: number | string }>(
       `SELECT c.id, c.name, t.status, COUNT(*) AS n FROM sales_campaigns c JOIN campaign_targets t ON t.campaign_id = c.id AND t.tenant_id = c.tenant_id

@@ -74,6 +74,8 @@ async function evaluate(tenantId: string, ask: Ask): Promise<Decision> {
   if (person.restriction_status === "suppressed") suppressed.push("ระเบียนถูกตั้งเป็นห้ามติดต่อ");
   if (person.restriction_status === "restricted" || person.restriction_status === "review") review.push("ระเบียนมีข้อจำกัดที่ต้องตรวจก่อน");
   if (person.lifecycle_state === "pending_review") review.push("ตัวตนยังรอตรวจในคิว (อาจเป็นคนเดียวกับอีกระเบียน)");
+  /* ข้อมูลที่ยืนยันแล้วกลับมาต้องทบทวน (หลักฐานขัดแย้ง · เปลี่ยนงาน · ขาดการยืนยัน — plan 5.2) */
+  if (person.lifecycle_state === "needs_review") review.push("ระเบียนถูกส่งกลับมาให้ทบทวน — ยืนยันก่อนใช้");
 
   const basis = await activeBasis(tenantId, ask.purposeId, at);
   /* รุ่นที่อ่านได้: กติกา · วัตถุประสงค์ · รุ่นของฐาน — ไม่มีข้อมูลส่วนบุคคล */
@@ -115,6 +117,9 @@ async function evaluate(tenantId: string, ask: Ask): Promise<Decision> {
     } else if (b === "contract" || b === "legal_obligation") {
       if (ask.messageKind === "service") ok.push(`ฐาน${LAWFUL_BASIS_TH[b].split(" (")[0]} ครอบคลุมข้อความบริการ`);
       else review.push(`ฐาน${LAWFUL_BASIS_TH[b].split(" (")[0]} ครอบคลุมเฉพาะข้อความบริการ ไม่ครอบคลุมข้อเสนอ`);
+    } else {
+      /* ฐานที่กติกานี้ไม่รู้จัก (เช่นเพิ่มใน LAWFUL_BASES แต่ยังไม่เขียนกติกา) ต้องไม่ตกเป็น "ใช้ได้" เงียบ ๆ */
+      review.push("ฐานการประมวลผลนี้ยังไม่มีกติกาตรวจ — ต้องให้คนตัดสิน");
     }
   }
   if (ask.messageKind === "consent_request") review.push("ไม่ส่งการขอความยินยอมแบบเหมารวม — ต้องให้คนตัดสินรายคน");
@@ -164,18 +169,28 @@ export async function setBasis(
   const lia = input.liaRef?.trim().slice(0, 200) || null;
   if (input.lawfulBasis === "legitimate_interest" && !lia) return { ok: false, error: "ฐานประโยชน์โดยชอบต้องอ้างผลประเมิน LIA (เลขที่หรือชื่อเอกสาร)" };
   const now = new Date().toISOString();
-  const prev = await get<{ id: string; version: number | string }>(
-    "SELECT id, version FROM processing_records WHERE tenant_id = ? AND purpose_id = ? AND effective_to IS NULL ORDER BY version DESC LIMIT 1", tenantId, purposeId);
-  const version = prev ? Number(prev.version) + 1 : 1;
-  await tx(async (q) => {
+  /* อ่านรุ่นล่าสุดในธุรกรรมเดียวกับการเขียน — สองคนตั้งพร้อมกันต้องไม่ได้รุ่นเดียวกันสองแถวที่ยังมีผล */
+  const version = await tx(async (q) => {
+    const prev = await q.get<{ id: string; version: number | string }>(
+      "SELECT id, version FROM processing_records WHERE tenant_id = ? AND purpose_id = ? AND effective_to IS NULL ORDER BY version DESC LIMIT 1", tenantId, purposeId);
+    const version = prev ? Number(prev.version) + 1 : 1;
     if (prev) await q.run("UPDATE processing_records SET effective_to = ? WHERE tenant_id = ? AND id = ?", now, tenantId, prev.id);
     await q.run(
       `INSERT INTO processing_records (id, tenant_id, purpose_id, lawful_basis, data_scope, approved_by, version, effective_from, effective_to, lia_ref, recorded_at)
        VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
       randomUUID(), tenantId, purposeId, input.lawfulBasis, input.dataScope?.trim().slice(0, 300) || null, actor, version, now, null, lia, now,
     );
+    return version;
   });
   await logActivity(tenantId, actor, "basis_set", `${purposeId} · ${input.lawfulBasis} · v${version}`);
+  /* ฐานเปลี่ยน = ผลตัดสินของเป้าหมายที่ใช้วัตถุประสงค์นี้อาจเปลี่ยน — ตรวจซ้ำ ไม่รอจนถึงตอนติดต่อ
+     (import ตอนเรียก: campaigns import ไฟล์นี้อยู่แล้ว) */
+  const { recheckTargetsFor } = await import("@/lib/engine/campaigns");
+  const people = await all<{ customer_id: string }>(
+    `SELECT DISTINCT t.customer_id FROM campaign_targets t JOIN sales_campaigns c ON c.id = t.campaign_id AND c.tenant_id = t.tenant_id
+     WHERE t.tenant_id = ? AND (c.purpose_id = ? OR c.disclosure_purpose_id = ?) AND t.status NOT IN ('won', 'lost', 'not_interested', 'cancelled')`,
+    tenantId, purposeId, purposeId);
+  for (const p of people) await recheckTargetsFor(tenantId, p.customer_id, actor);
   return { ok: true, version };
 }
 

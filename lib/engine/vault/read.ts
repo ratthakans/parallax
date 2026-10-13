@@ -21,6 +21,14 @@ export type ReadTable = {
   otherSheets?: string[];
 };
 
+/* ── เพดานขนาดตาราง ──
+   ไฟล์ 5 MB ยังซ่อนตารางขนาดมหาศาลได้ (CSV บรรทัดว่างหลายล้านบรรทัด · xlsx ที่ประกาศช่วงชีตใหญ่)
+   ซึ่งจะกินหน่วยความจำของ serverless function ก่อนจะถึงขั้นไหน — ตัดที่การอ่าน ไม่ใช่หลังอ่านเสร็จ
+   pilot คือไม่เกิน 10,000 รายการต้นทาง (plan หัวข้อ 13) · เพดานนี้เผื่อไว้ห้าเท่า */
+export const MAX_ROWS = 50_000;
+export const MAX_COLUMNS = 200;
+export class TableTooLarge extends Error {}
+
 export function decodeText(bytes: Uint8Array): { text: string; encoding: ReadTable["encoding"] } {
   if (bytes[0] === 0xff && bytes[1] === 0xfe) return { text: new TextDecoder("utf-16le").decode(bytes), encoding: "utf-16" };
   if (bytes[0] === 0xfe && bytes[1] === 0xff) return { text: new TextDecoder("utf-16be").decode(bytes), encoding: "utf-16" };
@@ -34,10 +42,15 @@ export function decodeText(bytes: Uint8Array): { text: string; encoding: ReadTab
 export function readTable(bytes: Uint8Array, kind: "csv" | "xlsx"): ReadTable {
   if (kind === "csv") {
     const { text, encoding } = decodeText(bytes);
-    return { ...shapeRecords(csvRecords(text)), encoding };
+    const records = csvRecords(text);
+    if (records.length > MAX_ROWS + 1) throw new TableTooLarge(`ไฟล์มีมากกว่า ${MAX_ROWS.toLocaleString("th-TH")} แถว — แบ่งไฟล์ก่อนนำเข้า`);
+    if (records.some((r) => r.cells.length > MAX_COLUMNS)) throw new TableTooLarge(`ไฟล์มีมากกว่า ${MAX_COLUMNS} คอลัมน์ — ตรวจว่าเลือกไฟล์ถูก`);
+    return { ...shapeRecords(records), encoding };
   }
   const wb = XLSX.read(bytes, {
     type: "array",
+    /* อ่านไม่เกินเพดาน (+ หัว + หนึ่งแถวไว้รู้ว่าเกิน) — SheetJS หยุดสร้างเซลล์ที่นี่ ไม่ใช่สร้างครบแล้วตัด */
+    sheetRows: MAX_ROWS + 2,
     cellFormula: false,
     cellHTML: false,
     cellStyles: false,
@@ -49,6 +62,13 @@ export function readTable(bytes: Uint8Array, kind: "csv" | "xlsx"): ReadTable {
     const ref = wb.Sheets[n]?.["!ref"];
     return ref && XLSX.utils.decode_range(ref).e.r > 0;
   }) ?? names[0];
+  /* ช่วงที่ชีตประกาศ (!fullref) คือขนาดจริงก่อนตัดด้วย sheetRows */
+  const full = wb.Sheets[sheetName]?.["!fullref"] ?? wb.Sheets[sheetName]?.["!ref"];
+  if (full) {
+    const r = XLSX.utils.decode_range(full);
+    if (r.e.r - r.s.r > MAX_ROWS) throw new TableTooLarge(`ชีต "${sheetName}" มีมากกว่า ${MAX_ROWS.toLocaleString("th-TH")} แถว — แบ่งไฟล์ก่อนนำเข้า`);
+    if (r.e.c - r.s.c >= MAX_COLUMNS) throw new TableTooLarge(`ชีต "${sheetName}" มีมากกว่า ${MAX_COLUMNS} คอลัมน์ — ตรวจว่าเลือกไฟล์ถูก`);
+  }
   const grid = XLSX.utils.sheet_to_json<string[]>(wb.Sheets[sheetName], {
     header: 1,
     raw: false,
@@ -69,9 +89,9 @@ export function readTable(bytes: Uint8Array, kind: "csv" | "xlsx"): ReadTable {
    ตัวแยกของตัวนำเข้ายุคค้าปลีก (parseCsv) ทิ้งแถวว่างและย้ายแถวที่คอลัมน์ไม่ครบไปไว้นอกตาราง
    ซึ่งดีสำหรับวิเคราะห์ยอดขาย แต่ทำให้ตรวจยอดของ Data Vault ไม่ได้ — แถวที่หายไปเงียบ ๆ
    คือสิ่งที่รายงานตรวจยอดมีไว้จับ ที่นี่จึงเก็บทุกระเบียนพร้อมบรรทัดจริงในไฟล์ (นับบรรทัดในช่องที่มีเครื่องหมายคำพูดด้วย) */
-export function csvRecords(text: string): { line: number; cells: string[] }[] {
+export function csvRecords(text: string): { line: number; endLine: number; cells: string[] }[] {
   const clean = text.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
-  const out: { line: number; cells: string[] }[] = [];
+  const out: { line: number; endLine: number; cells: string[] }[] = [];
   let field = "", row: string[] = [], inQuotes = false, line = 1, start = 1;
   for (let i = 0; i < clean.length; i++) {
     const ch = clean[i];
@@ -84,15 +104,16 @@ export function csvRecords(text: string): { line: number; cells: string[] }[] {
     }
     if (ch === '"') inQuotes = true;
     else if (ch === "," || ch === "\t") { row.push(field); field = ""; }
-    else if (ch === "\n") { row.push(field); out.push({ line: start, cells: row }); row = []; field = ""; start = line; }
+    else if (ch === "\n") { row.push(field); out.push({ line: start, endLine: line - 1, cells: row }); row = []; field = ""; start = line; }
     else field += ch;
   }
-  if (field.length || row.length) { row.push(field); out.push({ line: start, cells: row }); }
+  /* จบไฟล์ขณะเครื่องหมายคำพูดยังเปิด: บรรทัดสุดท้ายคือบรรทัดที่มีข้อความ ไม่ใช่บรรทัดว่างหลังขึ้นบรรทัดใหม่ */
+  if (field.length || row.length) { row.push(field); out.push({ line: start, endLine: clean.endsWith("\n") ? line - 1 : line, cells: row }); }
   return out;
 }
 
 /** หัวคอลัมน์ = ระเบียนแรกที่มีข้อมูล · ที่เหลือเป็นแถวทั้งหมด (รวมแถวว่าง) พร้อมปัญหาโครงสร้าง */
-function shapeRecords(records: { line: number; cells: string[] }[], lenient = false): Omit<ReadTable, "encoding"> {
+function shapeRecords(records: { line: number; endLine?: number; cells: string[] }[], lenient = false): Omit<ReadTable, "encoding"> {
   const h = records.findIndex((r) => r.cells.some((c) => c.trim()));
   if (h < 0) return { headers: [], rows: [], lines: [], issues: [] };
   const headers = records[h].cells.map((c) => c.trim());
@@ -103,6 +124,12 @@ function shapeRecords(records: { line: number; cells: string[] }[], lenient = fa
   while (body.length && !body[body.length - 1].cells.some((c) => c.trim())) body.pop();
   const issues = body.map((r) => {
     const extra = r.cells.slice(headers.length).some((c) => c.trim());
+    /* ระเบียนเดียวกินหลายบรรทัดและคอลัมน์ไม่ตรง = เครื่องหมายคำพูดเปิดค้าง (เช่น 12" monitor) กลืนบรรทัดถัดไป
+       บรรทัดที่ถูกกลืนไม่ใช่แถวของตัวเอง ตรวจยอดจึงมองไม่เห็นว่าหาย — บอกช่วงบรรทัดให้ชัดในเหตุผลของแถวนี้ */
+    const span = (r.endLine ?? r.line) - r.line;
+    if (span > 0 && (extra || r.cells.length !== headers.length)) {
+      return `เครื่องหมายคำพูดไม่ปิด — บรรทัด ${r.line}–${r.endLine} (${span + 1} บรรทัด) ถูกอ่านรวมเป็นแถวเดียว แก้ไฟล์แล้วนำเข้าใหม่`;
+    }
     if (!lenient && r.cells.some((c) => c.trim()) && r.cells.length < headers.length) {
       return `คอลัมน์ไม่ครบ (${r.cells.length} จาก ${headers.length}) — แถวอาจถูกตัดหรือมีเครื่องหมายคำพูดไม่ปิด`;
     }

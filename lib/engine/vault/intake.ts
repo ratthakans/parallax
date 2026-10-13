@@ -4,7 +4,7 @@ import { logActivity } from "@/lib/engine/db";
 import { mapColumns, type AiSource } from "@/lib/engine/ai";
 import { sealRecord } from "@/lib/engine/pii";
 import { scanFile } from "@/lib/engine/vault/scan";
-import { readTable } from "@/lib/engine/vault/read";
+import { TableTooLarge, readTable } from "@/lib/engine/vault/read";
 import { getSource, type Source } from "@/lib/engine/vault/sources";
 import {
   IDENTIFYING_FIELDS, VAULT_FIELDS, sensitiveReason, type ImportRowStatus, type VaultField,
@@ -119,7 +119,8 @@ async function scanAndRead(bytes: Uint8Array, filename: string): Promise<ScanRea
   let table;
   try {
     table = readTable(bytes, scan.kind);
-  } catch {
+  } catch (e) {
+    if (e instanceof TableTooLarge) return { error: e.message, threat: false };
     return { error: "อ่านไฟล์ไม่ได้ — ไฟล์อาจเสียหรือถูกป้องกันด้วยรหัสผ่าน", threat: false };
   }
   if (!table.headers.some((h) => h.trim())) return { error: "ไม่พบแถวหัวคอลัมน์ในไฟล์", threat: false };

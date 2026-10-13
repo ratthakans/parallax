@@ -6,7 +6,7 @@ import { run } from "@/lib/engine/sql";
    เก็บชนิดงานกับจำนวนโทเค็น ไม่เก็บ prompt หรือคำตอบ — log ต้องไม่มีข้อมูลส่วนบุคคลเกินจำเป็น
    ผู้ใช้เพิ่มแถวได้ แต่แก้หรือลบไม่ได้ (ไม่มีนโยบาย update/delete บน Postgres) */
 
-export type AiOutcome = "ai" | "refused" | "error" | "invalid" | "policy_blocked";
+export type AiOutcome = "ai" | "refused" | "error" | "invalid" | "truncated" | "policy_blocked";
 
 export async function recordAiCall(entry: {
   tenantId: string;
