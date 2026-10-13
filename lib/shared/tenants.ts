@@ -370,102 +370,15 @@ const BRC_GOLF: TenantProfile = {
   ],
 };
 
-/* ══════════════════════════════════════════════════════════════
-   4 · พรรคประชาธิปัตย์ — งานทะเบียนสมาชิกพรรค
-
-   ขอบเขตที่ตั้งใจจำกัด: บัญชีนี้เป็นงาน "ธุรการสมาชิก" เท่านั้น —
-   ต่ออายุค่าบำรุง · สมาชิกที่ขาดต่อ · ชวนมาร่วมกิจกรรม · ดูแลผู้บริจาค
-   ไม่ใช่เครื่องมือหาเสียงหรือโน้มน้าวผู้ออกเสียง และไม่มี play ใด
-   ที่แบ่งกลุ่มคนตามความคิดเห็นทางการเมือง
-
-   รูปทรงวงจร: expiry (หมดอายุ) — Annual duesตามพระราชบัญญัติ
-   ประกอบรัฐธรรมนูญว่าด้วยPolitical party คือวงจรหมดอายุแท้ ๆ
-   ══════════════════════════════════════════════════════════════ */
-
-const DEMOCRAT: TenantProfile = {
-  id: "democrat",
-  name: "Democrat Party",
-  industry: "Political party membership administration",
-  source: "Synthetic profile, not a real membership register — dues follow the statutory rates",
-  cycleShape: "expiry",
-  tier: "chain",
-  createdDaysAgo: 1100,
-  vocab: {
-    person: "member",
-    people: "members",
-    purchase: "payment",
-    spend: "amount paid",
-    item: "payment type",
-    base: "membership register",
-    topGroup: "supporters",
-    cycleExample: "a member renewing on time every year is nothing like one returning after several years away",
-    orgKind: "party",
-    purchaseVerb: "pay",
-    th: {
-      person: "สมาชิก", people: "สมาชิก", purchase: "การชำระ",
-      spend: "ยอดที่ชำระ", item: "ประเภทการชำระ", base: "ทะเบียนสมาชิก",
-      topGroup: "ผู้สนับสนุน", orgKind: "พรรค", purchaseVerb: "ชำระ",
-    },
-  },
-  /* เพดานเข้มกว่าทุกบัญชี: ข้อความจากPolitical partyที่ส่งถี่เกินไป
-     ไม่ได้เสียแค่คนคนนั้น แต่กลายเป็นข่าวได้ และห้ามใช้ส่วนลดโดยสิ้นเชิง
-     เพราะการให้ประโยชน์แลกกับสมาชิกภาพเป็นเรื่องที่มีข้อกฎหมายกำกับ */
-  limits: { weeklyCap: 1, quietStart: 20, quietEnd: 9, maxDiscountPct: 0, credits: 60000 },
-  scale: {
-    /* ขนาดทะเบียนสมาชิกที่จ่ายค่าบำรุงของพรรคใหญ่อยู่ระดับหลายหมื่น
-       ไม่ใช่หลายพัน ตัวเลขที่เล็กเกินจริงทำให้กลุ่ม "ใกล้หมดอายุ" เหลือ
-       ไม่ถึงร้อยคน ซึ่งวัดผลไม่ได้และไม่ตรงกับงานจริงของฝ่ายทะเบียน */
-    people: 26000,
-    everTransacted: 20800,
-    repeat: 11600,
-    recent30: 1980,
-    silent90: 14300,
-    whaleShare: 0.015,
-    whaleTxns: [8, 16],
-    repeatTxns: [2, 5],
-    whaleCycle: [70, 130],
-    normalCycle: [300, 420], // Annual dues จังหวะจึงห่างเป็นปี
-  },
-  lineShare: 0.62,
-  // ความยินยอมเข้มที่สุด เพราะความคิดเห็นทางการเมืองเป็นข้อมูลอ่อนไหว
-  noConsentShare: 0.26,
-  revokedShare: 0.11,
-  membership: { kind: "party_member", share: 0.82, termDays: 365 },
-  discountSeekerShare: 0,
-  whaleDiscountShare: 0,
-  anchorProb: { whale: 0.5, normal: 0.06 },
-  channels: ["branch_office", "online_transfer"],
-  events: { visitMax: 7, bookingShare: 0.24, bookingLabel: "volunteer_shift", formShare: 0.7 },
-  measurementCaveat:
-    "A member cycle runs a year, but the longest measurement window is 90 days, " +
-    "so a per-campaign difference sits close to the data\u2019s own noise and will swing " +
-    "hard both ways. Read the multi-cycle average, never a single campaign — " +
-    "a genuine limit of measuring an annual-cycle organisation, not a defect.",
-  compliance:
-    "Political opinion is sensitive personal data under PDPA section 26 and " +
-    "requires explicit consent, separate from general consent. This account caps " +
-    "sending at one message a week, forbids discounts entirely, and runs no play " +
-    "that segments on political position — this is membership administration, not campaigning.",
-  seedKey: 24890406,
-  catalogue: [
-    // อัตราค่าบำรุงตามกฎหมาย: รายปี 100 บาท · ตลอดชีพ 2,000 บาท
-    { id: "d-lifetime", name: "Life membership", category: "membership", group_role: "anchor", list_price: 2000 },
-    { id: "d-donate-major", name: "Major donation", category: "donation", group_role: "anchor", list_price: 5000 },
-    { id: "d-donate-branch", name: "Provincial branch donation", category: "donation", group_role: "anchor", list_price: 1000, is_new_arrival: true },
-    { id: "d-annual", name: "Annual dues", category: "membership", group_role: "consumable", list_price: 100 },
-    { id: "d-event-seminar", name: "Seminar registration", category: "event", group_role: "attachment", list_price: 300 },
-    { id: "d-event-training", name: "Branch officer training", category: "event", group_role: "attachment", list_price: 500 },
-    { id: "d-merch-shirt", name: "Party event shirt", category: "merch", group_role: "attachment", list_price: 250 },
-    { id: "d-merch-book", name: "Party history book", category: "merch", group_role: "attachment", list_price: 350, is_dead_stock: true },
-  ],
-};
-
 export const TENANT_PROFILES: TenantProfile[] = [
   MST_GOLF,
   HONG_MOVE,
   BRC_GOLF,
-  DEMOCRAT,
 ];
+
+/* บัญชีพรรคการเมืองถูกถอดออก 2026-10-13 (docs/plan.md B0) — PARALLAX เป็น CRM สำหรับ B2B
+   และไม่รับงานการเมืองทุกรูปแบบ แถวเก่าในฐานข้อมูลไม่มีผู้ใช้ผูกอยู่ จึงไม่มีใครเปิดได้
+   ร้านค้าปลีกสามบัญชีที่เหลือเป็นข้อมูลเดโมชั่วคราว จนตัวสร้างข้อมูล B2B (B1) มาแทน */
 
 /** บัญชีตั้งต้นเมื่อยังไม่ได้เลือก */
 export const DEFAULT_TENANT_ID = MST_GOLF.id;

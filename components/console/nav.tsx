@@ -19,40 +19,27 @@ const sentence = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
    และ hint ของเมนูแรกเป็น `Per-${personLabel} figures` ซึ่งประกอบจาก
    คำเอกพจน์อังกฤษ ทั้งที่เมนูข้าง ๆ พูดไทยหมด */
 function groupsFor(baseLabelTh: string, personLabelTh: string) {
+  /* เมนูตามแผน B2B (docs/plan.md · AXIS Blueprint 2.0): สามพื้นที่ + หน้าผู้ดูแล
+     มีแค่ส่วนที่สร้างแล้ว — Account Workspace และ Campaign Workspace เข้าเมนูเมื่อหน้าพร้อม
+     หน้าค้าปลีกเดิม (บรีฟเช้า แคมเปญ ผลที่วัดได้ คลัง play ค่าใช้จ่าย ภาพรวมผู้บริหาร) ออกจากเมนูแล้ว */
   return [
     {
-      title: "ประจำวัน",
+      title: "Data Vault",
       links: [
-        { href: "/app", label: "บรีฟเช้านี้", hint: "สามอย่างที่ควรทำวันนี้" },
-        { href: "/app/campaigns", label: "แคมเปญ", hint: "อนุมัติแล้ว · กำลังวัดผล" },
-        { href: "/app/proof", label: "ผลที่วัดได้", hint: "ส่วนต่างที่วัดได้ และข้อสรุป" },
-      ],
-    },
-    {
-      title: "ข้อมูลและเครื่องยนต์",
-      links: [
+        { href: "/app", label: "ภาพรวม", hint: "ตัวเลขที่นับได้จริงของฐาน" },
         {
           href: "/app/customers",
           label: baseLabelTh,
-          hint: `ตัวเลขราย${personLabelTh}`,
+          hint: `ราย${personLabelTh} · ช่องทาง · ที่มา`,
         },
-        // จำนวน play ที่ใช้ได้ขึ้นกับรูปทรงวงจรของบัญชี จึงไม่ตรึงเลขไว้
-        { href: "/app/plays", label: "คลัง play", hint: "ทุกวิธีที่ระบบรู้จัก" },
-        { href: "/app/import", label: "นำเข้าข้อมูล", hint: "ลากไฟล์ CSV เข้ามา" },
+        { href: "/app/import", label: "นำเข้าข้อมูล", hint: "Excel หรือ CSV" },
       ],
     },
     {
       title: "ควบคุม",
       links: [
-        { href: "/app/billing", label: "ค่าใช้จ่าย", hint: "แผน · เครดิต · คุ้มไหม" },
-        { href: "/app/settings", label: "ตั้งค่า", hint: "เพดาน · AI · เครื่องมือเดโม" },
-      ],
-    },
-    {
-      title: "มุมมอง",
-      links: [
-        { href: "/app/exec", label: "ภาพรวมผู้บริหาร", hint: "ทุกร้าน · ดูอย่างเดียว" },
-        { href: "/app/admin", label: "ผู้ดูแลระบบ", hint: "ร้าน · ผู้ใช้ · คำขอทดลองใช้" },
+        { href: "/app/settings", label: "ตั้งค่า", hint: "AI · เครื่องมือเดโม" },
+        { href: "/app/admin", label: "ผู้ดูแลระบบ", hint: "บัญชี · ผู้ใช้ · คำขอทดลองใช้" },
       ],
     },
   ];
