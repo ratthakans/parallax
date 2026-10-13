@@ -157,3 +157,38 @@ jobs:
           # บน main ต้องเทียบจริง — ถ้า secret หายไปให้ตกทันที ไม่ใช่ข้ามเงียบ
           # PR จากคนนอกอ่าน secret ไม่ได้อยู่แล้ว จึงยังข้ามได้ตามเดิม
           PARITY_REQUIRED: ${{ github.ref == 'refs/heads/main' && '1' || '0' }}
+
+  # ── ชุดตรวจบน Postgres จริง (RLS · grant · role authenticated) ──
+  # ชุดด้านบนทั้งหมดรันบน sqlite ซึ่งไม่มี RLS และไม่มี grant — บั๊กสามตัวเคยผ่านทุกชุดแล้วไปพังบนฐานจริง
+  # (ลบตามคำขอสิทธิไม่ได้ · สาย audit แตกเมื่อเขียนพร้อมกัน · ผล AI ถูกทิ้งเพราะเขียนแคชไม่ได้)
+  # ฐานเปล่าในคอนเทนเนอร์ + migration ทุกไฟล์ + ส่วนเลียนแบบ Supabase (scripts/pg-test-db.mts)
+  postgres:
+    name: Postgres under RLS
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 2s --health-timeout 5s --health-retries 20
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+      PG_REQUIRED: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Apply migrations to an empty database
+        run: npm run pg:test-db
+
+      - name: Postgres-only invariants
+        run: npm run verify:pg

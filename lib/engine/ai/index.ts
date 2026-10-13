@@ -1,4 +1,4 @@
-import { all, exec, get, run, usingPostgres } from "@/lib/engine/sql";
+import { all, asSystem, exec, get, run, usingPostgres } from "@/lib/engine/sql";
 import Anthropic from "@anthropic-ai/sdk";
 import { createHash } from "node:crypto";
 import { aiPolicy } from "@/lib/engine/ai/policy";
@@ -107,18 +107,23 @@ function cacheKey(tenantId: string, kind: string, input: unknown): string {
     .slice(0, 32);
 }
 
+/* ── แคชอ่าน/เขียนในนามระบบ ไม่ใช่ในนามผู้ใช้ ──
+   ai_cache เปิด RLS โดยไม่มีนโยบาย (0002) — ภายใต้ role authenticated จึงอ่านได้ศูนย์แถวและเขียนไม่ได้
+   ผลบน Postgres คือแคชไม่เคยโดน และทุกการเรียกที่สำเร็จถูกทิ้งไปใช้สูตรสำเร็จ
+   ปลอดภัยเพราะคีย์เป็น hash ที่รวม tenantId ของคำขอ (cacheKey) — ไม่มีทางอ่านแคชของบัญชีอื่น
+   และ tenantId มาจาก session ฝั่งเซิร์ฟเวอร์เสมอ */
 async function readCache<T>(key: string): Promise<T | null> {
   await ensureCache();
-  const row = await get<{ payload: string }>(
+  const row = await asSystem(() => get<{ payload: string }>(
     "SELECT payload FROM ai_cache WHERE key = ?",
     key,
-  );
+  ));
   return row ? (JSON.parse(row.payload) as T) : null;
 }
 
 async function writeCache(key: string, kind: string, value: unknown) {
   await ensureCache();
-  await run(
+  await asSystem(() => run(
     `INSERT INTO ai_cache (key, kind, payload, model, created_at)
      VALUES (?,?,?,?,?)
      ON CONFLICT(key) DO UPDATE SET payload = excluded.payload`,
@@ -127,7 +132,7 @@ async function writeCache(key: string, kind: string, value: unknown) {
     JSON.stringify(value),
     MODEL,
     new Date().toISOString(),
-  );
+  ));
 }
 
 export async function aiCacheStats(): Promise<{ kind: string; n: number }[]> {
@@ -247,7 +252,8 @@ async function ask<T>(opts: AskOptions<T>): Promise<AiResult<T>> {
       return { value: opts.fallback(), source: "fallback", note: "AI ตอบไม่ตรงรูปแบบ — ใช้สูตรสำเร็จแทน" };
     }
     await recordAiCall({ ...usage, outcome: "ai" });
-    if (!opts.noCache) await writeCache(key, opts.kind, value);
+    /* แคชเขียนไม่ได้ ≠ AI ล้มเหลว — ผลที่จ่ายเงินไปแล้วต้องถึงผู้ใช้ และ ledger ต้องไม่นับซ้ำเป็น error */
+    if (!opts.noCache) await writeCache(key, opts.kind, value).catch((err) => console.error("[ai] cache write", opts.kind, err));
     return { value, source: "ai" };
   } catch (err) {
     await recordAiCall({ tenantId: opts.tenantId, kind: opts.kind, model: MODEL, outcome: "error" });

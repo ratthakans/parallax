@@ -136,6 +136,18 @@ const due = new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10);
 ok((await assignTarget(T, tk.id, "bd@verify", due, "bd@verify")).ok, "มอบหมายคนที่ใช้ได้ = สร้างงาน");
 ok(Number((await get<{ n: number }>("SELECT COUNT(*) AS n FROM tasks WHERE tenant_id = ? AND target_id = ? AND status = 'open'", T, tk.id))!.n) === 1, "มีงานเปิดหนึ่งงาน");
 
+/* บันทึกผลต้องผ่านการมอบหมาย และต้อง Eligible จริง ณ ตอนนั้น — ไม่ใช่แค่ "ไม่ถูกระงับ" (plan 6.1)
+   Server Action ยิงตรงได้ หน้าจอที่ซ่อนฟอร์มไม่ใช่ด่าน */
+const tw = view.targets.find((t) => t.customerId === weera)!;
+const unassigned = await recordOutcome(T, tw.id, { outcome: "meeting", note: "นัดแล้ว", nextStep: "ส่งข้อเสนอ", nextDue: due }, "bd@verify");
+ok(!unassigned.ok && /มอบหมาย/.test(unassigned.ok ? "" : unassigned.error), "บันทึกผลกับเป้าหมายที่ยังไม่มอบหมายไม่ได้");
+await run("UPDATE customers SET lifecycle_state = 'pending_review' WHERE tenant_id = ? AND id = ?", T, kamon);
+const review = await recordOutcome(T, tk.id, { outcome: "meeting", note: "นัดแล้ว" }, "bd@verify");
+ok(!review.ok && /ยังไม่อนุญาต/.test(review.ok ? "" : review.error), "คนที่กลับไปรอตรวจ (Review required) บันทึกว่านัดประชุมไม่ได้");
+ok(!(await recordOutcome(T, tk.id, { outcome: "not_interested", note: "ไม่สนใจ", nextStep: "โทรตาม", nextDue: due }, "bd@verify")).ok,
+  "ปิดว่าไม่สนใจพร้อมสร้างงานติดต่อต่อกับคนที่ยังไม่ผ่านนโยบายไม่ได้");
+await run("UPDATE customers SET lifecycle_state = 'confirmed' WHERE tenant_id = ? AND id = ?", T, kamon);
+
 /* ตรวจซ้ำตอนบันทึกผล: การคัดค้านมาทางอื่นระหว่างงาน (ใส่ตรงลงตาราง ไม่ผ่านการยกเลิกอัตโนมัติ) */
 await run("INSERT INTO preferences (id, tenant_id, customer_id, purpose_id, channel, kind, effective_at, evidence_id, recorded_by, recorded_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
   "pref-direct", T, kamon, null, "any", "objection", new Date().toISOString(), null, "import", new Date().toISOString());

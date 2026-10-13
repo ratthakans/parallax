@@ -88,6 +88,22 @@ export type Dossier = {
   versions: Record<string, Version[]>;
 };
 
+/* ── ใครแก้แฟ้มบริษัทนี้ได้ ──
+   กติกาเดียวกับการเปิดแฟ้ม (getDossier): ระดับสิทธิ์ถึง หรือเป็นเจ้าของบัญชี/เจ้าของข้อมูล
+   ยกเว้น "รับเป็นเจ้าของ" ซึ่งต้องมีระดับสิทธิ์ถึงจริง — ไม่งั้นการรับเป็นเจ้าของคือทางลัดเปิดแฟ้มที่ถูกปิดบัง
+   ตรวจทุก action ที่แก้แฟ้ม เพราะ Server Action ยิงตรงได้โดยไม่ผ่านหน้าจอ */
+export async function orgAccess(
+  tenantId: string, orgId: string, viewer: Viewer, intent: "edit" | "claim" = "edit",
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const o = await get<{ classification: string | null; account_owner_id: string | null; data_owner_id: string | null }>(
+    "SELECT classification, account_owner_id, data_owner_id FROM orgs WHERE tenant_id = ? AND id = ?", tenantId, orgId);
+  if (!o) return { ok: false, error: "ไม่พบบริษัทนี้" };
+  if (canSee(viewer.clearance, (o.classification ?? "confidential") as Classification)) return { ok: true };
+  const owner = [o.account_owner_id, o.data_owner_id].includes(viewer.id);
+  if (intent === "edit" && owner) return { ok: true };
+  return { ok: false, error: "แฟ้มนี้อยู่ในระดับความลับที่สูงกว่าสิทธิ์ของคุณ — ขอให้เจ้าของบัญชีหรือผู้ดูแลมอบหมาย" };
+}
+
 export async function getDossier(tenantId: string, orgId: string, viewer: Viewer): Promise<Dossier | null> {
   const o = await get<Record<string, string | null>>("SELECT * FROM orgs WHERE tenant_id = ? AND id = ?", tenantId, orgId);
   if (!o) return null;

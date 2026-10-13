@@ -1,7 +1,7 @@
 import { all, get, insertMany, tx, type Param, type Sql } from "@/lib/engine/sql";
 import { logActivity } from "@/lib/engine/db";
-import { deletePersonData } from "@/lib/engine/tenant-data";
-import { mergePersons } from "@/lib/engine/vault/merge";
+import { PERSON_LINKED, deletePersonData, erasePersonHistory } from "@/lib/engine/tenant-data";
+import { RETAIL, mergePersons } from "@/lib/engine/vault/merge";
 import { findCustomersByContact, listContactPoints, type ContactPoint } from "@/lib/engine/contacts";
 import {
   CONTACT_KINDS,
@@ -537,8 +537,9 @@ export async function deleteCustomer(tenantId: string, id: string, actor: string
   const c = await get<{ name: string }>("SELECT name FROM customers WHERE tenant_id = ? AND id = ?", tenantId, id);
   if (!c) return { ok: false, error: "ไม่พบลูกค้าคนนี้ในบัญชีนี้" };
   await tx(async (q) => {
-    await deletePersonData(q, tenantId, id);
+    const ids = await deletePersonData(q, tenantId, id);
     await q.run("DELETE FROM customers WHERE tenant_id = ? AND id = ?", tenantId, id);
+    await erasePersonHistory(q, tenantId, ids);
   });
   await logActivity(tenantId, actor, "delete_customer", id);
   return { ok: true, name: c.name };
@@ -594,6 +595,20 @@ export async function findDuplicates(tenantId: string, id: string): Promise<Dupl
 
    หลังรวม การนำเข้าไฟล์ครั้งถัดไปที่มีเบอร์ของ drop จะเจอ keep ผ่านช่องทางติดต่อ
    (knownCustomers ใน ingest.ts) ไม่สร้าง drop กลับมา */
+/* ตารางที่การรวมแบบเดิมรู้จัก — นอกนั้นคือข้อมูล B2B ที่ต้องรวมด้วย mergePersons */
+const LEGACY_TABLES = new Set([...RETAIL, "consents", "contact_points", "contact_profiles", "customer_features"]);
+
+async function hasAny(tenantId: string, ids: string[], links: { table: string; column: string; where?: string }[]): Promise<boolean> {
+  for (const l of links) {
+    const hit = await get<{ x: number }>(
+      `SELECT 1 AS x FROM ${l.table} WHERE tenant_id = ? AND ${l.column} IN (${ids.map(() => "?").join(",")})${l.where ? ` AND ${l.where}` : ""} LIMIT 1`,
+      tenantId, ...ids,
+    );
+    if (hit) return true;
+  }
+  return false;
+}
+
 export async function mergeCustomers(
   tenantId: string,
   keepId: string,
@@ -607,11 +622,18 @@ export async function mergeCustomers(
   ]);
   if (!keep || !drop) return { ok: false, error: "ไม่พบลูกค้าคนใดคนหนึ่งในบัญชีนี้" };
 
-  /* คนจาก Data Vault (มีแถวต้นทาง) ใช้การรวมที่ย้อนได้ — การรวมแบบเดิมด้านล่างไม่รู้จักสังกัดและแถวต้นทาง จะทิ้งไว้ใต้รหัสที่ถูกลบ */
-  const vault = await get<{ x: number }>(
-    "SELECT 1 AS x FROM import_rows WHERE tenant_id = ? AND customer_id IN (?, ?) LIMIT 1", tenantId, keepId, dropId,
-  );
-  if (vault) {
+  /* ── เลือกทางรวม ──
+     การรวมที่ย้อนได้ (mergePersons) รู้จักทุกตาราง B2B และเขียน merge_log ซึ่งบริการนโยบายใช้ตามหาการถอน/คัดค้าน
+     ของคนที่ถูกรวมเข้ามา — ใช้ทุกครั้งที่ทำได้ ไม่ใช่เฉพาะคนที่มีแถวต้นทาง
+     เดิมตัดสินจาก import_rows อย่างเดียว คนที่เพิ่มด้วยมือแล้วมีสังกัด งาน หรือคำคัดค้าน จึงตกไปทางเดิม
+     ซึ่งลบรหัสทิ้งโดยไม่ย้ายแถวเหล่านั้น — คำคัดค้านหายจากการตัดสิน และย้อนไม่ได้
+     ทางเดิมเหลือไว้เฉพาะลูกค้าค้าปลีกล้วน (ไม่มีข้อมูล B2B ทั้งสองฝั่ง) */
+  const dropRetail = await hasAny(tenantId, [dropId], RETAIL.map((table) => ({ table, column: "customer_id" })));
+  const b2b = await hasAny(tenantId, [keepId, dropId], PERSON_LINKED.filter((l) => !LEGACY_TABLES.has(l.table)));
+  if (dropRetail && b2b) {
+    return { ok: false, error: "สองคนนี้มีทั้งข้อมูลระบบเดิม (ยอดซื้อ/แคมเปญ) และข้อมูล B2B — รวมอัตโนมัติไม่ได้ ติดต่อผู้ดูแลระบบ" };
+  }
+  if (!dropRetail) {
     const r = await mergePersons(tenantId, keepId, dropId, actor, "manual", null);
     if (!r.ok) return r;
     const log = await get<{ impact: string }>("SELECT impact FROM merge_log WHERE tenant_id = ? AND id = ?", tenantId, r.mergeId);

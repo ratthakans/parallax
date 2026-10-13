@@ -385,7 +385,8 @@ export function enterIdentity(userId: string) {
    RLS จะให้เห็นแค่ร้านของเขาเอง และอ่าน auth.users ไม่ได้เลย
 
    ⚠ ไม่ใช่ทางลัดข้ามสิทธิ์: ผู้เรียกต้องตรวจ isAdmin() ก่อนทุกครั้ง
-   จุดเดียวที่เรียกคือ adminData() ใน lib/engine/admin.ts */
+   ที่เรียก: adminData() ใน lib/engine/admin.ts (ตรวจ isAdmin ก่อน) · แคช AI ใน lib/engine/ai/index.ts
+   (คีย์เป็น hash ที่รวม tenantId ของคำขอ — อ่านข้ามบัญชีไม่ได้) */
 export function asSystem<T>(fn: () => Promise<T>): Promise<T> {
   return identity.exit(fn);
 }

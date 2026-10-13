@@ -15,7 +15,8 @@ import { commitUpload } from "@/lib/engine/vault/intake";
 import { resolveTenant } from "@/lib/engine/vault/resolve";
 import { decideReview, mergePersons, personIdsOf, unmerge } from "@/lib/engine/vault/merge";
 import { listOpenReviews } from "@/lib/engine/vault/review";
-import { deleteCustomer, mergeCustomers } from "@/lib/engine/customers";
+import { createCustomer, deleteCustomer, mergeCustomers } from "@/lib/engine/customers";
+import { recordPreference } from "@/lib/engine/policy/preferences";
 import { PERSON_LINKED } from "@/lib/engine/tenant-data";
 import { verifyAuditChain } from "@/lib/engine/audit";
 import { drawSample, recordSample, sampleStats } from "@/lib/engine/vault/sample";
@@ -198,6 +199,20 @@ ok(st.mergeChecked === drawn.size && st.mergeWrong === 1, `ผลวัดนั
 const miss = await drawSample(T, "missed");
 ok(miss != null && (await recordSample(T, miss.customerId, "missed", "steward@verify")).ok && (await sampleStats(T)).missRate === 1, "สุ่มตรวจซ้ำที่หลุดบันทึกได้และนับแยกจากรวมผิด");
 ok(!(await recordSample(T, "ไม่มีคนนี้", "merge_ok", "steward@verify")).ok, "บันทึกผลตรวจของคนที่ไม่มีอยู่ไม่ได้");
+
+// ── คนที่เพิ่มด้วยมือ (ไม่มีแถวต้นทาง) แต่มีข้อมูล B2B: ต้องรวมแบบย้อนได้ ไม่ใช่ทางเดิมที่ลบรหัสทิ้ง ──
+const hk = await createCustomer(T, { name: "มือหนึ่ง ทดสอบ", contacts: [{ kind: "email", value: "hand1@merge.example" }], profile: {}, consent: false }, "verify");
+const hd = await createCustomer(T, { name: "มือสอง ทดสอบ", contacts: [{ kind: "email", value: "hand2@merge.example" }], profile: {}, consent: false }, "verify");
+if (!hk.ok || !hd.ok) throw new Error("สร้างคนด้วยมือไม่ได้");
+ok((await recordPreference(T, hd.id, { kind: "objection", evidence: "คัดค้านทางโทรศัพท์ (สมมุติ)" }, "verify")).ok, "บันทึกการคัดค้านของคนที่เพิ่มด้วยมือ");
+const hm = await mergeCustomers(T, hk.id, hd.id, "steward@verify");
+const hlog = await get<{ id: string }>("SELECT id FROM merge_log WHERE tenant_id = ? AND survivor_id = ? AND merged_id = ? AND undone_at IS NULL", T, hk.id, hd.id);
+ok(hm.ok && Boolean(hlog), "รวมคนที่เพิ่มด้วยมือแต่มีคำคัดค้าน = ผ่านการรวมที่ย้อนได้ (มี merge_log)");
+ok((await personIdsOf(T, hk.id)).includes(hd.id), "คำคัดค้านใต้รหัสที่ถูกรวมยังถูกนับให้คนที่คงอยู่");
+ok(Boolean(hlog) && (await unmerge(T, hlog!.id, "steward@verify")).ok
+  && Boolean(await get("SELECT 1 AS x FROM customers WHERE tenant_id = ? AND id = ?", T, hd.id))
+  && Boolean(await get("SELECT 1 AS x FROM consents WHERE tenant_id = ? AND customer_id = ?", T, hd.id))
+  && Boolean(await get("SELECT 1 AS x FROM consents WHERE tenant_id = ? AND customer_id = ?", T, hk.id)), "แยกคืนได้ พร้อมสถานะความยินยอมเดิมของทั้งสองคน");
 
 const chain = await verifyAuditChain(T);
 ok(chain.ok, "บันทึกตรวจสอบต่อเนื่องครบหลังรวม/แยกทุกครั้ง");

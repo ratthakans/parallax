@@ -20,6 +20,8 @@ type PersonImpact = {
   moved: Moved;
   /** แถวของฝั่งที่ถูกรวมที่ชนกับแถวของฝั่งที่คงอยู่ (เป้าหมายแคมเปญเดียวกัน · โอกาสเดียวกัน) — เก็บทั้งแถวไว้คืนตอนแยก */
   parked?: Record<string, Record<string, Param>[]>;
+  /** สถานะความยินยอมแบบเดิม (consents) ของทั้งสองฝั่งก่อนรวม — คืนตอนแยก */
+  consents?: { drop: Record<string, Param>[]; keepBefore: Record<string, Param>[] };
 };
 
 /* ตารางที่หนึ่งคนมีได้หนึ่งแถวต่อขอบเขต — ถ้าทั้งสองฝั่งมีในขอบเขตเดียวกัน แถวของคนที่คงอยู่ชนะ
@@ -44,8 +46,10 @@ const PERSON_MOVES: { table: string; key: string[]; column: string; where?: stri
 ];
 /* preferences เป็นตารางเพิ่มอย่างเดียว (แก้/ลบไม่ได้ใน Postgres) จึงไม่ย้าย — คงอยู่ใต้รหัสเดิม
    และอ่านผ่าน personIdsOf() ซึ่งรวมรหัสที่ถูกรวมเข้ามาและยังไม่ถูกแยกคืน · แยกคืนจึงไม่ต้องแตะ preferences เลย */
-/* ข้อมูลยุคค้าปลีก — ไม่ย้ายในการรวมของ Data Vault (ใช้หน้าลูกค้าเดิม) */
-const RETAIL = ["transactions", "events", "consents", "memberships", "campaign_audience", "messages"];
+/* ข้อมูลยุคค้าปลีก — ไม่ย้ายในการรวมของ Data Vault (ใช้หน้าลูกค้าเดิม)
+   consents ไม่อยู่ในรายการนี้: ทุกคนที่เพิ่มด้วยมือมีแถว consents เสมอ ถ้าปฏิเสธเพราะมัน คนที่เพิ่มด้วยมือ
+   จะรวมแบบย้อนได้ไม่ได้เลย — การรวมด้านล่างรวม consents แบบเดียวกับทางเดิม (ถอนล่าสุดชนะ) และเก็บไว้คืนตอนแยก */
+export const RETAIL = ["transactions", "events", "memberships", "campaign_audience", "messages"];
 const RESTRICTION_RANK: Record<string, number> = { none: 0, review: 1, restricted: 2, suppressed: 3 };
 
 const id24 = (s: string) => createHash("sha256").update(s).digest("hex").slice(0, 24);
@@ -131,6 +135,17 @@ export async function mergePersons(
       await q.run("DELETE FROM contact_profiles WHERE customer_id = ?", dropId);
     }
 
+    // ความยินยอมแบบเดิม: รวมต่อวัตถุประสงค์ — ให้ครั้งแรกสุด · ถอนครั้งล่าสุด (เหมือนทางเดิมใน customers.ts)
+    const dropConsents = await q.all<Record<string, Param>>("SELECT * FROM consents WHERE tenant_id = ? AND customer_id = ?", tenantId, dropId);
+    const keepConsents = await q.all<Record<string, Param>>("SELECT * FROM consents WHERE tenant_id = ? AND customer_id = ?", tenantId, keepId);
+    for (const d of dropConsents) {
+      const k = keepConsents.find((r) => r.purpose === d.purpose);
+      const grants = [k?.granted_at, d.granted_at].filter(Boolean).map(String).sort();
+      const revokes = [k?.revoked_at, d.revoked_at].filter(Boolean).map(String).sort();
+      await q.run("DELETE FROM consents WHERE tenant_id = ? AND customer_id IN (?, ?) AND purpose = ?", tenantId, keepId, dropId, d.purpose);
+      await insertRow(q, "consents", { ...(k ?? d), customer_id: keepId, granted_at: grants[0] ?? null, revoked_at: revokes.pop() ?? null, source: k ? "merge" : d.source });
+    }
+
     // ข้อจำกัดที่เข้มกว่าชนะ · คนที่คนตรวจแล้วเป็น confirmed
     const strict = [String(keep.restriction_status ?? "none"), String(drop.restriction_status ?? "none")]
       .sort((a, b) => (RESTRICTION_RANK[b] ?? 0) - (RESTRICTION_RANK[a] ?? 0))[0];
@@ -141,6 +156,7 @@ export async function mergePersons(
       kind: "person", drop, dropProfile, dropPoints, createdPointIds,
       keepBefore: { lifecycle_state: String(keep.lifecycle_state), restriction_status: String(keep.restriction_status ?? "none"), profile: keepProfile },
       moved, parked,
+      consents: dropConsents.length ? { drop: dropConsents, keepBefore: keepConsents.filter((k) => dropConsents.some((d) => d.purpose === k.purpose)) } : undefined,
     };
     await q.run(
       `INSERT INTO merge_log (id, tenant_id, survivor_id, merged_id, rule, confidence, decided_by, decided_at, impact)
@@ -187,6 +203,13 @@ export async function unmerge(tenantId: string, mergeId: string, actor: string):
       }
     }
     for (const [table, rows] of Object.entries(impact.parked ?? {})) for (const r of rows) await insertRow(q, table, r);
+    if (impact.consents) {
+      for (const d of impact.consents.drop) {
+        await q.run("DELETE FROM consents WHERE tenant_id = ? AND customer_id = ? AND purpose = ?", tenantId, keepId, d.purpose);
+        await insertRow(q, "consents", d);
+      }
+      for (const k of impact.consents.keepBefore) await insertRow(q, "consents", k);
+    }
     if (impact.keepBefore.profile) {
       const p = impact.keepBefore.profile;
       const cols = Object.keys(p).filter((k) => k !== "customer_id");
