@@ -14,13 +14,18 @@ export type VaultOverview = {
   consentGranted: number;
   imports: number;
   lastImportAt: string | null;
+  /** Data Vault (B2): แหล่งที่ลงทะเบียน · แถวต้นทางที่รับเข้า · รอตรวจ · ถูกปฏิเสธ */
+  sources: number;
+  sourceRows: number;
+  pendingReview: number;
+  rejected: number;
 };
 
 type N = { n: number | string | null };
 const num = (r?: N | null) => Number(r?.n ?? 0);
 
 export async function vaultOverview(tenantId: string): Promise<VaultOverview> {
-  const [people, withContact, kinds, consent, imp] = await Promise.all([
+  const [people, withContact, kinds, consent, imp, sources, rowStatus] = await Promise.all([
     get<N>("SELECT COUNT(*) AS n FROM customers WHERE tenant_id = ?", tenantId),
     get<N>("SELECT COUNT(DISTINCT customer_id) AS n FROM contact_points WHERE tenant_id = ?", tenantId),
     all<{ kind: string; n: number | string }>(
@@ -34,10 +39,16 @@ export async function vaultOverview(tenantId: string): Promise<VaultOverview> {
       tenantId,
     ),
     get<N & { at: string | null }>(
-      "SELECT COUNT(*) AS n, MAX(at) AS at FROM activity_log WHERE tenant_id = ? AND action = 'import_csv'",
+      "SELECT COUNT(*) AS n, MAX(at) AS at FROM activity_log WHERE tenant_id = ? AND action IN ('import_csv', 'import_batch')",
+      tenantId,
+    ),
+    get<N>("SELECT COUNT(*) AS n FROM sources WHERE tenant_id = ?", tenantId),
+    all<{ status: string; n: number | string }>(
+      "SELECT status, COUNT(*) AS n FROM import_rows WHERE tenant_id = ? GROUP BY status",
       tenantId,
     ),
   ]);
+  const statusN = (s: string) => Number(rowStatus.find((r) => r.status === s)?.n ?? 0);
   return {
     people: num(people),
     withContact: num(withContact),
@@ -45,5 +56,9 @@ export async function vaultOverview(tenantId: string): Promise<VaultOverview> {
     consentGranted: num(consent),
     imports: num(imp),
     lastImportAt: imp?.at ?? null,
+    sources: num(sources),
+    sourceRows: rowStatus.reduce((a, r) => a + Number(r.n), 0),
+    pendingReview: statusN("pending_review"),
+    rejected: statusN("rejected"),
   };
 }

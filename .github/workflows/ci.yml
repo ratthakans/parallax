@@ -115,6 +115,11 @@ jobs:
       - name: Synthetic B2B data
         run: npm run verify:synthetic
 
+      # Data Vault รับไฟล์: ต้องมีแหล่งก่อน · ไฟล์อันตรายถูกปฏิเสธก่อนอ่าน · ตรวจยอดครบทุกแถว
+      # · เก็บเฉพาะฟิลด์ของแหล่ง · คอลัมน์อ่อนไหวไม่ลงฐาน · แถวดิบเข้ารหัส · Windows-874 และ xlsx
+      - name: Vault intake
+        run: npm run verify:intake
+
       # ── สคีมาสองฝั่งตรงกันไหม ──
       # ต้องมี DATABASE_URL ถึงจะเทียบได้ ไม่มีก็ข้ามโดยไม่ล้มเหลว เพราะ PR
       # จากคนนอกไม่ควรต้องมีรหัสฐานข้อมูล แต่บน push เข้า main ที่ตั้ง secret

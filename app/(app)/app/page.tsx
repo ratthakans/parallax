@@ -31,7 +31,7 @@ export default async function OverviewPage() {
         lead="ตัวเลขทุกตัวในหน้านี้นับจากข้อมูลที่อยู่ในระบบจริง ไม่มีประมาณการหรือคะแนนที่ระบบคิดขึ้น"
         actions={
           <>
-            <Link href="/app/import" className="c-btn c-btn-primary">นำเข้าข้อมูล</Link>
+            <Link href="/app/vault" className="c-btn c-btn-primary">แหล่งข้อมูลและนำเข้า</Link>
             <Link href="/app/customers" className="c-btn c-btn-ghost">ดู{v.people}ทั้งหมด</Link>
           </>
         }
@@ -52,6 +52,13 @@ export default async function OverviewPage() {
           sub={o.lastImportAt ? `ล่าสุด ${daysAgoLabel(o.lastImportAt)} · ${thaiDateTime(o.lastImportAt)}` : undefined}
           tone={o.imports > 0 ? "plain" : "muted"}
         />
+      </Panel>
+
+      <Panel flat className="mb-6 grid grid-cols-2 gap-x-6 gap-y-7 p-5 md:grid-cols-4 md:p-6">
+        <Metric label="แหล่งข้อมูลที่ลงทะเบียน" value={num(o.sources)} tone={o.sources ? "plain" : "muted"} />
+        <Metric label="แถวต้นทางที่รับเข้า" value={num(o.sourceRows)} sub="จากไฟล์ที่นำเข้าผ่าน Data Vault" />
+        <Metric label="รอตรวจตัวตน" value={num(o.pendingReview)} sub="ยังไม่รวมเป็นคนหรือบริษัท" tone={o.pendingReview ? "plain" : "muted"} />
+        <Metric label="ถูกปฏิเสธ" value={num(o.rejected)} sub="ชี้ไปหาใครไม่ได้ · แถวว่าง" tone="muted" />
       </Panel>
 
       <Panel className="p-5 md:p-6">

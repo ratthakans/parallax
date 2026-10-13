@@ -256,6 +256,22 @@ const rel = (f: string) => relative(ROOT, f);
   if (bad.length) fails.push("เรียก AI นอก gateway:\n    " + bad.join("\n    "));
 }
 
+/* ── 4.8 · แถวดิบที่นำเข้าเปิดได้เฉพาะโมดูล vault ──
+   import_rows.payload_enc คือทั้งแถวจากไฟล์ลูกค้า (เข้ารหัส) — หน้าจอและโมดูลอื่นไม่ควรแตะ
+   openRecord() (ถอดรหัส) เรียกได้จาก lib/engine/vault/ เท่านั้น */
+{
+  const bad: string[] = [];
+  for (const f of files) {
+    const r = rel(f);
+    if (r.startsWith("node_modules/") || r.startsWith("verify/") || r === "lib/engine/pii.ts") continue;
+    const src = read(f);
+    if (/\bopenRecord\(/.test(src) && !r.startsWith("lib/engine/vault/")) bad.push(`${r} → openRecord`);
+    if ((r.startsWith("app/") || r.startsWith("components/")) && /payload_enc/.test(src)) bad.push(`${r} → payload_enc`);
+  }
+  checks.push("แถวดิบที่นำเข้าเปิดได้เฉพาะ lib/engine/vault/ · หน้าจอไม่แตะ payload_enc");
+  if (bad.length) fails.push("แถวดิบหลุดออกนอกโมดูล vault:\n    " + bad.join("\n    "));
+}
+
 /* ── 5 · ไม่มีไฟล์ตกค้างใน lib/ ชั้นบนสุด ──
    ไฟล์ที่ไม่ได้อยู่ใน shared หรือ engine คือไฟล์ที่ยังไม่มีใครตัดสินว่า
    มันแตะข้อมูลลูกค้าหรือเปล่า ซึ่งเป็นสถานะที่ไม่ควรมี */

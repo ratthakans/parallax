@@ -23,7 +23,8 @@
     "verify:steward": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/steward.mts",
     "verify:vault": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/vault.mts",
     "verify:synthetic": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/synthetic.mts",
-    "synthetic": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs scripts/gen-synthetic.mts"
+    "synthetic": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs scripts/gen-synthetic.mts",
+    "verify:intake": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/intake.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
@@ -32,7 +33,8 @@
     "next": "16.2.12",
     "postgres": "^3.4.9",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

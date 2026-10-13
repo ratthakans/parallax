@@ -32,7 +32,7 @@ function groupsFor(baseLabelTh: string, personLabelTh: string) {
           label: baseLabelTh,
           hint: `ราย${personLabelTh} · ช่องทาง · ที่มา`,
         },
-        { href: "/app/import", label: "นำเข้าข้อมูล", hint: "Excel หรือ CSV" },
+        { href: "/app/vault", label: "แหล่งข้อมูลและนำเข้า", hint: "ลงทะเบียนแหล่ง · Excel หรือ CSV" },
       ],
     },
     {

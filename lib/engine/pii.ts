@@ -90,6 +90,29 @@ export function decryptContact(tenantId: string, kind: ContactKind, sealed: stri
   return Buffer.concat([d.update(Buffer.from(ct, "base64url")), d.final()]).toString("utf8");
 }
 
+/* ── แถวดิบจากไฟล์ที่นำเข้า (Data Vault) ──
+
+   Blueprint บท 3: เก็บค่าดั้งเดิมไว้เป็นหลักฐาน — แต่ทั้งแถวคือข้อมูลส่วนบุคคล จึงเข้ารหัสทั้งก้อน
+   AAD ผูกกับบัญชีและชนิด "import_row" — ย้ายไปวางในบัญชีอื่นหรือช่องอื่นแล้วถอดไม่ออก
+   ถอดได้เฉพาะโมดูล vault (กฎ boundaries) */
+export function sealRecord(tenantId: string, scope: "import_row", plaintext: string): string {
+  const iv = randomBytes(12);
+  const c = createCipheriv("aes-256-gcm", key("PII_KEY"), iv);
+  c.setAAD(Buffer.from(`${tenantId}:${scope}`));
+  const ct = Buffer.concat([c.update(plaintext, "utf8"), c.final()]);
+  const b = (x: Buffer) => x.toString("base64url");
+  return `${VERSION}.${b(iv)}.${b(c.getAuthTag())}.${b(ct)}`;
+}
+
+export function openRecord(tenantId: string, scope: "import_row", sealed: string): string {
+  const [v, iv, tag, ct] = sealed.split(".");
+  if (v !== VERSION || !iv || !tag || !ct) throw new Error("รูปแบบข้อมูลเข้ารหัสไม่ถูกต้อง");
+  const d = createDecipheriv("aes-256-gcm", key("PII_KEY"), Buffer.from(iv, "base64url"));
+  d.setAAD(Buffer.from(`${tenantId}:${scope}`));
+  d.setAuthTag(Buffer.from(tag, "base64url"));
+  return Buffer.concat([d.update(Buffer.from(ct, "base64url")), d.final()]).toString("utf8");
+}
+
 /* ── กุญแจจับคู่ ──
 
    ผูกกับร้านโดยตั้งใจ: คนเดียวกันที่เป็นลูกค้าของสองร้านต้องเป็นสองแถว
