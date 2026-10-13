@@ -8,17 +8,17 @@ export default function NotFound() {
       <div className="shell">
         <Label>404</Label>
         <h1 className="t-h1 balance mt-8 max-w-2xl text-ink">
-          No page visible from this angle
+          ไม่พบหน้าที่มองหาจากมุมนี้
         </h1>
         <p className="t-lead t-thai mt-8 max-w-lg text-ink-2">
-          The link may have moved, or this page does not exist yet.
+          ลิงก์อาจถูกย้าย หรือหน้านี้ยังไม่มีอยู่
         </p>
         <div className="mt-11 flex flex-wrap gap-3">
           <Link href="/" className="btn btn-primary">
-            Back to home
+            กลับหน้าแรก
           </Link>
           <Link href="/platform" className="btn btn-ghost">
-            See the platform
+            ดูแพลตฟอร์ม
           </Link>
         </div>
       </div>

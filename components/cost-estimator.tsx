@@ -57,14 +57,14 @@ export function CostEstimator() {
 
   return (
     <div className="panel p-7 md:p-9">
-      <p className="t-label text-ink-4">estimate a month</p>
+      <p className="t-label t-thai text-ink-4">ประมาณค่าใช้จ่ายต่อเดือน</p>
 
       <div className="mt-8 grid gap-8 md:grid-cols-2">
         <fieldset>
           <label htmlFor={baseId} className="t-small t-thai block text-ink-2">
-            Identifiable customers in the base
+            จำนวนลูกค้าที่ระบุตัวตนได้
           </label>
-          <p className="t-small t-thai mt-1 text-ink-4">Sets the subscription tier</p>
+          <p className="t-small t-thai mt-1 text-ink-4">ใช้กำหนดระดับค่าสมาชิก</p>
           <div id={baseId} className="mt-4 flex flex-wrap gap-2">
             {BASES.map((n) => (
               <button
@@ -86,11 +86,11 @@ export function CostEstimator() {
 
         <fieldset>
           <label htmlFor={sendId} className="t-small t-thai block text-ink-2">
-            Messages actually sent in a month
+            จำนวนข้อความที่ส่งจริงต่อเดือน
           </label>
           {/* ── ประโยคนี้คือข้อโต้แย้งของผลิตภัณฑ์ ไม่ใช่คำอธิบายช่อง ── */}
           <p className="t-small t-thai mt-1 text-ink-4">
-            Not the whole base — only the cohorts a play selects
+            ไม่ใช่ส่งทั้งฐาน ส่งเฉพาะกลุ่มที่ระบบคัดเลือก
           </p>
           <div id={sendId} className="mt-4 flex flex-wrap gap-2">
             {SENDS.map((n) => (
@@ -116,49 +116,49 @@ export function CostEstimator() {
 
       <div className="mt-8 grid gap-x-8 gap-y-7 sm:grid-cols-3">
         <div>
-          <p className="t-label text-ink-4">{plan.name} · subscription</p>
+          <p className="t-label t-thai text-ink-4">{plan.name} · ค่าสมาชิก</p>
           <p className="t-numeral-md mt-3 text-ink">
-            {sub == null ? "Quoted" : sub === 0 ? "฿0" : `฿${th(sub)}`}
+            {sub == null ? "ประเมินราคา" : sub === 0 ? "฿0" : `฿${th(sub)}`}
           </p>
           <p className="t-small t-thai mt-2 text-ink-3">
             {plan.contactCap == null
-              ? "No numeric cap"
-              : `Up to ${th(plan.contactCap)} identifiable customers`}
+              ? "กำหนดตามสัญญา"
+              : `สูงสุด ${th(plan.contactCap)} คน`}
           </p>
         </div>
 
         <div>
-          <p className="t-label text-ink-4">messaging credits</p>
+          <p className="t-label t-thai text-ink-4">เครดิตข้อความ</p>
           <p className="t-numeral-md mt-3 text-ink">
             <Numeral value={`฿${th(credits)}`} />
           </p>
           <p className="t-small t-thai mt-2 text-ink-3">
-            {th(sends)} messages at ฿{rate.toFixed(2)} each
+            {th(sends)} ข้อความ · ข้อความละ ฿{rate.toFixed(2)}
           </p>
         </div>
 
         <div>
-          <p className="t-label text-signal">total this month</p>
+          <p className="t-label t-thai text-signal">รวมเดือนนี้</p>
           <p className="t-numeral-lg mt-3 text-signal">
             {quotable ? (
               <Numeral value={`฿${th((sub ?? 0) + credits)}`} />
             ) : (
-              "Quoted"
+              "ประเมินราคา"
             )}
           </p>
           <p className="t-small t-thai mt-2 text-ink-3">
             {quotable
-              ? "Software plus what you actually sent"
-              : "Chain pricing starts at ฿15,000 and is quoted per group"}
+              ? "ค่าระบบรวมกับข้อความที่ส่งจริง"
+              : "แผน Chain เริ่ม ฿15,000 และประเมินตามกลุ่มธุรกิจ"}
           </p>
         </div>
       </div>
 
       {/* ── ข้อจำกัดต้องอยู่ติดตัวเลข ไม่ใช่ท้ายหน้า ── */}
       <p className="t-small t-thai measure mt-8 text-ink-4">
-        Credits are prepaid and never expire, so a quiet month carries forward rather
-        than being lost. Reach media spend goes straight to the ad platform and is not
-        included here. This is arithmetic on the prices above, not a quote.
+        เครดิตจ่ายล่วงหน้าและไม่มีวันหมดอายุ เดือนที่ส่งน้อยจึงยกยอดไปใช้ต่อได้
+        ค่าสื่อสำหรับหาลูกค้าใหม่จ่ายตรงให้แพลตฟอร์มโฆษณาและไม่รวมในนี้
+        ตัวเลขนี้เป็นการคำนวณจากราคาด้านบน ไม่ใช่ใบเสนอราคา
       </p>
     </div>
   );

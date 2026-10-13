@@ -81,7 +81,7 @@ export const PLANS: Record<PlanId, Plan> = {
     monthlyBaht: 0,
     contactCap: 500,
     welcomeCredits: 0,
-    who: "One file. One brief. One proof design.",
+    who: "หนึ่งไฟล์ หนึ่งบรีฟ และการออกแบบวิธีวัดผลหนึ่งชุด",
     caps: {
       dragDrop: YES,
       keep: { kind: "read" },
@@ -89,7 +89,7 @@ export const PLANS: Record<PlanId, Plan> = {
       proof: NO,
       api: NO,
       autopilot: NO,
-      onboarding: { kind: "text", value: "Docs" },
+      onboarding: { kind: "text", value: "คู่มือ" },
     },
   },
   growth: {
@@ -98,7 +98,7 @@ export const PLANS: Record<PlanId, Plan> = {
     monthlyBaht: 1900,
     contactCap: 5000,
     welcomeCredits: 1000,
-    who: "Daily brief, KEEP actions, outcome tracking.",
+    who: "บรีฟรายวัน งานรักษาลูกค้าเดิม และการติดตามผลลัพธ์",
     featured: true,
     caps: {
       dragDrop: YES,
@@ -107,7 +107,7 @@ export const PLANS: Record<PlanId, Plan> = {
       proof: YES,
       api: NO,
       autopilot: NO,
-      onboarding: { kind: "text", value: "Email" },
+      onboarding: { kind: "text", value: "อีเมล" },
     },
   },
   multi: {
@@ -116,7 +116,7 @@ export const PLANS: Record<PlanId, Plan> = {
     monthlyBaht: 5900,
     contactCap: 25000,
     welcomeCredits: 3000,
-    who: "REACH, multi-location, and advanced proof.",
+    who: "หาลูกค้าใหม่ หลายสาขา และการวัดผลขั้นสูง",
     caps: {
       dragDrop: YES,
       keep: YES,
@@ -124,17 +124,17 @@ export const PLANS: Record<PlanId, Plan> = {
       proof: YES,
       api: ROADMAP,
       autopilot: ROADMAP,
-      onboarding: { kind: "text", value: "Named contact" },
+      onboarding: { kind: "text", value: "ผู้ดูแลเฉพาะ" },
     },
   },
   chain: {
     id: "chain",
     name: "Chain",
     monthlyBaht: 15000,
-    priceSuffix: "and up",
+    priceSuffix: "ขึ้นไป",
     contactCap: null,
     welcomeCredits: 10000,
-    who: "Chains past 25k identities, with bespoke integration.",
+    who: "เครือธุรกิจที่มีลูกค้ามากกว่า 25,000 คน พร้อมการเชื่อมต่อเฉพาะ",
     caps: {
       dragDrop: YES,
       keep: YES,
@@ -142,7 +142,7 @@ export const PLANS: Record<PlanId, Plan> = {
       proof: YES,
       api: ROADMAP,
       autopilot: ROADMAP,
-      onboarding: { kind: "text", value: "Named contact" },
+      onboarding: { kind: "text", value: "ผู้ดูแลเฉพาะ" },
     },
   },
 };
@@ -228,11 +228,11 @@ export function capLabel(c: Cap): string {
     case "no":
       return "—";
     case "read":
-      return "Read only";
+      return "ดูได้อย่างเดียว";
     case "roadmap":
-      return "In build";
+      return "กำลังพัฒนา";
     case "trial":
-      return `${c.campaigns} campaign · ${c.audience.toLocaleString("en-US")} people`;
+      return `${c.campaigns} แคมเปญ · ${c.audience.toLocaleString("th-TH")} คน`;
     case "text":
       return c.value;
   }
@@ -240,11 +240,11 @@ export function capLabel(c: Cap): string {
 
 /** แถวเปรียบเทียบ — เรียงตามลำดับที่คนตัดสินใจอ่าน ไม่ใช่ตามโครงสร้างข้อมูล */
 export const CAP_ROWS: { key: keyof Plan["caps"]; label: string; note?: string }[] = [
-  { key: "keep", label: "Keep — who returns, and when" },
-  { key: "reach", label: "Reach — approve and send for real" },
-  { key: "proof", label: "Proof — holdout and confidence interval" },
-  { key: "dragDrop", label: "Drag-and-drop import" },
-  { key: "onboarding", label: "Setup and column mapping help" },
-  { key: "api", label: "Ingest API" },
-  { key: "autopilot", label: "Autopilot send" },
+  { key: "keep", label: "รักษาลูกค้าเดิม — ใครควรกลับมา และเมื่อไร" },
+  { key: "reach", label: "หาลูกค้าใหม่ — อนุมัติและส่งจริง" },
+  { key: "proof", label: "วัดผล — กลุ่มเปรียบเทียบและช่วงความเชื่อมั่น" },
+  { key: "dragDrop", label: "นำเข้าด้วยการลากไฟล์วาง" },
+  { key: "onboarding", label: "ช่วยตั้งค่าและจับคู่คอลัมน์" },
+  { key: "api", label: "API นำเข้าข้อมูล" },
+  { key: "autopilot", label: "ส่งอัตโนมัติ" },
 ];

@@ -113,7 +113,7 @@ export function ConsoleNav({
             onClick={() => setOpen((v) => !v)}
             aria-expanded={open}
             aria-controls="console-nav"
-            aria-label={open ? "Close menu" : "Open menu"}
+            aria-label={open ? "ปิดเมนู" : "เปิดเมนู"}
             className="c-btn c-btn-ghost c-btn-sm lg:hidden"
           >
             เมนู
@@ -132,7 +132,7 @@ export function ConsoleNav({
             และตรวจสิทธิ์ ไม่ใช่ให้เลือกเองจากรายการ */}
         <div className="px-4 py-4 lg:px-5">
           <div className="flex items-baseline justify-between gap-2">
-            <p className="c-label">account</p>
+            <p className="c-label-th">บัญชีที่กำลังดู</p>
             <button
               type="button"
               onClick={() => setPickerOpen((x) => !x)}
@@ -149,7 +149,7 @@ export function ConsoleNav({
             {industry}
           </p>
           <p className="c-mono mt-2 text-[0.75rem] text-[var(--c-text-4)]">
-            {planName} · {credits.toLocaleString("en-US")} credits
+            {planName} · เครดิตข้อความ {credits.toLocaleString("th-TH")}
           </p>
 
           {pickerOpen && (
@@ -174,9 +174,8 @@ export function ConsoleNav({
                 </form>
               ))}
               <p className="c-thai mt-2 text-[0.75rem] leading-relaxed text-[var(--c-text-4)]">
-                All four accounts are synthetic, chosen to cover the four revenue-cycle
-                shapes — so you can see the engine predicting from the cycle rather
-                than the industry.
+                ทุกบัญชีเป็นข้อมูลสังเคราะห์ที่ครอบคลุมวงจรรายได้หลายรูปแบบ
+                เพื่อแสดงว่าระบบคาดการณ์จากวงจรรายได้ ไม่ได้ดูแค่อุตสาหกรรม
               </p>
             </div>
           )}
@@ -184,7 +183,7 @@ export function ConsoleNav({
 
         <hr className="c-hair" />
 
-        <nav className="flex flex-col gap-5 p-3 lg:p-3.5" aria-label="Console">
+        <nav className="flex flex-col gap-5 p-3 lg:p-3.5" aria-label="เมนูระบบจัดการ">
           {groups.map((g) => (
             <div key={g.title} className="flex flex-col gap-1">
               <p className="c-label px-3 pb-1.5 text-[0.75rem]">{g.title}</p>

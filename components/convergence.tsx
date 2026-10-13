@@ -59,7 +59,7 @@ export function Convergence({ className = "" }: { className?: string }) {
       className={className}
       fill="none"
       role="img"
-      aria-label="Two sets of sight lines from two positions reaching the same customers — where they converge is where distance becomes knowable"
+      aria-label="เส้นสายตาสองชุดจากสองตำแหน่งมุ่งไปยังลูกค้ากลุ่มเดียวกัน จุดที่บรรจบทำให้รู้ระยะที่แท้จริง"
     >
       <defs>
         <linearGradient

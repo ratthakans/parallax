@@ -33,69 +33,68 @@ import {
    ตารางราคาที่จะไม่ตรงกับสิ่งที่ระบบทำจริงภายในสัปดาห์แรก */
 
 export const metadata: Metadata = {
-  title: "Pricing",
+  title: "ราคา",
   description:
     `Pilot ฿0 · Growth ฿${PLANS.growth.monthlyBaht?.toLocaleString("en-US")} · ` +
     `Multi ฿${PLANS.multi.monthlyBaht?.toLocaleString("en-US")} · ` +
-    `Chain ฿${PLANS.chain.monthlyBaht?.toLocaleString("en-US")} and up — ` +
-    "Priced on identities you can actually reach. Messages are prepaid credits, never hidden in the subscription.",
+    `Chain ฿${PLANS.chain.monthlyBaht?.toLocaleString("en-US")} ขึ้นไป — ` +
+    "คิดราคาตามจำนวนลูกค้าที่ติดต่อได้จริง ค่าข้อความเป็นเครดิตจ่ายล่วงหน้าและไม่ซ่อนในค่าสมาชิก",
 };
 
 const th = (n: number) => n.toLocaleString("en-US");
 
 const priceOf = (p: Plan) =>
-  p.monthlyBaht == null ? "Let's talk" : th(p.monthlyBaht);
+  p.monthlyBaht == null ? "ประเมินราคา" : th(p.monthlyBaht);
 
 const FAQ: { q: string; a: string }[] = [
   {
-    q: "Why isn't messaging included in the subscription?",
+    q: "ทำไมค่าข้อความไม่รวมในค่าสมาชิก?",
     a:
-      `Sending costs about ฿${MESSAGE_COST_BAHT} a message. Fold that into the fee and ` +
-      "your heaviest senders become your biggest losses — then everyone pays more. " +
-      "Separate credits are what stop light users subsidising heavy ones.",
+      `การส่งมีต้นทุนประมาณ ฿${MESSAGE_COST_BAHT} ต่อข้อความ หากรวมไว้ในค่าสมาชิก ` +
+      "ผู้ใช้ที่ส่งน้อยจะต้องช่วยจ่ายให้ผู้ใช้ที่ส่งมาก การแยกเครดิตทำให้ทุกคนจ่ายตามการใช้งานจริง",
   },
   {
-    q: "What happens if credits run out mid-campaign?",
+    q: "ถ้าเครดิตหมดกลางแคมเปญจะเกิดอะไรขึ้น?",
     a:
-      "It sends what the balance covers, then tells you exactly how many are still waiting. " +
-      "No retroactive billing. Top up, press send again — nobody gets a duplicate.",
+      "ระบบส่งเท่าที่เครดิตเหลือ แล้วแจ้งจำนวนคนที่ยังรออยู่ ไม่มีการเรียกเก็บย้อนหลัง " +
+      "เติมเครดิตแล้วกดส่งต่อได้โดยไม่มีใครได้รับข้อความซ้ำ",
   },
   {
-    q: "Do credits expire?",
-    a: "Never. They sit in the account until spent, and no billing cycle resets them.",
+    q: "เครดิตหมดอายุไหม?",
+    a: "ไม่หมดอายุ เครดิตอยู่ในบัญชีจนกว่าจะใช้ และไม่ถูกรีเซ็ตตามรอบบิล",
   },
   {
-    q: "How do you count an “identifiable customer”?",
+    q: "นับ “ลูกค้าที่ระบุตัวตนได้” อย่างไร?",
     a:
-      "Anyone carrying at least one identifier, so they can actually be reached — " +
-      "not rows in a file. Cash walk-ins who left nothing behind are neither counted nor billed.",
+      "นับคนที่มีตัวระบุอย่างน้อยหนึ่งอย่างและติดต่อได้จริง ไม่ได้นับจำนวนแถวในไฟล์ " +
+      "ลูกค้าที่จ่ายเงินสดแล้วไม่ทิ้งข้อมูลไว้จะไม่ถูกนับและไม่ถูกคิดเงิน",
   },
   {
-    q: "What if the base outgrows the plan cap?",
+    q: "ถ้าฐานลูกค้าเกินเพดานของแผนจะเกิดอะไรขึ้น?",
     a:
-      "The import is refused with the exact overage stated up front — not accepted " +
-      "halfway through and followed by an invoice.",
+      "ระบบปฏิเสธการนำเข้าและบอกจำนวนที่เกินอย่างชัดเจนตั้งแต่ต้น " +
+      "ไม่รับข้อมูลครึ่งทางแล้วค่อยส่งใบแจ้งหนี้ตามหลัง",
   },
   {
-    q: "What happens to the data if we cancel?",
+    q: "ถ้ายกเลิก ข้อมูลจะเป็นอย่างไร?",
     a:
-      "The data is yours. Ask for the file back or ask us to erase all of it, any time. " +
-      "Monthly plans carry no minimum term.",
+      "ข้อมูลเป็นของคุณ ขอไฟล์กลับหรือขอให้ลบทั้งหมดได้ทุกเมื่อ " +
+      "แผนรายเดือนไม่มีระยะเวลาขั้นต่ำ",
   },
 ];
 
 const NOT_READY = [
   {
-    t: "Ingest API",
-    d: "Drag-and-drop CSV only today. Works with almost every POS — but still by hand.",
+    t: "API นำเข้าข้อมูล",
+    d: "วันนี้รองรับการลาก CSV วาง ใช้ได้กับ POS แทบทุกระบบ แต่ยังต้องทำด้วยตนเอง",
   },
   {
-    t: "Autopilot send",
-    d: "Every campaign still needs a human approval — right for year one, not something to charge for.",
+    t: "ส่งอัตโนมัติ",
+    d: "ทุกแคมเปญยังต้องมีคนอนุมัติ เหมาะกับช่วงแรกและยังไม่ควรถูกนำมาคิดเงิน",
   },
   {
-    t: "Live LINE delivery",
-    d: "Logging and credit deduction are complete; the Messaging API connects when pilots begin.",
+    t: "ส่งผ่าน LINE จริง",
+    d: "ระบบบันทึกและหักเครดิตพร้อมแล้ว ส่วน Messaging API จะเชื่อมต่อเมื่อเริ่มโครงการทดลอง",
   },
 ];
 
@@ -107,13 +106,13 @@ export default function PricingPage() {
         offers={PLAN_ORDER.map((id) => ({
           name: PLANS[id].name,
           monthlyBaht: PLANS[id].monthlyBaht,
-          from: PLANS[id].priceSuffix === "and up",
+          from: Boolean(PLANS[id].priceSuffix),
         }))}
       />
       <PageHero
-        label="Pricing"
-        title="Priced on identities you can reach. Not on seats."
-        lead="The value we create scales with the size of the base, not with how many people log in. And there is no such thing as unlimited in a layer where we pay for the compute."
+        label="ราคา"
+        title="คิดตามจำนวนลูกค้าที่ติดต่อได้ ไม่ได้คิดตามจำนวนผู้ใช้"
+        lead="คุณค่าของระบบโตตามขนาดฐานลูกค้า ไม่ใช่จำนวนคนที่ล็อกอิน และสิ่งที่มีต้นทุนจริงจะไม่ถูกซ่อนไว้ใต้คำว่าไม่จำกัด"
       />
 
       {/* free tier logic */}
@@ -122,12 +121,12 @@ export default function PricingPage() {
           <Reveal>
             <div className="grid gap-10 border-b border-line pb-12 lg:grid-cols-[1fr_1.4fr] lg:gap-20">
               <div>
-                <Label>The Pilot logic</Label>
+                <Label>แนวคิดของแผน Pilot</Label>
               </div>
               <div>
                 <p className="t-h3 pretty text-ink">
-                  Pilot is read-only. See where the revenue leaks, see how many are
-                  about to go quiet — but you cannot fire.
+                  เริ่มจากดูว่ารายได้รั่วตรงไหน ใครกำลังจะเงียบ และทดลองส่งจริงได้
+                  หนึ่งแคมเปญพร้อมกลุ่มเปรียบเทียบ ก่อนตัดสินใจสมัครแผนรายเดือน
                 </p>
                 
               </div>
@@ -157,7 +156,7 @@ export default function PricingPage() {
                         <h2 className="t-h3 text-ink">{t.name}</h2>
                         {t.featured && (
                           <span className="t-label rounded-full bg-signal px-3 py-1.5 text-white">
-                            start here
+                            แนะนำ
                           </span>
                         )}
                       </div>
@@ -167,33 +166,33 @@ export default function PricingPage() {
                         </span>
                         {t.monthlyBaht != null && t.monthlyBaht > 0 && (
                           <span className="t-small text-ink-4">
-                            ฿ / month{t.priceSuffix ? ` ${t.priceSuffix}` : ""}
+                            ฿ / เดือน{t.priceSuffix ? ` ${t.priceSuffix}` : ""}
                           </span>
                         )}
                       </p>
                       {annual != null && annual > 0 && (
                         <p className="t-small mt-2.5 text-ink-4">
-                          Annual ฿{th(annual)} — save {annualDiscountPct}%
+                          รายปี ฿{th(annual)} — ประหยัด {annualDiscountPct}%
                         </p>
                       )}
 
                       <dl className="mt-7 flex flex-col gap-2.5 border-t border-line pt-6">
                         <div className="flex items-baseline justify-between gap-3">
                           <dt className="t-small text-ink-4">
-                            Identifiable customers
+                            ลูกค้าที่ระบุตัวตนได้
                           </dt>
                           <dd className="t-small text-ink">
-                            {t.contactCap == null ? "Let's talk" : `Up to ${th(t.contactCap)}`}
+                            {t.contactCap == null ? "ประเมินราคา" : `สูงสุด ${th(t.contactCap)}`}
                           </dd>
                         </div>
                         <div className="flex items-baseline justify-between gap-3">
-                          <dt className="t-small text-ink-4">Welcome credits</dt>
+                          <dt className="t-small text-ink-4">เครดิตแรกเข้า</dt>
                           <dd className="t-small text-ink">
                             {t.welcomeCredits > 0 ? th(t.welcomeCredits) : "—"}
                           </dd>
                         </div>
                         <div className="flex items-baseline justify-between gap-3">
-                          <dt className="t-small text-ink-4">Can send for real</dt>
+                          <dt className="t-small text-ink-4">ส่งจริงได้</dt>
                           <dd className="t-small text-ink">
                             {t.caps.reach.kind === "yes" ? "✓" : "—"}
                           </dd>
@@ -208,7 +207,7 @@ export default function PricingPage() {
                         t.featured ? "btn-primary" : "btn-ghost"
                       }`}
                     >
-                      {t.id === "free" ? "Start free" : "Talk to us"}
+                      {t.id === "free" ? "เริ่มใช้ฟรี" : "ติดต่อเรา"}
                     </Link>
                   </div>
                 </Reveal>
@@ -222,23 +221,22 @@ export default function PricingPage() {
       <Section tone="mist">
         <div className="shell">
           <Reveal>
-            <Label>Messaging — priced apart from the subscription</Label>
+            <Label>ค่าข้อความ — แยกจากค่าสมาชิก</Label>
           </Reveal>
 
           <Reveal delay={70}>
             <div className="mt-12 grid gap-10 lg:grid-cols-[1fr_1.2fr] lg:gap-20">
               <p className="t-h3 pretty text-ink">
-                Prepaid credits. It stops when they run out. No bill arrives later.
+                เครดิตจ่ายล่วงหน้า หมดแล้วหยุด ไม่มีบิลตามมาทีหลัง
               </p>
               <div>
                 <p className="t-body t-thai pretty text-ink-3">
-                  The subscription buys software. Messaging tracks real usage. Merge
-                  the two and the price you see stops being the price you pay.
+                  ค่าสมาชิกคือค่าระบบ ส่วนข้อความคิดตามการใช้งานจริง
+                  ถ้ารวมสองอย่างเข้าด้วยกัน ราคาที่เห็นจะไม่ใช่ราคาที่จ่ายจริง
                 </p>
-                <More label="what the margin covers">
-                  Delivery costs about ฿{MESSAGE_COST_BAHT} a message. The margin is the
-                  software riding along with each send — choosing the cohort, writing
-                  the copy, holding back the control group, and measuring the result.
+                <More label="ส่วนต่างราคาครอบคลุมอะไร">
+                  การส่งมีต้นทุนประมาณ ฿{MESSAGE_COST_BAHT} ต่อข้อความ ส่วนต่างคือค่าระบบ
+                  ที่คัดกลุ่ม เขียนข้อความ กันกลุ่มเปรียบเทียบ และวัดผลไปพร้อมกับทุกการส่ง
                 </More>
               </div>
             </div>
@@ -255,10 +253,10 @@ export default function PricingPage() {
                   <p className="t-numeral-md text-ink">
                     <Numeral value={th(pk.messages)} />
                   </p>
-                  <p className="t-small mt-1 text-ink-4">messages</p>
+                  <p className="t-small mt-1 text-ink-4">ข้อความ</p>
                   <p className="t-body mt-6 text-ink">฿{th(pk.baht)}</p>
                   <p className="t-small mt-1.5 text-ink-4">
-                    ฿{perMessage(pk).toFixed(2)} per message
+                    ข้อความละ ฿{perMessage(pk).toFixed(2)}
                   </p>
               </div>
             ))}
@@ -267,8 +265,8 @@ export default function PricingPage() {
           <Reveal delay={210}>
             <div className="mt-12">
               <Note>
-                Credits never expire and no billing cycle resets them · Reach media spend
-                goes straight to the ad platform, never through us
+                เครดิตไม่มีวันหมดอายุและไม่ถูกรีเซ็ตตามรอบบิล · ค่าสื่อสำหรับหาลูกค้าใหม่
+                จ่ายตรงให้แพลตฟอร์มโฆษณา ไม่ผ่านเรา
               </Note>
             </div>
           </Reveal>
@@ -289,7 +287,7 @@ export default function PricingPage() {
       <Section tone="paper">
         <div className="shell">
           <Reveal>
-            <Label>What each tier includes</Label>
+            <Label>แต่ละแผนมีอะไรบ้าง</Label>
           </Reveal>
 
           <Reveal delay={80}>
@@ -311,7 +309,7 @@ export default function PricingPage() {
                 <tbody>
                   <tr>
                     <td className="t-small whitespace-nowrap text-ink-3">
-                      Monthly subscription
+                      ค่าสมาชิกรายเดือน
                     </td>
                     {PLAN_ORDER.map((id) => (
                       <td
@@ -329,7 +327,7 @@ export default function PricingPage() {
                   </tr>
                   <tr>
                     <td className="t-small whitespace-nowrap text-ink-3">
-                      Identifiable customers
+                      ลูกค้าที่ระบุตัวตนได้
                     </td>
                     {PLAN_ORDER.map((id) => (
                       <td
@@ -341,14 +339,14 @@ export default function PricingPage() {
                         }
                       >
                         {PLANS[id].contactCap == null
-                          ? "Let's talk"
-                          : `Up to ${th(PLANS[id].contactCap!)}`}
+                          ? "ประเมินราคา"
+                          : `สูงสุด ${th(PLANS[id].contactCap!)}`}
                       </td>
                     ))}
                   </tr>
                   <tr>
                     <td className="t-small whitespace-nowrap text-ink-3">
-                      Welcome credits (one time)
+                      เครดิตแรกเข้า (ครั้งเดียว)
                     </td>
                     {PLAN_ORDER.map((id) => (
                       <td
@@ -395,11 +393,11 @@ export default function PricingPage() {
                   ))}
                   <tr>
                     <td className="t-small whitespace-nowrap text-ink-3">
-                      Seats
+                      จำนวนผู้ใช้
                     </td>
                     {PLAN_ORDER.map((id) => (
                       <td key={id} className="text-ink">
-                        Unlimited
+                        ไม่จำกัด
                       </td>
                     ))}
                   </tr>
@@ -411,8 +409,8 @@ export default function PricingPage() {
           <Reveal delay={160}>
             <div className="mt-12">
               <Note>
-                Anything marked “in build” does not exist today — we do not charge for it,
-                and it is not a reason to move up a tier
+                สิ่งที่ระบุว่า “กำลังพัฒนา” ยังไม่มีให้ใช้วันนี้ เราไม่คิดเงินส่วนนี้
+                และไม่ใช้เป็นเหตุผลให้ลูกค้าขยับไปแผนที่สูงขึ้น
               </Note>
             </div>
           </Reveal>
@@ -427,16 +425,16 @@ export default function PricingPage() {
                 เดิมเขียน tone="dark" เพราะอ่านว่า "แถบนี้เข้ม" แต่ tone
                 หมายถึงสีตัวอักษร ป้ายจึงเป็น ink-4 บนพื้น abyss = 3.84:1 */}
             <Label onDark>
-              What it takes to break even
+              ต้องสร้างรายได้เพิ่มเท่าไรจึงคุ้มทุน
             </Label>
           </Reveal>
           <Reveal delay={70}>
             <p className="t-h3 pretty mt-10 max-w-3xl text-frost">
-              The question isn’t “is it expensive.” It’s “how much incremental
-              revenue clears a year of subscription.”
+              คำถามไม่ใช่ “แพงไหม” แต่คือ “ต้องมีรายได้ส่วนเพิ่มเท่าไร
+              จึงครอบคลุมค่าสมาชิกหนึ่งปี”
             </p>
             <p className="t-small t-thai mt-5 text-frost/50">
-              Incremental revenue per year to break even, at a 40% gross margin
+              รายได้ส่วนเพิ่มต่อปีที่ต้องได้เพื่อคุ้มทุน เมื่อกำไรขั้นต้น 40%
             </p>
           </Reveal>
 
@@ -453,7 +451,7 @@ export default function PricingPage() {
                         <Numeral value={`฿${th(be)}`} />
                       </p>
                       <p className="t-small t-thai mt-4 text-frost/60">
-                        about ฿{th(Math.round(be / 12))} a month
+                        ประมาณ ฿{th(Math.round(be / 12))} ต่อเดือน
                       </p>
                     </div>
                   );
@@ -464,9 +462,8 @@ export default function PricingPage() {
 
           <Reveal delay={210}>
             <p className="t-small t-thai pretty mt-14 max-w-3xl text-frost/50">
-              A bar we have to clear, not a promise that we will. The console measures
-              the real thing against a control group — if it doesn’t pay, you’ll see
-              that it doesn’t pay.
+              นี่คือเกณฑ์ที่ระบบต้องทำให้ผ่าน ไม่ใช่คำสัญญาว่าจะผ่านเสมอ
+              ระบบวัดผลเทียบกับกลุ่มเปรียบเทียบ หากไม่คุ้ม คุณจะเห็นว่าไม่คุ้มตรงๆ
             </p>
           </Reveal>
         </div>
@@ -476,21 +473,21 @@ export default function PricingPage() {
       <Section tone="paper">
         <div className="shell">
           <Reveal>
-            <Label>Things we deliberately don’t do</Label>
+            <Label>สิ่งที่เราตั้งใจไม่ทำ</Label>
           </Reveal>
           <div className="mt-14 grid gap-8 md:grid-cols-3">
             {[
               {
-                t: "No such thing as unlimited",
-                d: "In a layer where we pay for the compute, your heaviest users become your biggest losses — and then everyone pays more.",
+                t: "ไม่ใช้คำว่าไม่จำกัดกับสิ่งที่มีต้นทุนจริง",
+                d: "ถ้าเราเป็นผู้จ่ายต้นทุนการประมวลผล ผู้ใช้ที่หนักที่สุดจะกลายเป็นขาดทุนสูงสุด และสุดท้ายทุกคนต้องจ่ายแพงขึ้น",
               },
               {
-                t: "No messaging hidden in the fee",
-                d: "Split out as visible credits, never averaged into the price so light users subsidise heavy ones.",
+                t: "ไม่ซ่อนค่าข้อความในค่าสมาชิก",
+                d: "แยกเป็นเครดิตที่มองเห็นได้ ไม่เฉลี่ยใส่ราคาให้คนส่งน้อยช่วยจ่ายแทนคนส่งมาก",
               },
               {
-                t: "No per-seat billing",
-                d: "How many people log in has nothing to do with the value delivered. Same base, same price.",
+                t: "ไม่คิดเงินตามจำนวนผู้ใช้",
+                d: "จำนวนคนที่ล็อกอินไม่เกี่ยวกับคุณค่าที่ส่งมอบ ฐานลูกค้าเท่ากัน ราคาจึงเท่ากัน",
               },
             ].map((x, i) => (
               <Reveal key={x.t} delay={i * 80}>
@@ -506,8 +503,8 @@ export default function PricingPage() {
           <Reveal delay={240}>
             <div className="mt-16 max-w-3xl">
               <Quote>
-                The line to watch is messaging. Without separate credits, your heaviest
-                customer becomes your most expensive one.
+                ต้นทุนที่ต้องจับตาคือการส่งข้อความ หากไม่แยกเครดิต
+                ลูกค้าที่ใช้งานหนักที่สุดจะกลายเป็นลูกค้าที่สร้างต้นทุนสูงที่สุด
               </Quote>
             </div>
           </Reveal>
@@ -518,17 +515,17 @@ export default function PricingPage() {
       <Section tone="mist">
         <div className="shell">
           <Reveal>
-            <Label>Not ready yet — and not billed for</Label>
+            <Label>ยังไม่พร้อม และยังไม่คิดเงิน</Label>
           </Reveal>
           <Reveal delay={70}>
             <p className="t-body t-thai pretty mt-10 max-w-3xl text-ink-3">
-              A price sheet that sells what doesn’t exist is a debt repaid on day one.
+              การขายสิ่งที่ยังไม่มี คือหนี้ที่ต้องชำระตั้งแต่วันแรกที่ลูกค้าเริ่มใช้
             </p>
           </Reveal>
           <Stagger step={90} className="mt-14 grid gap-8 md:grid-cols-3">
             {NOT_READY.map((x) => (
               <div key={x.t} className="border-t border-line pt-7">
-                <p className="t-label text-ink-4">in build</p>
+                <p className="t-label t-thai text-ink-4">กำลังพัฒนา</p>
                 <h3 className="t-h3 mt-4 text-ink">{x.t}</h3>
                 <p className="t-small t-thai mt-5 text-ink-3">{x.d}</p>
               </div>
@@ -541,13 +538,13 @@ export default function PricingPage() {
       <Section tone="paper">
         <div className="shell">
           <Reveal>
-            <Label>Questions people actually ask</Label>
+            <Label>คำถามที่ลูกค้าถามจริง</Label>
           </Reveal>
           <Stagger step={60} className="mt-12 grid gap-px bg-line lg:grid-cols-2">
             {FAQ.map((f) => (
               <div key={f.q} className="h-full bg-paper p-8">
                 <h3 className="t-body t-thai text-ink">{f.q}</h3>
-                <More label="answer">{f.a}</More>
+                <More label="ดูคำตอบ">{f.a}</More>
               </div>
             ))}
           </Stagger>
@@ -556,9 +553,9 @@ export default function PricingPage() {
 
       <NextUp
         items={[
-          { href: "/product#features", label: "Product", title: "Every feature" },
-          { href: "/contact", label: "Start", title: "Talk about a pilot" },
-          { href: "/investors", label: "Investors", title: "The economics behind the price" },
+          { href: "/product#features", label: "ผลิตภัณฑ์", title: "ดูฟีเจอร์ทั้งหมด" },
+          { href: "/contact", label: "เริ่มต้น", title: "ขอทดลองใช้" },
+          { href: "/investors", label: "นักลงทุน", title: "เศรษฐศาสตร์เบื้องหลังราคา" },
         ]}
       />
 

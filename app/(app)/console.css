@@ -34,7 +34,7 @@
     --c-text: #eaf3ff;
     --c-text-2: #a8badb;
     --c-text-3: #7990a1;
-    --c-text-4: #4c5d7d;
+    --c-text-4: #7185a8;
 
     --c-accent: #2b6bff;
     --c-accent-2: #075dff;
@@ -317,7 +317,7 @@
     align-items: center;
     justify-content: center;
     gap: 0.45rem;
-    height: 2.25rem;
+    min-height: 2.75rem;
     padding-inline: 0.95rem;
     border-radius: 999px;
     font-size: 0.83rem;
@@ -372,7 +372,7 @@
   }
 
   .c-btn-sm {
-    height: 1.85rem;
+    min-height: 2.25rem;
     padding-inline: 0.7rem;
     font-size: 0.78rem;
   }
@@ -485,6 +485,13 @@
     color: var(--c-text);
     outline: none;
     transition: border-color 0.2s ease;
+    min-height: 2.75rem;
+  }
+
+  @media (max-width: 767px) {
+    .c-btn-sm {
+      min-height: 2.75rem;
+    }
   }
 
   .c-input:focus,

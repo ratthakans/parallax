@@ -30,19 +30,19 @@ export default function ConsoleError({
   return (
     <div className="console min-h-dvh">
       <div className="mx-auto max-w-2xl px-6 py-24">
-        <p className="c-label text-[var(--c-bad)]">something broke</p>
+        <p className="c-label-th text-[var(--c-bad)]">เกิดข้อผิดพลาด</p>
         <h1 className="c-h1 mt-4 text-[var(--c-text)]">
-          This screen could not be built
+          ไม่สามารถสร้างหน้าจอนี้ได้
         </h1>
         <p className="c-thai mt-4 text-[0.92rem] text-[var(--c-text-2)]">
-          Nothing was sent and nothing was changed — the failure happened while
-          drawing the page, before any action ran. Try again; if it keeps
-          happening, the reference below is what identifies it in the server log.
+          ไม่มีข้อความถูกส่งและไม่มีข้อมูลถูกเปลี่ยนแปลง ข้อผิดพลาดเกิดขณะสร้างหน้า
+          ก่อนการทำงานใดจะเริ่ม ลองอีกครั้ง หากยังเกิดซ้ำให้ใช้รหัสอ้างอิงด้านล่าง
+          เพื่อตรวจสอบในบันทึกของเซิร์ฟเวอร์
         </p>
 
         {error.digest && (
           <p className="c-mono mt-5 text-[0.75rem] text-[var(--c-text-4)]">
-            reference {error.digest}
+            รหัสอ้างอิง {error.digest}
           </p>
         )}
 
@@ -52,10 +52,10 @@ export default function ConsoleError({
             onClick={() => unstable_retry()}
             className="c-btn c-btn-primary"
           >
-            Try again
+            ลองอีกครั้ง
           </button>
           <Link href="/app" className="c-btn c-btn-ghost">
-            Back to the morning brief
+            กลับไปบรีฟเช้า
           </Link>
         </div>
       </div>

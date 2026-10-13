@@ -16,26 +16,26 @@ const ITEMS: Item[] = [
   {
     n: "01",
     who: "165",
-    why: "Repeat window closes in 10 days · avg basket ฿4,200",
-    action: "Reactivation offer built from what they already bought",
+    why: "รอบซื้อซ้ำจะปิดใน 10 วัน · ยอดเฉลี่ย ฿4,200",
+    action: "ส่งข้อเสนอให้กลับมาซื้อจากสินค้าที่เคยเลือกไว้",
     value: "฿693,000",
-    tag: "repeat-window move",
+    tag: "ใกล้ถึงรอบซื้อซ้ำ",
   },
   {
     n: "02",
     who: "119",
-    why: "Top cohort · always full price, never waits for a discount",
-    action: "Private preview + advisor follow-up",
+    why: "กลุ่มมูลค่าสูง · ซื้อราคาเต็มและไม่รอส่วนลด",
+    action: "เปิดตัวสินค้าแบบส่วนตัว พร้อมให้พนักงานติดตาม",
     value: "฿786,800",
-    tag: "high-value return",
+    tag: "ลูกค้ามูลค่าสูง",
   },
   {
     n: "03",
     who: "98",
-    why: "Bought the driver, never bought balls",
-    action: "Attach the ball model this cohort buys next",
+    why: "ซื้อไดรเวอร์แล้ว แต่ยังไม่เคยซื้อลูกกอล์ฟ",
+    action: "แนะนำรุ่นลูกกอล์ฟที่ลูกค้ากลุ่มเดียวกันมักซื้อถัดไป",
     value: "฿147,000",
-    tag: "churn risk",
+    tag: "เสี่ยงเงียบหาย",
   },
 ];
 
@@ -56,9 +56,9 @@ export function BriefMock({ compact = false }: { compact?: boolean }) {
         <div className="flex items-center justify-between gap-4 border-b border-line px-5 py-4 md:px-7">
           <div className="flex items-center gap-2.5 text-ink">
             <Mark className="h-4 w-4" />
-            <span className="t-label">morning brief</span>
+            <span className="t-label t-thai">บรีฟเช้าวันนี้</span>
           </div>
-          <span className="t-label text-ink-4">08:12 · 03 moves ready</span>
+          <span className="t-label t-thai text-ink-4">08:12 · พร้อมทำ 3 งาน</span>
         </div>
 
         {/* items */}
@@ -77,7 +77,7 @@ export function BriefMock({ compact = false }: { compact?: boolean }) {
                     <span className="t-numeral text-[1.65rem] text-ink">
                       <Numeral value={it.who} />
                     </span>
-                    <span className="t-small text-ink-4">customers</span>
+                    <span className="t-small t-thai text-ink-4">คน</span>
                     <span className="t-label rounded-full border border-line px-2.5 py-1 text-ink-4">
                       {it.tag}
                     </span>
@@ -86,7 +86,7 @@ export function BriefMock({ compact = false }: { compact?: boolean }) {
                   <p className="t-body t-thai pretty mt-3 text-ink">{it.action}</p>
                 </div>
                 <div className="shrink-0 text-right">
-                  <p className="t-label text-ink-4">expected value</p>
+                  <p className="t-label t-thai text-ink-4">มูลค่าที่คาดไว้</p>
                   <p className="t-numeral mt-2.5 text-[1.35rem] text-signal">
                     <Numeral value={it.value} />
                   </p>
@@ -96,13 +96,13 @@ export function BriefMock({ compact = false }: { compact?: boolean }) {
               {!compact && (
                 <div className="mt-5 flex flex-wrap items-center gap-2.5">
                   <span className="inline-flex h-8 items-center rounded-full bg-signal px-4 text-[0.78rem] font-medium text-white">
-                    Approve
+                    อนุมัติ
                   </span>
                   <span className="inline-flex h-8 items-center rounded-full border border-line px-4 text-[0.78rem] text-ink-2">
-                    Why?
+                    ดูเหตุผล
                   </span>
                   <span className="inline-flex h-8 items-center rounded-full border border-line px-4 text-[0.78rem] text-ink-2">
-                    Snooze
+                    ไว้ทีหลัง
                   </span>
                 </div>
               )}
@@ -113,10 +113,10 @@ export function BriefMock({ compact = false }: { compact?: boolean }) {
         {/* foot */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-5 py-4 md:px-7">
           <span className="t-small text-ink-3">
-            Three moves. Ten seconds. Then back to work.
+            สามงาน สิบวินาที แล้วกลับไปทำงานต่อ
           </span>
           <span className="t-label text-ink-4">
-            90-day rolling δ · +7.4% ± 2.1
+            ผลต่างย้อนหลัง 90 วัน · +7.4% ± 2.1
           </span>
         </div>
       </div>

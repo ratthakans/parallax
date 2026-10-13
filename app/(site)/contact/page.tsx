@@ -4,30 +4,30 @@ import { Reveal } from "@/components/reveal";
 import { ContactForm } from "@/components/contact-form";
 
 export const metadata: Metadata = {
-  title: "Contact",
+  title: "ติดต่อเรา",
   description:
-    "Start a pilot, discuss a POS partnership, or request the investor materials.",
+    "ขอทดลองใช้ พูดคุยเรื่องการเชื่อมต่อ POS หรือขอข้อมูลสำหรับนักลงทุน",
 };
 
 const CHANNELS = [
   {
-    t: "Pilot programme",
-    d: "Send six months of sales history and we return the first set of next-best actions before you commit to anything.",
+    t: "ขอทดลองใช้",
+    d: "ส่งประวัติยอดขายหกเดือน แล้วเราจะคืนชุดงานแรกที่ควรทำต่อให้ดูก่อนตัดสินใจ",
     mail: "hello@parallax.co.th",
   },
   {
-    t: "POS and agency partners",
-    d: "Native API, app store placement, or managing several shops at once.",
+    t: "พาร์ตเนอร์ POS และเอเจนซี",
+    d: "เชื่อมต่อ API วางใน app store หรือจัดการหลายร้านในระบบเดียว",
     mail: "partners@parallax.co.th",
   },
   {
-    t: "Investors",
-    d: "The full materials — assumptions, the fallback plan, and what remains unproven.",
+    t: "นักลงทุน",
+    d: "ขอเอกสารฉบับเต็ม รวมสมมติฐาน แผนสำรอง และสิ่งที่ยังไม่ได้พิสูจน์",
     mail: "investors@parallax.co.th",
   },
   {
-    t: "Privacy and PDPA",
-    d: "Request the draft data processing agreement, or exercise a data subject right.",
+    t: "ความเป็นส่วนตัวและ PDPA",
+    d: "ขอร่างข้อตกลงประมวลผลข้อมูล หรือใช้สิทธิของเจ้าของข้อมูล",
     mail: "privacy@parallax.co.th",
   },
 ];
@@ -36,9 +36,9 @@ export default function ContactPage() {
   return (
     <>
       <PageHero
-        label="Contact"
-        title="Tell us what your revenue cycle looks like and we will tell you plainly whether it fits"
-        lead="If it doesn’t fit yet, you’ll hear that in the first conversation rather than after the sale."
+        label="ติดต่อเรา"
+        title="เล่าวงจรรายได้ของคุณ แล้วเราจะบอกตรงๆ ว่า PARALLAX เหมาะหรือไม่"
+        lead="ถ้ายังไม่เหมาะ คุณจะได้รู้ตั้งแต่การคุยครั้งแรก ไม่ใช่หลังตัดสินใจซื้อ"
       />
 
       <Section tone="paper">
@@ -46,7 +46,7 @@ export default function ContactPage() {
           <div className="grid gap-16 lg:grid-cols-[1.15fr_0.85fr] lg:gap-20">
             <Reveal>
               <div>
-                <Label>The form</Label>
+                <Label>ส่งรายละเอียด</Label>
                 <div className="mt-12">
                   <ContactForm />
                 </div>
@@ -55,7 +55,7 @@ export default function ContactPage() {
 
             <Reveal delay={120}>
               <div className="flex flex-col gap-6">
-                <Label>Or email us directly</Label>
+                <Label>หรือส่งอีเมลโดยตรง</Label>
                 {CHANNELS.map((c) => (
                   <Panel key={c.t}>
                     <h2 className="t-h3 text-ink">{c.t}</h2>
@@ -69,8 +69,7 @@ export default function ContactPage() {
                   </Panel>
                 ))}
                 <Note>
-                  PARALLAX · Bangkok, Thailand ·
-                  We reply within two business days
+                  PARALLAX · กรุงเทพฯ ประเทศไทย · ตอบกลับภายใน 2 วันทำการ
                 </Note>
               </div>
             </Reveal>

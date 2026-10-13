@@ -11,7 +11,7 @@ export default function SiteLayout({
         href="#main"
         className="btn btn-primary sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100]"
       >
-        Skip to main content
+        ข้ามไปยังเนื้อหา
       </a>
       <ReadingProgress />
       <SiteHeader />

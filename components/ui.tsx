@@ -462,7 +462,7 @@ export function ArrowLink({
   return (
     <Link
       href={href}
-      className={`group inline-flex items-center gap-2 text-[0.9rem] font-medium ${
+      className={`group inline-flex min-h-11 items-center gap-2 text-[0.9rem] font-medium ${
         onDark ? "text-cyan" : "text-signal"
       } ${className}`}
     >
@@ -495,7 +495,7 @@ export function NextUp({
   return (
     <Section tone="paper" size="band-sm" className="rule-t">
       <div className="shell">
-        <Label n="→">Read next</Label>
+        <Label n="→">อ่านต่อ</Label>
         <Stagger
           step={80}
           className="mt-9 grid gap-px bg-line md:grid-cols-2 lg:grid-cols-3"
@@ -542,7 +542,7 @@ export function NextUp({
 
 export function More({
   children,
-  label = "Why",
+  label = "ดูเหตุผล",
   onDark = false,
 }: {
   children: ReactNode;
@@ -563,8 +563,8 @@ export function More({
 /* ── closing CTA ─────────────────────────────────────────── */
 
 export function CTA({
-  title = "Start from the export you already have.",
-  body = "One file, one brief, one proof design. Nothing to install.",
+  title = "เริ่มจากไฟล์ยอดขายที่คุณมีอยู่แล้ว",
+  body = "หนึ่งไฟล์ หนึ่งบรีฟ และวิธีวัดผลที่เตรียมไว้ให้ ไม่ต้องติดตั้งอะไรเพิ่ม",
 }: {
   title?: string;
   body?: string;
@@ -578,10 +578,10 @@ export function CTA({
           <p className="t-lead t-thai mt-7 max-w-xl text-frost/70">{body}</p>
           <div className="mt-11 flex flex-wrap gap-3">
             <Link href="/contact" className="btn btn-frost">
-              Talk to us
+              ขอทดลองใช้
             </Link>
             <Link href="/app" className="btn btn-outline-frost">
-              Open the console
+              เข้าสู่ระบบ
             </Link>
           </div>
         </div>

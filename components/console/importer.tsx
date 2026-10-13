@@ -47,7 +47,7 @@ export function Importer() {
   async function handleFile(file: File) {
     setError(null);
     if (file.size > 4_000_000) {
-      setError("File is over 4MB — split it and import in parts");
+      setError("ไฟล์มีขนาดเกิน 4MB กรุณาแบ่งไฟล์แล้วนำเข้าทีละส่วน");
       return;
     }
     const text = await readText(file);
@@ -70,7 +70,7 @@ export function Importer() {
     if (!mapping) return;
     const next: ColumnMapping = {
       mappings: mapping.mappings.map((m) =>
-        m.column === column ? { ...m, field, confidence: 1, why: "Set by hand" } : m,
+        m.column === column ? { ...m, field, confidence: 1, why: "เลือกด้วยตนเอง" } : m,
       ),
     };
     setMapping(next);
@@ -106,15 +106,15 @@ export function Importer() {
   if (step === "done" && result) {
     return (
       <Panel className="p-6 md:p-8">
-        <p className="c-label text-[var(--c-good)]">import complete</p>
-        <h2 className="c-h1 mt-3 text-[var(--c-text)]">Ready to use</h2>
+        <p className="c-label-th text-[var(--c-good)]">นำเข้าเสร็จแล้ว</p>
+        <h2 className="c-h1 mt-3 text-[var(--c-text)]">พร้อมใช้งาน</h2>
         <div className="mt-7 grid grid-cols-2 gap-x-6 gap-y-7 md:grid-cols-4">
           {[
-            ["Customers", num(result.customers)],
+            ["ลูกค้า", num(result.customers)],
             ["ช่องทางติดต่อ", num(result.contactPoints)],
-            ["Transactions", num(result.transactions)],
-            ["Products", num(result.products)],
-            ["Unusable rows", num(result.rejected)],
+            ["รายการซื้อ", num(result.transactions)],
+            ["สินค้า", num(result.products)],
+            ["แถวที่ใช้ไม่ได้", num(result.rejected)],
           ].map(([k, v]) => (
             <div key={k}>
               <p className="c-label">{k}</p>
@@ -123,13 +123,13 @@ export function Importer() {
           ))}
         </div>
         <p className="c-thai mt-7 text-[0.85rem] text-[var(--c-text-3)]">
-          Each customer's cycle has been computed. Open the Morning Brief to see who to contact first.
+          ระบบคำนวณวงจรของลูกค้าแต่ละคนแล้ว เปิดบรีฟเช้าเพื่อดูว่าควรติดต่อลูกค้าคนใดก่อน
         </p>
         {!(result.consented ?? 0) && (
           <p className="c-thai mt-3 text-[0.8rem] text-[var(--c-warn)]">
-            A POS export carries no consent data, so every imported customer starts as
-              “no consent” — they will not be messaged or exported until real consent is
-              captured. That is a safe default, not a defect.
+            ไฟล์จาก POS ไม่มีข้อมูลความยินยอม ลูกค้าที่นำเข้าจึงเริ่มต้นด้วยสถานะ
+            “ยังไม่ได้ให้ความยินยอม” และจะไม่ถูกส่งข้อความหรือส่งออกจากระบบ
+            จนกว่าจะบันทึกความยินยอมจริง นี่คือค่าเริ่มต้นเพื่อความปลอดภัย
           </p>
         )}
         {(result.consented ?? 0) > 0 && (
@@ -139,13 +139,13 @@ export function Importer() {
         )}
         <div className="mt-8 flex flex-wrap gap-2.5">
           <Link href="/app" className="c-btn c-btn-primary">
-            Open the Morning Brief
+            เปิดบรีฟเช้า
           </Link>
           <Link href="/app/customers" className="c-btn c-btn-ghost">
-            View the base
+            ดูฐานลูกค้า
           </Link>
           <button type="button" onClick={reset} className="c-btn c-btn-ghost">
-            Import another file
+            นำเข้าไฟล์อื่น
           </button>
         </div>
       </Panel>
@@ -160,33 +160,33 @@ export function Importer() {
         <Panel className="p-5 md:p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="c-label">step 2 of 3 · review before importing</p>
+              <p className="c-label-th">ขั้นที่ 2 จาก 3 · ตรวจสอบก่อนนำเข้า</p>
               <h2 className="c-h2 mt-2.5 text-[var(--c-text)]">{fileName}</h2>
               <p className="c-thai mt-1.5 text-[0.85rem] text-[var(--c-text-3)]">
                 {analysis.mappingSource === "fallback"
-                  ? `Guessed from header names — ${analysis.mappingNote ?? ""}`
-                  : "AI read the headers and sample rows to infer the meaning"}
+                  ? `คาดเดาจากชื่อหัวคอลัมน์ — ${analysis.mappingNote ?? ""}`
+                  : "AI อ่านหัวคอลัมน์และแถวตัวอย่างเพื่อทำความเข้าใจข้อมูล"}
               </p>
             </div>
             <span
               className={`c-pill ${analysis.mappingSource === "ai" ? "c-pill-good" : analysis.mappingSource === "cache" ? "c-pill-keep" : "c-pill-warn"}`}
             >
               {analysis.mappingSource === "ai"
-                ? "Mapped by AI"
+                ? "จับคู่ด้วย AI"
                 : analysis.mappingSource === "cache"
-                  ? "Mapped by AI (cached)"
-                  : "Mapped by pattern matching"}
+                  ? "จับคู่ด้วย AI (จากแคช)"
+                  : "จับคู่จากรูปแบบข้อมูล"}
             </span>
           </div>
 
           <div className="mt-6 grid grid-cols-2 gap-x-6 gap-y-7 md:grid-cols-4">
             {[
-              ["Customers found", num(preview.customers)],
+              ["ลูกค้าที่พบ", num(preview.customers)],
               ["ช่องทางติดต่อ", num(preview.contactPoints)],
-              ["Usable rows", `${num(preview.usableRows)}/${num(preview.totalRows)}`],
-              ["Products", num(preview.products.length)],
+              ["แถวที่ใช้ได้", `${num(preview.usableRows)}/${num(preview.totalRows)}`],
+              ["สินค้า", num(preview.products.length)],
               [
-                "Date range",
+                "ช่วงวันที่",
                 preview.dateRange
                   ? `${thaiDate(preview.dateRange.from)} → ${thaiDate(preview.dateRange.to)}`
                   : "—",
@@ -252,32 +252,31 @@ export function Importer() {
 
           {blocking && (
             <p className="c-thai mt-6 border-l-2 border-[var(--c-bad)] pl-4 text-[0.85rem] text-[var(--c-bad)]">
-              Cannot import yet — a column is still needed for{" "}
+              ยังนำเข้าไม่ได้ — ต้องระบุคอลัมน์สำหรับ{" "}
               {preview.missing.map((f) => FIELD_LABEL[f]).join(" · ")}
             </p>
           )}
           {!blocking && preview.discountRowShare === 0 && (
             <p className="c-thai mt-6 border-l-2 border-[var(--c-warn)] pl-4 text-[0.85rem] text-[var(--c-warn)]">
-              No list-price column found — everything still works, but we cannot tell who
-              pays full price and who waits for a discount, which is what REACH uses to
-              find new customers.
+              ไม่พบคอลัมน์ราคาเต็ม ระบบส่วนอื่นยังทำงานได้ แต่จะยังแยกไม่ได้ว่าใคร
+              ซื้อราคาเต็มและใครรอส่วนลด ซึ่งเป็นข้อมูลที่ใช้หากลุ่มลูกค้าใหม่
             </p>
           )}
         </Panel>
 
         <Panel className="p-5 md:p-6">
-          <h3 className="c-h2 text-[var(--c-text)]">Columns in the file</h3>
+          <h3 className="c-h2 text-[var(--c-text)]">คอลัมน์ในไฟล์</h3>
           <p className="c-thai mt-1.5 text-[0.82rem] text-[var(--c-text-3)]">
-            Correct anything it got wrong — the figures above update immediately
+            แก้จุดที่จับคู่ไม่ถูกต้องได้ทันที ตัวเลขด้านบนจะอัปเดตตาม
           </p>
           <div className="c-scroll mt-5">
             <table className="c-table min-w-[52rem]">
               <thead>
                 <tr>
-                  <th>Column</th>
-                  <th>Sample</th>
-                  <th>Mapped to</th>
-                  <th>Why</th>
+                  <th>คอลัมน์</th>
+                  <th>ตัวอย่าง</th>
+                  <th>จับคู่กับ</th>
+                  <th>เหตุผล</th>
                 </tr>
               </thead>
               <tbody>
@@ -323,15 +322,15 @@ export function Importer() {
         {preview.rejected.length > 0 && (
           <Panel className="p-5 md:p-6">
             <h3 className="c-h2 text-[var(--c-text)]">
-              Unusable rows ({num(preview.rejected.length)})
+              แถวที่ใช้ไม่ได้ ({num(preview.rejected.length)})
             </h3>
             <p className="c-thai mt-1.5 text-[0.82rem] text-[var(--c-text-3)]">
-              These rows are skipped with a reason rather than guessed at
+              ระบบข้ามแถวเหล่านี้พร้อมบอกเหตุผล แทนการเดาข้อมูล
             </p>
             <ul className="mt-4 flex flex-col gap-1.5">
               {preview.rejected.slice(0, 10).map((r) => (
                 <li key={r.line} className="c-mono text-[0.76rem] text-[var(--c-text-3)]">
-                  Line {r.line} — {r.reason}
+                  บรรทัด {r.line} — {r.reason}
                 </li>
               ))}
             </ul>
@@ -351,10 +350,10 @@ export function Importer() {
             disabled={pending || blocking}
             className="c-btn c-btn-primary"
           >
-            {pending ? "Importing…" : "Import"}
+            {pending ? "กำลังนำเข้า…" : "นำเข้า"}
           </button>
           <button type="button" onClick={reset} className="c-btn c-btn-ghost">
-            Start over
+            เริ่มใหม่
           </button>
           {/* ไม่มีช่อง "แทนที่ข้อมูลเดิม" แล้ว — ติ๊กครั้งเดียวเคยลบลูกค้าทั้งบัญชี
               การล้างทั้งบัญชีย้ายไปเป็นปุ่มที่ต้องพิมพ์ชื่อร้านในหน้าตั้งค่า */}
@@ -387,11 +386,11 @@ export function Importer() {
             : "border-[var(--c-line-2)] bg-[rgba(8,16,31,0.5)]"
         }`}
       >
-        <p className="c-label">step 1 of 3</p>
-        <p className="c-h1 mt-4 text-[var(--c-text)]">Drop your POS export here</p>
+        <p className="c-label-th">ขั้นที่ 1 จาก 3</p>
+        <p className="c-h1 mt-4 text-[var(--c-text)]">ลากไฟล์จาก POS มาวางที่นี่</p>
         <p className="c-thai mt-3 max-w-lg text-[0.88rem] text-[var(--c-text-3)]">
-          CSV from any POS. No column tidying, no deleting blank rows — the headers
-            are read and mapped for you.
+          ใช้ CSV จาก POS ใดก็ได้ ไม่ต้องจัดคอลัมน์หรือลบแถวว่าง
+          ระบบจะอ่านหัวตารางและจับคู่ข้อมูลให้
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           <button
@@ -400,7 +399,7 @@ export function Importer() {
             disabled={pending}
             className="c-btn c-btn-primary"
           >
-            {pending ? "Reading…" : "Choose a file"}
+            {pending ? "กำลังอ่าน…" : "เลือกไฟล์"}
           </button>
           <input
             ref={inputRef}
@@ -414,7 +413,7 @@ export function Importer() {
           />
         </div>
         <p className="c-mono mt-6 text-[0.75rem] text-[var(--c-text-4)]">
-          CSV · TSV · up to 4MB
+          CSV · TSV · ขนาดไม่เกิน 4MB
         </p>
       </div>
 

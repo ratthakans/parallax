@@ -15,21 +15,21 @@ import Link from "next/link";
 export default function ConsoleNotFound() {
   return (
     <div className="mx-auto max-w-xl py-16">
-      <p className="c-label text-[var(--c-warn)]">not found</p>
+      <p className="c-label-th text-[var(--c-warn)]">ไม่พบข้อมูล</p>
       <h1 className="c-h1 mt-4 text-[var(--c-text)]">
-        That campaign is not in this account
+        ไม่พบแคมเปญนี้ในบัญชีที่กำลังดู
       </h1>
       <p className="c-thai mt-4 text-[0.9rem] leading-relaxed text-[var(--c-text-2)]">
-        Either it never existed, or it belongs to a different account than the one
-        this screen is open on. Nothing was changed.
+        แคมเปญอาจไม่มีอยู่ หรือเป็นของบัญชีอื่นที่ไม่ใช่บัญชีบนหน้าจอนี้
+        ไม่มีข้อมูลใดถูกเปลี่ยนแปลง
       </p>
 
       <div className="mt-8 flex flex-wrap gap-2.5">
         <Link href="/app/campaigns" className="c-btn c-btn-primary">
-          All campaigns
+          แคมเปญทั้งหมด
         </Link>
         <Link href="/app" className="c-btn c-btn-ghost">
-          Morning brief
+          บรีฟเช้า
         </Link>
       </div>
     </div>

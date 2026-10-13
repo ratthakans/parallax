@@ -19,17 +19,17 @@ export default function SiteError({
     <div className="relative flex min-h-[80svh] items-center overflow-hidden pt-32 pb-24">
       <Field variant="aurora" />
       <div className="shell">
-        <Label>error</Label>
+        <Label>เกิดข้อผิดพลาด</Label>
         <h1 className="t-h1 balance mt-8 max-w-2xl text-ink">
-          This page failed to load
+          โหลดหน้านี้ไม่สำเร็จ
         </h1>
         <p className="t-lead t-thai mt-8 max-w-lg text-ink-2">
-          Something went wrong on our side, not yours. Try again — the rest of
-          the site is unaffected.
+          มีบางอย่างผิดพลาดในระบบ ไม่ได้เกิดจากคุณ ลองอีกครั้งได้ทันที
+          และหน้าอื่นของเว็บไซต์ยังใช้งานได้ตามปกติ
         </p>
         {error.digest && (
           <p className="t-mono mt-6 text-[0.74rem] text-ink-4">
-            reference {error.digest}
+            รหัสอ้างอิง {error.digest}
           </p>
         )}
         <div className="mt-11 flex flex-wrap gap-3">
@@ -38,10 +38,10 @@ export default function SiteError({
             onClick={() => unstable_retry()}
             className="btn btn-primary"
           >
-            Try again
+            ลองอีกครั้ง
           </button>
           <Link href="/" className="btn btn-ghost">
-            Back to home
+            กลับหน้าแรก
           </Link>
         </div>
       </div>

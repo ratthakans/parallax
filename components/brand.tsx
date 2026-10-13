@@ -36,8 +36,8 @@ export function Wordmark({
   return (
     <Link
       href={href}
-      className={`group inline-flex items-center gap-2.5 ${className}`}
-      aria-label="PARALLAX — home"
+      className={`group inline-flex min-h-11 items-center gap-2.5 ${className}`}
+      aria-label="PARALLAX — หน้าแรก"
     >
       <Mark className="h-5 w-5 shrink-0 transition-transform duration-500 group-hover:-translate-y-0.5" />
       <span className="text-[0.95rem] font-medium tracking-[0.24em]">PARALLAX</span>

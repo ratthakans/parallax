@@ -17,16 +17,16 @@ import { Reveal } from "@/components/reveal";
 import { BriefMock } from "@/components/brief-mock";
 
 export const metadata: Metadata = {
-  title: "What you get",
+  title: "สิ่งที่คุณได้ใช้",
   description:
-    "The Morning Brief is the product — three moves, ten seconds, every morning. Everything else is the engine that gives it something to say.",
+    "บรีฟเช้าคือหน้าหลักของผลิตภัณฑ์ สามงาน สิบวินาที ทุกเช้า ส่วนที่เหลือคือระบบที่เตรียมคำตอบให้",
 };
 
 const NAMES = [
-  { n: "Morning Brief", d: "The product surface. Three moves, ten seconds, daily", href: "#brief" },
-  { n: "Keep", d: "The side that works the base you already have", href: "/platform/keep" },
-  { n: "Reach", d: "The side that finds new customers from a proven signature", href: "/platform/reach" },
-  { n: "Proof", d: "The layer that measures the difference — and makes churn hard", href: "/platform/proof" },
+  { n: "บรีฟเช้าวันนี้", d: "หน้าที่เปิดทุกวัน สามงาน สิบวินาที", href: "#brief" },
+  { n: "รักษาลูกค้าเดิม", d: "ทำงานกับฐานลูกค้าที่คุณมีอยู่แล้ว", href: "/platform/keep" },
+  { n: "หาลูกค้าใหม่", d: "หากลุ่มใหม่จากลักษณะของลูกค้าที่พิสูจน์แล้ว", href: "/platform/reach" },
+  { n: "ผลที่วัดได้", d: "วัดส่วนต่างและบอกว่าระบบคุ้มจริงหรือไม่", href: "/platform/proof" },
 ];
 
 const FEATURES: {
@@ -35,63 +35,63 @@ const FEATURES: {
   items: string[];
 }[] = [
   {
-    group: "Ingest",
-    question: "“The data is scattered — do I need to hire someone?”",
+    group: "นำเข้าข้อมูล",
+    question: "“ข้อมูลกระจัดกระจาย ต้องจ้างคนมาจัดก่อนหรือไม่?”",
     items: [
-      "Drag and drop — CSV or Excel from any POS",
-      "Headers read automatically, meaning inferred, rows cleaned",
-      "Mail the report to a system address for automatic updates",
-      "Native API for partner POS platforms",
+      "ลาก CSV หรือ Excel จาก POS ใดก็ได้มาวาง",
+      "อ่านหัวตาราง ทำความเข้าใจความหมาย และทำความสะอาดแถวอัตโนมัติ",
+      "ส่งรายงานเข้าอีเมลระบบเพื่ออัปเดตอัตโนมัติ",
+      "API สำหรับเชื่อมต่อแพลตฟอร์ม POS พาร์ตเนอร์",
     ],
   },
   {
-    group: "Identity",
-    question: "“Is sending this even legal?”",
+    group: "ตัวตนและสิทธิ",
+    question: "“ส่งข้อความนี้ได้อย่างถูกกฎหมายหรือไม่?”",
     items: [
-      "Identity resolved across POS, marketplace, LINE and forms",
-      "A consent ledger bound to the identity, auditable after the fact",
-      "Masked before processing",
-      "Point-of-sale capture for shops whose receipts aren't tied to people yet",
+      "รวมตัวตนจาก POS, marketplace, LINE และฟอร์ม",
+      "บันทึกความยินยอมผูกกับตัวตนและตรวจสอบย้อนหลังได้",
+      "ปกปิดตัวระบุก่อนประมวลผล",
+      "เก็บตัวตนที่จุดขายสำหรับร้านที่ใบเสร็จยังไม่ผูกกับลูกค้า",
     ],
   },
   {
-    group: "Understanding",
-    question: "“Who should I contact first?”",
+    group: "ทำความเข้าใจ",
+    question: "“ควรติดต่อลูกค้าคนใดก่อน?”",
     items: [
-      "Per-person RFM computed against that customer's own cycle",
-      "Churn risk scored against their own normal behaviour",
-      "Price tier and discount sensitivity",
-      "Opportunity map — closeness × value",
+      "คำนวณ RFM รายคนเทียบกับวงจรของลูกค้าคนนั้น",
+      "ประเมินความเสี่ยงเงียบหายเทียบกับพฤติกรรมปกติของตัวเอง",
+      "ระดับราคาและความไวต่อส่วนลด",
+      "แผนที่โอกาสจากความใกล้ถึงรอบ × มูลค่า",
     ],
   },
   {
-    group: "Keep",
-    question: "“I have no time to think up campaigns.”",
+    group: "รักษาลูกค้าเดิม",
+    question: "“ไม่มีเวลาคิดแคมเปญทุกวัน”",
     items: [
-      "Morning Brief — three moves for today",
-      "Campaigns arrive drafted, in three tones",
-      "LINE, individually or as a group",
-      "Cycle automation — due dates and expiry",
+      "บรีฟเช้า — สามงานสำหรับวันนี้",
+      "เตรียมข้อความแคมเปญให้เลือกสามโทน",
+      "ส่ง LINE รายคนหรือรายกลุ่ม",
+      "ทำงานตามวงจร วันครบกำหนด และวันหมดอายุ",
     ],
   },
   {
-    group: "Reach",
-    question: "“Ads only bring me one-time buyers.”",
+    group: "หาลูกค้าใหม่",
+    question: "“โฆษณาพามาแต่คนที่ซื้อครั้งเดียว”",
     items: [
-      "A signature extracted from full-price repeat buyers",
-      "Hashed audience sync to Meta, TikTok and Google",
-      "Three ad drafts and a landing page",
-      "Leads scored on arrival, then handed to KEEP",
+      "สกัดลักษณะจากลูกค้าที่ซื้อซ้ำในราคาเต็ม",
+      "ซิงก์กลุ่มเป้าหมายแบบแฮชไปยัง Meta, TikTok และ Google",
+      "ร่างโฆษณาสามแบบพร้อม landing page",
+      "ให้คะแนน lead ตั้งแต่เข้ามา แล้วส่งต่อให้ระบบรักษาลูกค้าเดิม",
     ],
   },
   {
-    group: "Proof",
-    question: "“Is the software actually paying for itself?”",
+    group: "วัดผล",
+    question: "“ระบบสร้างรายได้คุ้มค่าตัวจริงหรือไม่?”",
     items: [
-      "Holdouts whose method follows the cohort size",
-      "ROI tracker — 90-day rolling average with a confidence interval",
-      "Cost per returning customer",
-      "A plain “not enough to conclude” while the data is unsettled",
+      "เลือกวิธีกันกลุ่มเปรียบเทียบตามขนาดกลุ่ม",
+      "ติดตาม ROI — ค่าเฉลี่ยย้อนหลัง 90 วันพร้อมช่วงความเชื่อมั่น",
+      "ต้นทุนต่อลูกค้าที่กลับมาซื้อ",
+      "รายงานตรงๆ ว่า “ข้อมูลยังไม่พอสรุป” เมื่อผลยังไม่นิ่ง",
     ],
   },
 ];
@@ -100,16 +100,16 @@ export default function ProductPage() {
   return (
     <>
       <PageHero
-        label="What you get"
-        title="The product is one screen. Everything else is the engine that gives it something to say."
-        lead="KEEP and REACH are internal names. What the owner opens every morning is the Brief — and they never need to know what sits underneath it."
+        label="สิ่งที่คุณได้ใช้"
+        title="ผลิตภัณฑ์อยู่ในหน้าจอเดียว ส่วนที่เหลือคือระบบที่เตรียมคำตอบให้"
+        lead="ทุกเช้าเจ้าของธุรกิจเปิดเพียงบรีฟเดียว โดยไม่จำเป็นต้องรู้ว่าสถาปัตยกรรมด้านล่างซับซ้อนแค่ไหน"
       />
 
       {/* naming system */}
       <Section tone="paper">
         <div className="shell">
           <Reveal>
-            <Label>How the product is named</Label>
+            <Label>ชื่อของแต่ละส่วน</Label>
           </Reveal>
           <div className="mt-14 grid gap-px bg-line md:grid-cols-2 xl:grid-cols-4">
             {NAMES.map((x, i) => (
@@ -132,9 +132,8 @@ export default function ProductPage() {
           <Reveal delay={220}>
             <div className="mt-12">
               <Note>
-                The Brief is the product; everything else is the engine. When a customer
-                stops opening it they are about to cancel — the best early warning
-                signal we have.
+                บรีฟคือผลิตภัณฑ์ ส่วนที่เหลือคือระบบที่อยู่ข้างหลัง
+                เมื่อผู้ใช้หยุดเปิดบรีฟ นั่นคือสัญญาณเตือนการยกเลิกที่มาก่อนตัวเลขอื่น
               </Note>
             </div>
           </Reveal>
@@ -149,17 +148,17 @@ export default function ProductPage() {
             <Reveal>
               <div>
                 <Label onDark>
-                  The product surface
+                  หน้าหลักของผลิตภัณฑ์
                 </Label>
-                <h2 className="t-h1 balance mt-9 text-frost">Morning Brief</h2>
+                <h2 className="t-h1 balance mt-9 text-frost">บรีฟเช้าวันนี้</h2>
                 <p className="t-lead t-thai mt-8 text-frost/70">
-                  Three moves. Ten seconds. Every morning.
+                  สามงาน สิบวินาที ทุกเช้า
                 </p>
                 <div className="mt-10 flex flex-col gap-6">
                   {[
-                    ["Why three", "Because ten is the same as none. The system takes the top three from the opportunity map and holds the rest for the next cycle."],
-                    ["Why ten seconds", "Because owners are not idle. What has to be read is who, how many, why now, and what it should return."],
-                    ["Why approval", "Because trust is built by keeping a person in control. Autopilot comes later, and only for templates a human has already cleared."],
+                    ["ทำไมมีสามงาน", "เพราะสิบงานแทบไม่ต่างจากไม่มีงาน ระบบเลือกสามอันดับแรกจากแผนที่โอกาส และเก็บที่เหลือไว้รอบถัดไป"],
+                    ["ทำไมใช้สิบวินาที", "เพราะเจ้าของธุรกิจไม่มีเวลาว่าง สิ่งที่ต้องอ่านมีเพียงใคร กี่คน ทำไมต้องตอนนี้ และคาดว่าจะได้อะไร"],
+                    ["ทำไมต้องอนุมัติ", "เพราะความไว้ใจเกิดจากการให้คนควบคุม ระบบอัตโนมัติจะใช้ได้ภายหลังเฉพาะกับรูปแบบที่คนเคยอนุมัติแล้ว"],
                   ].map(([q, a]) => (
                     <div key={q} className="border-t border-cyan/12 pt-6">
                       <p className="t-label text-cyan/60">{q}</p>
@@ -180,11 +179,11 @@ export default function ProductPage() {
       <Section tone="paper" id="features">
         <div className="shell">
           <Reveal>
-            <Label>Every feature</Label>
+            <Label>ฟีเจอร์ทั้งหมด</Label>
           </Reveal>
           <Reveal delay={70}>
             <h2 className="t-h2 balance mt-9 max-w-3xl text-ink">
-              Every feature answers one question an owner actually asks — not an IT requirement
+              ทุกฟีเจอร์ตอบคำถามที่เจ้าของธุรกิจถามจริง ไม่ใช่ข้อกำหนดของฝ่ายไอที
             </h2>
           </Reveal>
 
@@ -225,10 +224,10 @@ export default function ProductPage() {
           <Reveal delay={180}>
             <div className="mt-14 grid gap-8 lg:grid-cols-[1fr_auto] lg:items-end">
               <Quote>
-                Build order — Identity and the Morning Brief ship first. Everything else
-                sits downstream of those two.
+                ลำดับการพัฒนา — ตัวตนลูกค้าและบรีฟเช้ามาก่อน
+                ฟีเจอร์อื่นทั้งหมดทำงานต่อจากสองส่วนนี้
               </Quote>
-              <ArrowLink href="/pricing">See which tier each feature sits in</ArrowLink>
+              <ArrowLink href="/pricing">ดูว่าแต่ละฟีเจอร์อยู่ในแผนใด</ArrowLink>
             </div>
           </Reveal>
         </div>
@@ -238,33 +237,33 @@ export default function ProductPage() {
       <Section tone="mist">
         <div className="shell">
           <Reveal>
-            <Label>Day one</Label>
+            <Label>วันแรก</Label>
           </Reveal>
           <Reveal delay={70}>
             <h2 className="t-h2 balance mt-9 max-w-3xl text-ink">
-              Drop the file, see something worth acting on in three minutes
+              วางไฟล์ แล้วเห็นสิ่งที่ควรทำต่อภายในสามนาที
             </h2>
           </Reveal>
 
           <div className="mt-14 grid gap-8 md:grid-cols-3">
             {[
               {
-                t: "Minute 0",
-                d: "Export sales history from the POS as CSV or Excel and drop it in. No column tidying, no deleting blank rows.",
+                t: "นาทีที่ 0",
+                d: "ส่งออกประวัติยอดขายจาก POS เป็น CSV หรือ Excel แล้วลากมาวาง ไม่ต้องจัดคอลัมน์หรือลบแถวว่าง",
               },
               {
-                t: "Minute 1",
-                d: "Headers are read and mapped to date, amount, product and customer identifier — you only confirm what it got wrong.",
+                t: "นาทีที่ 1",
+                d: "ระบบอ่านหัวตารางและจับคู่วันที่ ยอดเงิน สินค้า และตัวระบุลูกค้า คุณตรวจเฉพาะจุดที่จับคู่ผิด",
               },
               {
-                t: "Minute 3",
-                d: "The base is segmented, you can see how many are about to go quiet, and the first Morning Brief is waiting.",
+                t: "นาทีที่ 3",
+                d: "ฐานลูกค้าถูกแบ่งกลุ่ม เห็นจำนวนคนที่กำลังจะเงียบ และบรีฟแรกพร้อมให้อ่าน",
               },
             ].map((x, i) => (
               <Reveal key={x.t} delay={i * 80}>
                 <Panel className="h-full">
                   <p className="t-label text-signal">{x.t}</p>
-                  <More label="detail">{x.d}</More>
+                  <More label="ดูรายละเอียด">{x.d}</More>
                 </Panel>
               </Reveal>
             ))}
@@ -273,8 +272,8 @@ export default function ProductPage() {
           <Reveal delay={240}>
             <div className="mt-12">
               <Note>
-                The only requirement — at least six months of purchase history, and at
-              least one way to identify a customer: phone, email or member ID.
+                สิ่งที่ต้องมีคือประวัติการซื้ออย่างน้อยหกเดือน และตัวระบุลูกค้าอย่างน้อยหนึ่งแบบ:
+                เบอร์โทร อีเมล หรือรหัสสมาชิก
               </Note>
             </div>
           </Reveal>
@@ -283,10 +282,10 @@ export default function ProductPage() {
 
       <NextUp
         items={[
-          { href: "/platform", label: "Platform", title: "The five layers behind that one screen" },
-          { href: "/pricing", label: "Pricing", title: "Four tiers and what each includes" },
-          { href: "/playbook", label: "Validation", title: "The result on real data" },
-          { href: "/app", label: "Console", title: "Open the console" },
+          { href: "/platform", label: "แพลตฟอร์ม", title: "ระบบห้าชั้นที่อยู่หลังหน้าจอเดียว" },
+          { href: "/pricing", label: "ราคา", title: "สี่แผนและสิ่งที่รวมอยู่" },
+          { href: "/playbook", label: "หลักฐาน", title: "ผลลัพธ์จากข้อมูลจริง" },
+          { href: "/demo", label: "เดโม", title: "ดูตัวอย่างระบบ" },
         ]}
       />
 

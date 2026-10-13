@@ -15,8 +15,14 @@ type Payload = {
   topic?: string;
 };
 
-const CYCLES = ["Replenish", "Recall", "Expiry", "Considered", "Not sure yet"];
-const TOPICS = ["Pilot programme", "POS partnership", "Investor", "Something else"];
+const CYCLES = [
+  "ซื้อเติมเป็นรอบ",
+  "กลับมาตามเวลา",
+  "ต่ออายุเมื่อหมดอายุ",
+  "ใช้เวลาตัดสินใจ",
+  "ยังไม่แน่ใจ",
+];
+const TOPICS = ["ขอทดลองใช้", "พาร์ตเนอร์ POS", "นักลงทุน", "เรื่องอื่นๆ"];
 
 function clean(v: unknown, max: number) {
   return typeof v === "string" ? v.trim().slice(0, max) : "";
@@ -58,7 +64,7 @@ export async function POST(req: Request) {
 
   if (rateLimited(ip)) {
     return NextResponse.json(
-      { error: "Too many submissions. Please wait a minute and try again." },
+      { error: "ส่งข้อมูลถี่เกินไป กรุณารอหนึ่งนาทีแล้วลองอีกครั้ง" },
       { status: 429 },
     );
   }
@@ -67,7 +73,7 @@ export async function POST(req: Request) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Malformed request body" }, { status: 400 });
+    return NextResponse.json({ error: "รูปแบบข้อมูลไม่ถูกต้อง" }, { status: 400 });
   }
 
   const data = {
@@ -82,12 +88,12 @@ export async function POST(req: Request) {
   };
 
   const errors: Record<string, string> = {};
-  if (!data.name) errors.name = "Please enter your name";
-  if (!data.company) errors.company = "Please enter your business name";
+  if (!data.name) errors.name = "กรุณากรอกชื่อ";
+  if (!data.company) errors.company = "กรุณากรอกชื่อธุรกิจ";
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email))
-    errors.email = "Please enter a valid email";
-  if (data.cycle && !CYCLES.includes(data.cycle)) errors.cycle = "Unrecognised value";
-  if (data.topic && !TOPICS.includes(data.topic)) errors.topic = "Unrecognised value";
+    errors.email = "กรุณากรอกอีเมลให้ถูกต้อง";
+  if (data.cycle && !CYCLES.includes(data.cycle)) errors.cycle = "ตัวเลือกไม่ถูกต้อง";
+  if (data.topic && !TOPICS.includes(data.topic)) errors.topic = "ตัวเลือกไม่ถูกต้อง";
 
   if (Object.keys(errors).length > 0) {
     return NextResponse.json({ errors }, { status: 422 });

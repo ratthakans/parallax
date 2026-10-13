@@ -6,7 +6,7 @@ import { explainPlay } from "@/lib/engine/ai";
 import { approveAction } from "@/app/(app)/actions";
 import { ActionForm } from "./action-form";
 import { reachBlockedReason } from "@/lib/engine/billing";
-import { CYCLE_LABEL } from "@/lib/shared/types";
+import { CYCLE_LABEL_TH } from "@/lib/shared/types";
 import {
   AiBadge,
   EnginePill,
@@ -213,10 +213,10 @@ export async function CandidateCard({
           ))}
         </div>
         <p className="c-thai mt-3 text-[0.76rem] text-[var(--c-text-4)]">
-          Written once per campaign, never per person — the{" "}
+          เขียนหนึ่งครั้งต่อแคมเปญ ไม่ได้สร้างใหม่รายคน — ตัวแปร{" "}
           <span className="c-mono">{"{{name}}"}</span>{" "}
           <span className="c-mono">{"{{last_product}}"}</span>{" "}
-          placeholders are filled with each person's name and {v.item} at send time
+          จะถูกแทนด้วยชื่อและ{v.item}ของแต่ละคนตอนส่ง
         </p>
       </details>
 
@@ -229,7 +229,7 @@ export async function CandidateCard({
           <Meter treated={treated} holdout={holdout} />
           <div className="mt-2.5 flex flex-wrap items-center justify-between gap-x-6 gap-y-1">
             <p className="c-mono text-[0.75rem] text-[var(--c-text-3)]">
-              Treated {num(treated)} · held back {num(holdout)} (
+              กลุ่มที่ส่ง {num(treated)} · กลุ่มที่กันไว้ {num(holdout)} (
               {candidate.holdout_pct}%)
             </p>
             <p className="c-mono text-[0.75rem] text-[var(--c-text-4)]">
@@ -240,9 +240,9 @@ export async function CandidateCard({
             {measurementNote}
           </p>
           <p className="c-thai mt-2 text-[0.78rem] text-[var(--c-text-4)]">
-            The held-back group never receives this message. If they {v.purchaseVerb}
-                at the same rate as the treated group, the message caused nothing —
-                and the system will say so plainly.
+            กลุ่มที่กันไว้จะไม่ได้รับข้อความนี้ หากกลุ่มนั้น{v.purchaseVerb}
+            ในอัตราเดียวกับกลุ่มที่ส่ง แปลว่าข้อความไม่ได้สร้างผลต่าง
+            และระบบจะรายงานตามนั้นตรงๆ
           </p>
         </div>
 
@@ -251,7 +251,7 @@ export async function CandidateCard({
         <p className="c-thai text-[0.82rem] text-[var(--c-text-3)]">{playLogicTh(play)}</p>
         <div className="mt-4 grid gap-5 md:grid-cols-2">
           <div>
-            <p className="c-label">selection criteria · selector</p>
+            <p className="c-label-th">เกณฑ์คัดเลือก</p>
             <pre className="c-code mt-2.5">
               {Object.entries(play.selector)
                 .map(([k, val]) => `${k}: ${JSON.stringify(val)}`)
@@ -260,7 +260,7 @@ export async function CandidateCard({
           </div>
           <div className="flex flex-col gap-4">
             <div>
-              <p className="c-label">excluded</p>
+              <p className="c-label-th">กลุ่มที่ถูกตัดออก</p>
               {candidate.filtered.length ? (
                 <ul className="mt-2.5 flex flex-col gap-1.5">
                   {candidate.filtered.map((f) => (
@@ -277,27 +277,27 @@ export async function CandidateCard({
                 </ul>
               ) : (
                 <p className="c-thai mt-2 text-[0.8rem] text-[var(--c-text-4)]">
-                  Nobody was excluded this round
+                  รอบนี้ไม่มีใครถูกตัดออก
                 </p>
               )}
             </div>
             <div>
-              <p className="c-label">ranking formula</p>
-              <pre className="c-code mt-2.5">{`score ${candidate.score}
-= expected value ${baht(candidate.expected_value)}
-÷ estimated cost ${baht(candidate.estimated_cost)}
+              <p className="c-label-th">สูตรจัดลำดับ</p>
+              <pre className="c-code mt-2.5">{`คะแนน ${candidate.score}
+= มูลค่าที่คาดไว้ ${baht(candidate.expected_value)}
+÷ ต้นทุนโดยประมาณ ${baht(candidate.estimated_cost)}
 
-expected response ${(candidate.expected_response_rate * 100).toFixed(2)}%
-  (posterior across accounts in the same cycle)
-expected order value ${baht(candidate.expected_order_value)}
-cycle shape ${play.cycle_shape.map((c) => CYCLE_LABEL[c]).join(" · ")}
-play id ${play.id}`}</pre>
+อัตราตอบรับที่คาดไว้ ${(candidate.expected_response_rate * 100).toFixed(2)}%
+  (เรียนรู้จากบัญชีที่มีวงจรรายได้รูปแบบเดียวกัน)
+ยอดสั่งซื้อที่คาดไว้ ${baht(candidate.expected_order_value)}
+รูปแบบวงจร ${play.cycle_shape.map((c) => CYCLE_LABEL_TH[c]).join(" · ")}
+รหัสวิธี ${play.id}`}</pre>
             </div>
           </div>
         </div>
         <p className="c-thai mt-4 text-[0.76rem] text-[var(--c-text-4)]">
-          Selection and ranking are entirely arithmetic — no AI involved. Repeatable,
-              and explainable line by line.
+          การคัดเลือกและจัดลำดับใช้การคำนวณทั้งหมด ไม่มี AI เข้ามาตัดสิน
+          จึงทำซ้ำและอธิบายที่มาของทุกบรรทัดได้
         </p>
       </details>
     </Panel>

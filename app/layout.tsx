@@ -33,35 +33,35 @@ const plexMono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl()),
   title: {
-    default: "PARALLAX — We measure cost per returning customer",
+    default: "PARALLAX — เปลี่ยนข้อมูลลูกค้าเดิมให้เป็นยอดขายครั้งถัดไป",
     template: "%s · PARALLAX",
   },
   description:
-    "Everyone measures cost per lead. We measure cost per returning customer — an agentic revenue OS that finds new customers and earns from existing ones, each side training the other.",
+    "ทุกเช้า PARALLAX สรุปสามงานที่ควรทำ พร้อมกลุ่มลูกค้า ข้อความ และวิธีวัดรายได้ส่วนเพิ่มจากลูกค้าที่กลับมาซื้อจริง",
   keywords: [
     "CRM",
     "lead generation",
     "agentic",
     "marketing",
-    "customer retention",
+    "รักษาลูกค้าเดิม",
     "POS",
     "LINE OA",
     "PDPA",
-    "Thai SME",
+    "ธุรกิจไทย",
   ],
   openGraph: {
     type: "website",
     locale: "th_TH",
     siteName: "PARALLAX",
-    title: "PARALLAX — We measure cost per returning customer",
+    title: "PARALLAX — เปลี่ยนข้อมูลลูกค้าเดิมให้เป็นยอดขายครั้งถัดไป",
     description:
-      "Everyone measures cost per lead. We measure cost per returning customer.",
+      "ทุกเช้าได้สามงานที่ควรทำ พร้อมกลุ่มลูกค้า ข้อความ และวิธีวัดว่าคุ้มจริงไหม",
   },
   twitter: {
     card: "summary_large_image",
     title: "PARALLAX",
     description:
-      "Everyone measures cost per lead. We measure cost per returning customer.",
+      "ทุกเช้าได้สามงานที่ควรทำ พร้อมกลุ่มลูกค้า ข้อความ และวิธีวัดว่าคุ้มจริงไหม",
   },
   robots: { index: true, follow: true },
 };
@@ -78,6 +78,7 @@ export default function RootLayout({
   return (
     <html
       lang="th"
+      data-scroll-behavior="smooth"
       className={`${plexThai.variable} ${plexMono.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">

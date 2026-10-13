@@ -13,8 +13,8 @@ function Line({ w }: { w: string }) {
 
 export default function ConsoleLoading() {
   return (
-    <div className="animate-pulse" aria-busy="true" aria-label="Loading">
-      <p className="c-label">loading</p>
+    <div className="animate-pulse" aria-busy="true" aria-label="กำลังโหลด">
+      <p className="c-label-th">กำลังโหลด</p>
       <div className="mt-4 flex flex-col gap-3">
         <Line w="min(22rem, 70%)" />
         <Line w="min(34rem, 90%)" />

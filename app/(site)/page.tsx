@@ -1,513 +1,207 @@
-import Image from "next/image";
 import Link from "next/link";
-import {
-  ArrowLink,
-  CTA,
-  Cmd,
-  Field,
-  Label,
-  More,
-  Quote,
-  Section,
-  SignalCard,
-  SignalField,
-  Metric,
-  MetricBand,
-  SysBar,
-} from "@/components/ui";
-import { LineReveal, Numeral, Reveal, Stagger } from "@/components/reveal";
 import { BriefMock } from "@/components/brief-mock";
-import { Convergence } from "@/components/convergence";
+import { ArrowLink, CTA, Label, Section } from "@/components/ui";
+import { Reveal, Stagger } from "@/components/reveal";
 
-/* เนื้อหาเดินตามเด็คนักลงทุน 16 สไลด์ แต่ย่อเหลือเก้าช่วง
-   สองช่วงที่ถูกตัด (From signal to ship · Data moat) พูดซ้ำสิ่งที่
-   ช่วงอื่นพูดไปแล้ว จึงยุบประโยคที่ดีที่สุดของแต่ละช่วงเข้าไปแทน
-   ที่จะให้ผู้อ่านเลื่อนผ่านอีกสองจอ */
-
-const LEAK = [
+const STEPS = [
   {
-    index: "who",
-    title: (
-      <>
-        Same follow-up.
-        <br />
-        Different customers.
-      </>
-    ),
-    body: "Broad segments flatten the signal that should change the move.",
+    n: "1",
+    title: "ส่งไฟล์ยอดขาย",
+    body: "ใช้ไฟล์จาก POS ที่มีอยู่แล้ว ไม่ต้องเปลี่ยนระบบเดิม",
   },
   {
-    index: "when",
-    title: (
-      <>
-        Repeat windows
-        <br />
-        close quietly.
-      </>
-    ),
-    body: "By the time the dashboard notices, the moment has already moved.",
+    n: "2",
+    title: "รับ 3 งานที่ควรทำ",
+    body: "รู้ทันทีว่าควรดูแลลูกค้ากลุ่มไหน และควรทำอะไรต่อ",
   },
   {
-    index: "proof",
-    title: (
-      <>
-        Revenue happened.
-        <br />
-        Cause unknown.
-      </>
-    ),
-    body: "“Revenue from the sent group” is a total, not an answer.",
+    n: "3",
+    title: "วัดยอดที่เพิ่มขึ้นจริง",
+    body: "แยกยอดจากแคมเปญ ออกจากยอดที่น่าจะเกิดขึ้นอยู่แล้ว",
   },
 ];
 
-const LIVE = [
+const BENEFITS = [
   {
-    index: "recency",
-    title: "The next window is moving",
-    body: "Every day of silence changes what the right moment looks like.",
+    title: "รู้ว่าต้องคุยกับใคร",
+    body: "จัดลำดับลูกค้าจากโอกาสซื้อซ้ำ มูลค่า และจังหวะที่เหมาะสม",
   },
   {
-    index: "context",
-    title: "Each interaction rewrites the best action",
-    body: "What worked last cycle is a prior, not an instruction.",
+    title: "รู้ว่าควรทำอะไรวันนี้",
+    body: "ได้ข้อเสนอ ข้อความ และช่องทางที่พร้อมนำไปใช้ ไม่ใช่รายงานที่ต้องตีความต่อ",
   },
   {
-    index: "consent",
-    title: "The channel that worked may be gone",
-    body: "Permission is state, not a one-time checkbox.",
-  },
-  {
-    index: "outcome",
-    title: "Every result should change tomorrow",
-    body: "A measured difference is the only honest input to the next decision.",
+    title: "รู้ว่าสิ่งที่ทำได้ผลไหม",
+    body: "มีวิธีวัดผลและกลุ่มเปรียบเทียบเตรียมไว้ตั้งแต่ก่อนเริ่มแคมเปญ",
   },
 ];
 
-/* กายวิภาคของหนึ่งการตัดสินใจ — เดิมเป็นทั้ง section
-   ตอนนี้เป็นแถบเดียวต่อจากบรีฟ เพราะมันคือคำอธิบายของบรีฟ ไม่ใช่หัวข้อใหม่ */
-const ANATOMY = [
-  { k: "Who", v: "119 high-value customers" },
-  { k: "Why now", v: "Repeat window closes in 10 days" },
-  { k: "What", v: "Private preview + advisor follow-up" },
-  { k: "Proof", v: "Matched holdout at T+90" },
-];
-
-const GOVERNANCE = [
-  {
-    t: "Patterns travel. Identities don’t.",
-    d: "Timing, plays and audience shape learn across accounts. Names, numbers and transactions never leave the one they came from.",
-    href: "/platform/learning",
-  },
-  {
-    t: "A human approves",
-    d: "Every campaign passes a person before it sends, and never opens for regulated categories.",
-    href: "/trust",
-  },
-  {
-    t: "Limits that are always set",
-    d: "Messages per person per week, quiet hours, and a discount ceiling.",
-    href: "/trust",
-  },
+const TRUST = [
+  "คุณเป็นคนอนุมัติก่อนส่งทุกครั้ง",
+  "ชื่อ เบอร์ และธุรกรรมไม่ถูกส่งข้ามบัญชี",
+  "กำหนดเพดานข้อความ เวลา และส่วนลดได้",
 ];
 
 export default function HomePage() {
   return (
     <>
-      {/* ── hero — บรีฟอยู่ในจอแรก ไม่ใช่จอที่สาม ───────────── */}
-      <header className="relative overflow-hidden pt-32 pb-20 md:pt-40 md:pb-28">
-        <SignalField />
+      <header className="surface-dark relative overflow-hidden pt-28 pb-16 md:pt-36 md:pb-24">
+        <div
+          className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_78%_30%,rgba(7,93,255,0.34),transparent_42%),radial-gradient(circle_at_52%_90%,rgba(98,231,255,0.12),transparent_38%)]"
+          aria-hidden
+        />
         <div className="shell">
-          <div className="grid items-center gap-14 lg:grid-cols-[1.06fr_0.94fr] lg:gap-14">
+          <div className="grid items-center gap-12 lg:grid-cols-[0.92fr_1.08fr] lg:gap-16">
             <div>
-              <Reveal>
-                <SysBar
-                  onDark
-                  left="sys / agentic revenue os"
-                  right="status / signals live"
-                />
-              </Reveal>
-
-              <Reveal delay={90}>
-                <h1 className="t-display-split mt-9 text-frost">
-                  <LineReveal text="Your customer data" />
-                  <LineReveal text="has a next move." step={190} />
+              <div className="hero-in">
+                <p className="t-label text-cyan">ระบบช่วยเพิ่มยอดขายจากลูกค้าเดิม</p>
+              </div>
+              <div className="hero-in" style={{ animationDelay: "80ms" }}>
+                <h1 className="mt-6 max-w-2xl text-[clamp(2.5rem,4vw,3.6rem)] leading-[1.22] font-normal text-frost">
+                  <span className="block">เปลี่ยนไฟล์ยอดขาย</span>
+                  <span className="block text-cyan">เป็น 3 งานสำคัญ</span>
+                  <span className="block text-cyan">ของวันนี้</span>
                 </h1>
-              </Reveal>
-
-              {/* ── ประโยคที่ต้องอ่านได้ในสิบวินาที ──
-
-                  ประโยคนี้เคยอยู่แต่ใน meta description ซึ่งไม่มีใครเห็น
-                  ส่วนบนหน้าจอมีสามชื่อที่ไม่ตรงกัน — title บอกว่า
-                  "Agentic Lead Generation & CRM Platform" · description
-                  บอกว่า "agentic revenue OS" · H1 ไม่พูดทั้งสองอย่าง
-                  คนแปลกหน้าจึงเล่าต่อไม่ได้ว่านี่คืออะไร
-
-                  ตอนนี้เหลือชื่อหมวดเดียว (agentic revenue OS ใน SysBar
-                  ข้างบนกับใน description) และคำสัญญาเดียวคือบรรทัดนี้ */}
-              <Reveal delay={210}>
-                <p className="t-lead pretty mt-8 max-w-lg text-frost/78">
-                  Everyone measures cost per lead.{" "}
-                  <span className="text-frost">
-                    We measure cost per returning customer.
-                  </span>
+              </div>
+              <div className="hero-in" style={{ animationDelay: "150ms" }}>
+                <p className="t-lead pretty mt-7 max-w-xl text-frost/72">
+                  PARALLAX บอกว่าควรดูแลลูกค้ากลุ่มไหน ทำอะไรต่อ
+                  และวัดได้ว่ายอดขายเพิ่มขึ้นจากสิ่งที่ทำจริงหรือไม่
                 </p>
-              </Reveal>
-
-              <Reveal delay={250}>
-                <p className="t-small pretty mt-4 max-w-md text-frost/55">
-                  Three decisions before 9AM, each one measured against what
-                  would have happened anyway.
-                </p>
-              </Reveal>
-
-              <Reveal delay={280}>
-                <div className="mt-8 flex flex-wrap items-center gap-2.5">
-                  <Cmd hot>decide</Cmd>
-                  <Cmd>act</Cmd>
-                  <Cmd>prove</Cmd>
-                </div>
-              </Reveal>
-
-              {/* ── ปุ่มเดียวที่เป็นหลัก และตอนนี้มันคือคอนโซล ──
-
-                  เดิมหน้านี้มี CTA เก้าปุ่มหกข้อความ ถามหกอย่างพร้อมกัน
-                  จึงไม่ได้ถามอะไรเลย ที่เหลือลดเป็นลิงก์ข้อความ
-
-                  ปุ่มหลักเคยเป็น "Start a pilot" ซึ่งเหมาะกับตอนมีลูกค้าแล้ว
-                  ตอนนี้ยังไม่มีสักราย ทุกคนที่มาถึงจึงมาแบบเย็นสนิทและยัง
-                  ไม่มีเหตุผลจะคุยกับเรา แต่มีเหตุผลจะลอง
-
-                  และคอนโซลคือสิ่งเดียวบนเว็บนี้ที่ไม่ใช่คำพูด — ที่เหลือ
-                  ทั้งหมดคือการอ้าง กดเข้าไปแล้วเห็นของทำงานจริงมีน้ำหนัก
-                  กว่าอีกสามหมื่นคำที่เขียนไว้ */}
-              <Reveal delay={350}>
-                <div className="mt-10 flex flex-wrap items-center gap-x-7 gap-y-4">
-                  <Link href="/app" className="btn btn-frost">
-                    Open the live console
+              </div>
+              <div className="hero-in" style={{ animationDelay: "220ms" }}>
+                <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <Link href="/demo" className="btn btn-frost">
+                    ดูเดโม ไม่ต้องสมัคร
                   </Link>
-                  <ArrowLink href="/contact" onDark>
-                    Start a pilot
-                  </ArrowLink>
+                  <Link href="/contact" className="btn btn-outline-frost">
+                    ทดลองกับข้อมูลจริง
+                  </Link>
                 </div>
-                <p className="t-small mt-6 max-w-md text-frost/55">
-                  Four businesses, real calculations, no signup. Day one runs on
-                  the POS export you already have.
+                <p className="t-small mt-5 text-frost/52">
+                  เริ่มได้จากไฟล์ยอดขาย 6 เดือน · ไม่ต้องติดตั้งระบบเพิ่ม
                 </p>
-              </Reveal>
+              </div>
             </div>
 
-            <Reveal delay={180} dir="scale">
-              <div className="relative">
-                <div
-                  className="absolute -inset-10 -z-10 rounded-full bg-[radial-gradient(circle_at_55%_45%,rgba(98,231,255,0.22),transparent_68%)] blur-3xl"
-                  aria-hidden
-                />
-                <BriefMock compact />
-              </div>
-            </Reveal>
+            <div className="hero-in" style={{ animationDelay: "120ms" }}>
+              <BriefMock compact />
+            </div>
           </div>
         </div>
       </header>
 
-      {/* ── กายวิภาคของหนึ่งการตัดสินใจ ───────────────────── */}
       <Section tone="paper" size="band-sm">
         <div className="shell">
           <Reveal>
-            <SysBar left="anatomy of one move" right="decision ≠ recommendation" />
-          </Reveal>
-          <Reveal delay={80}>
-            <dl className="mt-9 grid gap-px border border-line bg-line md:grid-cols-2 xl:grid-cols-4">
-              {ANATOMY.map((d) => (
-                <div key={d.k} className="bg-paper p-6">
-                  <dt className="t-label text-ink-4">{d.k}</dt>
-                  <dd className="t-h3 mt-3.5 text-ink">{d.v}</dd>
-                </div>
-              ))}
-            </dl>
-          </Reveal>
-          <Reveal delay={140}>
-            <p className="t-body measure mt-8 text-ink-3">
-              You make the call. PARALLAX does the prep — the cohort, the copy,
-              the held-back group, and the arithmetic that says whether it worked.
-            </p>
-          </Reveal>
-        </div>
-      </Section>
-
-      {/* ── market numbers ─────────────────────────────────── */}
-      <section className="surface-paper relative">
-        <div className="shell">
-          <Reveal>
-            <MetricBand
-              items={[
-                {
-                  value: "7,024",
-                  label: "Thai businesses closed",
-                  sub: "First half of 2026",
-                },
-                {
-                  value: "12.49%",
-                  label: "Growth in the closure rate",
-                  sub: "Year over year",
-                },
-                {
-                  value: "44,773",
-                  label: "New registrations",
-                  sub: "Same period",
-                },
-                {
-                  value: "6×",
-                  label: "Deaths accelerating faster than births",
-                  sub: "By growth rate",
-                },
-              ]}
-            />
-          </Reveal>
-        </div>
-      </section>
-
-      {/* ── the revenue leak ───────────────────────────────── */}
-      <Section tone="paper">
-        <div className="shell">
-          <Reveal>
-            <Label>The revenue leak</Label>
-          </Reveal>
-          <Reveal delay={80}>
-            <h2 className="t-h1 balance mt-8 max-w-3xl text-ink">
-              <LineReveal text="The data is there." />
-              <span className="text-signal">
-                <LineReveal text="The decision isn’t." step={200} />
-              </span>
-            </h2>
-          </Reveal>
-
-          <Stagger step={90} className="mt-14 grid gap-10 md:grid-cols-3">
-            {LEAK.map((x) => (
-              <SignalCard
-                key={x.index}
-                index={x.index}
-                title={x.title}
-                body={x.body}
-              />
-            ))}
-          </Stagger>
-
-          <Reveal delay={180}>
-            <div className="mt-14 max-w-3xl">
-              <Quote>Miss the signal today. Pay to reacquire it tomorrow.</Quote>
-              {/* ทางเข้าเดียวของ /problem จากเนื้อหา — หน้านั้นขยายสามข้อ
-                  ข้างบนนี้ให้เต็ม และเดิมเข้าถึงไม่ได้เลยนอกจากพิมพ์ URL */}
-              <div className="mt-9">
-                <ArrowLink href="/problem">
-                  The three ways a standing business loses
-                </ArrowLink>
-              </div>
+            <div className="max-w-2xl">
+              <Label>เริ่มง่าย ใช้ของที่มีอยู่แล้ว</Label>
+              <h2 className="t-h2 balance mt-6 text-ink">
+                จากไฟล์หนึ่งไฟล์ ไปสู่งานที่ลงมือทำได้
+              </h2>
             </div>
           </Reveal>
+
+          <Stagger step={80} className="mt-10 grid gap-px border border-line bg-line md:grid-cols-3">
+            {STEPS.map((step) => (
+              <article key={step.n} className="bg-paper p-6 md:p-8">
+                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-signal text-sm font-semibold text-white">
+                  {step.n}
+                </span>
+                <h3 className="t-h3 mt-6 text-ink">{step.title}</h3>
+                <p className="t-small pretty mt-3 text-ink-3">{step.body}</p>
+              </article>
+            ))}
+          </Stagger>
         </div>
       </Section>
 
-      {/* ── why agentic — แถบเข้มที่หนึ่งจากสอง ─────────────── */}
-      <Section tone="dark" className="overflow-hidden">
-        <Field variant="deep" />
+      <Section tone="mist">
         <div className="shell">
-          <div className="grid gap-14 lg:grid-cols-[0.9fr_1.1fr] lg:gap-20">
+          <div className="grid gap-12 lg:grid-cols-[0.78fr_1.22fr] lg:gap-20">
             <Reveal dir="left">
               <div className="lg:sticky lg:top-28">
-                <Label onDark>Why agentic, why now</Label>
-                {/* จังหวะยาว — ตัดสร้อยสองจังหวะที่ใช้ซ้ำทั้งหน้า */}
-                <h2 className="t-h2 balance mt-8 text-frost">
-                  A rule written last quarter is a photograph of a customer who
-                  has already moved.
+                <Label>สิ่งที่คุณได้ทุกเช้า</Label>
+                <h2 className="t-h1 balance mt-6 text-ink">
+                  ไม่ใช่รายงานเพิ่ม
+                  <br />
+                  แต่คือคำตอบว่าต้องทำอะไร
                 </h2>
-                <p className="t-body measure mt-8 text-frost/62">
-                  These four inputs change while you sleep. Nothing written down
-                  in advance keeps up with all of them.
-                </p>
-                <p className="t-label mt-10 text-cyan/60">
-                  observe → decide → act → learn
-                </p>
+                <div className="mt-8">
+                  <ArrowLink href="/product">ดูรายละเอียดผลิตภัณฑ์</ArrowLink>
+                </div>
               </div>
             </Reveal>
 
-            <Stagger step={90} dir="right" className="flex flex-col gap-9">
-              {LIVE.map((x) => (
-                <SignalCard
-                  key={x.index}
-                  onDark
-                  index={x.index}
-                  title={x.title}
-                  body={x.body}
-                  status="live"
-                />
+            <Stagger step={80} className="divide-y divide-line border-y border-line">
+              {BENEFITS.map((benefit, index) => (
+                <article key={benefit.title} className="grid gap-4 py-7 sm:grid-cols-[2.5rem_1fr] md:py-9">
+                  <span className="marker-num">0{index + 1}</span>
+                  <div>
+                    <h3 className="t-h3 text-ink">{benefit.title}</h3>
+                    <p className="t-body pretty mt-3 max-w-xl text-ink-3">{benefit.body}</p>
+                  </div>
+                </article>
               ))}
             </Stagger>
           </div>
         </div>
       </Section>
 
-      {/* ── the thesis — เวทีของมันเอง ไม่มี body copy ─────── */}
-      <section className="surface-paper relative overflow-hidden">
-        <div className="shell pt-28 text-center md:pt-36">
-          <Reveal>
-            <Label className="justify-center">The name</Label>
-          </Reveal>
-          <Reveal delay={90}>
-            <p className="t-display balance mx-auto mt-9 max-w-4xl text-ink">
-              <LineReveal text="Two views." />
-              <span className="text-signal">
-                <LineReveal text="One true distance." step={220} />
-              </span>
-            </p>
-          </Reveal>
-        </div>
-        <Reveal delay={140} dir="scale">
-          <Convergence className="mx-auto -mb-1 w-full max-w-6xl" />
-        </Reveal>
-      </section>
-
-      {/* ── proof layer — แถบเข้มที่สอง ────────────────────── */}
-      <Section tone="dark" className="overflow-hidden">
-        <Field variant="deep" />
-        <div className="shell">
-          <Reveal>
-            <Label onDark>Proof layer</Label>
-          </Reveal>
-          <Reveal delay={80}>
-            <h2 className="t-h1 balance mt-8 max-w-3xl text-frost">
-              Revenue happened.
-              <br />
-              <span className="text-cyan">Did we cause it?</span>
-            </h2>
-          </Reveal>
-
-          <Reveal delay={150}>
-            <div className="mt-14 grid gap-px border border-cyan/15 bg-cyan/15 md:grid-cols-[1fr_1fr_1.1fr]">
-              <div className="bg-abyss/80 p-8 backdrop-blur-xl">
-                <p className="t-label text-frost/50">a / sent group return</p>
-                <p className="t-numeral-lg mt-5 text-frost">
-                  <Numeral value="24%" />
-                </p>
-                <p className="t-small measure mt-4 text-frost/58">
-                  Observed return after the intervention.
-                </p>
-              </div>
-              <div className="bg-abyss/80 p-8 backdrop-blur-xl">
-                <p className="t-label text-frost/50">
-                  b / expected holdout return
-                </p>
-                <p className="t-numeral-lg mt-5 text-frost/70">
-                  <Numeral value="15%" />
-                </p>
-                <p className="t-small measure mt-4 text-frost/58">
-                  What likely would have happened anyway.
-                </p>
-              </div>
-              <div className="bg-signal/16 p-8 backdrop-blur-xl">
-                <p className="t-label text-cyan">δ / the number we report</p>
-                <p className="t-numeral-lg mt-5 text-cyan">
-                  <Numeral value="9" />
-                  <span className="t-h3"> pts</span>
-                </p>
-                <p className="t-small measure mt-4 text-frost/70">
-                  Incremental customers → cost per incremental return.
-                </p>
-              </div>
-            </div>
-          </Reveal>
-
-          <Reveal delay={220}>
-            <div className="mt-10">
-              <ArrowLink href="/platform/proof" onDark>
-                How the measurement works
-              </ArrowLink>
-            </div>
-          </Reveal>
-        </div>
-      </Section>
-
-      {/* ── validation ─────────────────────────────────────── */}
       <Section tone="paper">
         <div className="shell">
           <Reveal>
-            <Label>Validated on real data · MST Golf</Label>
-          </Reveal>
-          <div className="mt-8 grid gap-14 lg:grid-cols-2 lg:gap-20">
-            <Reveal dir="left">
+            <div className="grid gap-10 border border-line p-7 md:grid-cols-[0.8fr_1.2fr] md:p-10 lg:gap-16 lg:p-14">
               <div>
-                <h2 className="t-h2 balance text-ink">
-                  One file. 967 next-best actions.
-                </h2>
-                <p className="t-body measure mt-7 text-ink-3">
-                  Single-location golf retail — wrong ICP by every textbook, and
-                  the engine still worked.
+                <Label>ทดสอบกับข้อมูลจริง · MST Golf</Label>
+                <p className="mt-7 text-[clamp(3.5rem,8vw,6.5rem)] leading-none font-semibold tracking-[-0.055em] text-signal">
+                  967
                 </p>
-                <More label="why that matters">
-                  It is the evidence that the filter should be revenue-cycle
-                  shape rather than industry label. Actionability is validated;
-                  incremental lift is next to prove, and we will not claim it
-                  before the holdout matures.
-                </More>
-                <div className="mt-9">
-                  <ArrowLink href="/playbook">See every number</ArrowLink>
+                <p className="t-body mt-3 text-ink-2">งานที่จัดลำดับได้จากไฟล์เดียว</p>
+              </div>
+              <div className="flex flex-col justify-center border-t border-line pt-8 md:border-t-0 md:border-l md:pt-0 md:pl-10 lg:pl-16">
+                <h2 className="t-h2 balance text-ink">
+                  เห็นโอกาสที่ทำต่อได้ โดยไม่ต้องเปลี่ยนระบบหน้าร้าน
+                </h2>
+                <p className="t-body pretty mt-5 max-w-xl text-ink-3">
+                  นำเข้ารายการซื้อ 1,240 รายการ และพบว่าข้อมูลลูกค้า 78%
+                  พร้อมใช้สำหรับจัดลำดับงานต่อทันที
+                </p>
+                <div className="mt-7">
+                  <ArrowLink href="/playbook">ดูกรณีศึกษาทั้งหมด</ArrowLink>
                 </div>
               </div>
-            </Reveal>
-
-            <Reveal delay={140} dir="right">
-              <div className="grid grid-cols-2 gap-px border border-line bg-line">
-                {[
-                  ["967", "Customers ranked", "From a single export"],
-                  ["78%", "Usable identity coverage", undefined],
-                  ["1,240", "Purchase records ingested", undefined],
-                  ["119", "High-value return", undefined],
-                ].map(([v, l, sub]) => (
-                  <div key={l} className="bg-paper p-7">
-                    <Metric value={v!} label={l!} sub={sub} />
-                  </div>
-                ))}
-              </div>
-            </Reveal>
-          </div>
-
-          <Reveal delay={200}>
-            <div className="mt-14 overflow-hidden border border-line">
-              <Image
-                src="/img/agentic-revenue-console.jpg"
-                alt="The Morning Brief as rendered in the PARALLAX console"
-                width={1672}
-                height={941}
-                sizes="(min-width: 1024px) 76vw, 100vw"
-                className="h-auto w-full"
-              />
             </div>
           </Reveal>
         </div>
       </Section>
 
-      {/* ── governance — ดูดคูเมืองข้อมูลเข้ามาเป็นใบแรก ───── */}
-      <Section tone="mist" size="band-sm">
+      <Section tone="dark" size="band-sm">
         <div className="shell">
           <Reveal>
-            <SysBar left="governance" right="always on" />
-          </Reveal>
-          <Stagger step={90} className="mt-10 grid gap-10 md:grid-cols-3">
-            {GOVERNANCE.map((x) => (
-              <div key={x.t} className="border-t border-line pt-7">
-                <h3 className="t-h3 text-ink">{x.t}</h3>
-                <p className="t-small measure mt-4 text-ink-3">{x.d}</p>
-                <div className="mt-5">
-                  <ArrowLink href={x.href}>Read more</ArrowLink>
-                </div>
+            <div className="grid gap-9 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
+              <div>
+                <Label onDark>ควบคุมได้ทุกขั้นตอน</Label>
+                <h2 className="t-h2 balance mt-6 text-frost">ระบบช่วยเตรียมงาน คนยังเป็นผู้ตัดสินใจ</h2>
               </div>
-            ))}
-          </Stagger>
+              <ul className="grid gap-3">
+                {TRUST.map((item) => (
+                  <li key={item} className="flex min-h-14 items-center gap-4 border border-frost/14 px-5 text-frost/76">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-cyan/12 text-sm text-cyan" aria-hidden>
+                      ✓
+                    </span>
+                    <span className="t-body">{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </Reveal>
         </div>
       </Section>
 
       <CTA
-        title="Start from the export you already have."
-        body="One file, one brief, one proof design. Nothing to install."
+        title="พร้อมดู 3 งานจากข้อมูลของคุณหรือยัง?"
+        body="ส่งไฟล์ยอดขายตัวอย่างมาให้เรา เราจะบอกตรงๆ ว่าข้อมูลทำอะไรได้ และอะไรยังพิสูจน์ไม่ได้"
       />
     </>
   );

@@ -58,6 +58,7 @@
   html {
     scroll-behavior: smooth;
     -webkit-tap-highlight-color: transparent;
+    overflow-x: clip;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -73,7 +74,7 @@
     font-weight: 400;
     text-rendering: optimizeLegibility;
     font-feature-settings: "liga" 1, "kern" 1;
-    overflow-x: hidden;
+    overflow-x: clip;
   }
 
   ::selection {

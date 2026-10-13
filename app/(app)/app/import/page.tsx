@@ -37,24 +37,24 @@ export default async function ImportPage() {
       <PageHead
         label="นำเข้าข้อมูล"
         title="ลากไฟล์เข้ามา แล้วดูว่ารายได้รั่วตรงไหน"
-        lead="Almost every POS exports CSV. That is an API already open that nobody can close — no vendor deal required."
+        lead="POS แทบทุกระบบส่งออก CSV ได้ จึงเริ่มต้นได้ทันทีโดยไม่ต้องรอข้อตกลงกับผู้ให้บริการ"
       />
 
       {/* ── ปลายทางของไฟล์ ต้องอ่านได้ก่อนลาก ── */}
       <Panel flat className="mb-6 border-l-2 border-[var(--c-accent)] p-5 md:p-6">
-        <p className="c-label text-[var(--c-accent)]">this file goes into</p>
+        <p className="c-label-th text-[var(--c-accent)]">ไฟล์นี้จะถูกนำเข้าไปยัง</p>
         <div className="mt-4 grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-4">
           <Metric size="sm" label="บัญชี" value={profile.name} sub={profile.industry} />
           <Metric size="sm" label="แผน" value={u.plan.name} />
           <Metric
             size="sm"
-            label={`Identifiable ${v.people}`}
+            label={`${v.th.people}ที่ระบุตัวตนได้`}
             value={
               u.contactCap != null
                 ? `${num(u.identified)} / ${num(u.contactCap)}`
                 : num(u.identified)
             }
-            sub={u.contactCap == null ? "No numeric cap on this plan" : undefined}
+            sub={u.contactCap == null ? "แผนนี้ไม่มีเพดานตัวเลข" : undefined}
             tone={u.overCap ? "bad" : "plain"}
           />
           <Metric
@@ -63,8 +63,8 @@ export default async function ImportPage() {
             value={headroom != null ? `อีก ${num(headroom)} คน` : "—"}
             sub={
               headroom != null
-                ? "An import past this is refused"
-                : "Agreed by contract"
+                ? "ถ้าเกินจำนวนนี้ ระบบจะปฏิเสธการนำเข้า"
+                : "กำหนดตามสัญญา"
             }
             tone={headroom != null && headroom === 0 ? "bad" : "muted"}
           />

@@ -12,46 +12,46 @@ import {
 import { Reveal } from "@/components/reveal";
 
 export const metadata: Metadata = {
-  title: "Privacy and governance",
+  title: "ความเป็นส่วนตัวและการกำกับดูแล",
   description:
-    "PDPA, a consent ledger, masking before processing, sending limits, and the line autopilot never crosses.",
+    "PDPA บันทึกความยินยอม การปกปิดตัวตนก่อนประมวลผล เพดานการส่ง และขอบเขตที่ระบบอัตโนมัติไม่ข้าม",
 };
 
 const PRINCIPLES = [
   {
-    t: "The shop's data belongs to the shop",
-    d: "Names, numbers and purchase history stay inside that account. Never across accounts, never sold.",
+    t: "ข้อมูลของร้านเป็นของร้าน",
+    d: "ชื่อ เบอร์ และประวัติการซื้ออยู่ภายในบัญชีนั้น ไม่ข้ามบัญชีและไม่ถูกขาย",
   },
   {
-    t: "Masked before processing",
-    d: "Identifiers are separated before any calculation. The statistics run on masked data.",
+    t: "ปกปิดตัวตนก่อนประมวลผล",
+    d: "ตัวระบุถูกแยกออกก่อนคำนวณ สถิติทั้งหมดทำงานบนข้อมูลที่ปกปิดแล้ว",
   },
   {
-    t: "Consent binds to the identity",
-    d: "Withdraw consent and that identity drops out of every cohort and every audience the next cycle.",
+    t: "ความยินยอมผูกกับตัวตน",
+    d: "เมื่อถอนความยินยอม ตัวตนนั้นจะหลุดจากทุกกลุ่มและกลุ่มเป้าหมายในรอบถัดไป",
   },
   {
-    t: "Auditable after the fact",
-    d: "Every send records who approved it, what went out, to whom, when, and under which consent.",
+    t: "ตรวจสอบย้อนหลังได้",
+    d: "ทุกการส่งบันทึกว่าใครอนุมัติ ส่งอะไร ให้ใคร เมื่อไร และอ้างอิงความยินยอมใด",
   },
   {
-    t: "Hashed before export",
-    d: "Custom audiences always use hashed identifiers, and only consented rows.",
+    t: "แฮชก่อนส่งออก",
+    d: "กลุ่มเป้าหมายใช้ตัวระบุที่แฮชแล้วและส่งออกเฉพาะแถวที่มีความยินยอม",
   },
   {
-    t: "Opt out of cycle-level learning",
-    d: "Participation is a default you can switch off, not a condition of service. Switch it off and every feature still works.",
+    t: "ปิดการเรียนรู้ข้ามบัญชีได้",
+    d: "การเข้าร่วมเป็นค่าเริ่มต้นที่ปิดได้ ไม่ใช่เงื่อนไขบริการ และทุกฟีเจอร์ยังทำงานเมื่อปิด",
   },
 ];
 
 const LIMITS = [
-  { k: "Maximum messages per person per week", v: "Configurable, with a system ceiling above it" },
-  { k: "Quiet hours", v: "Configurable, defaulting to nights and holidays" },
-  { k: "Ceiling on system-proposed discounts", v: "Configurable; anything above it needs a human" },
-  { k: "Autopilot on new copy", v: "Always off until a human has cleared the template" },
+  { k: "ข้อความสูงสุดต่อคนต่อสัปดาห์", v: "ตั้งค่าได้และมีเพดานของระบบกำกับอีกชั้น" },
+  { k: "ช่วงเวลาห้ามส่ง", v: "ตั้งค่าได้ โดยค่าเริ่มต้นครอบคลุมกลางคืนและวันหยุด" },
+  { k: "เพดานส่วนลดที่ระบบเสนอ", v: "ตั้งค่าได้ สิ่งที่เกินเพดานต้องผ่านคน" },
+  { k: "ส่งข้อความใหม่อัตโนมัติ", v: "ปิดเสมอจนกว่าคนจะอนุมัติรูปแบบข้อความ" },
   {
-    k: "Autopilot on regulated categories",
-    v: "Permanently off — supplements, cosmetics, medical services",
+    k: "ระบบอัตโนมัติกับหมวดที่มีกฎกำกับ",
+    v: "ปิดถาวร — อาหารเสริม เครื่องสำอาง และบริการทางการแพทย์",
   },
 ];
 
@@ -59,19 +59,19 @@ export default function TrustPage() {
   return (
     <>
       <PageHero
-        label="Privacy and governance"
-        title="A system that messages real people has to draw its lines first, not afterwards"
-        lead="The first question an owner asks is not how clever the system is. It is whether sending this is legal. So we answer that before talking about features."
+        label="ความเป็นส่วนตัวและการกำกับดูแล"
+        title="ระบบที่ส่งข้อความหาคนจริง ต้องกำหนดขอบเขตก่อนลงมือ ไม่ใช่ภายหลัง"
+        lead="คำถามแรกไม่ใช่ว่าระบบฉลาดแค่ไหน แต่คือส่งอย่างถูกกฎหมายหรือไม่ เราจึงตอบเรื่องนี้ก่อนพูดถึงฟีเจอร์"
       />
 
       <Section tone="paper">
         <div className="shell">
           <Reveal>
-            <Label>Enforced at the system level</Label>
+            <Label>บังคับใช้ที่ระดับระบบ</Label>
           </Reveal>
           <Reveal delay={70}>
             <h2 className="t-h2 balance mt-9 max-w-3xl text-ink">
-              All six are constraints in code, not sentences in a policy
+              หลักทั้งหกข้อเป็นข้อจำกัดในโค้ด ไม่ใช่เพียงข้อความในนโยบาย
             </h2>
           </Reveal>
 
@@ -95,13 +95,13 @@ export default function TrustPage() {
           <div className="grid gap-14 lg:grid-cols-[0.8fr_1.2fr] lg:gap-20">
             <Reveal>
               <div>
-                <Label>Limits that are always set</Label>
+                <Label>เพดานที่ตั้งอยู่เสมอ</Label>
                 <h2 className="t-h2 balance mt-9 text-ink">
-                  A system that can send without limit is a system that gets the shop muted
+                  ระบบที่ส่งได้ไม่จำกัด คือระบบที่ทำให้ร้านถูกปิดเสียง
                 </h2>
                 <p className="t-body t-thai pretty mt-8 max-w-md text-ink-3">
-                  Over-messaging destroys the very asset we are helping build, so the caps
-              exist at every tier — including the most expensive one.
+                  การส่งมากเกินไปทำลายความสัมพันธ์ที่เรากำลังช่วยสร้าง
+                  เพดานจึงมีในทุกแผน รวมถึงแผนที่ราคาสูงที่สุด
                 </p>
               </div>
             </Reveal>
@@ -134,12 +134,12 @@ export default function TrustPage() {
               <div>
                 <Label>PDPA</Label>
                 <h2 className="t-h2 balance mt-9 text-ink">
-                  The shop is the controller. We are the processor.
+                  ร้านคือผู้ควบคุมข้อมูล เราคือผู้ประมวลผลข้อมูล
                 </h2>
                 <p className="t-body t-thai pretty mt-8 text-ink-3">
-                  That relationship defines everything. The shop owns the base, sets the
-                purpose, and is who the customer consented to. We process on the
-                shop's instruction, under a data processing agreement.
+                  ความสัมพันธ์นี้กำหนดทุกอย่าง ร้านเป็นเจ้าของฐาน กำหนดวัตถุประสงค์
+                  และเป็นผู้ที่ลูกค้าให้ความยินยอม เราประมวลผลตามคำสั่งของร้าน
+                  ภายใต้ข้อตกลงประมวลผลข้อมูล
                 </p>
               </div>
             </Reveal>
@@ -147,20 +147,20 @@ export default function TrustPage() {
               <div className="flex flex-col gap-6">
                 {[
                   {
-                    t: "Consent templates",
-                    d: "For point of sale, forms and LINE OA, separating contact purposes from marketing.",
+                    t: "แบบฟอร์มความยินยอม",
+                    d: "สำหรับจุดขาย ฟอร์ม และ LINE OA โดยแยกวัตถุประสงค์การติดต่อออกจากการตลาด",
                   },
                   {
-                    t: "Data subject rights",
-                    d: "Access, correction, withdrawal and erasure — every request has a path through the system, not a spreadsheet edited by hand.",
+                    t: "สิทธิของเจ้าของข้อมูล",
+                    d: "เข้าถึง แก้ไข ถอนความยินยอม และลบ ทุกคำขอมีเส้นทางผ่านระบบ ไม่ใช่แก้ spreadsheet ด้วยมือ",
                   },
                   {
-                    t: "Data processing agreement",
-                    d: "Offered at every tier including the free one, not reserved for enterprise.",
+                    t: "ข้อตกลงประมวลผลข้อมูล",
+                    d: "มีให้ทุกแผนรวมถึงแผนฟรี ไม่ได้สงวนไว้เฉพาะองค์กรใหญ่",
                   },
                   {
-                    t: "Data residency",
-                    d: "Customer data is processed and stored in region, with a record of which sub-processors touched what.",
+                    t: "ที่จัดเก็บข้อมูล",
+                    d: "ข้อมูลลูกค้าถูกประมวลผลและเก็บในภูมิภาค พร้อมบันทึกว่าผู้ประมวลผลช่วงใดแตะข้อมูลอะไร",
                   },
                 ].map((x) => (
                   <Panel key={x.t}>
@@ -175,8 +175,8 @@ export default function TrustPage() {
           <Reveal delay={200}>
             <div className="mt-16 max-w-3xl">
               <Quote>
-                A system that sends on someone's behalf has to make the wrong send harder
-              than the right one — not merely warn about it in a document.
+                ระบบที่ส่งแทนผู้อื่นต้องทำให้การส่งผิดยากกว่าการส่งถูก
+                ไม่ใช่เพียงเขียนคำเตือนไว้ในเอกสาร
               </Quote>
             </div>
           </Reveal>
@@ -196,20 +196,19 @@ export default function TrustPage() {
           <div className="grid gap-14 lg:grid-cols-2 lg:gap-20">
             <Reveal>
               <div>
-                <Label>Cookies</Label>
+                <Label>คุกกี้</Label>
                 <h2 className="t-h2 balance mt-9 text-ink">
-                  One cookie. Nothing that follows you.
+                  มีคุกกี้หนึ่งตัว และไม่มีสิ่งใดติดตามคุณ
                 </h2>
                 <p className="t-body t-thai pretty mt-8 text-ink-3">
-                  There is no consent banner on this site because there is nothing to
-                consent to. No analytics, no advertising pixels, no third-party
-                trackers, and nothing that follows a visitor to another site.
+                  เว็บไซต์นี้ไม่มีแถบขอความยินยอม เพราะไม่มีระบบวิเคราะห์พฤติกรรม
+                  ไม่มีพิกเซลโฆษณา ไม่มีตัวติดตามจากบุคคลที่สาม
+                  และไม่มีสิ่งใดติดตามผู้เข้าชมไปยังเว็บไซต์อื่น
                 </p>
                 <p className="t-small t-thai pretty mt-6 text-ink-4">
-                  The one cookie exists only so the console remembers which account a
-                screen is open on. It is readable by the server alone, never by
-                scripts in the page, and it carries an account identifier — never a
-                name, a phone number, or anything about a shop&apos;s customers.
+                  คุกกี้หนึ่งตัวมีไว้ให้ระบบจำว่ากำลังเปิดบัญชีใด อ่านได้เฉพาะเซิร์ฟเวอร์
+                  ไม่อ่านผ่านสคริปต์บนหน้า และเก็บเพียงรหัสบัญชี ไม่เก็บชื่อ เบอร์โทร
+                  หรือข้อมูลเกี่ยวกับลูกค้าของร้าน
                 </p>
               </div>
             </Reveal>
@@ -218,15 +217,15 @@ export default function TrustPage() {
                 {[
                   {
                     t: "parallax_tenant",
-                    d: "Which account the console is showing. Strictly necessary — the console cannot work without it.",
+                    d: "ระบุว่าระบบกำลังแสดงบัญชีใด เป็นสิ่งจำเป็นที่ระบบขาดไม่ได้",
                   },
                   {
-                    t: "Kept for 30 days",
-                    d: "Then it expires on its own. Clearing it returns the console to the default account; nothing else changes.",
+                    t: "เก็บไว้ 30 วัน",
+                    d: "จากนั้นหมดอายุเอง การล้างคุกกี้จะพากลับไปบัญชีเริ่มต้นและไม่เปลี่ยนแปลงอย่างอื่น",
                   },
                   {
                     t: "HttpOnly · Secure · SameSite Lax",
-                    d: "Unreachable from page scripts, sent over HTTPS only, and never attached to a cross-site form post.",
+                    d: "สคริปต์บนหน้าอ่านไม่ได้ ส่งผ่าน HTTPS เท่านั้น และไม่แนบกับฟอร์มข้ามเว็บไซต์",
                   },
                 ].map((c) => (
                   <div key={c.t} className="panel p-7">
@@ -245,16 +244,16 @@ export default function TrustPage() {
           <Reveal>
             <div className="grid gap-10 lg:grid-cols-[1fr_2fr] lg:gap-20">
               <div>
-                <Label>Legal documents</Label>
+                <Label>เอกสารทางกฎหมาย</Label>
               </div>
               <div className="flex flex-col gap-8">
                 <p className="t-body t-thai pretty text-ink-2">
-                  The full privacy policy, terms of use and data processing agreement are in
-              legal review, and publish alongside the opening of the pilot programme.
+                  นโยบายความเป็นส่วนตัว เงื่อนไขการใช้งาน และข้อตกลงประมวลผลข้อมูลฉบับเต็ม
+                  อยู่ระหว่างการตรวจทางกฎหมาย และจะเผยแพร่พร้อมเปิดโครงการทดลอง
                 </p>
                 <Note>
-                  In the meantime we are glad to send all three drafts ahead of time to
-              anyone considering the pilot — contact{" "}
+                  ระหว่างนี้เรายินดีส่งร่างทั้งสามฉบับล่วงหน้าให้ผู้ที่กำลังพิจารณาทดลองใช้
+                  ติดต่อ{" "}
                   <a
                     href="mailto:privacy@parallax.co.th"
                     className="ulink text-signal"
@@ -272,11 +271,11 @@ export default function TrustPage() {
         items={[
           {
             href: "/platform/learning",
-            label: "Platform",
-            title: "What crosses accounts, and what never does",
+            label: "แพลตฟอร์ม",
+            title: "สิ่งใดเรียนรู้ข้ามบัญชี และสิ่งใดไม่ข้ามเด็ดขาด",
           },
-          { href: "/platform", label: "Platform", title: "Identity and consent" },
-          { href: "/contact", label: "Contact", title: "Request the drafts" },
+          { href: "/platform", label: "แพลตฟอร์ม", title: "ตัวตนและความยินยอม" },
+          { href: "/contact", label: "ติดต่อ", title: "ขอรับร่างเอกสาร" },
         ]}
       />
 

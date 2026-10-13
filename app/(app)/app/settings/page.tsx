@@ -7,7 +7,7 @@ import { demoState } from "@/lib/engine/demo";
 import { profileFor } from "@/lib/shared/tenants";
 import { ALL_PLAYS } from "@/lib/shared/plays";
 import { runMatch } from "@/lib/engine/match";
-import { CYCLE_LABEL } from "@/lib/shared/types";
+import { CYCLE_LABEL_TH } from "@/lib/shared/types";
 import { Metric, PageHead, Panel, num } from "@/components/console/ui";
 import {
   clearAiCacheAction,
@@ -22,27 +22,27 @@ import { demoToolsEnabled } from "@/lib/shared/demo-tools";
 export const dynamic = "force-dynamic";
 
 const AI_JOB_LABEL: Record<string, string> = {
-  map_columns: "Column mapping on import",
-  product_roles: "Inferring product roles",
-  campaign_copy: "Writing copy in three tones",
-  brief_summary: "Summarising the Morning Brief",
-  explain_play: "Explaining why a play was suggested",
+  map_columns: "จับคู่คอลัมน์ตอนนำเข้า",
+  product_roles: "ทำความเข้าใจบทบาทของสินค้า",
+  campaign_copy: "เขียนข้อความสามโทน",
+  brief_summary: "สรุปบรีฟเช้า",
+  explain_play: "อธิบายเหตุผลของงานที่แนะนำ",
 };
 
 const AI_JOBS = [
-  { kind: "map_columns", why: "No two POS vendors name their headers the same way — fixed rules cannot cover it" },
-  { kind: "product_roles", why: "We need to know which item is the anchor and which follows it" },
-  { kind: "campaign_copy", why: "Called once per campaign, never per person — this is what sets the margin" },
-  { kind: "brief_summary", why: "An owner should never need to know what RFM means" },
-  { kind: "explain_play", why: "We must be able to answer why this person, every time" },
+  { kind: "map_columns", why: "POS แต่ละรายตั้งชื่อหัวตารางไม่เหมือนกัน กฎตายตัวจึงครอบคลุมไม่ได้" },
+  { kind: "product_roles", why: "ต้องรู้ว่าสินค้าใดเป็นสินค้าหลัก และสินค้าใดมักถูกซื้อถัดไป" },
+  { kind: "campaign_copy", why: "เรียกหนึ่งครั้งต่อแคมเปญ ไม่ได้เรียกรายคน เพื่อควบคุมต้นทุน" },
+  { kind: "brief_summary", why: "เจ้าของธุรกิจไม่ควรต้องรู้ว่า RFM แปลว่าอะไร" },
+  { kind: "explain_play", why: "ระบบต้องตอบได้ทุกครั้งว่าทำไมจึงเลือกลูกค้ากลุ่มนี้" },
 ];
 
 const AI_NEVER = [
-  "Choosing who is in a cohort",
-  "Scoring and ranking plays",
-  "Computing the difference and its confidence interval",
-  "Deciding whether to send",
-  "Enforcing cooldowns and frequency caps",
+  "เลือกว่าลูกค้าคนใดอยู่ในกลุ่ม",
+  "ให้คะแนนและจัดลำดับงาน",
+  "คำนวณผลต่างและช่วงความเชื่อมั่น",
+  "ตัดสินใจว่าจะส่งหรือไม่",
+  "บังคับช่วงพักและเพดานความถี่",
 ];
 
 export default async function SettingsPage() {
@@ -74,30 +74,30 @@ export default async function SettingsPage() {
       <PageHead
         label="ตั้งค่า"
         title="เพดาน · AI · เครื่องมือเดโม"
-        lead="Every limit here is enforced in the dispatch layer, not on screen — change one and it applies from the next match run."
+        lead="ทุกเพดานถูกบังคับที่ชั้นส่งจริง ไม่ได้อยู่แค่บนหน้าจอ เมื่อแก้แล้วจะมีผลตั้งแต่รอบคำนวณถัดไป"
       />
 
       {/* ── โปรไฟล์บัญชี ── */}
       <Panel className="mb-6 p-5 md:p-6">
-        <h2 className="c-h2 text-[var(--c-text)]">What this account is</h2>
+        <h2 className="c-h2 text-[var(--c-text)]">ข้อมูลบัญชีนี้</h2>
         <div className="mt-5 grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-4">
           <Metric size="sm" label="บัญชี" value={profile.name} />
           <Metric size="sm" label="ประเภทธุรกิจ" value={profile.industry} />
           <Metric
             size="sm"
             label="รูปทรงวงจรรายได้"
-            value={CYCLE_LABEL[profile.cycleShape]}
-            sub={`${playCount} of ${ALL_PLAYS.length} plays apply`}
+            value={CYCLE_LABEL_TH[profile.cycleShape]}
+            sub={`ใช้ได้ ${playCount} จากทั้งหมด ${ALL_PLAYS.length} วิธี`}
           />
           <Metric
             size="sm"
-            label={`${v.base} size`}
+            label={`ขนาด${v.th.base}`}
             value={num(profile.scale.people)}
-            sub={`All ${v.people} in the dataset`}
+            sub={`${v.th.people}ทั้งหมดในชุดข้อมูล`}
           />
         </div>
         <p className="c-thai mt-6 max-w-3xl text-[0.8rem] text-[var(--c-text-3)]">
-          Dataset source: {profile.source}
+          ที่มาของชุดข้อมูล: {profile.source}
         </p>
         <p className="c-thai mt-2 max-w-3xl text-[0.78rem] text-[var(--c-text-4)]">
           play ถูกกรองด้วยรูปทรงวงจรของบัญชี ไม่ใช่รันให้ทุกคนเหมือนกัน — บริษัทแท็กซี่จึงไม่มีวัน
@@ -105,7 +105,7 @@ export default async function SettingsPage() {
         </p>
         {profile.compliance && (
           <div className="mt-6 border-l-2 border-[var(--c-warn)] pl-4">
-            <p className="c-label text-[var(--c-warn)]">constraints on this account</p>
+            <p className="c-label-th text-[var(--c-warn)]">ข้อจำกัดของบัญชีนี้</p>
             <p className="c-thai mt-2 max-w-3xl text-[0.83rem] leading-relaxed text-[var(--c-text-2)]">
               {profile.compliance}
             </p>
@@ -115,7 +115,7 @@ export default async function SettingsPage() {
 
       {/* ── เพดาน ── */}
       <Panel className="mb-6 p-5 md:p-6">
-        <h2 className="c-h2 text-[var(--c-text)]">Limits in force</h2>
+        <h2 className="c-h2 text-[var(--c-text)]">เพดานที่บังคับอยู่</h2>
         <p className="c-thai mt-1.5 text-[0.83rem] text-[var(--c-text-3)]">
           ระบบที่ส่งได้ไม่จำกัดคือระบบที่ทำให้ร้านถูกปิดเสียง
         </p>
@@ -129,7 +129,7 @@ export default async function SettingsPage() {
         >
           <div className="grid w-full gap-5 sm:grid-cols-2 lg:grid-cols-4">
             <label className="flex flex-col gap-2">
-              <span className="c-label">max messages per person per week</span>
+              <span className="c-label-th">ข้อความสูงสุดต่อคนต่อสัปดาห์</span>
               <input
                 className="c-input"
                 name="weeklyCap"
@@ -143,7 +143,7 @@ export default async function SettingsPage() {
               </span>
             </label>
             <label className="flex flex-col gap-2">
-              <span className="c-label">quiet hours start</span>
+              <span className="c-label-th">เริ่มช่วงเวลาห้ามส่ง</span>
               <input
                 className="c-input"
                 name="quietStart"
@@ -157,7 +157,7 @@ export default async function SettingsPage() {
               </span>
             </label>
             <label className="flex flex-col gap-2">
-              <span className="c-label">quiet hours end</span>
+              <span className="c-label-th">จบช่วงเวลาห้ามส่ง</span>
               <input
                 className="c-input"
                 name="quietEnd"
@@ -167,11 +167,11 @@ export default async function SettingsPage() {
                 defaultValue={tenant?.quiet_hours_end ?? 9}
               />
               <span className="c-thai text-[0.75rem] text-[var(--c-text-4)]">
-                It is currently {new Date().getHours()}:00
+                เวลาปัจจุบัน {new Date().getHours()}:00 น.
               </span>
             </label>
             <label className="flex flex-col gap-2">
-              <span className="c-label">shop discount ceiling (%)</span>
+              <span className="c-label-th">เพดานส่วนลดของร้าน (%)</span>
               <input
                 className="c-input"
                 name="maxDiscount"
@@ -192,7 +192,7 @@ export default async function SettingsPage() {
       <Panel className="mb-6 p-5 md:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h2 className="c-h2 text-[var(--c-text)]">Where AI sits</h2>
+            <h2 className="c-h2 text-[var(--c-text)]">AI ใช้ตรงไหน</h2>
             <p className="c-thai mt-1.5 max-w-2xl text-[0.83rem] text-[var(--c-text-3)]">
               การเลือกกลุ่ม จัดอันดับ และคำนวณส่วนต่าง เป็นเลขคณิตล้วน ห้าม LLM เข้าใกล้ —
             เพราะต้องอธิบายได้ ทำซ้ำได้ผลเดิม และไม่มีค่าใช้จ่ายในการรัน
@@ -216,7 +216,7 @@ export default async function SettingsPage() {
 
         <div className="mt-6 grid gap-6 lg:grid-cols-2">
           <div>
-            <p className="c-label text-[var(--c-good)]">where ai is used</p>
+            <p className="c-label-th text-[var(--c-good)]">งานที่ใช้ AI</p>
             <ul className="mt-4 flex flex-col gap-3.5">
               {AI_JOBS.map((j) => {
                 const hit = cache.find((c) => c.kind === j.kind);
@@ -227,7 +227,7 @@ export default async function SettingsPage() {
                         {AI_JOB_LABEL[j.kind]}
                       </span>
                       <span className="c-mono shrink-0 text-[0.75rem] text-[var(--c-text-4)]">
-                        {hit ? `${num(hit.n)} cached` : "Never called"}
+                        {hit ? `แคชแล้ว ${num(hit.n)}` : "ยังไม่เคยเรียก"}
                       </span>
                     </div>
                     <p className="c-thai mt-1 text-[0.76rem] text-[var(--c-text-4)]">
@@ -239,7 +239,7 @@ export default async function SettingsPage() {
             </ul>
           </div>
           <div>
-            <p className="c-label text-[var(--c-bad)]">where ai is forbidden</p>
+            <p className="c-label-th text-[var(--c-bad)]">งานที่ห้าม AI ตัดสิน</p>
             <ul className="mt-4 flex flex-col gap-2.5">
               {AI_NEVER.map((x) => (
                 <li key={x} className="c-thai text-[0.85rem] text-[var(--c-text-2)]">
@@ -248,8 +248,8 @@ export default async function SettingsPage() {
               ))}
             </ul>
             <p className="c-thai mt-5 text-[0.76rem] text-[var(--c-text-4)]">
-              Every AI result is cached against a hash of its input, so repeats cost
-              nothing. {num(cachedTotal)} entries cached right now.
+              ผลจาก AI ถูกแคชตามข้อมูลเข้า การเรียกซ้ำจึงไม่มีค่าใช้จ่ายเพิ่ม
+              ขณะนี้มีแคช {num(cachedTotal)} รายการ
             </p>
             <ActionForm
               action={clearAiCacheAction}
@@ -265,7 +265,7 @@ export default async function SettingsPage() {
 
       {/* ── เครื่องมือเดโม ── */}
       <Panel className="mb-6 p-5 md:p-6">
-        <h2 className="c-h2 text-[var(--c-text)]">Demo tools</h2>
+        <h2 className="c-h2 text-[var(--c-text)]">เครื่องมือเดโม</h2>
         <p className="c-thai mt-1.5 max-w-2xl text-[0.83rem] text-[var(--c-text-3)]">
           แคมเปญที่เพิ่งอนุมัติเมื่อสิบวินาทีที่แล้วยังไม่ถึง T+7 ทุกอย่างจึงขึ้นว่า "ยังไม่พอสรุป" —
             ถูกต้องตามสถิติ แต่ใช้แสดงความสามารถของชั้น Proof ไม่ได้
@@ -274,9 +274,9 @@ export default async function SettingsPage() {
         {/* บอกเหตุผลตรงที่ปุ่มอยู่ ไม่ใช่ปล่อยให้กดแล้วงงว่าทำไมไม่ทำงาน */}
         {!demoTools && (
           <p className="c-msg c-msg-err mt-5">
-            Turned off on the public console — otherwise any visitor could wipe or
-            time-shift the dataset the next person is looking at. Set{" "}
-            <span className="c-mono">PARALLAX_DEMO_TOOLS=1</span> to enable them.
+            เครื่องมือนี้ปิดอยู่บนระบบสาธารณะ เพื่อไม่ให้ผู้เข้าชมลบหรือเลื่อนเวลา
+            ชุดข้อมูลที่คนถัดไปกำลังดูอยู่ ตั้งค่า{" "}
+            <span className="c-mono">PARALLAX_DEMO_TOOLS=1</span> เพื่อเปิดใช้งาน
           </p>
         )}
 
@@ -286,7 +286,7 @@ export default async function SettingsPage() {
               key={d}
               action={travelAction}
               fields={{ tenantId, days: d }}
-              label={`Travel forward ${d} days`}
+              label={`เลื่อนเวลาไปข้างหน้า ${d} วัน`}
               pendingLabel="กำลังเลื่อนเวลาและวัดใหม่…"
               disabled={!demoTools}
               full
@@ -300,7 +300,7 @@ export default async function SettingsPage() {
             label="แคมเปญที่เก่าที่สุด"
             value={
               demo.oldestCampaignAt
-                ? `${Math.floor((Date.now() - Date.parse(demo.oldestCampaignAt)) / 86400000)}d`
+                ? `${Math.floor((Date.now() - Date.parse(demo.oldestCampaignAt)) / 86400000)} วัน`
                 : "—"
             }
             sub="ต้องมีอายุ 90 วันขึ้นไป T+90 ถึงจะสรุปได้"
@@ -313,10 +313,10 @@ export default async function SettingsPage() {
                 size="sm"
                 label={
                   v === "positive"
-                    ? "Worked"
+                    ? "ได้ผล"
                     : v === "no_effect"
-                      ? "No different"
-                      : "Not enough yet"
+                      ? "ไม่ต่าง"
+                      : "ข้อมูลยังไม่พอ"
                 }
                 value={num(hit?.n ?? 0)}
                 tone={v === "positive" ? "good" : v === "no_effect" ? "bad" : "muted"}
@@ -338,11 +338,9 @@ export default async function SettingsPage() {
           className="mt-7 border-t border-[var(--c-line)] pt-5"
           note={
             <p className="c-thai max-w-2xl text-[0.76rem] text-[var(--c-text-4)]">
-              Deletes this account&apos;s campaigns and results, then regenerates the
-              dataset (other accounts untouched). The {v.base} and payment history are
-              generated deterministically, so the figures repeat exactly. Measured
-              results shift slightly, because campaign ids are random and the
-              treated/held split is computed from them.
+              ลบแคมเปญและผลลัพธ์ของบัญชีนี้ แล้วสร้างชุดข้อมูลใหม่โดยไม่แตะบัญชีอื่น
+              {v.th.base}และประวัติการจ่ายถูกสร้างด้วยสูตรเดิม ตัวเลขจึงซ้ำได้ทุกครั้ง
+              ส่วนผลวัดอาจขยับเล็กน้อยเพราะรหัสแคมเปญและการแบ่งกลุ่มถูกสร้างใหม่
             </p>
           }
         />
@@ -350,7 +348,7 @@ export default async function SettingsPage() {
 
       {/* ── บันทึกการใช้งาน ── */}
       <Panel className="p-5 md:p-6">
-        <h2 className="c-h2 text-[var(--c-text)]">Activity log</h2>
+        <h2 className="c-h2 text-[var(--c-text)]">บันทึกการใช้งาน</h2>
         <p className="c-thai mt-1.5 text-[0.83rem] text-[var(--c-text-3)]">
           ใครทำอะไรเมื่อไร — ทุกการอนุมัติและการส่งถูกบันทึกไว้
         </p>
@@ -358,17 +356,17 @@ export default async function SettingsPage() {
           <table className="c-table min-w-[38rem]">
             <thead>
               <tr>
-                <th>Time</th>
-                <th>Actor</th>
-                <th>Action</th>
-                <th>Detail</th>
+                <th>เวลา</th>
+                <th>ผู้ใช้งาน</th>
+                <th>การกระทำ</th>
+                <th>รายละเอียด</th>
               </tr>
             </thead>
             <tbody>
               {log.map((l, i) => (
                 <tr key={`${l.at}-${i}`}>
                   <td className="c-mono whitespace-nowrap text-[0.75rem]">
-                    {new Date(l.at).toLocaleString("en-GB", {
+                    {new Date(l.at).toLocaleString("th-TH", {
                       dateStyle: "short",
                       timeStyle: "short",
                     })}
@@ -384,8 +382,7 @@ export default async function SettingsPage() {
           </table>
         </div>
         <p className="c-thai mt-5 text-[0.78rem] text-[var(--c-warn)]">
-          คอนโซลนี้ยังไม่มีระบบเข้าสู่ระบบ ทุกการกระทำจึงถูกบันทึกเป็น owner —
-          ต้องเพิ่มการยืนยันตัวตนก่อนใช้งานจริง
+          ทุกการอนุมัติและการส่งผูกกับบัญชีผู้ใช้ที่เข้าสู่ระบบ เพื่อให้ตรวจสอบย้อนหลังได้
         </p>
       </Panel>
 

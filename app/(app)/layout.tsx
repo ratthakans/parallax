@@ -47,7 +47,7 @@ export default async function ConsoleLayout({
           credits={tenant?.message_credits ?? 0}
           planName={planById(tenant?.tier ?? "growth").name}
           computedAt={computedAt}
-          tenants={TENANT_PROFILES.map((t) => ({
+          tenants={TENANT_PROFILES.filter((t) => allowed.includes(t.id)).map((t) => ({
             id: t.id,
             name: t.name,
             industry: t.industry,
@@ -55,6 +55,8 @@ export default async function ConsoleLayout({
           switchAction={switchTenantAction}
           baseLabel={profile.vocab.th.base}
           personLabel={profile.vocab.th.person}
+          userEmail={user?.email}
+          signOutAction={signOutAction}
         />
         <main id="console-main" tabIndex={-1} className="c-main">
           {/* ── ปฐมนิเทศคนที่เพิ่งกดเข้ามาจากหน้าเว็บ ────────────
@@ -72,10 +74,10 @@ export default async function ConsoleLayout({
           {synthetic && (
             <div className="c-demobar">
               <span>
-                <strong>Demo</strong> · synthetic data, four Thai businesses
+                <strong>เดโม</strong> · ข้อมูลสังเคราะห์จากธุรกิจไทย 4 รูปแบบ
               </span>
               <span className="c-demobar__sep" aria-hidden />
-              <span>Approving and sending really work — no message leaves the system</span>
+              <span>การอนุมัติและส่งทำงานครบ แต่ไม่มีข้อความออกจากระบบจริง</span>
               <Link href="/" className="c-demobar__back">
                 ← parallax
               </Link>
