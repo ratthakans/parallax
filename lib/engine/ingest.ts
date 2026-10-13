@@ -765,6 +765,7 @@ export async function commitImport(
      group_role คือสิ่งที่ทำให้ K3 K4 R2 ทำงานได้ */
   const roleGuess = preview.products.length
     ? await guessProductRoles(
+        tenantId,
         preview.products.slice(0, 60).map((x) => ({ name: x.name, price: x.price, category: x.category })),
       )
     : { value: { products: [] }, source: "fallback" as const };

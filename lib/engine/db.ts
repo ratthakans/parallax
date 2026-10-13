@@ -1,4 +1,5 @@
 import { all, exec, run, usingPostgres } from "@/lib/engine/sql";
+import { TENANT_PROFILES } from "@/lib/shared/tenants";
 
 /* ── ชั้นเก็บข้อมูล ────────────────────────────────────────────
    schema ตรงตาม Play Engine §5 · §6 · §7
@@ -338,7 +339,44 @@ export async function ensureSchema(): Promise<void> {
       detail TEXT,
       at TEXT NOT NULL
     );
+
+    /* ── สถานะการชำระต่อบัญชี (docs/plan.md หัวข้อ 9.2 ข้อ 8 · lib/engine/ai/policy.ts) ──
+       แยกจาก tenants เพราะเจ้าของร้านแก้แถว tenants ของตัวเองได้ — ตารางนี้ผู้ใช้อ่านได้อย่างเดียว */
+    CREATE TABLE IF NOT EXISTS tenant_billing (
+      tenant_id TEXT PRIMARY KEY,
+      state TEXT NOT NULL DEFAULT 'demo',
+      is_customer INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL,
+      updated_by TEXT NOT NULL
+    );
+
+    /* ── บันทึกการเรียก AI ทุกครั้ง (lib/engine/ai/ledger.ts) — ไม่เก็บ prompt หรือคำตอบ ── */
+    CREATE TABLE IF NOT EXISTS ai_ledger (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id TEXT NOT NULL,
+      at TEXT NOT NULL,
+      provider TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      model TEXT NOT NULL,
+      served_model TEXT,
+      outcome TEXT NOT NULL,
+      input_tokens INTEGER NOT NULL DEFAULT 0,
+      output_tokens INTEGER NOT NULL DEFAULT 0,
+      cache_read_tokens INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS ix_ai_ledger_tenant ON ai_ledger (tenant_id, at);
   `);
+
+  /* บัญชีเดโมสังเคราะห์ได้สถานะ demo — เฉพาะบัญชีในทะเบียนเดโม ไม่ใช่ทุกแถวใน tenants
+     บัญชีลูกค้าจริงต้องถูกสร้างพร้อมแถวของตัวเอง (is_customer = 1) ไม่มีแถว = AI ปิด */
+  for (const p of TENANT_PROFILES) {
+    await run(
+      `INSERT OR IGNORE INTO tenant_billing (tenant_id, state, is_customer, updated_at, updated_by)
+       VALUES (?, 'demo', 0, ?, 'schema')`,
+      p.id,
+      new Date().toISOString(),
+    );
+  }
 
   /* คอลัมน์ที่เพิ่มทีหลัง — CREATE TABLE IF NOT EXISTS ไม่เพิ่มให้ฐานที่มีอยู่แล้ว
      จึงต้องเติมเอง sqlite ไม่มี ADD COLUMN IF NOT EXISTS ต้องอ่านรายชื่อก่อน */

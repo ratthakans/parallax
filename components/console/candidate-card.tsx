@@ -51,7 +51,7 @@ export async function CandidateCard({
   const copy = previewCopy(play, play.guards.max_discount_pct, tenantId);
   const net = candidate.expected_value - candidate.estimated_cost;
 
-  const why = await explainPlay({
+  const why = await explainPlay(tenantId, {
     playName: play.name,
     logic: play.logic,
     size,

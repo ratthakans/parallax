@@ -47,7 +47,9 @@ export async function analyseCsv(csvText: string): Promise<AnalyseResult> {
     return { ok: false, error: "เจอหัวคอลัมน์ แต่ไม่มีข้อมูลสักแถว" };
   }
 
-  const mapped = await mapColumns(parsed.headers, parsed.rows.slice(0, 3));
+  /* บัญชีที่เปิดอยู่ — ตัวกำหนดว่า AI ใช้ได้ไหม (ต้องชำระแล้ว) และแยกแคชของ AI ตามบัญชี */
+  const tenantId = await activeTenantId();
+  const mapped = await mapColumns(tenantId, parsed.headers, parsed.rows.slice(0, 3));
   const preview = buildPreview(parsed, mapped.value);
 
   return {

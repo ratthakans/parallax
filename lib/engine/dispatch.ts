@@ -140,7 +140,7 @@ export async function approveCampaign(
 
   /* F3 — เรียกเขียนข้อความหนึ่งครั้งต่อแคมเปญ ไม่ใช่ต่อคน
      ผลถูก cache ด้วย hash ของ (play, ส่วนลด, ขนาดกลุ่ม) */
-  const copyResult = await writeCopy(candidate.play, {
+  const copyResult = await writeCopy(input.tenantId, candidate.play, {
     discountPct,
     audienceSize: candidate.audience.length,
     businessName: tenant.name,

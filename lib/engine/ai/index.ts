@@ -1,6 +1,8 @@
 import { all, exec, get, run, usingPostgres } from "@/lib/engine/sql";
 import Anthropic from "@anthropic-ai/sdk";
 import { createHash } from "node:crypto";
+import { aiPolicy } from "@/lib/engine/ai/policy";
+import { recordAiCall } from "@/lib/engine/ai/ledger";
 import type { Play } from "@/lib/shared/types";
 import {
   IMPORT_FIELDS,
@@ -28,7 +30,9 @@ export type { ColumnMapping, ImportField } from "@/lib/shared/ingest-types";
    deterministic แทน — demo ไม่พังและไม่มีค่าใช้จ่าย
    ───────────────────────────────────────────────────────────── */
 
-const MODEL = "claude-opus-5";
+/* เจ้าของ 2026-10-13: ใช้ Claude Opus 5.5 กับทุกงาน AI (docs/plan.md หัวข้อ 9.2)
+   รุ่นนี้ปิด thinking ไม่ได้ — คุมต้นทุนด้วย effort ต่องาน ซึ่งค่าตั้งต้นของรุ่นนี้คือ medium จึงตั้งเองทุกครั้ง */
+const MODEL = "claude-opus-5-5";
 
 export type AiSource = "ai" | "fallback" | "cache";
 
@@ -83,9 +87,10 @@ async function ensureCache() {
   `);
 }
 
-function cacheKey(kind: string, input: unknown): string {
+/* คีย์รวม tenant ด้วย — ผลของ AI ไม่ปนข้ามบัญชี แม้ input จะเหมือนกันทุกตัวอักษร (Blueprint บท 9) */
+function cacheKey(tenantId: string, kind: string, input: unknown): string {
   return createHash("sha256")
-    .update(`${kind}:${MODEL}:${JSON.stringify(input)}`)
+    .update(`${tenantId}:${kind}:${MODEL}:${JSON.stringify(input)}`)
     .digest("hex")
     .slice(0, 32);
 }
@@ -135,6 +140,8 @@ export async function clearAiCache() {
    ───────────────────────────────────────────────────────────── */
 
 type AskOptions<T> = {
+  /** บัญชีที่ร้องขอ — ใช้ตรวจนโยบาย แยกแคช และบันทึกต้นทุน */
+  tenantId: string;
   kind: string;
   input: unknown;
   system: string;
@@ -143,10 +150,16 @@ type AskOptions<T> = {
   schema: Record<string, unknown>;
   fallback: () => T;
   maxTokens?: number;
+  /** งานสั้นตรงไปตรงมาใช้ low · งานวิเคราะห์ใช้ high */
+  effort?: "low" | "medium" | "high";
 };
 
 async function ask<T>(opts: AskOptions<T>): Promise<AiResult<T>> {
-  const key = cacheKey(opts.kind, opts.input);
+  /* นโยบายก่อนแคช — บัญชีที่ยังไม่ชำระต้องไม่เห็นผลของ AI แม้จากแคช */
+  const policy = await aiPolicy(opts.tenantId);
+  if (!policy.allowed) return { value: opts.fallback(), source: "fallback", note: policy.reason };
+
+  const key = cacheKey(opts.tenantId, opts.kind, opts.input);
   const cached = await readCache<T>(key);
   if (cached) return { value: cached, source: "cache" };
 
@@ -168,20 +181,33 @@ async function ask<T>(opts: AskOptions<T>): Promise<AiResult<T>> {
   }
 
   try {
-    const res = await client().messages.create({
+    /* server-side fallbacks: ถ้า safety classifier ปฏิเสธผิดพลาด API จะรันคำขอเดิมบนรุ่นที่ Anthropic
+       แนะนำสำหรับหมวดนั้นให้ในคำขอเดียว — ไม่ให้การปฏิเสธผิดพลาดกลายเป็นงานล่ม (plan D25) */
+    const res = await client().beta.messages.create({
       model: MODEL,
       max_tokens: opts.maxTokens ?? 2000,
-      // งานเหล่านี้สั้นและตรงไปตรงมา ไม่ต้องใช้ effort สูง
+      betas: ["server-side-fallback-2026-07-01"],
+      fallbacks: "default",
       output_config: {
-        effort: "low",
+        effort: opts.effort ?? "low",
         format: { type: "json_schema", schema: opts.schema },
       },
       system: opts.system,
       messages: [{ role: "user", content: opts.prompt }],
     });
+    const usage = {
+      tenantId: opts.tenantId,
+      kind: opts.kind,
+      model: MODEL,
+      servedModel: res.model,
+      inputTokens: res.usage.input_tokens,
+      outputTokens: res.usage.output_tokens,
+      cacheReadTokens: res.usage.cache_read_input_tokens ?? 0,
+    };
 
-    // safety classifier ปฏิเสธได้ ต้องเช็คก่อนอ่าน content
+    // ทั้งสายปฏิเสธ (รวมรุ่นสำรอง) — เช็คก่อนอ่าน content เสมอ
     if (res.stop_reason === "refusal") {
+      await recordAiCall({ ...usage, outcome: "refused" });
       return {
         value: opts.fallback(),
         source: "fallback",
@@ -190,13 +216,22 @@ async function ask<T>(opts: AskOptions<T>): Promise<AiResult<T>> {
     }
 
     const text = res.content
-      .filter((b): b is Anthropic.TextBlock => b.type === "text")
+      .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text")
       .map((b) => b.text)
       .join("");
-    const value = JSON.parse(text) as T;
+    let value: T;
+    try {
+      value = JSON.parse(text) as T;
+    } catch {
+      /* ผลไม่ตรงรูปแบบ = ทิ้ง ไม่ใช้ครึ่ง ๆ กลาง ๆ (plan หัวข้อ 9.2) */
+      await recordAiCall({ ...usage, outcome: "invalid" });
+      return { value: opts.fallback(), source: "fallback", note: "AI ตอบไม่ตรงรูปแบบ — ใช้สูตรสำเร็จแทน" };
+    }
+    await recordAiCall({ ...usage, outcome: "ai" });
     await writeCache(key, opts.kind, value);
     return { value, source: "ai" };
   } catch (err) {
+    await recordAiCall({ tenantId: opts.tenantId, kind: opts.kind, model: MODEL, outcome: "error" });
     let note = "The AI call failed — using templates";
     if (err instanceof Anthropic.RateLimitError) note = "Rate limited — using templates";
     else if (err instanceof Anthropic.AuthenticationError) note = "Invalid API key — using templates";
@@ -391,10 +426,8 @@ export function mapColumnsHeuristic(headers: string[]): ColumnMapping {
    เป็นวันที่รูปแบบไหน · ตัวเลขนี้เป็นยอดสุทธิหรือราคาต่อหน่วย · ช่องนี้
    ว่างบ่อยไหม ทั้งหมดนั้นอ่านได้จากรูปทรง
 
-   ตัวเลขกับวันที่จึงส่งไปทั้งค่า (ไม่ระบุตัวบุคคล และเป็นสัญญาณที่
-   system prompt บอกเองว่าต้องใช้แยกคอลัมน์เงิน) ส่วนข้อความอิสระ —
-   ชื่อ ที่อยู่ อีเมล — เหลือแต่โครง และเบอร์โทรเหลือแค่สองหลักแรก
-   ซึ่งพอให้รู้ว่าเป็นเบอร์มือถือไทย โดยไม่ชี้ไปที่ใคร */
+   รอบแรกส่งค่าที่ปิดบางแล้ว (ตัวเลขกับวันที่ไปทั้งค่า) — 2026-10-13 เปลี่ยนเป็นส่งชนิดของค่า
+   อย่างเดียว ดู columnShapes() ด้านล่าง เพราะวันที่อาจเป็นวันเกิดของคนจริง */
 
 const DATE_LIKE = /^\s*\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}([ T]\d{1,2}:\d{2}(:\d{2})?)?\s*$/;
 const NUMBER_LIKE = /^\s*[-+]?[฿$€]?\s*\d[\d,\s]*(\.\d+)?\s*%?\s*$/;
@@ -414,57 +447,61 @@ function looksLikePhone(v: string): boolean {
   return /^[0+]/.test(v.trim()) || /[\s()-]/.test(v.trim());
 }
 
-export function maskCell(v: string): string {
-  if (v === "") return "";
-  if (v.length > 64) v = v.slice(0, 64);
+/* ── ส่งชนิดของค่า ไม่ส่งค่า ─────────────────────────────────
 
-  /* วันที่ — ส่งทั้งค่า รูปแบบวันที่คือสัญญาณที่ต้องอ่านให้ออก */
-  if (DATE_LIKE.test(v)) return v;
+   Blueprint 2.0 บท 4 และ 9: ไม่ส่งข้อมูลทั้งไฟล์ให้บริการภายนอก และส่งเท่าที่จำเป็น
+   เดิมส่งตัวอย่างสามแถวที่ปิดบางแล้ว แต่ตัวเลขและวันที่ไปทั้งค่า — วันที่อาจเป็นวันเกิด
+   ตอนนี้ส่งแค่ชื่อคอลัมน์ + ชนิดของค่าที่เห็นในสามแถวแรก (อีเมล · เบอร์ · วันที่ · ตัวเลข · ข้อความไทย/อังกฤษ)
+   ซึ่งพอให้แยกคอลัมน์ได้ โดยไม่มีค่าของใครออกไปเลย */
+export type ValueShape = "empty" | "email" | "phone" | "date" | "number" | "thai_text" | "latin_text" | "mixed_text";
 
-  /* เบอร์โทร — ต้องมาก่อนจำนวน เหลือสองหลักแรกพอให้รู้ว่าเป็นมือถือไทย */
-  if (looksLikePhone(v)) {
-    const d = v.replace(/\D/g, "");
-    return d.slice(0, 2) + "X".repeat(d.length - 2);
-  }
+export function shapeOf(v: string): ValueShape {
+  const t = (v ?? "").trim();
+  if (!t) return "empty";
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t)) return "email";
+  if (looksLikePhone(t)) return "phone";
+  if (DATE_LIKE.test(t)) return "date";
+  if (NUMBER_LIKE.test(t)) return "number";
+  const thai = /[\u0E00-\u0E7F]/.test(t);
+  const latin = /[A-Za-z]/.test(t);
+  return thai && latin ? "mixed_text" : thai ? "thai_text" : "latin_text";
+}
 
-  /* จำนวนเงิน — ส่งทั้งค่า system prompt ต้องใช้แยกยอดสุทธิจากราคาต่อหน่วย */
-  if (NUMBER_LIKE.test(v)) return v;
-
-  /* ข้อความอิสระ — เหลือแต่โครง วรรคตอนคงไว้เพราะบอกรูปแบบได้
-     (เช่น มี @ คืออีเมล มี / คือรหัสอ้างอิง) */
-  return v.replace(/[^\s@/\-_.,:#()]/gu, (ch) =>
-    /\d/.test(ch) ? "9" : /[\u0E00-\u0E7F]/.test(ch) ? "ก" : "x",
+/** ชนิดของค่าต่อคอลัมน์จากแถวตัวอย่าง — สิ่งเดียวที่ออกจากระบบนอกจากชื่อคอลัมน์ */
+export function columnShapes(headers: string[], sampleRows: string[][]): Record<string, ValueShape[]> {
+  return Object.fromEntries(
+    headers.map((h, i) => [h, sampleRows.slice(0, 3).map((r) => shapeOf(r[i] ?? ""))]),
   );
 }
 
 export async function mapColumns(
+  tenantId: string,
   headers: string[],
   sampleRows: string[][],
 ): Promise<AiResult<ColumnMapping>> {
-  const masked = sampleRows.slice(0, 3).map((r) => r.map(maskCell));
+  const shapes = columnShapes(headers, sampleRows);
 
   return ask<ColumnMapping>({
+    tenantId,
     kind: "map_columns",
-    input: { headers, sample: masked },
+    input: { headers, shapes },
     schema: MAPPING_SCHEMA,
     maxTokens: 2000,
+    effort: "low",
     system:
-      "You map the columns of a sales export from a Thai POS system. " +
+      "You map the columns of a contact or sales export from a Thai organisation. " +
       "Headers may be Thai, English or mixed. Reply as JSON matching the schema only. " +
       "When unsure, use the field \"ignore\" and give a low confidence. " +
-      "Separate the money columns carefully: total = the row net after discount " +
+      "You never see cell values — only the header and the kind of value seen in the first rows. " +
+      "Separate the money columns by their headers: total = the row net after discount " +
       "(for example ยอดสุทธิ, รวมทั้งสิ้น, net amount) · " +
       "unit_price = price per unit · list_price = the pre-discount ticket price · " +
-      "discount = the discount. When both a net total and a unit price exist, total " +
-      "must always be the net column — never map a unit price to total. " +
-      "When both a customer code and a phone number exist, customer_ref is the code. " +
+      "discount = the discount. When both a customer code and a phone number exist, customer_ref is the code. " +
       "Each field maps to at most one column.",
     prompt: `Headers: ${JSON.stringify(headers)}
 
-First three sample rows. Letters and digits in free text have been replaced
-with placeholders to keep customer data out of this request — read them for
-shape, not meaning. Dates and amounts are unaltered.
-${masked.map((r) => JSON.stringify(r)).join("\n")}
+Kind of value in the first rows of each column (no values are sent):
+${JSON.stringify(shapes)}
 
 Map every column and give a short reason in English.`,
     fallback: () => mapColumnsHeuristic(headers),
@@ -517,9 +554,11 @@ export function guessRolesHeuristic(
 }
 
 export async function guessProductRoles(
+  tenantId: string,
   items: { name: string; price: number; category: string }[],
 ): Promise<AiResult<RoleGuess>> {
   return ask<RoleGuess>({
+    tenantId,
     kind: "product_roles",
     input: items,
     schema: ROLE_SCHEMA,
@@ -634,6 +673,7 @@ export function writeCopyFallback(
 }
 
 export async function writeCopy(
+  tenantId: string,
   play: Play,
   ctx: {
     discountPct: number;
@@ -644,6 +684,7 @@ export async function writeCopy(
 ): Promise<AiResult<CopySet>> {
   const vc = ctx.vocab ?? DEFAULT_VOCAB;
   const res = await ask<{ variants: CopySet }>({
+    tenantId,
     kind: "campaign_copy",
     input: { play: play.id, ...ctx },
     schema: COPY_SCHEMA,
@@ -719,9 +760,11 @@ export function summariseBriefFallback(input: BriefInput): string {
 }
 
 export async function summariseBrief(
+  tenantId: string,
   input: BriefInput,
 ): Promise<AiResult<string>> {
   const res = await ask<{ summary: string }>({
+    tenantId,
     kind: "brief_summary",
     input,
     schema: BRIEF_SCHEMA,
@@ -801,8 +844,9 @@ export function explainPlayFallback(i: WhyInput): string {
     : base;
 }
 
-export async function explainPlay(i: WhyInput): Promise<AiResult<string>> {
+export async function explainPlay(tenantId: string, i: WhyInput): Promise<AiResult<string>> {
   const res = await ask<{ explanation: string }>({
+    tenantId,
     kind: "explain_play",
     input: i,
     schema: WHY_SCHEMA,

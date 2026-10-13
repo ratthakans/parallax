@@ -241,6 +241,21 @@ const rel = (f: string) => relative(ROOT, f);
   if (bad.length) fails.push("ข้อมูลติดต่อหลุดออกนอกทางที่บันทึกได้:\n    " + bad.join("\n    "));
 }
 
+/* ── 4.7 · AI ผ่าน gateway เท่านั้น ─────────────────────────────
+   docs/plan.md หัวข้อ 9.2: ทุกคำขอไปหาโมเดลต้องผ่าน lib/engine/ai/ ซึ่งตรวจนโยบาย
+   (บัญชีต้องชำระแล้ว) ตัดข้อมูลที่ไม่จำเป็น และบันทึกลง ai_ledger — import SDK ที่อื่น
+   คือทางลัดที่ข้ามทั้งสามอย่างโดยไม่มีอะไรเตือน */
+{
+  const bad: string[] = [];
+  for (const f of files) {
+    const r = rel(f);
+    if (r.startsWith("lib/engine/ai/") || r.startsWith("node_modules/")) continue;
+    if (importsOf(read(f)).some((m) => m.startsWith("@anthropic-ai/"))) bad.push(r);
+  }
+  checks.push("SDK ของ Anthropic ถูก import ใน lib/engine/ai/ เท่านั้น");
+  if (bad.length) fails.push("เรียก AI นอก gateway:\n    " + bad.join("\n    "));
+}
+
 /* ── 5 · ไม่มีไฟล์ตกค้างใน lib/ ชั้นบนสุด ──
    ไฟล์ที่ไม่ได้อยู่ใน shared หรือ engine คือไฟล์ที่ยังไม่มีใครตัดสินว่า
    มันแตะข้อมูลลูกค้าหรือเปล่า ซึ่งเป็นสถานะที่ไม่ควรมี */

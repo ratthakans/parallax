@@ -100,6 +100,11 @@ jobs:
       - name: Real-world imports
         run: npm run verify:import
 
+      # AI gateway: บัญชีที่ยังไม่ชำระไม่ได้ผลของ AI · ไม่มีค่าในเซลล์หลุดไปกับคำขอ
+      # · ทุกการเรียกถูกบันทึกโดยไม่เก็บ prompt (docs/plan.md หัวข้อ 9.2)
+      - name: AI gateway
+        run: npm run verify:steward
+
       # ── สคีมาสองฝั่งตรงกันไหม ──
       # ต้องมี DATABASE_URL ถึงจะเทียบได้ ไม่มีก็ข้ามโดยไม่ล้มเหลว เพราะ PR
       # จากคนนอกไม่ควรต้องมีรหัสฐานข้อมูล แต่บน push เข้า main ที่ตั้ง secret

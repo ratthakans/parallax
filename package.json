@@ -19,7 +19,8 @@
     "verify:contacts": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/contacts.mts",
     "verify:customers": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/customers.mts",
     "verify:import": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/import-real.mts",
-    "verify:schema": "node --experimental-strip-types --import ./verify/hook-register.mjs verify/schema-parity.mts"
+    "verify:schema": "node --experimental-strip-types --import ./verify/hook-register.mjs verify/schema-parity.mts",
+    "verify:steward": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/steward.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
