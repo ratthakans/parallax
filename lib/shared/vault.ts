@@ -66,6 +66,7 @@ export const VAULT_FIELDS = [
   "customer_name", "first_name", "last_name", "company", "job_title",
   "email", "phone", "phone_alt", "line_id", "website",
   "province", "occurred_at", "consent", "note",
+  "program", "edition", "participant_role",
 ] as const;
 export type VaultField = (typeof VAULT_FIELDS)[number];
 
@@ -122,4 +123,7 @@ export const VAULT_FIELD_TH: Record<VaultField, string> = {
   occurred_at: "วันที่ของรายการ (ลงทะเบียน · ติดต่อ · สแกน)",
   consent: "ความยินยอมที่ระบุในไฟล์",
   note: "หมายเหตุ",
+  program: "ชื่องาน / โครงการที่ร่วม",
+  edition: "ปีหรือครั้งที่ของงาน",
+  participant_role: "บทบาทในงาน (ผู้เข้าชม · ผู้ออกบูธ · สปอนเซอร์ · วิทยากร)",
 };

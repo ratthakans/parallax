@@ -710,6 +710,25 @@ export async function ensureSchema(): Promise<void> {
       note TEXT,
       created_at TEXT NOT NULL
     );
+
+    /* ══ Account Workspace (B4) — สเปกเดียวกับ supabase/migrations/0009_account_workspace.sql ══ */
+    -- สรุปแฟ้มบริษัท — ผูกกับระดับสิทธิ์และ hash ของหลักฐาน · ทุกประโยคมีรหัสหลักฐาน · ลบตามเมื่อหลักฐานถูกลบ
+    CREATE TABLE IF NOT EXISTS account_briefs (
+      id TEXT NOT NULL PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      org_id TEXT NOT NULL,
+      clearance TEXT NOT NULL,
+      evidence_hash TEXT NOT NULL,
+      source TEXT NOT NULL,
+      model TEXT,
+      sentences TEXT NOT NULL DEFAULT '[]',
+      unknowns TEXT NOT NULL DEFAULT '[]',
+      evidence TEXT NOT NULL DEFAULT '[]',
+      dropped INTEGER NOT NULL DEFAULT 0,
+      created_by TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS ux_brief_scope ON account_briefs (tenant_id, org_id, clearance);
   `);
 
   /* บัญชีเดโมสังเคราะห์ได้สถานะ demo — เฉพาะบัญชีในทะเบียนเดโม ไม่ใช่ทุกแถวใน tenants
@@ -770,6 +789,15 @@ export async function ensureSchema(): Promise<void> {
   {
     const have = await columnsOf("tenant_users");
     if (!have.has("is_staff")) await exec("ALTER TABLE tenant_users ADD COLUMN is_staff INTEGER NOT NULL DEFAULT 0");
+  }
+  /* เจ้าของบัญชีฝั่งขาย (B4 · 0009) */
+  {
+    const have = await columnsOf("orgs");
+    if (!have.has("account_owner_id")) await exec("ALTER TABLE orgs ADD COLUMN account_owner_id TEXT");
+  }
+  {
+    const have = await columnsOf("affiliations");
+    if (!have.has("last_seen_at")) await exec("ALTER TABLE affiliations ADD COLUMN last_seen_at TEXT");
   }
 }
 

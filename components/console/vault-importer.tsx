@@ -83,6 +83,7 @@ export function VaultImporter({ sourceId, allowed }: { sourceId: string; allowed
             ตรวจตัวตนแล้ว: <span className="c-mono">{num(result.resolved.people)}</span> คน
             (ใหม่ <span className="c-mono">{num(result.resolved.newPeople)}</span> · ตรงกับคนเดิม <span className="c-mono">{num(result.resolved.matchedExisting)}</span>)
             · <span className="c-mono">{num(result.resolved.orgs)}</span> องค์กร
+            {result.resolved.participations > 0 && <> · การร่วมงาน <span className="c-mono">{num(result.resolved.participations)}</span> ครั้ง</>}
             {result.resolved.personPairs + result.resolved.orgGroups > 0 && (
               <> · เข้าคิวให้คนตรวจ <span className="c-mono">{num(result.resolved.personPairs)}</span> คู่
               {result.resolved.orgGroups > 0 && <> และ <span className="c-mono">{num(result.resolved.orgGroups)}</span> กลุ่มองค์กร</>}</>

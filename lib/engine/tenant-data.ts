@@ -50,7 +50,7 @@ export const B2B_DATA_TABLES = [
   "import_rows", "import_batches", "affiliations", "relationship_assertions", "interactions",
   "participations", "opportunity_people", "tasks", "opportunities", "org_domains", "orgs",
   "preferences", "evidence", "record_versions", "merge_log",
-  "review_items", "resolution_overrides", "sample_checks",
+  "review_items", "resolution_overrides", "sample_checks", "account_briefs",
 ] as const;
 
 /* ── ทุกที่ที่ข้อมูลของคนหนึ่งคนอยู่ ─────────────────────────────
@@ -100,6 +100,16 @@ export async function deletePersonData(q: Sql, tenantId: string, customerId: str
 }
 
 async function deleteOneId(q: Sql, tenantId: string, customerId: string): Promise<void> {
+  /* สรุปแฟ้มบริษัทที่อาจเอ่ยถึงคนนี้ (สังกัด · ความสัมพันธ์ · ปฏิสัมพันธ์) ถูกลบก่อนที่ร่องรอยจะหายไป —
+     เปิดแฟ้มครั้งหน้าระบบสร้างใหม่จากหลักฐานที่เหลือ */
+  await q.run(
+    `DELETE FROM account_briefs WHERE tenant_id = ? AND org_id IN (
+       SELECT org_id FROM affiliations WHERE tenant_id = ? AND customer_id = ?
+       UNION SELECT org_id FROM interactions WHERE tenant_id = ? AND customer_id = ? AND org_id IS NOT NULL
+       UNION SELECT to_id FROM relationship_assertions WHERE tenant_id = ? AND from_kind = 'person' AND from_id = ? AND to_kind = 'org'
+       UNION SELECT from_id FROM relationship_assertions WHERE tenant_id = ? AND to_kind = 'person' AND to_id = ? AND from_kind = 'org')`,
+    tenantId, tenantId, customerId, tenantId, customerId, tenantId, customerId, tenantId, customerId,
+  );
   await q.run(
     "DELETE FROM line_items WHERE tenant_id = ? AND txn_id IN (SELECT id FROM transactions WHERE tenant_id = ? AND customer_id = ?)",
     tenantId, tenantId, customerId,

@@ -45,6 +45,10 @@ export const IMPORT_FIELDS = [
   // ── บิลและสถานะ — ไฟล์ POS ส่วนใหญ่มีหนึ่งแถวต่อสินค้า ไม่ใช่ต่อบิล ──
   "order_id",
   "order_status",
+  // ── การร่วมงาน (B2B · Data Vault) — งาน · ครั้งที่/ปี · บทบาทในงาน ──
+  "program",
+  "edition",
+  "participant_role",
   // ── ความยินยอมรับข่าวสาร ──
   "consent",
   "ignore",
@@ -67,6 +71,7 @@ export const IMPORT_FIELD_GROUPS: { label: string; fields: ImportField[] }[] = [
     fields: ["phone", "phone_alt", "email", "line_id", "facebook", "instagram", "tiktok", "website"],
   },
   { label: "ที่อยู่", fields: ["address", "subdistrict", "district", "province", "postcode"] },
+  { label: "การร่วมงาน", fields: ["program", "edition", "participant_role"] },
   {
     label: "การซื้อ",
     fields: ["occurred_at", "order_id", "order_status", "total", "unit_price", "list_price", "discount",
@@ -109,6 +114,9 @@ export const FIELD_LABEL: Record<ImportField, string> = {
   channel: "ช่องทาง",
   order_id: "เลขที่บิล / เลขที่คำสั่งซื้อ",
   order_status: "สถานะคำสั่งซื้อ (ยกเลิก · คืนเงิน จะไม่ถูกนับ)",
+  program: "ชื่องาน / โครงการ",
+  edition: "ปีหรือครั้งที่ของงาน",
+  participant_role: "บทบาทในงาน (ผู้เข้าชม · ผู้ออกบูธ · สปอนเซอร์ · วิทยากร)",
   consent: "ยินยอมรับข่าวสาร (ใช่ / ไม่)",
   ignore: "ไม่ใช้คอลัมน์นี้",
 };

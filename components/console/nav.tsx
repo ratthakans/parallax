@@ -37,6 +37,12 @@ function groupsFor(baseLabelTh: string, personLabelTh: string) {
       ],
     },
     {
+      title: "Account Workspace",
+      links: [
+        { href: "/app/accounts", label: "บัญชีบริษัท", hint: "แฟ้มบริษัท · คนตามเวลา · สรุปก่อนพบ" },
+      ],
+    },
+    {
       title: "ควบคุม",
       links: [
         { href: "/app/settings", label: "ตั้งค่า", hint: "AI · เครื่องมือเดโม" },

@@ -37,8 +37,16 @@ type Row = {
 
 export type ResolveStats = {
   rows: number; people: number; newPeople: number; matchedExisting: number; orgs: number;
-  orgOnlyRows: number; personPairs: number; orgGroups: number;
+  orgOnlyRows: number; personPairs: number; orgGroups: number; participations: number;
 };
+
+/* ชื่องานที่มีปีติดท้าย ("Sunline Energy Week 2019" · "งานพลังงาน 2562") แยกเป็นงาน + ครั้ง เมื่อไฟล์ไม่มีคอลัมน์ปี */
+export function splitProgram(program: string, edition?: string): { program: string; edition: string | null } {
+  const p = program.replace(/\s+/g, " ").trim();
+  if (edition?.trim()) return { program: p, edition: edition.trim() };
+  const m = p.match(/^(.*\S)\s+((?:19|20|25)\d{2})$/);
+  return m ? { program: m[1], edition: m[2] } : { program: p, edition: null };
+}
 
 const h24 = (s: string) => createHash("sha256").update(s).digest("hex").slice(0, 24);
 export const orgIdFor = (tenantId: string, key: string) => `o-${matchKey(tenantId, "org", key).slice(0, 24)}`;
@@ -105,7 +113,7 @@ async function existingByContact(tenantId: string, kind: "email" | "phone", valu
 
 export async function resolveTenant(tenantId: string, actor: string): Promise<ResolveStats> {
   const rows = await loadPending(tenantId);
-  const stats: ResolveStats = { rows: rows.length, people: 0, newPeople: 0, matchedExisting: 0, orgs: 0, orgOnlyRows: 0, personPairs: 0, orgGroups: 0 };
+  const stats: ResolveStats = { rows: rows.length, people: 0, newPeople: 0, matchedExisting: 0, orgs: 0, orgOnlyRows: 0, personPairs: 0, orgGroups: 0, participations: 0 };
   if (!rows.length) return stats;
 
   // ── คนที่มีอยู่แล้ว ──
@@ -277,6 +285,8 @@ export async function resolveTenant(tenantId: string, actor: string): Promise<Re
   const personInfo = new Map<string, { name: string | null; first: string | null; last: string | null; company: string | null; title: string | null; source: string; at: string; firstAt: string }>();
   const points = new Map<string, Param[]>();
   const rowUpdates: Param[][] = [];
+  /* การร่วมงานจากไฟล์ (งาน · ครั้ง · บทบาท) — ต้องมีชื่องาน ไม่มีชื่องาน = ไม่สร้าง (ไม่เดาว่าเป็นงานไหน) */
+  const parts = new Map<string, Param[]>();
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
     const person = isPersonRow.has(i) ? personOfNode(i) : null;
@@ -306,6 +316,13 @@ export async function resolveTenant(tenantId: string, actor: string): Promise<Re
       points.set(String(row[0]), row);
     }
     const ok = orgKeyOf(r);
+    if (r.v.program?.trim()) {
+      const pg = splitProgram(r.v.program, r.v.edition);
+      const role = r.v.participant_role?.trim() || "ไม่ระบุบทบาท";
+      const org = ok ? (ok.startsWith("o-") ? ok : orgIdFor(tenantId, ok)) : null;
+      const pid = `pt-${h24(`${tenantId}|${person}|${pg.program}|${pg.edition ?? ""}|${role}`)}`;
+      if (!parts.has(pid)) parts.set(pid, [pid, tenantId, person, org, pg.program, pg.edition, role, r.when, r.sourceId, now]);
+    }
     if (ok) {
       const org = ok.startsWith("o-") ? ok : orgIdFor(tenantId, ok);
       const k = `${person}|${org}`;
@@ -326,8 +343,26 @@ export async function resolveTenant(tenantId: string, actor: string): Promise<Re
     list.forEach((a, j) => {
       const next = list[j + 1];
       const to = next && a.last < next.first ? next.first : null;
-      affRows.push([`a-${h24(`${tenantId}|${a.person}|${a.org}`)}`, tenantId, a.person, a.org, a.title, a.first, to, a.source, now]);
+      affRows.push([`a-${h24(`${tenantId}|${a.person}|${a.org}`)}`, tenantId, a.person, a.org, a.title, a.first, to, a.last, a.source, now]);
     });
+  }
+  /* ย้ายงานข้ามไฟล์: สังกัดเดิมที่ยังเปิด (จากไฟล์ก่อน) ซึ่งเห็นครั้งสุดท้ายก่อนที่ไฟล์นี้เห็นที่ใหม่ครั้งแรก → ปิดช่วง
+     ไม่แตะสังกัดที่คนยืนยันแล้ว — คนตัดสินแล้วว่ายังอยู่ ระบบไม่ปิดแทน */
+  const runPeople = [...byPerson.keys()];
+  for (let i = 0; i < runPeople.length; i += 400) {
+    const chunk = runPeople.slice(i, i + 400);
+    const open = await all<{ id: string; customer_id: string; org_id: string; valid_from: string | null; last_seen_at: string | null }>(
+      `SELECT id, customer_id, org_id, valid_from, last_seen_at FROM affiliations
+       WHERE tenant_id = ? AND valid_to IS NULL AND confirmed_by IS NULL AND customer_id IN (${chunk.map(() => "?").join(",")})`,
+      tenantId, ...chunk,
+    );
+    for (const e of open) {
+      const list = byPerson.get(e.customer_id) ?? [];
+      if (list.some((a) => a.org === e.org_id)) continue; // ไฟล์นี้ก็เห็นที่เดิม — ช่วงคำนวณจากแถวในไฟล์แล้ว
+      const seen = e.last_seen_at ?? e.valid_from;
+      const next = list.filter((a) => seen && a.first > seen).sort((x, y) => (x.first < y.first ? -1 : 1))[0];
+      if (next) affRows.push([e.id, tenantId, e.customer_id, e.org_id, null, e.valid_from, next.first, null, null, now]);
+    }
   }
   const inReview = new Set([...pairs.values()].flatMap((p) => p.ids));
 
@@ -337,6 +372,7 @@ export async function resolveTenant(tenantId: string, actor: string): Promise<Re
   stats.orgs = orgRowsSql.length;
   stats.personPairs = pairs.size;
   stats.orgGroups = groups.size;
+  stats.participations = parts.size;
   await tx(async (q) => {
     await insertMany(q, "orgs", ["id", "tenant_id", "name", "name_norm", "primary_domain", "created_at", "recorded_at"], orgRowsSql, {
       onConflict: "ON CONFLICT(id) DO UPDATE SET primary_domain = COALESCE(orgs.primary_domain, excluded.primary_domain), recorded_at = excluded.recorded_at",
@@ -358,11 +394,19 @@ export async function resolveTenant(tenantId: string, actor: string): Promise<Re
           last_name = COALESCE(excluded.last_name, contact_profiles.last_name), company = COALESCE(excluded.company, contact_profiles.company),
           job_title = COALESCE(excluded.job_title, contact_profiles.job_title), updated_at = excluded.updated_at`,
       });
-    await insertMany(q, "affiliations", ["id", "tenant_id", "customer_id", "org_id", "title", "valid_from", "valid_to", "source_id", "recorded_at"], affRows, {
-      onConflict: `ON CONFLICT(id) DO UPDATE SET title = COALESCE(excluded.title, affiliations.title),
-        valid_from = CASE WHEN excluded.valid_from < affiliations.valid_from THEN excluded.valid_from ELSE affiliations.valid_from END,
-        valid_to = excluded.valid_to, recorded_at = excluded.recorded_at`,
+    /* สังกัดที่คนยืนยันแล้ว: ไฟล์เติมได้แค่ตำแหน่งที่ว่างและวันที่เห็นล่าสุด — ไม่เลื่อนช่วงที่คนกำหนด
+       ที่ยังไม่ยืนยัน: ช่วงที่ปิดแล้วไม่ถูกเปิดใหม่เองจากไฟล์ (ค่า null ไม่ทับวันที่ออก) */
+    await insertMany(q, "affiliations", ["id", "tenant_id", "customer_id", "org_id", "title", "valid_from", "valid_to", "last_seen_at", "source_id", "recorded_at"], affRows, {
+      onConflict: `ON CONFLICT(id) DO UPDATE SET
+        title = CASE WHEN affiliations.confirmed_by IS NOT NULL THEN COALESCE(affiliations.title, excluded.title) ELSE COALESCE(excluded.title, affiliations.title) END,
+        valid_from = CASE WHEN affiliations.confirmed_by IS NULL AND excluded.valid_from < affiliations.valid_from THEN excluded.valid_from ELSE affiliations.valid_from END,
+        valid_to = CASE WHEN affiliations.confirmed_by IS NOT NULL THEN affiliations.valid_to ELSE COALESCE(excluded.valid_to, affiliations.valid_to) END,
+        last_seen_at = CASE WHEN affiliations.last_seen_at IS NULL OR excluded.last_seen_at > affiliations.last_seen_at THEN excluded.last_seen_at ELSE affiliations.last_seen_at END,
+        source_id = COALESCE(affiliations.source_id, excluded.source_id),
+        recorded_at = excluded.recorded_at`,
     });
+    await insertMany(q, "participations", ["id", "tenant_id", "customer_id", "org_id", "program", "edition", "role", "occurred_at", "source_id", "recorded_at"],
+      [...parts.values()], { onConflict: "ON CONFLICT(id) DO NOTHING" });
     await insertMany(q, "review_items", ["id", "tenant_id", "kind", "subject_ids", "signals", "confidence", "status", "created_at"],
       [
         ...[...pairs.values()].map((p) => [
@@ -378,7 +422,7 @@ export async function resolveTenant(tenantId: string, actor: string): Promise<Re
       onConflict: "ON CONFLICT(batch_id, line) DO UPDATE SET status = excluded.status, customer_id = excluded.customer_id",
     });
     await logActivity(tenantId, actor, "resolve_identities",
-      `${stats.rows} rows · ${stats.people} people (${stats.newPeople} new · ${stats.matchedExisting} existing) · ${stats.orgs} orgs · ${stats.personPairs} pairs · ${stats.orgGroups} org groups`);
+      `${stats.rows} rows · ${stats.people} people (${stats.newPeople} new · ${stats.matchedExisting} existing) · ${stats.orgs} orgs · ${stats.participations} participations · ${stats.personPairs} pairs · ${stats.orgGroups} org groups`);
   });
   return stats;
 }
