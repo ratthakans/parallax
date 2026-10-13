@@ -255,6 +255,32 @@ const stillTwo = Number((await get<{ n: number }>("SELECT COUNT(*) AS n FROM cus
 const rv = await get<{ status: string }>("SELECT status FROM review_items WHERE tenant_id = ? AND id = 'rv-group'", T);
 ok(!half.ok && stillTwo === 2 && rv?.status === "open", `รวมกลุ่มไม่สำเร็จกลางทาง: ย้อนทั้งกลุ่ม ไม่ค้างครึ่งหนึ่ง (เหลือ ${stillTwo} คน · ${rv?.status})`);
 
+// ── คำตัดสิน "ต่างคน" ชนะกฎตัวระบุ: แถวใหม่ที่มีเบอร์ของคนหนึ่งและอีเมลของอีกคนไม่ดึงสองคนเข้าด้วยกัน ──
+await importCsv("ชื่อซ้ำ.csv", [
+  "สมศรี,ทดลอง,บริษัท ชื่อซ้ำ จำกัด,ผู้จัดการ,somsri.a@chuesam.example,081-555-0701,2024-01-01",
+  "สมศรี,ทดลอง,บริษัท ชื่อซ้ำ จำกัด,ที่ปรึกษา,somsri.b@chuesam.example,081-555-0702,2024-01-01",
+]);
+const twin = (await listOpenReviews(T, "person_pair", 50)).find((p) => p.people.some((x) => x.name.includes("สมศรี")));
+ok(Boolean(twin) && (await decideReview(T, twin!.id, "different", "steward@verify")).ok, "สองคนชื่อเดียวกันถูกตัดสินว่าต่างคน");
+const twinIds = twin!.people.map((x) => x.id).sort();
+const phoneOf = async (id: string) => (await get<{ n: number }>("SELECT COUNT(*) AS n FROM import_rows WHERE tenant_id = ? AND customer_id = ? AND line = 2", T, id))!.n;
+/* ให้เบอร์มาจากคนที่รหัสมากกว่า และอีเมลจากคนที่รหัสน้อยกว่า — ทางเดิมยกแถวให้รหัสน้อยสุดในกลุ่มเสมอ */
+const [low, high] = twinIds;
+const highIsA = Number(await phoneOf(high)) > 0;
+await importCsv("ผสม.csv", [
+  `สมศรี,ทดลอง,บริษัท ชื่อซ้ำ จำกัด,ผู้จัดการ,${highIsA ? "somsri.b" : "somsri.a"}@chuesam.example,${highIsA ? "081-555-0701" : "081-555-0702"},2025-01-01`,
+]);
+const mixed = await get<{ customer_id: string }>(
+  "SELECT r.customer_id FROM import_rows r JOIN import_batches b ON b.id = r.batch_id AND b.tenant_id = r.tenant_id WHERE r.tenant_id = ? AND b.filename = ?", T, "ผสม.csv");
+ok(mixed?.customer_id === high && Boolean(await get("SELECT 1 AS x FROM customers WHERE tenant_id = ? AND id = ?", T, low)),
+  "แถวที่มีเบอร์ของคนหนึ่งและอีเมลของอีกคน ไปอยู่กับเจ้าของเบอร์ · สองคนที่ตัดสินว่าต่างคนไม่ถูกดึงเข้ากลุ่มเดียว");
+
+// ── โดเมนเดียวกันข้ามไฟล์ → กลุ่มองค์กรในคิว ──
+await importCsv("โดเมน1.csv", ["ก้อง,หนึ่ง,บริษัท โดเมนร่วม หนึ่ง จำกัด,ผู้จัดการ,kong@sharedgrp.example,081-555-0801,2024-01-01"]);
+await importCsv("โดเมน2.csv", ["แก้ว,สอง,บริษัท โดเมนร่วม สอง จำกัด,ผู้จัดการ,kaew@sharedgrp.example,081-555-0802,2024-01-01"]);
+const crossGroup = (await listOpenReviews(T, "org_group", 50)).find((g) => g.orgs.some((o) => o.name.includes("โดเมนร่วม หนึ่ง")) && g.orgs.some((o) => o.name.includes("โดเมนร่วม สอง")));
+ok(Boolean(crossGroup), "สององค์กรที่ใช้โดเมนเดียวกันแต่มาจากคนละไฟล์ เข้าคิวเป็นกลุ่มเดียวกัน");
+
 const chain = await verifyAuditChain(T);
 ok(chain.ok, "บันทึกตรวจสอบต่อเนื่องครบหลังรวม/แยกทุกครั้ง");
 

@@ -141,9 +141,26 @@ export async function resolveTenant(tenantId: string, actor: string): Promise<Re
   const isPersonRow = new Set(personRows);
   const exNode = new Map<string, number>();
   const existingOfNode = new Map<number, string>();
+  /* คนเดิมในแต่ละกลุ่ม — ใช้กันไม่ให้เบอร์/อีเมลเชื่อมสองคนที่คนตัดสินแล้วว่าต่างคนเข้ากลุ่มเดียวกัน */
+  const exOfRoot = new Map<number, Set<string>>();
   const nodeOfExisting = (id: string) => {
-    if (!exNode.has(id)) { const n = uf.add(); exNode.set(id, n); existingOfNode.set(n, id); }
+    if (!exNode.has(id)) { const n = uf.add(); exNode.set(id, n); existingOfNode.set(n, id); exOfRoot.set(n, new Set([id])); }
     return exNode.get(id)!;
+  };
+  /* ── คำตัดสิน "ต่างคน" ชนะกฎตัวระบุ ──
+     เดิมตรวจคำตัดสินตอนสร้างคู่ในคิวเท่านั้น: แถวใหม่ที่มีเบอร์ของ A และอีเมลของ B ดึง A กับ B เข้ากลุ่มเดียว
+     แถวทั้งหมดของกลุ่มตกไปที่ A (รวมช่องทางของ B) และคู่ในคิวถูกซ่อนเพราะ "ต่างคน" — ไม่มีใครเห็น */
+  const apartConflict = (a: number, b: number) => {
+    const A = exOfRoot.get(uf.find(a)), B = exOfRoot.get(uf.find(b));
+    if (!A || !B) return false;
+    for (const x of A) for (const y of B) if (x !== y && apart.has([x, y].sort().join("|"))) return true;
+    return false;
+  };
+  const join = (a: number, b: number) => {
+    const ex = new Set([...(exOfRoot.get(uf.find(a)) ?? []), ...(exOfRoot.get(uf.find(b)) ?? [])]);
+    uf.union(a, b);
+    if (ex.size) exOfRoot.set(uf.find(a), ex);
+    afterUnion(a, b);
   };
   const nameOfNode = (n: number): NameInfo => (n < rows.length ? rows[n].name : exName.get(existingOfNode.get(n)!) ?? nameInfo(""));
   const weak: { a: number; b: number; why: string }[] = [];
@@ -166,8 +183,8 @@ export async function resolveTenant(tenantId: string, actor: string): Promise<Re
     for (const [k, members] of groups) {
       const anchors: number[] = (existing?.get(k) ?? []).map(nodeOfExisting);
       for (const i of members) {
-        const fit = anchors.find((a) => fits(nameOfNode(a), rows[i].name) && !phoneConflict(a, i));
-        if (fit !== undefined) { uf.union(fit, i); afterUnion(fit, i); }
+        const fit = anchors.find((a) => fits(nameOfNode(a), rows[i].name) && !phoneConflict(a, i) && !apartConflict(a, i));
+        if (fit !== undefined) join(fit, i);
         else {
           if (anchors.length) weak.push({ a: anchors[0], b: i, why });
           anchors.push(i);
@@ -270,6 +287,16 @@ export async function resolveTenant(tenantId: string, actor: string): Promise<Re
       domainRows.push([tenantId, id, d]);
       domainToOrgs.set(d, (domainToOrgs.get(d) ?? new Set()).add(id));
     }
+  }
+  /* โดเมนเดียวกันกับองค์กรที่มาจากไฟล์ก่อนหน้า — org_domains มีกุญแจ (tenant, domain) จึงเก็บได้องค์กรเดียว
+     ถ้าดูแค่แถวของรอบนี้ องค์กรที่สองที่ใช้โดเมนเดิมจะไม่ถูกบันทึกโดเมนและไม่เข้าคิวเลย */
+  const seenDomains = [...domainToOrgs.keys()];
+  for (let i = 0; i < seenDomains.length; i += 500) {
+    const chunk = seenDomains.slice(i, i + 500);
+    const known = await all<{ domain: string; org_id: string }>(
+      `SELECT d.domain, d.org_id FROM org_domains d JOIN orgs o ON o.id = d.org_id AND o.tenant_id = d.tenant_id
+       WHERE d.tenant_id = ? AND d.domain IN (${chunk.map(() => "?").join(",")})`, tenantId, ...chunk);
+    for (const k of known) domainToOrgs.get(k.domain)!.add(k.org_id);
   }
   const groups = new Map<string, string[]>();
   for (const ids of domainToOrgs.values()) {
