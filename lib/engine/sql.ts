@@ -379,6 +379,17 @@ export function enterIdentity(userId: string) {
   identity.enterWith({ userId });
 }
 
+/* ── ออกจากตัวตนของผู้ใช้ชั่วคราว ──────────────────────────────
+
+   ใช้กับหน้าผู้ดูแลระบบเท่านั้น ซึ่งต้องอ่านข้ามทุกร้าน — ภายใต้ตัวตนของผู้ใช้
+   RLS จะให้เห็นแค่ร้านของเขาเอง และอ่าน auth.users ไม่ได้เลย
+
+   ⚠ ไม่ใช่ทางลัดข้ามสิทธิ์: ผู้เรียกต้องตรวจ isAdmin() ก่อนทุกครั้ง
+   จุดเดียวที่เรียกคือ adminData() ใน lib/engine/admin.ts */
+export function asSystem<T>(fn: () => Promise<T>): Promise<T> {
+  return identity.exit(fn);
+}
+
 /** ธุรกรรมที่กำลังเปิดอยู่ของคำขอนี้ ถ้ามี */
 const activeTx = new AsyncLocalStorage<Sql>();
 

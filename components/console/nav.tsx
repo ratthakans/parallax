@@ -48,6 +48,13 @@ function groupsFor(baseLabelTh: string, personLabelTh: string) {
         { href: "/app/settings", label: "ตั้งค่า", hint: "เพดาน · AI · เครื่องมือเดโม" },
       ],
     },
+    {
+      title: "มุมมอง",
+      links: [
+        { href: "/app/exec", label: "ภาพรวมผู้บริหาร", hint: "ทุกร้าน · ดูอย่างเดียว" },
+        { href: "/app/admin", label: "ผู้ดูแลระบบ", hint: "ร้าน · ผู้ใช้ · คำขอทดลองใช้" },
+      ],
+    },
   ];
 }
 
