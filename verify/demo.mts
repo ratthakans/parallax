@@ -2,7 +2,8 @@
 
    1. แฟ้มบริษัทตามเวลา — คนในบริษัท บทบาท ช่วงเวลา และความสัมพันธ์ที่ยืนยันพร้อมผู้ยืนยัน · ช่องที่ไม่ทราบแสดงว่าไม่ทราบ
    2. หลักฐานทุกค่า — ค่าใดก็ได้ เห็นแหล่ง (ไฟล์ แถว) เวลาที่บันทึก เวลาตรวจล่าสุด และประวัติรุ่น
-   ข้อ 3–4 (สถานะใช้ข้อมูล · วงจรแคมเปญ) มาใน B5
+   3. สถานะใช้ข้อมูลพร้อมเหตุผล — คนเดียวกัน ใช้ได้สำหรับวัตถุประสงค์หนึ่ง และห้าม/ต้องตรวจสำหรับอีกวัตถุประสงค์ พร้อมรุ่นนโยบาย (B5)
+   4. วงจรแคมเปญ — เกณฑ์ → รายชื่อพร้อมเหตุผล → มอบหมาย → บันทึกผล → หน้าทบทวนรายสัปดาห์ (B5)
    ข้อมูลทั้งหมดเป็นชื่อสมมุติ โดเมน .example */
 import "./isolate.mts";
 import { createHash } from "node:crypto";
@@ -12,6 +13,10 @@ import { registerSource } from "@/lib/engine/vault/sources";
 import { commitUpload } from "@/lib/engine/vault/intake";
 import { resolveTenant } from "@/lib/engine/vault/resolve";
 import { getDossier, listAccounts, unknownsOf } from "@/lib/engine/accounts";
+import { ensurePurpose } from "@/lib/engine/vault/sources";
+import { decide, setBasis } from "@/lib/engine/policy";
+import { recordPreference } from "@/lib/engine/policy/preferences";
+import { assignTarget, buildTargets, createCampaign, getCampaign, logWork, recordOutcome, weeklyReview } from "@/lib/engine/campaigns";
 import {
   addRelationship, confirmAffiliation, endAffiliation, logInteraction, setAccountOwner, setParent, updateOrgField, verifyOrg,
 } from "@/lib/engine/accounts/edit";
@@ -162,6 +167,50 @@ ok(p24?.program === "Sunline Energy Week" && p24.role === "ผู้ออกบ
 ok(dl.participations.some((p) => p.edition === "2025" && p.role === "สปอนเซอร์"), "ประวัติการร่วมงานหลายปีอยู่ในแฟ้มบริษัท");
 const again = await resolveTenant(T, "verify");
 ok(again.participations === 0 && (await getDossier(T, lom.id, V))!.participations.length === 2, "ตรวจตัวตนซ้ำไม่สร้างการร่วมงานซ้ำ");
+
+// ── 3 · สถานะใช้ข้อมูลพร้อมเหตุผล ──
+const SPONSOR = await ensurePurpose(T, "ขายสปอนเซอร์ (เดโม)", "verify");
+const NEWS = await ensurePurpose(T, "ข่าวสารจากผู้จัดงาน (เดโม)", "verify");
+await setBasis(T, SPONSOR, { lawfulBasis: "legitimate_interest", liaRef: "LIA-DEMO-01 (สมมุติ)" }, "dpo@verify");
+await setBasis(T, NEWS, { lawfulBasis: "consent" }, "dpo@verify");
+const preecha = preechaAtSiam!.personId;
+const dA = await decide(T, { customerId: preecha, purposeId: SPONSOR, channel: "email", messageKind: "marketing" });
+const dB = await decide(T, { customerId: preecha, purposeId: NEWS, channel: "email", messageKind: "marketing" });
+ok(dA.status === "eligible" && dA.reasons.length > 0 && /ฐานรุ่น 1$/.test(dA.policyVersion), `คนเดียวกัน: ขายสปอนเซอร์ = ใช้ได้ พร้อมเหตุผลและรุ่น (${dA.policyVersion})`);
+ok(dB.status === "review_required" && dB.reasons.some((r) => /ไม่ทราบสถานะความยินยอม/.test(r)), "คนเดียวกัน: ข่าวสาร (ฐานยินยอม) = ต้องตรวจก่อน เพราะไม่ทราบความยินยอม");
+await recordPreference(T, preecha, { kind: "withdrawal", purposeId: NEWS, evidence: "ขอยกเลิกรับข่าวทางอีเมล (สมมุติ)" }, "verify");
+ok((await decide(T, { customerId: preecha, purposeId: NEWS, channel: "email", messageKind: "marketing" })).status === "suppressed"
+  && (await decide(T, { customerId: preecha, purposeId: SPONSOR, channel: "email", messageKind: "marketing" })).status === "eligible",
+  "หลังถอนรับข่าว: ข่าวสาร = ห้าม · ขายสปอนเซอร์ยังใช้ได้");
+
+// ── 4 · วงจรแคมเปญ ──
+const camp = await createCampaign(T, {
+  name: "ขายสปอนเซอร์ Sunline 2027 (สมมุติ)", offer: "แพ็กเกจ Gold", purposeId: SPONSOR, channel: "email", messageKind: "marketing",
+  criteria: { titleKeywords: ["จัดซื้อ"], maxPerOrg: 2 },
+}, "lead@verify");
+if (!camp.ok) throw new Error(camp.error);
+const built = await buildTargets(T, camp.id, "lead@verify");
+const cv = (await getCampaign(T, camp.id))!;
+const tp = cv.targets.find((t) => t.customerId === preecha);
+ok(built.ok && cv.criteriaText.some((t) => /จัดซื้อ/.test(t)), "เกณฑ์แสดงเป็นประโยคที่อ่านได้");
+ok(tp != null && tp.reasons.some((r) => /สยามกริด/.test(r)) && tp.reasons.some((r) => /จัดซื้อ/.test(r)) && tp.eligibility === "eligible",
+  "รายชื่อมีเหตุผลที่ถูกเลือก (บริษัท · ตำแหน่ง) และผลนโยบาย");
+ok(!cv.targets.some((t) => t.name.includes("อรุณี")), "คนที่ออกจากบริษัทแล้วไม่อยู่ในรายชื่อ (เกณฑ์ใช้สังกัดปัจจุบัน)");
+const due = new Date(Date.now() + 3 * 864e5).toISOString().slice(0, 10);
+ok((await assignTarget(T, tp!.id, "bd@verify", due, "lead@verify")).ok, "มอบหมายให้ BD");
+ok((await recordOutcome(T, tp!.id, { outcome: "meeting", note: "นัดคุยแพ็กเกจ (สมมุติ)", nextStep: "ส่งข้อเสนอ", nextDue: due }, "bd@verify")).ok, "บันทึกผล: นัดประชุม + ขั้นตอนถัดไป");
+ok((await recordOutcome(T, tp!.id, { outcome: "proposal", note: "ส่งข้อเสนอ Gold (สมมุติ)", value: 450000 }, "bd@verify")).ok, "บันทึกผล: ส่งข้อเสนอ → เกิดโอกาสขาย");
+await logWork(null, T, "staff@parallax", true, "assign", camp.id, tp!.id);
+const wk = await weeklyReview(T);
+const row = wk.campaigns.find((c) => c.id === camp.id);
+ok(row?.counts.proposal === 1, "หน้าทบทวนรายสัปดาห์เห็นเป้าหมายในขั้นส่งข้อเสนอ");
+ok(wk.opportunities.some((o) => o.org.includes("สยามกริด") && o.stage === "proposal" && Number(o.value) === 450000), "โอกาสที่ขยับในสัปดาห์นี้มีมูลค่าข้อเสนอ");
+const bd = wk.activity.find((a) => a.actor === "bd@verify"), lead = wk.activity.find((a) => a.actor === "lead@verify");
+ok(bd?.outcomes === 2 && lead?.assign === 1 && !wk.activity.some((a) => a.actor === "staff@parallax") && wk.staffActions === 1,
+  "กิจกรรมที่มีผลนับต่อคน และไม่นับทีม PARALLAX");
+const dossier = (await getDossier(T, siam.id, V))!;
+ok(dossier.interactions.some((i) => /ส่งข้อเสนอ Gold/.test(i.summary ?? "")) && dossier.opportunities.some((o) => o.stage === "proposal"),
+  "ผลที่บันทึกลงไทม์ไลน์และโอกาสขายในแฟ้มบริษัท");
 
 for (const line of out) console.log(line);
 const failed = out.filter((l) => l.startsWith("FAIL"));

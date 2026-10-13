@@ -729,6 +729,61 @@ export async function ensureSchema(): Promise<void> {
       created_at TEXT NOT NULL
     );
     CREATE UNIQUE INDEX IF NOT EXISTS ux_brief_scope ON account_briefs (tenant_id, org_id, clearance);
+
+    /* ══ Campaign Workspace (B5) — สเปกเดียวกับ supabase/migrations/0010_campaign_workspace.sql ══ */
+    -- แคมเปญขาย B2B (เช่น ขายสปอนเซอร์) — วัตถุประสงค์ · ช่องทาง · ชนิดข้อความ · เกณฑ์เป้าหมายแบบอ่านได้
+    CREATE TABLE IF NOT EXISTS sales_campaigns (
+      id TEXT NOT NULL PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      offer TEXT,
+      purpose_id TEXT NOT NULL,
+      channel TEXT NOT NULL DEFAULT 'email',
+      message_kind TEXT NOT NULL DEFAULT 'marketing',
+      disclosure_purpose_id TEXT,
+      criteria TEXT NOT NULL DEFAULT '{}',
+      status TEXT NOT NULL DEFAULT 'draft',
+      owner_id TEXT,
+      starts_at TEXT,
+      ends_at TEXT,
+      created_by TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS ix_sales_campaigns_tenant ON sales_campaigns (tenant_id, status);
+    -- รายชื่อเป้าหมายของแคมเปญ — เหตุผลที่ถูกเลือก · ผลตัดสินนโยบายพร้อมรุ่น · ผู้รับผิดชอบ · ผล
+    CREATE TABLE IF NOT EXISTS campaign_targets (
+      id TEXT NOT NULL PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      campaign_id TEXT NOT NULL,
+      org_id TEXT,
+      customer_id TEXT NOT NULL,
+      reasons TEXT NOT NULL DEFAULT '[]',
+      eligibility TEXT NOT NULL DEFAULT 'review_required',
+      eligibility_reasons TEXT NOT NULL DEFAULT '[]',
+      policy_version TEXT NOT NULL,
+      checked_at TEXT NOT NULL,
+      assigned_to TEXT,
+      status TEXT NOT NULL DEFAULT 'open',
+      outcome TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS ux_target_person ON campaign_targets (tenant_id, campaign_id, customer_id);
+    CREATE INDEX IF NOT EXISTS ix_target_person ON campaign_targets (tenant_id, customer_id);
+    CREATE INDEX IF NOT EXISTS ix_target_assignee ON campaign_targets (tenant_id, assigned_to, status);
+    -- กิจกรรมที่มีผล (มอบหมาย · บันทึกผล · ทบทวน) — วัดการใช้งานจริง แยกจาก login · ธง is_staff ไม่นับ · เพิ่มอย่างเดียว
+    CREATE TABLE IF NOT EXISTS work_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id TEXT NOT NULL,
+      actor TEXT NOT NULL,
+      is_staff INTEGER NOT NULL DEFAULT 0,
+      kind TEXT NOT NULL,
+      campaign_id TEXT,
+      target_id TEXT,
+      at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS ix_work_log_tenant ON work_log (tenant_id, at);
   `);
 
   /* บัญชีเดโมสังเคราะห์ได้สถานะ demo — เฉพาะบัญชีในทะเบียนเดโม ไม่ใช่ทุกแถวใน tenants
@@ -798,6 +853,16 @@ export async function ensureSchema(): Promise<void> {
   {
     const have = await columnsOf("affiliations");
     if (!have.has("last_seen_at")) await exec("ALTER TABLE affiliations ADD COLUMN last_seen_at TEXT");
+  }
+  /* งานและโอกาสผูกกับแคมเปญ (B5 · 0010) */
+  {
+    const have = await columnsOf("tasks");
+    if (!have.has("campaign_id")) await exec("ALTER TABLE tasks ADD COLUMN campaign_id TEXT");
+    if (!have.has("target_id")) await exec("ALTER TABLE tasks ADD COLUMN target_id TEXT");
+  }
+  {
+    const have = await columnsOf("opportunities");
+    if (!have.has("campaign_id")) await exec("ALTER TABLE opportunities ADD COLUMN campaign_id TEXT");
   }
 }
 

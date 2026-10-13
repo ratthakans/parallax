@@ -51,6 +51,7 @@ export const B2B_DATA_TABLES = [
   "participations", "opportunity_people", "tasks", "opportunities", "org_domains", "orgs",
   "preferences", "evidence", "record_versions", "merge_log",
   "review_items", "resolution_overrides", "sample_checks", "account_briefs",
+  "campaign_targets", "sales_campaigns", "work_log",
 ] as const;
 
 /* ── ทุกที่ที่ข้อมูลของคนหนึ่งคนอยู่ ─────────────────────────────
@@ -82,6 +83,7 @@ export const PERSON_LINKED: { table: string; column: string; where?: string }[] 
   { table: "merge_log", column: "survivor_id" },
   { table: "merge_log", column: "merged_id" },
   { table: "sample_checks", column: "customer_id" },
+  { table: "campaign_targets", column: "customer_id" },
   { table: "resolution_overrides", column: "a_id", where: "kind = 'person'" },
   { table: "resolution_overrides", column: "b_id", where: "kind = 'person'" },
 ];

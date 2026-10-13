@@ -43,6 +43,14 @@ function groupsFor(baseLabelTh: string, personLabelTh: string) {
       ],
     },
     {
+      title: "Campaign Workspace",
+      links: [
+        { href: "/app/sales", label: "แคมเปญขาย", hint: "เกณฑ์ · รายชื่อพร้อมเหตุผล · มอบหมาย" },
+        { href: "/app/sales/weekly", label: "ทบทวนรายสัปดาห์", hint: "งานเลยกำหนด · โอกาสที่ขยับ" },
+        { href: "/app/sales/purposes", label: "วัตถุประสงค์และฐาน", hint: "ฐานการประมวลผลเป็นรุ่น" },
+      ],
+    },
+    {
       title: "ควบคุม",
       links: [
         { href: "/app/settings", label: "ตั้งค่า", hint: "AI · เครื่องมือเดโม" },

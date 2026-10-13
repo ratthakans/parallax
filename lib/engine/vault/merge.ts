@@ -18,7 +18,16 @@ type PersonImpact = {
   createdPointIds: string[];
   keepBefore: { lifecycle_state: string; restriction_status: string; profile: Record<string, Param> | null };
   moved: Moved;
+  /** แถวของฝั่งที่ถูกรวมที่ชนกับแถวของฝั่งที่คงอยู่ (เป้าหมายแคมเปญเดียวกัน · โอกาสเดียวกัน) — เก็บทั้งแถวไว้คืนตอนแยก */
+  parked?: Record<string, Record<string, Param>[]>;
 };
+
+/* ตารางที่หนึ่งคนมีได้หนึ่งแถวต่อขอบเขต — ถ้าทั้งสองฝั่งมีในขอบเขตเดียวกัน แถวของคนที่คงอยู่ชนะ
+   แถวของฝั่งที่ถูกรวมถูกพักไว้ใน impact (ไม่ทิ้ง) แล้วคืนตอนแยก */
+const PERSON_UNIQUE: { table: string; scope: string }[] = [
+  { table: "campaign_targets", scope: "campaign_id" },
+  { table: "opportunity_people", scope: "opportunity_id" },
+];
 
 /* ตารางที่ย้ายตามคน — กุญแจของแต่ละแถวที่ย้ายถูกจดไว้ เพื่อแยกคืนได้ตรงแถว */
 const PERSON_MOVES: { table: string; key: string[]; column: string; where?: string }[] = [
@@ -29,6 +38,7 @@ const PERSON_MOVES: { table: string; key: string[]; column: string; where?: stri
   { table: "import_rows", key: ["batch_id", "line"], column: "customer_id" },
   { table: "sample_checks", key: ["id"], column: "customer_id" },
   { table: "opportunity_people", key: ["opportunity_id"], column: "customer_id" },
+  { table: "campaign_targets", key: ["id"], column: "customer_id" },
   { table: "relationship_assertions", key: ["id"], column: "from_id", where: "from_kind = 'person'" },
   { table: "relationship_assertions", key: ["id"], column: "to_id", where: "to_kind = 'person'" },
 ];
@@ -68,6 +78,18 @@ export async function mergePersons(
     const keepHmacs = new Set((await q.all<{ kind: string; value_hmac: string }>(
       "SELECT kind, value_hmac FROM contact_points WHERE tenant_id = ? AND customer_id = ?", tenantId, keepId,
     )).map((p) => `${p.kind}|${p.value_hmac}`));
+
+    const parked: Record<string, Record<string, Param>[]> = {};
+    for (const u of PERSON_UNIQUE) {
+      const clash = await q.all<Record<string, Param>>(
+        `SELECT * FROM ${u.table} d WHERE d.tenant_id = ? AND d.customer_id = ? AND EXISTS (
+           SELECT 1 FROM ${u.table} k WHERE k.tenant_id = d.tenant_id AND k.customer_id = ? AND k.${u.scope} = d.${u.scope})`,
+        tenantId, dropId, keepId,
+      );
+      if (!clash.length) continue;
+      parked[u.table] = clash;
+      for (const r of clash) await q.run(`DELETE FROM ${u.table} WHERE tenant_id = ? AND customer_id = ? AND ${u.scope} = ?`, tenantId, dropId, r[u.scope]);
+    }
 
     // ย้ายแถวที่ผูกกับคน และจดกุญแจไว้
     const moved: Moved = {};
@@ -118,7 +140,7 @@ export async function mergePersons(
     const impact: PersonImpact = {
       kind: "person", drop, dropProfile, dropPoints, createdPointIds,
       keepBefore: { lifecycle_state: String(keep.lifecycle_state), restriction_status: String(keep.restriction_status ?? "none"), profile: keepProfile },
-      moved,
+      moved, parked,
     };
     await q.run(
       `INSERT INTO merge_log (id, tenant_id, survivor_id, merged_id, rule, confidence, decided_by, decided_at, impact)
@@ -164,6 +186,7 @@ export async function unmerge(tenantId: string, mergeId: string, actor: string):
         );
       }
     }
+    for (const [table, rows] of Object.entries(impact.parked ?? {})) for (const r of rows) await insertRow(q, table, r);
     if (impact.keepBefore.profile) {
       const p = impact.keepBefore.profile;
       const cols = Object.keys(p).filter((k) => k !== "customer_id");
