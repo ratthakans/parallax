@@ -1,5 +1,6 @@
 import { all, get, insertMany, tx, type Param, type Sql } from "@/lib/engine/sql";
 import { logActivity } from "@/lib/engine/db";
+import { deletePersonData } from "@/lib/engine/tenant-data";
 import { findCustomersByContact, listContactPoints, type ContactPoint } from "@/lib/engine/contacts";
 import {
   CONTACT_KINDS,
@@ -535,16 +536,7 @@ export async function deleteCustomer(tenantId: string, id: string, actor: string
   const c = await get<{ name: string }>("SELECT name FROM customers WHERE tenant_id = ? AND id = ?", tenantId, id);
   if (!c) return { ok: false, error: "ไม่พบลูกค้าคนนี้ในบัญชีนี้" };
   await tx(async (q) => {
-    await q.run(
-      "DELETE FROM line_items WHERE tenant_id = ? AND txn_id IN (SELECT id FROM transactions WHERE tenant_id = ? AND customer_id = ?)",
-      tenantId, tenantId, id,
-    );
-    for (const t of [
-      "transactions", "events", "consents", "memberships", "contact_points", "contact_profiles",
-      "customer_features", "campaign_audience", "messages",
-    ]) {
-      await q.run(`DELETE FROM ${t} WHERE tenant_id = ? AND customer_id = ?`, tenantId, id);
-    }
+    await deletePersonData(q, tenantId, id);
     await q.run("DELETE FROM customers WHERE tenant_id = ? AND id = ?", tenantId, id);
   });
   await logActivity(tenantId, actor, "delete_customer", id);

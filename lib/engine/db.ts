@@ -1,5 +1,6 @@
 import { all, exec, run, usingPostgres } from "@/lib/engine/sql";
 import { TENANT_PROFILES } from "@/lib/shared/tenants";
+import { appendAudit } from "@/lib/engine/audit";
 
 /* ── ชั้นเก็บข้อมูล ────────────────────────────────────────────
    schema ตรงตาม Play Engine §5 · §6 · §7
@@ -365,6 +366,306 @@ export async function ensureSchema(): Promise<void> {
       cache_read_tokens INTEGER NOT NULL DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS ix_ai_ledger_tenant ON ai_ledger (tenant_id, at);
+
+    /* ══ โครงข้อมูล B2B — Blueprint 2.0 บท 3 · docs/plan.md หัวข้อ 4 ══
+       สร้างจากสเปกเดียวกับ supabase/migrations/0007_b2b_model.sql — แก้ที่นี่ต้องแก้ที่นั่นด้วย
+       (npm run verify:schema ตรวจให้) */
+    -- องค์กร — นิติบุคคลหนึ่งแถว · บริษัทในเครือเชื่อมด้วย parent_id ไม่รวมเป็นแถวเดียว
+    CREATE TABLE IF NOT EXISTS orgs (
+      id TEXT NOT NULL PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      name_en TEXT,
+      name_norm TEXT NOT NULL,
+      tax_id TEXT,
+      branch_code TEXT,
+      legal_entity INTEGER NOT NULL DEFAULT 1,
+      parent_id TEXT,
+      primary_domain TEXT,
+      industry TEXT,
+      classification TEXT NOT NULL DEFAULT 'confidential',
+      data_owner_id TEXT,
+      source_id TEXT,
+      lifecycle_state TEXT NOT NULL DEFAULT 'received',
+      state_owner_id TEXT,
+      state_due_at TEXT,
+      restriction_status TEXT NOT NULL DEFAULT 'none',
+      retention_rule_id TEXT,
+      recorded_at TEXT,
+      last_verified_at TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS ix_orgs_name ON orgs (tenant_id, name_norm);
+    CREATE INDEX IF NOT EXISTS ix_orgs_tax ON orgs (tenant_id, tax_id);
+    -- โดเมนอีเมลขององค์กร — ใช้เป็นสัญญาณให้ตรวจ ไม่ใช่เหตุผลรวมคน
+    CREATE TABLE IF NOT EXISTS org_domains (
+      tenant_id TEXT NOT NULL,
+      org_id TEXT NOT NULL,
+      domain TEXT NOT NULL,
+      PRIMARY KEY (tenant_id, domain)
+    );
+    CREATE INDEX IF NOT EXISTS ix_org_domains_org ON org_domains (tenant_id, org_id);
+    -- คนสังกัดองค์กรช่วงไหน · valid_from/valid_to = เวลาที่เป็นจริง · recorded_at = เวลาที่ระบบรับรู้
+    CREATE TABLE IF NOT EXISTS affiliations (
+      id TEXT NOT NULL PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      customer_id TEXT NOT NULL,
+      org_id TEXT NOT NULL,
+      title TEXT,
+      department TEXT,
+      valid_from TEXT,
+      valid_to TEXT,
+      source_id TEXT,
+      confirmed_by TEXT,
+      recorded_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS ix_aff_person ON affiliations (tenant_id, customer_id);
+    CREATE INDEX IF NOT EXISTS ix_aff_org ON affiliations (tenant_id, org_id);
+    -- ความสัมพันธ์ที่มีหลักฐาน: คน↔คน · คน↔องค์กร · องค์กร↔องค์กร
+    CREATE TABLE IF NOT EXISTS relationship_assertions (
+      id TEXT NOT NULL PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      from_kind TEXT NOT NULL,
+      from_id TEXT NOT NULL,
+      to_kind TEXT NOT NULL,
+      to_id TEXT NOT NULL,
+      type TEXT NOT NULL,
+      context TEXT,
+      evidence_id TEXT,
+      confirmed_by TEXT,
+      confirmed_at TEXT,
+      valid_from TEXT,
+      valid_to TEXT,
+      source_id TEXT,
+      lifecycle_state TEXT NOT NULL DEFAULT 'pending_review',
+      recorded_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS ix_rel_from ON relationship_assertions (tenant_id, from_kind, from_id);
+    CREATE INDEX IF NOT EXISTS ix_rel_to ON relationship_assertions (tenant_id, to_kind, to_id);
+    -- ปฏิสัมพันธ์: ประชุม · โทร · อีเมลนอกระบบ · กิจกรรม · โน้ต พร้อมผลและผู้รับผิดชอบ
+    CREATE TABLE IF NOT EXISTS interactions (
+      id TEXT NOT NULL PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      occurred_at TEXT NOT NULL,
+      org_id TEXT,
+      customer_id TEXT,
+      opportunity_id TEXT,
+      summary TEXT,
+      outcome TEXT,
+      owner_id TEXT,
+      source_id TEXT,
+      classification TEXT NOT NULL DEFAULT 'confidential',
+      recorded_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS ix_inter_org ON interactions (tenant_id, org_id, occurred_at);
+    CREATE INDEX IF NOT EXISTS ix_inter_person ON interactions (tenant_id, customer_id);
+    -- การร่วมงาน/กิจกรรมในบทบาทหนึ่ง เช่น ผู้ออกบูธงานปี 2024
+    CREATE TABLE IF NOT EXISTS participations (
+      id TEXT NOT NULL PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      customer_id TEXT NOT NULL,
+      org_id TEXT,
+      program TEXT NOT NULL,
+      edition TEXT,
+      role TEXT NOT NULL,
+      occurred_at TEXT,
+      source_id TEXT,
+      recorded_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS ix_part_person ON participations (tenant_id, customer_id);
+    CREATE INDEX IF NOT EXISTS ix_part_program ON participations (tenant_id, program, edition);
+    -- โอกาสแบบง่าย: ข้อเสนอ · บริษัท · ขั้น · เจ้าของ
+    CREATE TABLE IF NOT EXISTS opportunities (
+      id TEXT NOT NULL PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      org_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      offer TEXT,
+      stage TEXT NOT NULL DEFAULT 'open',
+      owner_id TEXT,
+      value REAL,
+      expected_close TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS ix_opp_org ON opportunities (tenant_id, org_id);
+    -- ผู้เกี่ยวข้องของโอกาส
+    CREATE TABLE IF NOT EXISTS opportunity_people (
+      tenant_id TEXT NOT NULL,
+      opportunity_id TEXT NOT NULL,
+      customer_id TEXT NOT NULL,
+      role TEXT,
+      PRIMARY KEY (opportunity_id, customer_id)
+    );
+    CREATE INDEX IF NOT EXISTS ix_opp_people_person ON opportunity_people (tenant_id, customer_id);
+    -- งานถัดไปที่มีเจ้าของและกำหนด
+    CREATE TABLE IF NOT EXISTS tasks (
+      id TEXT NOT NULL PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'open',
+      due_at TEXT,
+      owner_id TEXT,
+      org_id TEXT,
+      customer_id TEXT,
+      opportunity_id TEXT,
+      outcome TEXT,
+      created_by TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      done_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS ix_tasks_owner ON tasks (tenant_id, owner_id, status);
+    CREATE INDEX IF NOT EXISTS ix_tasks_org ON tasks (tenant_id, org_id);
+    -- แหล่งข้อมูลที่ลงทะเบียน: วัตถุประสงค์ · เจ้าของงาน · ขอบเขตสิทธิ · ฟิลด์ที่เลือก — ไม่มีแหล่ง = อัปโหลดไม่ได้
+    CREATE TABLE IF NOT EXISTS sources (
+      id TEXT NOT NULL PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      purpose_id TEXT,
+      owner_id TEXT NOT NULL,
+      scope_note TEXT,
+      fields TEXT NOT NULL DEFAULT '[]',
+      acquisition_note TEXT,
+      status TEXT NOT NULL DEFAULT 'active',
+      registered_by TEXT NOT NULL,
+      registered_at TEXT NOT NULL
+    );
+    -- ไฟล์หนึ่งไฟล์ที่นำเข้า — เริ่มที่สถานะกัก (quarantined) จนผ่านการสแกน
+    CREATE TABLE IF NOT EXISTS import_batches (
+      id TEXT NOT NULL PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      source_id TEXT NOT NULL,
+      filename TEXT NOT NULL,
+      sha256 TEXT NOT NULL,
+      bytes INTEGER NOT NULL,
+      rows_total INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'quarantined',
+      uploaded_by TEXT NOT NULL,
+      uploaded_at TEXT NOT NULL,
+      finished_at TEXT
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS ux_batches_sha ON import_batches (tenant_id, sha256);
+    -- ผลรายแถว: accepted · rejected · pending_review · suspended · ค่าดั้งเดิมเข้ารหัสใน payload_enc
+    CREATE TABLE IF NOT EXISTS import_rows (
+      tenant_id TEXT NOT NULL,
+      batch_id TEXT NOT NULL,
+      line INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending_review',
+      reason TEXT,
+      source_ref TEXT,
+      customer_id TEXT,
+      payload_enc TEXT,
+      recorded_at TEXT NOT NULL,
+      PRIMARY KEY (batch_id, line)
+    );
+    CREATE INDEX IF NOT EXISTS ix_rows_person ON import_rows (tenant_id, customer_id);
+    -- วัตถุประสงค์การประมวลผลของบัญชี
+    CREATE TABLE IF NOT EXISTS purposes (
+      id TEXT NOT NULL PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      code TEXT NOT NULL,
+      name TEXT NOT NULL,
+      description TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS ux_purposes_code ON purposes (tenant_id, code);
+    -- ฐานการประมวลผลต่อวัตถุประสงค์ (เชื่อมทะเบียน ROPA) · เก็บเป็นรุ่น
+    CREATE TABLE IF NOT EXISTS processing_records (
+      id TEXT NOT NULL PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      purpose_id TEXT NOT NULL,
+      lawful_basis TEXT NOT NULL,
+      data_scope TEXT,
+      approved_by TEXT,
+      version INTEGER NOT NULL DEFAULT 1,
+      effective_from TEXT NOT NULL,
+      effective_to TEXT,
+      lia_ref TEXT,
+      recorded_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS ix_proc_purpose ON processing_records (tenant_id, purpose_id);
+    -- ความยินยอม · ถอน · คัดค้าน · ข้อจำกัด ต่อวัตถุประสงค์และช่องทาง — เพิ่มอย่างเดียว
+    CREATE TABLE IF NOT EXISTS preferences (
+      id TEXT NOT NULL PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      customer_id TEXT NOT NULL,
+      purpose_id TEXT,
+      channel TEXT NOT NULL DEFAULT 'any',
+      kind TEXT NOT NULL,
+      effective_at TEXT NOT NULL,
+      evidence_id TEXT,
+      recorded_by TEXT NOT NULL,
+      recorded_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS ix_pref_person ON preferences (tenant_id, customer_id);
+    -- หลักฐานแนบ: แถวในไฟล์ · ฟอร์ม · เอกสาร · คำยืนยัน — เพิ่มอย่างเดียว
+    CREATE TABLE IF NOT EXISTS evidence (
+      id TEXT NOT NULL PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      ref TEXT,
+      note TEXT,
+      captured_by TEXT NOT NULL,
+      captured_at TEXT NOT NULL
+    );
+    -- ประวัติทุกการเปลี่ยนค่า (เวลาที่ระบบรับรู้) — ค่า PII เก็บแบบปิดบาง · เพิ่มอย่างเดียว
+    CREATE TABLE IF NOT EXISTS record_versions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id TEXT NOT NULL,
+      record_kind TEXT NOT NULL,
+      record_id TEXT NOT NULL,
+      field TEXT NOT NULL,
+      old_value TEXT,
+      new_value TEXT,
+      reason TEXT NOT NULL,
+      changed_by TEXT NOT NULL,
+      valid_from TEXT,
+      recorded_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS ix_versions_record ON record_versions (tenant_id, record_kind, record_id, recorded_at);
+    -- การรวมตัวตน — ย้อนได้ · impact เก็บสิ่งที่ย้ายตอนรวม
+    CREATE TABLE IF NOT EXISTS merge_log (
+      id TEXT NOT NULL PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      survivor_id TEXT NOT NULL,
+      merged_id TEXT NOT NULL,
+      rule TEXT,
+      confidence REAL,
+      decided_by TEXT NOT NULL,
+      decided_at TEXT NOT NULL,
+      impact TEXT NOT NULL DEFAULT '{}',
+      undone_at TEXT,
+      undone_by TEXT
+    );
+    CREATE INDEX IF NOT EXISTS ix_merge_survivor ON merge_log (tenant_id, survivor_id);
+    -- บันทึกตรวจสอบ — hash ต่อเนื่องตรวจความครบได้ · ไม่มีค่า PII เต็ม · เพิ่มอย่างเดียว
+    CREATE TABLE IF NOT EXISTS audit_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id TEXT NOT NULL,
+      at TEXT NOT NULL,
+      actor TEXT NOT NULL,
+      action TEXT NOT NULL,
+      target_kind TEXT,
+      target_id TEXT,
+      detail TEXT,
+      prev_hash TEXT,
+      hash TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS ix_audit_tenant ON audit_log (tenant_id, at);
+    -- กฎอายุข้อมูลต่อประเภท — ไม่มีค่า 'เก็บตลอดไป' เป็นค่าตั้งต้น
+    CREATE TABLE IF NOT EXISTS retention_rules (
+      id TEXT NOT NULL PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      data_kind TEXT NOT NULL,
+      trigger_event TEXT NOT NULL,
+      period_days INTEGER NOT NULL,
+      review_owner_id TEXT,
+      legal_hold INTEGER NOT NULL DEFAULT 0,
+      note TEXT,
+      created_at TEXT NOT NULL
+    );
   `);
 
   /* บัญชีเดโมสังเคราะห์ได้สถานะ demo — เฉพาะบัญชีในทะเบียนเดโม ไม่ใช่ทุกแถวใน tenants
@@ -399,6 +700,33 @@ export async function ensureSchema(): Promise<void> {
       "ALTER TABLE tenants ADD COLUMN billing_day INTEGER NOT NULL DEFAULT 1",
     );
   }
+
+  /* ข้อมูลกำกับบนระเบียนเดิม (Blueprint บท 3) — ระดับความลับ · เจ้าของ · ที่มา · สถานะตลอดอายุ
+     · ข้อจำกัด · กฎอายุ · เวลาบันทึก/ตรวจล่าสุด และสถานะตรวจของช่องทาง · ธง is_staff ของทีม PARALLAX */
+  {
+    const have = await columnsOf("customers");
+    if (!have.has("classification")) await exec("ALTER TABLE customers ADD COLUMN classification TEXT NOT NULL DEFAULT 'confidential'");
+    if (!have.has("data_owner_id")) await exec("ALTER TABLE customers ADD COLUMN data_owner_id TEXT");
+    if (!have.has("source_id")) await exec("ALTER TABLE customers ADD COLUMN source_id TEXT");
+    if (!have.has("lifecycle_state")) await exec("ALTER TABLE customers ADD COLUMN lifecycle_state TEXT NOT NULL DEFAULT 'received'");
+    if (!have.has("state_owner_id")) await exec("ALTER TABLE customers ADD COLUMN state_owner_id TEXT");
+    if (!have.has("state_due_at")) await exec("ALTER TABLE customers ADD COLUMN state_due_at TEXT");
+    if (!have.has("restriction_status")) await exec("ALTER TABLE customers ADD COLUMN restriction_status TEXT NOT NULL DEFAULT 'none'");
+    if (!have.has("retention_rule_id")) await exec("ALTER TABLE customers ADD COLUMN retention_rule_id TEXT");
+    if (!have.has("recorded_at")) await exec("ALTER TABLE customers ADD COLUMN recorded_at TEXT");
+    if (!have.has("last_verified_at")) await exec("ALTER TABLE customers ADD COLUMN last_verified_at TEXT");
+  }
+  {
+    const have = await columnsOf("contact_points");
+    if (!have.has("verify_status")) await exec("ALTER TABLE contact_points ADD COLUMN verify_status TEXT NOT NULL DEFAULT 'unverified'");
+    if (!have.has("valid_from")) await exec("ALTER TABLE contact_points ADD COLUMN valid_from TEXT");
+    if (!have.has("valid_to")) await exec("ALTER TABLE contact_points ADD COLUMN valid_to TEXT");
+    if (!have.has("last_verified_at")) await exec("ALTER TABLE contact_points ADD COLUMN last_verified_at TEXT");
+  }
+  {
+    const have = await columnsOf("tenant_users");
+    if (!have.has("is_staff")) await exec("ALTER TABLE tenant_users ADD COLUMN is_staff INTEGER NOT NULL DEFAULT 0");
+  }
 }
 
 /* ── ต้องเขียนผ่าน adapter เดียวกับที่เหลือ ──
@@ -424,4 +752,8 @@ export async function logActivity(
     detail ?? null,
     new Date().toISOString(),
   );
+  /* ทุกการกระทำที่บันทึกไว้เข้าสาย audit ด้วย (Blueprint บท 8) — activity_log ไว้แสดงบนหน้าจอ
+     audit_log ไว้ตรวจย้อนหลัง แก้ไม่ได้ และต่อกันด้วย hash · detail ของที่นี่ไม่มีค่า PII อยู่แล้ว
+     (verify:customers ตรวจ) */
+  await appendAudit({ tenantId, actor, action, detail: detail ?? null });
 }

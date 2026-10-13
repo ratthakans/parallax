@@ -9,7 +9,7 @@
 import "./isolate.mts";
 import { existsSync, readFileSync } from "node:fs";
 import { ensureReady } from "@/lib/engine/bootstrap";
-import { all, get } from "@/lib/engine/sql";
+import { all, get, run } from "@/lib/engine/sql";
 import { commitImport, parseCsv } from "@/lib/engine/ingest";
 import { mapColumnsHeuristic } from "@/lib/engine/ai";
 import { customerIdFor, normaliseContact } from "@/lib/engine/pii";
@@ -145,19 +145,37 @@ ok(!logs.some((l) => l.detail?.includes("897654321") || l.detail?.includes("8222
 // ── 7 · ลบ ──
 ok(!(await deleteCustomer(B, id, "test")).ok, "อีกร้านลบคนนี้ไม่ได้");
 const neighbour = all1.rows.find((r) => r.id !== id)!.id;
+
+/* ใส่ข้อมูลของคนนี้ลงทุกตารางของโครง B2B ก่อนลบ — ไม่งั้นการตรวจว่า "ไม่เหลือเศษ" จะผ่านเพราะไม่เคยมีอะไรให้ลบ */
+const t0 = new Date().toISOString();
+await run("INSERT INTO affiliations (id, tenant_id, customer_id, org_id, recorded_at) VALUES (?,?,?,?,?)", "aff-v", A, id, "org-v", t0);
+await run("INSERT INTO participations (id, tenant_id, customer_id, program, role, recorded_at) VALUES (?,?,?,?,?,?)", "par-v", A, id, "expo", "visitor", t0);
+await run("INSERT INTO interactions (id, tenant_id, kind, occurred_at, customer_id, recorded_at) VALUES (?,?,?,?,?,?)", "int-v", A, "call", t0, id, t0);
+await run("INSERT INTO opportunity_people (tenant_id, opportunity_id, customer_id) VALUES (?,?,?)", A, "opp-v", id);
+await run("INSERT INTO tasks (id, tenant_id, title, customer_id, created_by, created_at) VALUES (?,?,?,?,?,?)", "task-v", A, "โทรติดตาม", id, "test", t0);
+await run("INSERT INTO preferences (id, tenant_id, customer_id, kind, effective_at, recorded_by, recorded_at) VALUES (?,?,?,?,?,?,?)", "pref-v", A, id, "objection", t0, "test", t0);
+await run("INSERT INTO import_rows (tenant_id, batch_id, line, customer_id, recorded_at) VALUES (?,?,?,?,?)", A, "batch-v", 1, id, t0);
+await run("INSERT INTO relationship_assertions (id, tenant_id, from_kind, from_id, to_kind, to_id, type, recorded_at) VALUES (?,?,?,?,?,?,?,?)", "rel-v", A, "person", id, "org", "org-v", "works_with", t0);
+await run("INSERT INTO record_versions (tenant_id, record_kind, record_id, field, reason, changed_by, recorded_at) VALUES (?,?,?,?,?,?,?)", A, "person", id, "name", "user", "test", t0);
+await run("INSERT INTO merge_log (id, tenant_id, survivor_id, merged_id, decided_by, decided_at) VALUES (?,?,?,?,?,?)", "merge-v", A, id, "someone-else", "test", t0);
+
 const del = await deleteCustomer(A, id, "test");
 ok(del.ok, "ลบได้");
-const tables = [
-  "customers:id", "contact_points:customer_id", "contact_profiles:customer_id", "consents:customer_id",
-  "transactions:customer_id", "events:customer_id", "memberships:customer_id", "customer_features:customer_id",
-  "campaign_audience:customer_id", "messages:customer_id",
-];
+
+/* ไล่หาเองทุกตารางที่มีคอลัมน์ customer_id — ตารางใหม่ที่ลืมใส่ใน PERSON_LINKED จะถูกจับที่นี่ */
+const tables = ["customers:id", "relationship_assertions:from_id", "relationship_assertions:to_id",
+  "record_versions:record_id", "merge_log:survivor_id", "merge_log:merged_id"];
+for (const { name } of await all<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table'")) {
+  const cols = await all<{ name: string }>(`PRAGMA table_info(${name})`);
+  if (cols.some((c) => c.name === "customer_id")) tables.push(`${name}:customer_id`);
+}
 const left: string[] = [];
 for (const t of tables) {
   const [name, col] = t.split(":");
   const n = Number((await get<{ n: number }>(`SELECT COUNT(*) AS n FROM ${name} WHERE ${col} = ?`, id))!.n);
   if (n) left.push(`${name}=${n}`);
 }
+ok(tables.length >= 20, `ตรวจครบทุกตารางที่ผูกกับคน (${tables.length} จุด)`);
 ok(left.length === 0, `ลบแล้วไม่เหลือเศษในตารางไหน${left.length ? ` (เหลือ ${left.join(", ")})` : ""}`);
 ok((await getCustomer(A, neighbour)) !== null, "คนอื่นไม่ถูกแตะ");
 ok((await getCustomer(B, otherShop.ok ? otherShop.id : "")) !== null, "คนเบอร์เดียวกันในอีกร้านยังอยู่");
