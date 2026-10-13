@@ -305,7 +305,9 @@ const RULES: Rule[] = [
   { field: "gender", re: /(gender|^\s*sex\s*$|เพศ)/i, score: 10 },
   // "birth date" ต้องเป็นวันเกิด ไม่ใช่วันที่ซื้อ — 11 ชนะ occurred_at (6)
   { field: "birthday", re: /(birth|dob|วันเกิด|เกิดวันที่)/i, score: 11 },
-  { field: "company", re: /(company|organi[sz]ation|business.?name|บริษัท|องค์กร|หน่วยงาน)/i, score: 10 },
+  /* "Account Name" คือชื่อบริษัทในไฟล์ส่งออกจาก CRM แบบ Salesforce — ไม่ใช่ชื่อคน
+     (เดิมตกไปที่ customer_name เพราะ /name/ — verify:synthetic จับได้) */
+  { field: "company", re: /(company|organi[sz]ation|business.?name|account.?name|^\s*account\s*$|บริษัท|องค์กร|หน่วยงาน)/i, score: 10 },
   { field: "job_title", re: /(job.?title|position|^\s*title\s*$|ตำแหน่ง)/i, score: 10 },
 
   /* ── ช่องทางติดต่อ ──
