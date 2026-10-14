@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { viewer } from "@/app/(app)/viewer";
+import { denied, viewer } from "@/app/(app)/viewer";
 import { assignTarget, buildTargets, createCampaign, recordOutcome, updateCriteria } from "@/lib/engine/campaigns";
 import { setBasis } from "@/lib/engine/policy";
 import { recordPreference } from "@/lib/engine/policy/preferences";
@@ -29,6 +29,8 @@ function criteriaOf(fd: FormData): Criteria {
 
 export async function createCampaignAction(_p: ActionState, fd: FormData): Promise<ActionState> {
   const v = await viewer();
+  const no = denied(v, "write");
+  if (no) return { error: no };
   const res = await createCampaign(v.tenantId, {
     name: str(fd, "name"), offer: str(fd, "offer"), purposeId: str(fd, "purposeId"), channel: str(fd, "channel"),
     messageKind: str(fd, "messageKind"), disclosurePurposeId: str(fd, "disclosurePurposeId") || undefined,
@@ -41,6 +43,8 @@ export async function createCampaignAction(_p: ActionState, fd: FormData): Promi
 
 export async function updateCriteriaAction(_p: ActionState, fd: FormData): Promise<ActionState> {
   const v = await viewer();
+  const no = denied(v, "write");
+  if (no) return { error: no };
   const id = str(fd, "campaignId");
   const res = await updateCriteria(v.tenantId, id, criteriaOf(fd), v.actor);
   if (!res.ok) return { error: res.error };
@@ -50,6 +54,8 @@ export async function updateCriteriaAction(_p: ActionState, fd: FormData): Promi
 
 export async function buildTargetsAction(_p: ActionState, fd: FormData): Promise<ActionState> {
   const v = await viewer();
+  const no = denied(v, "write");
+  if (no) return { error: no };
   const id = str(fd, "campaignId");
   const res = await buildTargets(v.tenantId, id, v.actor);
   if (!res.ok) return { error: res.error };
@@ -62,6 +68,8 @@ export async function buildTargetsAction(_p: ActionState, fd: FormData): Promise
 
 export async function assignTargetAction(_p: ActionState, fd: FormData): Promise<ActionState> {
   const v = await viewer();
+  const no = denied(v, "write");
+  if (no) return { error: no };
   const res = await assignTarget(v.tenantId, str(fd, "targetId"), str(fd, "assignee") || v.actor, str(fd, "dueOn"), v.actor, v.isStaff);
   if (!res.ok) return { error: res.reasons?.length ? `${res.error}: ${res.reasons.join(" · ")}` : res.error };
   revalidatePath(`/app/sales/${str(fd, "campaignId")}`);
@@ -70,6 +78,8 @@ export async function assignTargetAction(_p: ActionState, fd: FormData): Promise
 
 export async function recordOutcomeAction(_p: ActionState, fd: FormData): Promise<ActionState> {
   const v = await viewer();
+  const no = denied(v, "write");
+  if (no) return { error: no };
   const value = Number(str(fd, "value").replace(/[^\d.]/g, ""));
   const res = await recordOutcome(v.tenantId, str(fd, "targetId"), {
     outcome: str(fd, "outcome"), note: str(fd, "note"), nextStep: str(fd, "nextStep"), nextDue: str(fd, "nextDue"),
@@ -82,17 +92,23 @@ export async function recordOutcomeAction(_p: ActionState, fd: FormData): Promis
 
 export async function recordPreferenceAction(_p: ActionState, fd: FormData): Promise<ActionState> {
   const v = await viewer();
+  /* ถอน · คัดค้าน · ขอจำกัด เป็นการปกป้องเจ้าของข้อมูล — ใครในบัญชีก็บันทึกได้
+     ความยินยอมทำให้คนที่ "ต้องตรวจก่อน" กลายเป็น "ใช้ได้" จึงต้องเป็นบทบาทที่เขียนได้ */
+  const no = str(fd, "kind") === "consent" ? denied(v, "write") : null;
+  if (no) return { error: no };
   const res = await recordPreference(v.tenantId, str(fd, "customerId"), {
     kind: str(fd, "kind"), purposeId: str(fd, "purposeId") || null, channel: str(fd, "channel") || "any", evidence: str(fd, "evidence"),
   }, v.actor);
   if (!res.ok) return { error: res.error };
   const back = str(fd, "back");
-  if (back) revalidatePath(back);
+  if (back.startsWith("/app/")) revalidatePath(back);
   return { ok: res.cancelled ? `บันทึกแล้ว — ยกเลิกเป้าหมายแคมเปญและงานที่ค้าง ${res.cancelled} รายการตามนโยบาย` : "บันทึกแล้ว" };
 }
 
 export async function setBasisAction(_p: ActionState, fd: FormData): Promise<ActionState> {
   const v = await viewer();
+  const no = denied(v, "policy");
+  if (no) return { error: no };
   const res = await setBasis(v.tenantId, str(fd, "purposeId"), { lawfulBasis: str(fd, "lawfulBasis"), liaRef: str(fd, "liaRef"), dataScope: str(fd, "dataScope") }, v.actor);
   if (!res.ok) return { error: res.error };
   revalidatePath("/app/sales/purposes");

@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 import { all, get, run, tx, type Param, type Sql } from "@/lib/engine/sql";
 import { logActivity } from "@/lib/engine/db";
+import { CLEARANCE_RANK } from "@/lib/shared/accounts";
+import type { Classification } from "@/lib/shared/vault";
 
 /* ── รวมและแยกตัวตน (Blueprint 2.0 บท 3: "การรวมต้องย้อนได้โดยไม่ทำให้ประวัติการติดต่อหาย") ─────
 
@@ -20,6 +22,10 @@ type PersonImpact = {
   moved: Moved;
   /** แถวของฝั่งที่ถูกรวมที่ชนกับแถวของฝั่งที่คงอยู่ (เป้าหมายแคมเปญเดียวกัน · โอกาสเดียวกัน) — เก็บทั้งแถวไว้คืนตอนแยก */
   parked?: Record<string, Record<string, Param>[]>;
+  /** งานเปิดของเป้าหมายที่ถูกพัก ซึ่งย้ายไปผูกกับเป้าหมายของคนที่คงอยู่ — [task id, target เดิม] คืนตอนแยก */
+  repointedTasks?: [string, string][];
+  /** สถานะความยินยอมแบบเดิม (consents) ของทั้งสองฝั่งก่อนรวม — คืนตอนแยก */
+  consents?: { drop: Record<string, Param>[]; keepBefore: Record<string, Param>[] };
 };
 
 /* ตารางที่หนึ่งคนมีได้หนึ่งแถวต่อขอบเขต — ถ้าทั้งสองฝั่งมีในขอบเขตเดียวกัน แถวของคนที่คงอยู่ชนะ
@@ -44,9 +50,15 @@ const PERSON_MOVES: { table: string; key: string[]; column: string; where?: stri
 ];
 /* preferences เป็นตารางเพิ่มอย่างเดียว (แก้/ลบไม่ได้ใน Postgres) จึงไม่ย้าย — คงอยู่ใต้รหัสเดิม
    และอ่านผ่าน personIdsOf() ซึ่งรวมรหัสที่ถูกรวมเข้ามาและยังไม่ถูกแยกคืน · แยกคืนจึงไม่ต้องแตะ preferences เลย */
-/* ข้อมูลยุคค้าปลีก — ไม่ย้ายในการรวมของ Data Vault (ใช้หน้าลูกค้าเดิม) */
-const RETAIL = ["transactions", "events", "consents", "memberships", "campaign_audience", "messages"];
+/* ข้อมูลยุคค้าปลีก — ไม่ย้ายในการรวมของ Data Vault (ใช้หน้าลูกค้าเดิม)
+   consents ไม่อยู่ในรายการนี้: ทุกคนที่เพิ่มด้วยมือมีแถว consents เสมอ ถ้าปฏิเสธเพราะมัน คนที่เพิ่มด้วยมือ
+   จะรวมแบบย้อนได้ไม่ได้เลย — การรวมด้านล่างรวม consents แบบเดียวกับทางเดิม (ถอนล่าสุดชนะ) และเก็บไว้คืนตอนแยก */
+export const RETAIL = ["transactions", "events", "memberships", "campaign_audience", "messages"];
 const RESTRICTION_RANK: Record<string, number> = { none: 0, review: 1, restricted: 2, suppressed: 3 };
+/* ระดับความลับที่สูงกว่าชนะเมื่อรวม — รวมแฟ้มจำกัดสูงเข้ากับแฟ้มทั่วไปต้องไม่ทำให้ข้อมูลจำกัดสูงเปิดให้ทุกคน */
+const higher = (a: Param, b: Param): Classification =>
+  [String(a ?? "confidential"), String(b ?? "confidential")]
+    .sort((x, y) => (CLEARANCE_RANK[y as Classification] ?? 2) - (CLEARANCE_RANK[x as Classification] ?? 2))[0] as Classification;
 
 const id24 = (s: string) => createHash("sha256").update(s).digest("hex").slice(0, 24);
 const one = async <T,>(q: Sql, sql: string, ...p: Param[]) => (await q.get<T>(sql, ...p)) ?? null;
@@ -80,6 +92,7 @@ export async function mergePersons(
     )).map((p) => `${p.kind}|${p.value_hmac}`));
 
     const parked: Record<string, Record<string, Param>[]> = {};
+    const repointed: [string, string][] = [];
     for (const u of PERSON_UNIQUE) {
       const clash = await q.all<Record<string, Param>>(
         `SELECT * FROM ${u.table} d WHERE d.tenant_id = ? AND d.customer_id = ? AND EXISTS (
@@ -88,6 +101,17 @@ export async function mergePersons(
       );
       if (!clash.length) continue;
       parked[u.table] = clash;
+      /* งานเปิดของเป้าหมายที่ถูกพักจะย้ายตามคน (tasks) แต่ยังชี้ target ที่ถูกลบ — การถอน/คัดค้านทีหลังจึงยกเลิกมันไม่ได้
+         ผูกใหม่กับเป้าหมายของคนที่คงอยู่ในแคมเปญเดียวกัน */
+      if (u.table === "campaign_targets") {
+        for (const r of clash) {
+          const keepTarget = await one<{ id: string }>(q, "SELECT id FROM campaign_targets WHERE tenant_id = ? AND customer_id = ? AND campaign_id = ?", tenantId, keepId, r.campaign_id);
+          const open = await q.all<{ id: string }>("SELECT id FROM tasks WHERE tenant_id = ? AND target_id = ? AND status = 'open'", tenantId, r.id);
+          if (!keepTarget || !open.length) continue;
+          for (const t of open) repointed.push([t.id, String(r.id)]);
+          await q.run("UPDATE tasks SET target_id = ? WHERE tenant_id = ? AND target_id = ? AND status = 'open'", keepTarget.id, tenantId, r.id);
+        }
+      }
       for (const r of clash) await q.run(`DELETE FROM ${u.table} WHERE tenant_id = ? AND customer_id = ? AND ${u.scope} = ?`, tenantId, dropId, r[u.scope]);
     }
 
@@ -131,16 +155,30 @@ export async function mergePersons(
       await q.run("DELETE FROM contact_profiles WHERE customer_id = ?", dropId);
     }
 
+    // ความยินยอมแบบเดิม: รวมต่อวัตถุประสงค์ — ให้ครั้งแรกสุด · ถอนครั้งล่าสุด (เหมือนทางเดิมใน customers.ts)
+    const dropConsents = await q.all<Record<string, Param>>("SELECT * FROM consents WHERE tenant_id = ? AND customer_id = ?", tenantId, dropId);
+    const keepConsents = await q.all<Record<string, Param>>("SELECT * FROM consents WHERE tenant_id = ? AND customer_id = ?", tenantId, keepId);
+    for (const d of dropConsents) {
+      const k = keepConsents.find((r) => r.purpose === d.purpose);
+      const grants = [k?.granted_at, d.granted_at].filter(Boolean).map(String).sort();
+      const revokes = [k?.revoked_at, d.revoked_at].filter(Boolean).map(String).sort();
+      await q.run("DELETE FROM consents WHERE tenant_id = ? AND customer_id IN (?, ?) AND purpose = ?", tenantId, keepId, dropId, d.purpose);
+      await insertRow(q, "consents", { ...(k ?? d), customer_id: keepId, granted_at: grants[0] ?? null, revoked_at: revokes.pop() ?? null, source: k ? "merge" : d.source });
+    }
+
     // ข้อจำกัดที่เข้มกว่าชนะ · คนที่คนตรวจแล้วเป็น confirmed
     const strict = [String(keep.restriction_status ?? "none"), String(drop.restriction_status ?? "none")]
       .sort((a, b) => (RESTRICTION_RANK[b] ?? 0) - (RESTRICTION_RANK[a] ?? 0))[0];
-    await q.run("UPDATE customers SET restriction_status = ? WHERE tenant_id = ? AND id = ?", strict, tenantId, keepId);
+    await q.run("UPDATE customers SET restriction_status = ?, classification = ? WHERE tenant_id = ? AND id = ?",
+      strict, higher(keep.classification, drop.classification), tenantId, keepId);
     await q.run("DELETE FROM customers WHERE tenant_id = ? AND id = ?", tenantId, dropId);
 
     const impact: PersonImpact = {
       kind: "person", drop, dropProfile, dropPoints, createdPointIds,
       keepBefore: { lifecycle_state: String(keep.lifecycle_state), restriction_status: String(keep.restriction_status ?? "none"), profile: keepProfile },
       moved, parked,
+      repointedTasks: repointed.length ? repointed : undefined,
+      consents: dropConsents.length ? { drop: dropConsents, keepBefore: keepConsents.filter((k) => dropConsents.some((d) => d.purpose === k.purpose)) } : undefined,
     };
     await q.run(
       `INSERT INTO merge_log (id, tenant_id, survivor_id, merged_id, rule, confidence, decided_by, decided_at, impact)
@@ -157,13 +195,18 @@ export async function mergePersons(
     await logActivity(tenantId, actor, "merge_people", `${mergeId} · ${Object.values(moved).reduce((n, r) => n + r.length, 0)} rows moved`);
     return null;
   });
-  return done ? { ok: false, error: done } : { ok: true, mergeId };
+  if (done) return { ok: false, error: done };
+  /* คำคัดค้าน/ข้อจำกัดของฝั่งที่ถูกรวมมีผลกับคนที่คงอยู่ทันที — งานแคมเปญที่ค้างต้องถูกตรวจซ้ำ (plan 6.2)
+     import ตอนเรียก: campaigns import ไฟล์นี้อยู่แล้ว */
+  const { recheckTargetsFor } = await import("@/lib/engine/campaigns");
+  await recheckTargetsFor(tenantId, keepId, actor);
+  return { ok: true, mergeId };
 }
 
 export async function unmerge(tenantId: string, mergeId: string, actor: string): Promise<{ ok: true } | { ok: false; error: string }> {
   const err = await tx(async (q) => {
-    const m = await one<{ survivor_id: string; merged_id: string; impact: string; undone_at: string | null; rule: string | null }>(
-      q, "SELECT survivor_id, merged_id, impact, undone_at, rule FROM merge_log WHERE tenant_id = ? AND id = ?", tenantId, mergeId,
+    const m = await one<{ survivor_id: string; merged_id: string; impact: string; undone_at: string | null; rule: string | null; decided_at: string }>(
+      q, "SELECT survivor_id, merged_id, impact, undone_at, rule, decided_at FROM merge_log WHERE tenant_id = ? AND id = ?", tenantId, mergeId,
     );
     if (!m) return "ไม่พบรายการรวมนี้";
     if (m.undone_at) return "รายการนี้ถูกแยกคืนไปแล้ว";
@@ -187,6 +230,13 @@ export async function unmerge(tenantId: string, mergeId: string, actor: string):
       }
     }
     for (const [table, rows] of Object.entries(impact.parked ?? {})) for (const r of rows) await insertRow(q, table, r);
+    if (impact.consents) {
+      for (const d of impact.consents.drop) {
+        await q.run("DELETE FROM consents WHERE tenant_id = ? AND customer_id = ? AND purpose = ?", tenantId, keepId, d.purpose);
+        await insertRow(q, "consents", d);
+      }
+      for (const k of impact.consents.keepBefore) await insertRow(q, "consents", k);
+    }
     if (impact.keepBefore.profile) {
       const p = impact.keepBefore.profile;
       const cols = Object.keys(p).filter((k) => k !== "customer_id");
@@ -194,8 +244,24 @@ export async function unmerge(tenantId: string, mergeId: string, actor: string):
     } else {
       await q.run("DELETE FROM contact_profiles WHERE customer_id = ?", keepId);
     }
+    for (const [taskId, targetId] of impact.repointedTasks ?? []) {
+      await q.run("UPDATE tasks SET target_id = ? WHERE tenant_id = ? AND id = ?", targetId, tenantId, taskId);
+    }
+    /* ── แยกคืนต้องไม่ทำให้ข้อจำกัดอ่อนลง ──
+       ระหว่างที่รวมอยู่ ข้อจำกัดหรือคำคัดค้านที่บันทึกเข้ามาอยู่ใต้รหัสของคนที่คงอยู่ — ไม่รู้ว่าเป็นของใครในสองคน
+       จึงให้ทั้งสองคนถือไว้ (ข้อจำกัดที่เข้มกว่าชนะจนคนตรวจ) · preferences เพิ่มอย่างเดียว จึงคัดลอกเป็นแถวใหม่ */
+    const cur = await one<{ restriction_status: string | null }>(q, "SELECT restriction_status FROM customers WHERE tenant_id = ? AND id = ?", tenantId, keepId);
+    const strictest = (...xs: (string | null | undefined)[]) =>
+      xs.map((x) => String(x ?? "none")).sort((a, b) => (RESTRICTION_RANK[b] ?? 0) - (RESTRICTION_RANK[a] ?? 0))[0];
     await q.run("UPDATE customers SET lifecycle_state = ?, restriction_status = ? WHERE tenant_id = ? AND id = ?",
-      impact.keepBefore.lifecycle_state, impact.keepBefore.restriction_status, tenantId, keepId);
+      impact.keepBefore.lifecycle_state, strictest(impact.keepBefore.restriction_status, cur?.restriction_status), tenantId, keepId);
+    await q.run("UPDATE customers SET restriction_status = ? WHERE tenant_id = ? AND id = ?",
+      strictest(String(impact.drop.restriction_status ?? "none"), cur?.restriction_status), tenantId, dropId);
+    const during = await q.all<Record<string, Param>>(
+      "SELECT * FROM preferences WHERE tenant_id = ? AND customer_id = ? AND recorded_at >= ?", tenantId, keepId, m.decided_at);
+    for (const p of during) {
+      await insertRow(q, "preferences", { ...p, id: `${p.id}:split:${dropId}`.slice(0, 120), customer_id: dropId, recorded_by: `unmerge:${actor}`, recorded_at: new Date().toISOString() });
+    }
     await q.run("UPDATE merge_log SET undone_at = ?, undone_by = ? WHERE tenant_id = ? AND id = ?", new Date().toISOString(), actor, tenantId, mergeId);
     await upsertOverride(q, tenantId, "person", "different", keepId, dropId, actor);
     /* แยกคืน = คนตัดสินแล้วว่าต่างคน — ไม่ค้างในสถานะรอตรวจ เว้นแต่ยังมีคู่อื่นค้างอยู่ */
@@ -221,6 +287,7 @@ const ORG_MOVES: { table: string; key: string[]; column: string; where?: string 
   { table: "interactions", key: ["id"], column: "org_id" },
   { table: "tasks", key: ["id"], column: "org_id" },
   { table: "participations", key: ["id"], column: "org_id" },
+  { table: "campaign_targets", key: ["id"], column: "org_id" },
   { table: "orgs", key: ["id"], column: "parent_id" },
   { table: "relationship_assertions", key: ["id"], column: "from_id", where: "from_kind = 'org'" },
   { table: "relationship_assertions", key: ["id"], column: "to_id", where: "to_kind = 'org'" },
@@ -233,6 +300,10 @@ export async function mergeOrgs(tenantId: string, keepId: string, dropId: string
     const keep = await one<Record<string, Param>>(q, "SELECT * FROM orgs WHERE tenant_id = ? AND id = ?", tenantId, keepId);
     const drop = await one<Record<string, Param>>(q, "SELECT * FROM orgs WHERE tenant_id = ? AND id = ?", tenantId, dropId);
     if (!keep || !drop) return "ไม่พบองค์กรใดองค์กรหนึ่ง — อาจถูกรวมไปแล้ว";
+    /* เลขผู้เสียภาษีต่างกัน = คนละนิติบุคคล (บริษัทในเครือ) — เชื่อมด้วยบริษัทแม่ ไม่รวม (plan 4.4) */
+    if (keep.tax_id && drop.tax_id && keep.tax_id !== drop.tax_id) {
+      return "สององค์กรนี้มีเลขประจำตัวผู้เสียภาษีต่างกัน — เป็นคนละนิติบุคคล ให้เชื่อมเป็นบริษัทในเครือแทนการรวม";
+    }
     const moved: Moved = {};
     for (const m of ORG_MOVES) {
       const rows = await q.all<Record<string, string | number>>(
@@ -242,8 +313,15 @@ export async function mergeOrgs(tenantId: string, keepId: string, dropId: string
       moved[`${m.table}.${m.column}`] = rows.map((r) => m.key.map((k) => r[k]));
       await q.run(`UPDATE ${m.table} SET ${m.column} = ? WHERE tenant_id = ? AND ${m.column} = ?${m.where ? ` AND ${m.where}` : ""}`, keepId, tenantId, dropId);
     }
+    /* ที่คงอยู่เคยเป็นบริษัทลูกของที่ถูกรวม → การย้าย parent_id ด้านบนทำให้เป็นแม่ของตัวเอง (แยกคืนแล้วได้ค่าเดิมกลับจาก moved) */
+    await q.run("UPDATE orgs SET parent_id = NULL WHERE tenant_id = ? AND id = ? AND parent_id = ?", tenantId, keepId, keepId);
+    /* สรุปแฟ้มของทั้งสองฝั่งสร้างจากหลักฐานชุดเดิม — ทิ้งให้สร้างใหม่ ไม่ย้าย */
+    await q.run("DELETE FROM account_briefs WHERE tenant_id = ? AND org_id IN (?, ?)", tenantId, keepId, dropId);
     await q.run("DELETE FROM orgs WHERE tenant_id = ? AND id = ?", tenantId, dropId);
-    await q.run("UPDATE orgs SET lifecycle_state = 'confirmed' WHERE tenant_id = ? AND id = ?", tenantId, keepId);
+    const strictOrg = [String(keep.restriction_status ?? "none"), String(drop.restriction_status ?? "none")]
+      .sort((a, b) => (RESTRICTION_RANK[b] ?? 0) - (RESTRICTION_RANK[a] ?? 0))[0];
+    await q.run("UPDATE orgs SET lifecycle_state = 'confirmed', classification = ?, restriction_status = ? WHERE tenant_id = ? AND id = ?",
+      higher(keep.classification, drop.classification), strictOrg, tenantId, keepId);
     /* ชื่อของที่ถูกรวม → ชี้ไปที่ที่คงอยู่ ไฟล์ที่นำเข้าทีหลังจะไม่สร้างองค์กรนี้ขึ้นมาใหม่ · alias เดิมที่ชี้ที่ถูกรวมย้ายตาม */
     const repointedAliases = (await q.all<{ id: string }>(
       "SELECT id FROM resolution_overrides WHERE tenant_id = ? AND kind = 'org_alias' AND b_id = ?", tenantId, dropId,
@@ -333,18 +411,30 @@ export async function decideReview(
     })));
     weights.sort((a, b) => b.n - a.n || (a.id < b.id ? -1 : 1));
     const keep = weights[0].id;
-    for (const w of weights.slice(1)) {
-      const r = item.kind === "person_pair"
-        ? await mergePersons(tenantId, keep, w.id, actor, "review", Number(item.confidence))
-        : await mergeOrgs(tenantId, keep, w.id, actor);
-      if (!r.ok) return r;
-      mergeIds.push(r.mergeId);
+    /* ── กลุ่มสามรายการขึ้นไปต้องรวมครบหรือไม่รวมเลย ──
+       ทุกการรวมอยู่ในธุรกรรมเดียว (tx ซ้อนใช้ธุรกรรมเดิม) · จองรายการก่อน — สองคนกดพร้อมกัน คนที่สองได้ "ตัดสินไปแล้ว"
+       รวมไม่สำเร็จกลางทาง = โยนเพื่อย้อนทั้งหมด ไม่ค้างครึ่งกลุ่ม */
+    class Abort extends Error {}
+    try {
+      await tx(async (q) => {
+        const claimed = await q.run("UPDATE review_items SET status = 'merging' WHERE tenant_id = ? AND id = ? AND status = 'open'", tenantId, reviewId);
+        if (!claimed.changes) throw new Abort("รายการนี้ถูกตัดสินไปแล้ว");
+        for (const w of weights.slice(1)) {
+          const r = item.kind === "person_pair"
+            ? await mergePersons(tenantId, keep, w.id, actor, "review", Number(item.confidence))
+            : await mergeOrgs(tenantId, keep, w.id, actor);
+          if (!r.ok) throw new Abort(r.error);
+          mergeIds.push(r.mergeId);
+        }
+        await q.run(
+          "UPDATE review_items SET status = 'merged', decided_by = ?, decided_at = ?, decision_note = ? WHERE tenant_id = ? AND id = ?",
+          actor, now, note ?? null, tenantId, reviewId,
+        );
+      });
+    } catch (e) {
+      if (e instanceof Abort) return { ok: false, error: e.message };
+      throw e;
     }
-    await run(
-      /* การรวมปิดรายการนี้ไปแล้วผ่าน repointReviews — เติมว่าใครตัดสิน */
-      "UPDATE review_items SET status = 'merged', decided_by = ?, decided_at = ?, decision_note = ? WHERE tenant_id = ? AND id = ?",
-      actor, now, note ?? null, tenantId, reviewId,
-    );
   } else {
     await tx(async (q) => {
       for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) {

@@ -1,4 +1,4 @@
-import type { Sql } from "@/lib/engine/sql";
+import { usingPostgres, type Sql } from "@/lib/engine/sql";
 
 /* ── ล้างข้อมูลลูกค้าของบัญชีเดียว ──────────────────────────────
 
@@ -37,11 +37,17 @@ export async function wipeCustomerData(q: Sql, tenantId: string): Promise<void> 
     "campaigns", "customer_features", "contact_points", "contact_profiles",
     "customers", "products",
     // โครงข้อมูล B2B (0007) — ข้อมูลของคนและองค์กร ไม่ใช่การตั้งค่าของบัญชี
-    ...B2B_DATA_TABLES,
+    ...B2B_DATA_TABLES.filter((t) => !(usingPostgres() && APPEND_ONLY.has(t))),
   ]) {
     await q.run(`DELETE FROM ${t} WHERE tenant_id = ?`, tenantId);
   }
+  /* ตารางเพิ่มอย่างเดียวลบตรงไม่ได้บน Postgres (0007 ถอนสิทธิ์ DELETE) — ลบผ่านฟังก์ชันฝั่งระบบ
+     ซึ่งยอมเฉพาะเจ้าของบัญชี และเฉพาะเมื่อไม่เหลือลูกค้าในบัญชีแล้ว (0011) */
+  if (usingPostgres()) await q.run("SELECT app.erase_tenant_history(?)", tenantId);
 }
+
+/* ── ตารางหลักฐานที่ผู้ใช้เพิ่มได้แต่ลบไม่ได้ (0007) ── */
+const APPEND_ONLY = new Set(["preferences", "evidence", "record_versions"]);
 
 /* ── ตารางข้อมูล B2B ที่ล้างพร้อมข้อมูลลูกค้า ──
    ไม่รวม: sources · purposes · processing_records · retention_rules (การตั้งค่าและนโยบายของบัญชี)
@@ -89,7 +95,7 @@ export const PERSON_LINKED: { table: string; column: string; where?: string }[] 
 ];
 
 /** ลบข้อมูลของคนหนึ่งคนจากทุกตารางที่ผูกอยู่ (ยกเว้นตัวแถว customers ซึ่งผู้เรียกลบเอง) */
-export async function deletePersonData(q: Sql, tenantId: string, customerId: string): Promise<void> {
+export async function deletePersonData(q: Sql, tenantId: string, customerId: string): Promise<string[]> {
   /* คนที่เคยถูกรวมเข้ามา: preferences ของเขายังอยู่ใต้รหัสเดิม (ตารางเพิ่มอย่างเดียว ไม่ถูกย้าย) — ลบตามไปด้วย */
   const ids = [customerId];
   for (let i = 0; i < ids.length; i++) {
@@ -99,6 +105,26 @@ export async function deletePersonData(q: Sql, tenantId: string, customerId: str
   }
   for (const id of ids.slice(1)) await deleteOneId(q, tenantId, id);
   await deleteOneId(q, tenantId, customerId);
+  return ids;
+}
+
+/* ── ลบประวัติในตารางเพิ่มอย่างเดียวของคนที่ถูกลบแล้ว ──
+   เรียกหลังลบแถว customers ในธุรกรรมเดียวกัน · ids = ผลของ deletePersonData
+   บน Postgres ผ่าน app.erase_person_history (0011) ซึ่งปฏิเสธถ้าคนยังอยู่ในทะเบียน —
+   ลบ "คัดค้าน" ทิ้งแล้วติดต่อต่อไม่ได้ */
+export async function erasePersonHistory(q: Sql, tenantId: string, ids: string[]): Promise<void> {
+  if (usingPostgres()) {
+    await q.run("SELECT app.erase_person_history(?, ?::text[])", tenantId, `{${ids.map((i) => `"${i}"`).join(",")}}`);
+    return;
+  }
+  for (const id of ids) {
+    await q.run(
+      "DELETE FROM evidence WHERE tenant_id = ? AND id IN (SELECT evidence_id FROM preferences WHERE tenant_id = ? AND customer_id = ?)",
+      tenantId, tenantId, id,
+    );
+    await q.run("DELETE FROM preferences WHERE tenant_id = ? AND customer_id = ?", tenantId, id);
+    await q.run("DELETE FROM record_versions WHERE tenant_id = ? AND record_kind = 'person' AND record_id = ?", tenantId, id);
+  }
 }
 
 async function deleteOneId(q: Sql, tenantId: string, customerId: string): Promise<void> {
@@ -117,6 +143,7 @@ async function deleteOneId(q: Sql, tenantId: string, customerId: string): Promis
     tenantId, tenantId, customerId,
   );
   for (const l of PERSON_LINKED) {
+    if (APPEND_ONLY.has(l.table)) continue; // ลบใน erasePersonHistory หลังแถว customers หายแล้ว
     await q.run(
       `DELETE FROM ${l.table} WHERE tenant_id = ? AND ${l.column} = ?${l.where ? ` AND ${l.where}` : ""}`,
       tenantId, customerId,

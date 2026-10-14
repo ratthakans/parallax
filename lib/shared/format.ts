@@ -39,6 +39,10 @@ const TH_DATE_TIME = new Intl.DateTimeFormat("th-TH", {
   timeZone: "Asia/Bangkok",
 });
 
+/* วันและชั่วโมงตามเวลาไทยสำหรับตรรกะ (ไม่ใช่การแสดงผล) — ประเทศไทยไม่มีเวลาออมแสง จึงบวก 7 ชั่วโมงได้ตรง ๆ */
+export const bangkokDay = (t: number | Date = Date.now()): string => new Date(+t + 7 * 3600_000).toISOString().slice(0, 10);
+export const bangkokHour = (t: number | Date = Date.now()): number => new Date(+t + 7 * 3600_000).getUTCHours();
+
 export function thaiDate(iso: string | null | undefined): string {
   if (!iso) return "—";
   const t = Date.parse(iso);

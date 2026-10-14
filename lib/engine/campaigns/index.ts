@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { all, get, run, tx, type Sql } from "@/lib/engine/sql";
 import { logActivity } from "@/lib/engine/db";
+import { bangkokDay } from "@/lib/shared/format";
 import { decide, type Decision } from "@/lib/engine/policy";
 import { personIdsOf } from "@/lib/engine/vault/merge";
 import {
@@ -154,6 +155,11 @@ export async function buildTargets(tenantId: string, campaignId: string, actor: 
           `UPDATE campaign_targets SET org_id = ?, reasons = ?, eligibility = ?, eligibility_reasons = ?, policy_version = ?, checked_at = ?, updated_at = ?
            WHERE tenant_id = ? AND id = ?`,
           m.orgId, JSON.stringify(m.reasons), d.status, JSON.stringify(d.reasons), d.policyVersion, at, at, tenantId, prev.id);
+        /* เป้าหมายที่มอบหมายแล้วแต่ตอนนี้ถูกระงับ: ยกเลิกพร้อมงานค้าง แบบเดียวกับ recheckTargetsFor — ไม่ใช่แค่เปลี่ยนป้าย */
+        if (d.status === "suppressed" && prev.status !== "open" && !FINAL.includes(prev.status as TargetStatus)) {
+          await q.run("UPDATE campaign_targets SET status = 'cancelled', outcome = ? WHERE tenant_id = ? AND id = ?", d.reasons.join(" · "), tenantId, prev.id);
+          await q.run("UPDATE tasks SET status = 'cancelled', outcome = ?, done_at = ? WHERE tenant_id = ? AND target_id = ? AND status = 'open'", "ยกเลิกตามนโยบาย", at, tenantId, prev.id);
+        }
       } else {
         await q.run(
           `INSERT INTO campaign_targets (id, tenant_id, campaign_id, org_id, customer_id, reasons, eligibility, eligibility_reasons, policy_version, checked_at, assigned_to, status, outcome, created_at, updated_at)
@@ -189,16 +195,22 @@ export async function assignTarget(
     d.status, JSON.stringify(d.reasons), d.policyVersion, at, tenantId, targetId);
   if (d.failed) return { ok: false, error: "บริการนโยบายใช้ไม่ได้ — ยังไม่มอบหมาย (fail closed)" };
   if (d.status !== "eligible") return { ok: false, error: "นโยบายยังไม่อนุญาตให้ติดต่อคนนี้ในแคมเปญนี้", reasons: d.reasons };
-  await tx(async (q) => {
+  const res = await tx(async (q) => {
+    /* จองเป้าหมายก่อน: ถ้าถูกยกเลิกระหว่างตรวจนโยบาย (ถอน/คัดค้าน) ต้องไม่สร้างงานเปิดค้างไว้ */
+    const claimed = await q.run(
+      `UPDATE campaign_targets SET assigned_to = ?, status = CASE WHEN status = 'open' THEN 'assigned' ELSE status END, updated_at = ?
+       WHERE tenant_id = ? AND id = ? AND status NOT IN (${FINAL.map(() => "?").join(",")})`,
+      who, at, tenantId, targetId, ...FINAL);
+    if (!claimed.changes) return false;
     await q.run("UPDATE tasks SET status = 'cancelled', done_at = ? WHERE tenant_id = ? AND target_id = ? AND status = 'open'", at, tenantId, targetId);
     await q.run(
       `INSERT INTO tasks (id, tenant_id, title, status, due_at, owner_id, org_id, customer_id, opportunity_id, outcome, created_by, created_at, done_at, campaign_id, target_id)
        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       randomUUID(), tenantId, `ติดต่อ ${t.name} — ${c.name}`, "open", due, who, t.org_id, t.customer_id, null, null, actor, at, null, t.campaign_id, targetId);
-    await q.run("UPDATE campaign_targets SET assigned_to = ?, status = CASE WHEN status = 'open' THEN 'assigned' ELSE status END, updated_at = ? WHERE tenant_id = ? AND id = ?",
-      who, at, tenantId, targetId);
     await logWork(q, tenantId, actor, isStaff, "assign", t.campaign_id, targetId);
+    return true;
   });
+  if (!res) return { ok: false, error: "เป้าหมายนี้เพิ่งถูกปิดหรือยกเลิก — ยังไม่มอบหมาย" };
   await logActivity(tenantId, actor, "target_assign", targetId);
   return { ok: true };
 }
@@ -217,24 +229,34 @@ export async function recordOutcome(
     "SELECT campaign_id, customer_id, org_id, status FROM campaign_targets WHERE tenant_id = ? AND id = ?", tenantId, targetId);
   if (!t) return { ok: false, error: "ไม่พบเป้าหมายนี้" };
   if (FINAL.includes(t.status as TargetStatus)) return { ok: false, error: `เป้าหมายนี้จบแล้ว (${TARGET_STATUS_TH[t.status as TargetStatus]})` };
+  /* เป้าหมายที่ยังไม่ถูกมอบหมายคือคนที่ยังไม่ผ่านการตรวจตอนมอบหมาย — หน้าจอซ่อนฟอร์มอยู่แล้ว แต่ action ยิงตรงได้ */
+  if (t.status === "open") return { ok: false, error: "มอบหมายเป้าหมายนี้ก่อน แล้วค่อยบันทึกผล" };
   const c = (await loadCampaign(tenantId, t.campaign_id))!;
-  /* ก่อนบันทึกว่าติดต่อ/นัด/เสนอ: ตรวจซ้ำ — ถ้าเขาเพิ่งคัดค้านหรือถอน ต้องหยุด ไม่ใช่บันทึกต่อ */
-  if (!["lost", "not_interested"].includes(outcome)) {
-    const d = await decide(tenantId, askFor(c, t.customer_id));
-    if (d.failed) return { ok: false, error: "บริการนโยบายใช้ไม่ได้ — ยังไม่บันทึก (fail closed)" };
-    if (d.status === "suppressed") return { ok: false, error: "คนนี้ถูกระงับการติดต่อแล้ว — หยุดติดต่อ", reasons: d.reasons };
-  }
   const nextStep = clean(input.nextStep, 200);
   const nextDue = clean(input.nextDue, 10);
   if (nextStep && !/^\d{4}-\d{2}-\d{2}$/.test(nextDue)) return { ok: false, error: "ขั้นตอนถัดไปต้องมีวันครบกำหนด" };
+  /* ก่อนบันทึกว่าติดต่อ/นัด/เสนอ หรือสร้างงานติดต่อต่อ: ตรวจซ้ำ และต้องผ่านจริง (Eligible)
+     Review required = ยังไม่มีหลักฐานพอให้ติดต่อ (plan 6.1) — ไม่ใช่แค่กันคนที่ถูกระงับ */
+  if (!["lost", "not_interested"].includes(outcome) || nextStep) {
+    const d = await decide(tenantId, askFor(c, t.customer_id));
+    if (d.failed) return { ok: false, error: "บริการนโยบายใช้ไม่ได้ — ยังไม่บันทึก (fail closed)" };
+    if (d.status === "suppressed") return { ok: false, error: "คนนี้ถูกระงับการติดต่อแล้ว — หยุดติดต่อ", reasons: d.reasons };
+    if (d.status !== "eligible") return { ok: false, error: "นโยบายยังไม่อนุญาตให้ติดต่อคนนี้ในแคมเปญนี้ — ยังไม่บันทึก", reasons: d.reasons };
+  }
   const at = now();
-  await tx(async (q) => {
+  const res = await tx(async (q) => {
+    /* จองเป้าหมายก่อนเขียนอย่างอื่น: ถ้าระหว่างตรวจนโยบายมีคนบันทึกการถอน (recheckTargetsFor → cancelled)
+       หรือมีผลอื่นปิดเป้าหมายไปแล้ว ต้องไม่เขียนทับและไม่สร้างงานใหม่ */
+    const claimed = await q.run(
+      `UPDATE campaign_targets SET status = ?, outcome = ?, updated_at = ? WHERE tenant_id = ? AND id = ? AND status NOT IN (${FINAL.map(() => "?").join(",")})`,
+      outcome, note, at, tenantId, targetId, ...FINAL);
+    if (!claimed.changes) return false;
     const kind = c.channel === "email" ? "email" : c.channel === "phone" ? "call" : "meeting";
     if (t.org_id) {
       await q.run(
         `INSERT INTO interactions (id, tenant_id, kind, occurred_at, org_id, customer_id, opportunity_id, summary, outcome, owner_id, source_id, classification, recorded_at)
          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-        randomUUID(), tenantId, kind, at.slice(0, 10), t.org_id, t.customer_id, null, `${c.name}: ${note}`, TARGET_STATUS_TH[outcome], actor, null, "confidential", at);
+        randomUUID(), tenantId, kind, bangkokDay(Date.parse(at)), t.org_id, t.customer_id, null, `${c.name}: ${note}`, TARGET_STATUS_TH[outcome], actor, null, "confidential", at);
       await q.run("DELETE FROM account_briefs WHERE tenant_id = ? AND org_id = ?", tenantId, t.org_id);
     }
     await q.run("UPDATE tasks SET status = 'done', outcome = ?, done_at = ? WHERE tenant_id = ? AND target_id = ? AND status = 'open'", TARGET_STATUS_TH[outcome], at, tenantId, targetId);
@@ -258,9 +280,10 @@ export async function recordOutcome(
         await q.run("INSERT INTO opportunity_people (tenant_id, opportunity_id, customer_id, role) VALUES (?,?,?,?)", tenantId, oid, t.customer_id, "ผู้ติดต่อ");
       }
     }
-    await q.run("UPDATE campaign_targets SET status = ?, outcome = ?, updated_at = ? WHERE tenant_id = ? AND id = ?", outcome, note, at, tenantId, targetId);
     await logWork(q, tenantId, actor, isStaff, `outcome:${outcome}`, t.campaign_id, targetId);
+    return true;
   });
+  if (!res) return { ok: false, error: "เป้าหมายนี้เพิ่งถูกปิดหรือยกเลิก (เช่น เจ้าของข้อมูลถอนความยินยอม) — ยังไม่บันทึก" };
   await logActivity(tenantId, actor, "target_outcome", `${targetId} · ${outcome}`);
   return { ok: true };
 }
@@ -340,7 +363,7 @@ export async function getCampaign(tenantId: string, id: string) {
 
 /* ── ทบทวนรายสัปดาห์ (plan หัวข้อ 3.3) ── นับกิจกรรมที่มีผล ไม่นับ login และไม่นับทีม PARALLAX */
 export async function weeklyReview(tenantId: string, since = new Date(Date.now() - 7 * 864e5).toISOString()) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = bangkokDay();
   const [byCampaign, overdue, opps, activity, moves] = await Promise.all([
     all<{ id: string; name: string; status: string; n: number | string }>(
       `SELECT c.id, c.name, t.status, COUNT(*) AS n FROM sales_campaigns c JOIN campaign_targets t ON t.campaign_id = c.id AND t.tenant_id = c.tenant_id

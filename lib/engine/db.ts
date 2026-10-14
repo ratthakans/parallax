@@ -654,6 +654,7 @@ export async function ensureSchema(): Promise<void> {
       hash TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS ix_audit_tenant ON audit_log (tenant_id, at);
+    CREATE UNIQUE INDEX IF NOT EXISTS ux_audit_chain ON audit_log (tenant_id, prev_hash);
 
     /* ══ คิวตรวจตัวตน (B3) — สเปกเดียวกับ supabase/migrations/0008_review_queue.sql ══ */
     -- คิวให้คนตรวจ: คู่คนที่อาจเป็นคนเดียวกัน · กลุ่มชื่อองค์กรที่อาจเป็นนิติบุคคลเดียว — ระบบไม่รวมเองจากสัญญาณอ่อน

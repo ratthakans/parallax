@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { all, usingPostgres } from "@/lib/engine/sql";
+import { all, get, usingPostgres } from "@/lib/engine/sql";
 import {
   DEFAULT_TENANT_ID,
   isKnownTenant,
@@ -48,6 +48,17 @@ export const tenantsForUser = cache(async function tenantsForUser(
    การแยกบัญชียังทำงานอยู่แม้ในโหมดนี้ เพราะทุก query มี
    WHERE tenant_id = ? ของตัวเอง — RLS เป็นชั้นที่สอง ไม่ใช่ชั้นเดียว */
 export const membershipEnforced = () => usingPostgres();
+
+/* ── บทบาทในบัญชี ── owner · operator · viewer (tenant_users.role)
+   โหมดเดโมไม่มีสมาชิก จึงถือเป็น owner เหมือนที่เปิดได้ทุกอย่างอยู่แล้ว
+   ไม่พบแถว = viewer (สิทธิ์น้อยสุด) ไม่ใช่ owner */
+export type TenantRole = "owner" | "operator" | "viewer";
+export async function tenantRole(tenantId: string, userId: string | null | undefined): Promise<TenantRole> {
+  if (!membershipEnforced()) return "owner";
+  if (!userId) return "viewer";
+  const r = (await get<{ role: string }>("SELECT role FROM tenant_users WHERE tenant_id = ? AND user_id = ?", tenantId, userId))?.role;
+  return r === "owner" || r === "operator" ? r : "viewer";
+}
 
 /**
  * บัญชีที่ควรเปิดให้ผู้ใช้คนนี้

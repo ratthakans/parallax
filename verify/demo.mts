@@ -12,13 +12,13 @@ import { all, get } from "@/lib/engine/sql";
 import { registerSource } from "@/lib/engine/vault/sources";
 import { commitUpload } from "@/lib/engine/vault/intake";
 import { resolveTenant } from "@/lib/engine/vault/resolve";
-import { getDossier, listAccounts, unknownsOf } from "@/lib/engine/accounts";
+import { getDossier, listAccounts, orgAccess, unknownsOf } from "@/lib/engine/accounts";
 import { ensurePurpose } from "@/lib/engine/vault/sources";
 import { decide, setBasis } from "@/lib/engine/policy";
 import { recordPreference } from "@/lib/engine/policy/preferences";
 import { assignTarget, buildTargets, createCampaign, getCampaign, logWork, recordOutcome, weeklyReview } from "@/lib/engine/campaigns";
 import {
-  addRelationship, confirmAffiliation, endAffiliation, logInteraction, setAccountOwner, setParent, updateOrgField, verifyOrg,
+  addRelationship, confirmAffiliation, endAffiliation, logInteraction, setAccountOwner, setClassification, setParent, updateOrgField, verifyOrg,
 } from "@/lib/engine/accounts/edit";
 
 const out: string[] = [];
@@ -142,6 +142,19 @@ const hiddenForOther = other.interactions.find((i) => i.classification === "rest
 ok(hiddenForOther?.masked === true && hiddenForOther.summary === null, "บันทึกระดับจำกัดสูง: คนอื่นเห็นว่ามี แต่ไม่เห็นเนื้อหา");
 ok(mine.interactions.find((i) => i.classification === "restricted_high")?.summary === "ราคาที่ต่อรองได้ (สมมุติ)", "ผู้บันทึกเห็นเนื้อหาของตัวเอง");
 ok(other.interactions.find((i) => i.kind === "meeting")?.summary?.includes("สปอนเซอร์") === true, "บันทึกระดับลับเห็นได้ทุกคนในบัญชี (ระดับเริ่มต้นจนกว่าจะแยกบทบาทใน B6)");
+
+// แฟ้มระดับจำกัดสูง: การ "รับเป็นเจ้าของ" ต้องไม่ใช่ทางลัดเปิดแฟ้ม · แก้แฟ้มได้เฉพาะคนที่เปิดแฟ้มได้
+const lomBefore = (await get<{ classification: string; account_owner_id: string | null }>(
+  "SELECT classification, account_owner_id FROM orgs WHERE tenant_id = ? AND id = ?", T, lom.id))!;
+await setClassification(T, lom.id, "restricted_high", "dpo@verify");
+const outsider = { id: "outsider@verify", clearance: "confidential" as const };
+ok((await getDossier(T, lom.id, outsider))!.masked, "แฟ้มจำกัดสูงถูกปิดบังสำหรับคนที่ระดับสิทธิ์ไม่ถึง");
+ok(!(await orgAccess(T, lom.id, outsider, "claim")).ok, "รับเป็นเจ้าของแฟ้มที่ระดับสิทธิ์ไม่ถึงไม่ได้");
+ok(!(await orgAccess(T, lom.id, outsider)).ok, "แก้หรือลดระดับความลับของแฟ้มที่เปิดไม่ได้ไม่ได้");
+await setAccountOwner(T, lom.id, outsider.id, "dpo@verify");
+ok((await orgAccess(T, lom.id, outsider)).ok && !(await getDossier(T, lom.id, outsider))!.masked, "เจ้าของบัญชีที่ถูกมอบหมายเปิดและแก้แฟ้มได้");
+await setAccountOwner(T, lom.id, lomBefore.account_owner_id, "dpo@verify");
+await setClassification(T, lom.id, lomBefore.classification, "dpo@verify");
 
 // การร่วมงานจากไฟล์ลงทะเบียน: "งาน" มีปีติดท้าย → งาน + ครั้ง · "ประเภทผู้ร่วมงาน" → บทบาท
 const MAP2 = { 0: "customer_name", 1: "company", 2: "email", 3: "participant_role", 4: "program", 5: "occurred_at" };

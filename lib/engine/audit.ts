@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { all, get, run, tx } from "@/lib/engine/sql";
+import { all, get, tx, usingPostgres } from "@/lib/engine/sql";
 
 /* ── บันทึกตรวจสอบแบบต่อกันด้วย hash ───────────────────────────
 
@@ -30,6 +30,11 @@ function hashOf(prev: string, at: string, e: AuditEntry): string {
 
 export async function appendAudit(e: AuditEntry): Promise<void> {
   await tx(async (q) => {
+    /* อ่าน hash ล่าสุดแล้วเขียนต่อต้องเป็นทีละคนต่อบัญชี — ไม่งั้นสองคำขอพร้อมกันอ่าน hash เดียวกัน
+       แล้วสายแตกเป็นสองกิ่ง ซึ่ง verifyAuditChain จะรายงานว่าถูกแก้ทั้งที่ไม่มีใครแก้
+       ล็อกหลุดเองเมื่อจบธุรกรรม · sqlite เขียนทีละธุรกรรมอยู่แล้ว
+       ux_audit_chain (0011) เป็นด่านสุดท้ายถ้ามีทางเขียนอื่นหลุดมา */
+    if (usingPostgres()) await q.get("SELECT pg_advisory_xact_lock(hashtext(?))", `audit:${e.tenantId}`);
     const last = await q.get<{ hash: string }>(
       "SELECT hash FROM audit_log WHERE tenant_id = ? ORDER BY id DESC LIMIT 1",
       e.tenantId,

@@ -37,23 +37,24 @@ export function evidencePack(d: Dossier, scope: Classification): EvidenceItem[] 
   if (d.parent) out.push({ kind: "org", ref: d.parent.id, text: `เป็นบริษัทในเครือของ ${d.parent.name} (คนละนิติบุคคล)` });
   for (const s of d.subsidiaries) out.push({ kind: "org", ref: s.id, text: `มีบริษัทในเครือ: ${s.name} (คนละนิติบุคคล)` });
   if (d.org.accountOwner) out.push({ kind: "org", ref: d.org.id, text: `เจ้าของบัญชีฝั่งเรา: ${d.org.accountOwner}` });
-  for (const p of d.people.slice(0, 40)) {
+  /* คนที่ถูกปิดบังไม่ส่งให้โมเดลเลย แม้ในรูปชื่อแทน — สรุปต้องไม่เดาจากการมีอยู่ของเขา */
+  for (const p of d.people.filter((x) => !x.masked).slice(0, 40)) {
     const period = p.current ? `ตั้งแต่ ${thaiDay(p.from)} ถึงปัจจุบัน` : `${thaiDay(p.from)} ถึง ${thaiDay(p.to)} (ออกแล้ว)`;
     out.push({ kind: "person", ref: p.affiliationId, text: `${p.name} — ${p.title ?? "ไม่ทราบตำแหน่ง"} · ${period}${p.confirmedBy ? " · คนยืนยันแล้ว" : ""}` });
   }
-  for (const r of d.relationships.filter((x) => x.confirmedBy && x.lifecycle === "confirmed")) {
+  for (const r of d.relationships.filter((x) => !x.masked && x.confirmedBy && x.lifecycle === "confirmed")) {
     out.push({
       kind: "relationship", ref: r.id,
       text: `${r.fromName} ${RELATIONSHIP_TH[r.type] ?? r.type} ${r.toName}${r.context ? ` (${r.context})` : ""}${r.validTo ? ` · สิ้นสุด ${thaiDay(r.validTo)}` : ""} · ยืนยันโดย ${r.confirmedBy}`,
     });
   }
-  for (const i of d.interactions.filter((x) => !x.masked && CLEARANCE_RANK[x.classification] <= CLEARANCE_RANK[scope]).slice(0, 25)) {
+  for (const i of d.interactions.filter((x) => !x.masked && !x.personMasked && CLEARANCE_RANK[x.classification] <= CLEARANCE_RANK[scope]).slice(0, 25)) {
     out.push({
       kind: "interaction", ref: i.id,
       text: `${thaiDay(i.occurredAt)} ${INTERACTION_TH[i.kind] ?? i.kind}${i.personName ? ` กับ ${i.personName}` : ""}: ${i.summary ?? ""}${i.outcome ? ` · ผล: ${i.outcome}` : ""}`,
     });
   }
-  for (const p of d.participations.slice(0, 20)) {
+  for (const p of d.participations.filter((x) => !x.masked).slice(0, 20)) {
     out.push({ kind: "participation", ref: p.id, text: `${p.personName ?? "ไม่ทราบชื่อ"} ร่วม ${p.program}${p.edition ? ` ${p.edition}` : ""} ในบทบาท ${p.role}` });
   }
   for (const o of d.opportunities) out.push({ kind: "opportunity", ref: o.id, text: `โอกาสขาย: ${o.name} · ขั้น ${o.stage}` });
@@ -108,6 +109,9 @@ function validate(draft: BriefDraft, pack: EvidenceItem[]) {
     const cites = [...new Set(s.cites ?? [])];
     const text = String(s.text ?? "").trim();
     const known = cites.every((c) => c === "U" || ids.has(c));
+    /* อ้างแค่ U ได้เฉพาะประโยคที่บอกว่าไม่ทราบ — ไม่ใช่ทางลัดให้ข้อความที่ไม่มีหลักฐานผ่าน */
+    const onlyUnknown = cites.every((c) => c === "U");
+    if (onlyUnknown && !/ไม่ทราบ|ไม่มีข้อมูล|ยังไม่มี/.test(text)) { dropped++; continue; }
     /* ห้ามช่องทางติดต่อหลุดในข้อความ แม้หลักฐานไม่มีให้ — กันโมเดลแต่งขึ้นเอง */
     const contact = /[\w.+-]+@[\w-]+\.[\w.]+|(?:\+?66|0)[\s-]?\d{1,2}[\s-]?\d{3}[\s-]?\d{3,4}/.test(text);
     if (!text || !cites.length || !known || contact) { dropped++; continue; }

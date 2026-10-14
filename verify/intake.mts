@@ -127,6 +127,27 @@ if (as.ok) {
   ok(Boolean(rs?.reasons.some((g) => /คอลัมน์ไม่ครบ/.test(g.reason) && g.lines[0] === 3)), "แถวคอลัมน์ไม่ครบถูกปฏิเสธพร้อมบรรทัดจริงในไฟล์ (บรรทัด 3)");
 } else ok(false, `ไฟล์ทดสอบแถวขาดอ่านไม่ได้: ${as.error}`);
 
+// เครื่องหมายคำพูดเปิดค้าง (12" monitor) กลืนบรรทัดถัดไปเป็นแถวเดียว — ต้องบอกช่วงบรรทัดที่หาย ไม่ใช่แค่ "คอลัมน์ไม่ครบ"
+const quoteCsv = enc('ชื่อ,บริษัท,อีเมล\nจอ 12" ทดสอบ,บจก. ตัวอย่าง,screen@sample.example\nมานี ทดสอบ,บจก. ตัวอย่าง,manee@sample.example\nมานะ ทดสอบ,บจก. ตัวอย่าง,mana@sample.example\n');
+const aq = await analyseUpload(A, SID, quoteCsv, "quote.csv", ACTOR);
+if (aq.ok) {
+  const cq = await commitUpload(A, SID, quoteCsv, "quote.csv", Object.fromEntries(aq.columns.map((c) => [c.index, c.field])), aq.sha256, ACTOR);
+  const rq = cq.ok ? (await getBatchReport(A, cq.batchId))! : null;
+  ok(Boolean(rq?.reasons.some((g) => /เครื่องหมายคำพูดไม่ปิด — บรรทัด 2–4/.test(g.reason))),
+    `เครื่องหมายคำพูดเปิดค้าง: รายงานบอกช่วงบรรทัดที่ถูกกลืน (${rq?.reasons.map((g) => g.reason).join(" | ")})`);
+} else ok(false, `ไฟล์ทดสอบเครื่องหมายคำพูดอ่านไม่ได้: ${aq.error}`);
+
+// ไฟล์เล็กที่ซ่อนตารางใหญ่ — ปฏิเสธที่การอ่าน ก่อนกินหน่วยความจำ
+const tall = enc("ชื่อ,อีเมล\n" + "ก,\n".repeat(50_001));
+const at = await analyseUpload(A, SID, tall, "tall.csv", ACTOR);
+ok(!at.ok && /มากกว่า 50,000 แถว/.test(at.ok ? "" : at.error), "CSV เกิน 50,000 แถว ถูกปฏิเสธพร้อมเหตุผล");
+const bigWs = XLSX.utils.aoa_to_sheet([["ชื่อ"], ...Array.from({ length: 50_001 }, () => ["ก"])]);
+const bigWb = XLSX.utils.book_new();
+XLSX.utils.book_append_sheet(bigWb, bigWs, "ใหญ่");
+const bigX = new Uint8Array(XLSX.write(bigWb, { type: "array", bookType: "xlsx" }));
+const abig = await analyseUpload(A, SID, bigX, "big.xlsx", ACTOR);
+ok(!abig.ok && /มากกว่า 50,000 แถว/.test(abig.ok ? "" : abig.error), `xlsx เกิน 50,000 แถว ถูกปฏิเสธโดยไม่อ่านทั้งชีต (${abig.ok ? "อ่านผ่าน" : abig.error})`);
+
 // ── 5 · Windows-874 และ xlsx ──
 const sponsors = syn.files[1];
 const w874 = fileBytes(sponsors);

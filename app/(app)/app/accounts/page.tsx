@@ -18,7 +18,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
   const v = await viewer();
   const page = Math.max(1, Number(sp.page) || 1);
   const mine = sp.mine === "1";
-  const { rows, total } = await listAccounts(v.tenantId, { q: sp.q, mine: mine ? v.actor : undefined, limit: PAGE, offset: (page - 1) * PAGE });
+  const { rows, total } = await listAccounts(v.tenantId, { q: sp.q, mine: mine ? v.actor : undefined, limit: PAGE, offset: (page - 1) * PAGE, viewer: { id: v.actor, clearance: v.clearance } });
   const pages = Math.max(1, Math.ceil(total / PAGE));
   const qs = (p: number) => `/app/accounts?${new URLSearchParams({ ...(sp.q ? { q: sp.q } : {}), ...(mine ? { mine: "1" } : {}), page: String(p) })}`;
 

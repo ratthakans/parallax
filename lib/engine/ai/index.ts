@@ -1,4 +1,4 @@
-import { all, exec, get, run, usingPostgres } from "@/lib/engine/sql";
+import { all, asSystem, exec, get, run, usingPostgres } from "@/lib/engine/sql";
 import Anthropic from "@anthropic-ai/sdk";
 import { createHash } from "node:crypto";
 import { aiPolicy } from "@/lib/engine/ai/policy";
@@ -107,18 +107,23 @@ function cacheKey(tenantId: string, kind: string, input: unknown): string {
     .slice(0, 32);
 }
 
+/* ── แคชอ่าน/เขียนในนามระบบ ไม่ใช่ในนามผู้ใช้ ──
+   ai_cache เปิด RLS โดยไม่มีนโยบาย (0002) — ภายใต้ role authenticated จึงอ่านได้ศูนย์แถวและเขียนไม่ได้
+   ผลบน Postgres คือแคชไม่เคยโดน และทุกการเรียกที่สำเร็จถูกทิ้งไปใช้สูตรสำเร็จ
+   ปลอดภัยเพราะคีย์เป็น hash ที่รวม tenantId ของคำขอ (cacheKey) — ไม่มีทางอ่านแคชของบัญชีอื่น
+   และ tenantId มาจาก session ฝั่งเซิร์ฟเวอร์เสมอ */
 async function readCache<T>(key: string): Promise<T | null> {
   await ensureCache();
-  const row = await get<{ payload: string }>(
+  const row = await asSystem(() => get<{ payload: string }>(
     "SELECT payload FROM ai_cache WHERE key = ?",
     key,
-  );
+  ));
   return row ? (JSON.parse(row.payload) as T) : null;
 }
 
 async function writeCache(key: string, kind: string, value: unknown) {
   await ensureCache();
-  await run(
+  await asSystem(() => run(
     `INSERT INTO ai_cache (key, kind, payload, model, created_at)
      VALUES (?,?,?,?,?)
      ON CONFLICT(key) DO UPDATE SET payload = excluded.payload`,
@@ -127,7 +132,7 @@ async function writeCache(key: string, kind: string, value: unknown) {
     JSON.stringify(value),
     MODEL,
     new Date().toISOString(),
-  );
+  ));
 }
 
 export async function aiCacheStats(): Promise<{ kind: string; n: number }[]> {
@@ -224,6 +229,12 @@ async function ask<T>(opts: AskOptions<T>): Promise<AiResult<T>> {
       cacheReadTokens: res.usage.cache_read_input_tokens ?? 0,
     };
 
+    /* ถูกตัดเพราะเกินเพดานโทเค็น = JSON ไม่ครบ — ทิ้ง ไม่ใช้ครึ่ง ๆ กลาง ๆ และบันทึกแยกให้เห็นว่าเพดานต่ำไป (plan 9.2) */
+    if (res.stop_reason === "max_tokens") {
+      await recordAiCall({ ...usage, outcome: "truncated" });
+      return { value: opts.fallback(), source: "fallback", note: "AI ตอบยาวเกินเพดาน — ใช้สูตรสำเร็จแทน" };
+    }
+
     // ทั้งสายปฏิเสธ (รวมรุ่นสำรอง) — เช็คก่อนอ่าน content เสมอ
     if (res.stop_reason === "refusal") {
       await recordAiCall({ ...usage, outcome: "refused" });
@@ -247,7 +258,8 @@ async function ask<T>(opts: AskOptions<T>): Promise<AiResult<T>> {
       return { value: opts.fallback(), source: "fallback", note: "AI ตอบไม่ตรงรูปแบบ — ใช้สูตรสำเร็จแทน" };
     }
     await recordAiCall({ ...usage, outcome: "ai" });
-    if (!opts.noCache) await writeCache(key, opts.kind, value);
+    /* แคชเขียนไม่ได้ ≠ AI ล้มเหลว — ผลที่จ่ายเงินไปแล้วต้องถึงผู้ใช้ และ ledger ต้องไม่นับซ้ำเป็น error */
+    if (!opts.noCache) await writeCache(key, opts.kind, value).catch((err) => console.error("[ai] cache write", opts.kind, err));
     return { value, source: "ai" };
   } catch (err) {
     await recordAiCall({ tenantId: opts.tenantId, kind: opts.kind, model: MODEL, outcome: "error" });
@@ -939,13 +951,15 @@ export async function writeAccountBrief(
   input: { org: string; evidence: BriefEvidence[]; unknowns: string[]; scope: string },
   fallback: () => BriefDraft,
 ): Promise<AiResult<BriefDraft>> {
-  const lines = input.evidence.map((e) => `${e.id}: ${e.text.replace(/</g, "‹")}`).join("\n");
+  /* หนึ่งหลักฐานต่อหนึ่งบรรทัดเสมอ — ขึ้นบรรทัดใหม่ในบันทึกของผู้ใช้ปลอมบรรทัด "E2: ..." ที่อ้างรหัสจริงได้ */
+  const flat = (t: string) => t.replace(/</g, "‹").replace(/[\r\n\u2028\u2029]+/g, " ");
+  const lines = input.evidence.map((e) => `${e.id}: ${flat(e.text)}`).join("\n");
   return ask<BriefDraft>({
     tenantId,
     kind: "account_brief",
     input,
     system: ACCOUNT_BRIEF_SYSTEM,
-    prompt: `บริษัท: ${input.org.replace(/</g, "‹")}\n<evidence>\n${lines}\nU: ไม่ทราบ — ${input.unknowns.join(" · ") || "ไม่มี"}\n</evidence>`,
+    prompt: `บริษัท: ${flat(input.org)}\n<evidence>\n${lines}\nU: ไม่ทราบ — ${input.unknowns.join(" · ") || "ไม่มี"}\n</evidence>`,
     schema: ACCOUNT_BRIEF_SCHEMA,
     fallback,
     maxTokens: 3000,
