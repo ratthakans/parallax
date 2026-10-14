@@ -6,10 +6,10 @@ import { Field, Label } from "@/components/ui";
 
 export default function SiteError({
   error,
-  unstable_retry,
+  retry,
 }: {
   error: Error & { digest?: string };
-  unstable_retry: () => void;
+  retry: () => void;
 }) {
   useEffect(() => {
     console.error(error);
@@ -35,7 +35,7 @@ export default function SiteError({
         <div className="mt-11 flex flex-wrap gap-3">
           <button
             type="button"
-            onClick={() => unstable_retry()}
+            onClick={() => retry()}
             className="btn btn-primary"
           >
             ลองอีกครั้ง

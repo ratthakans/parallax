@@ -18,10 +18,10 @@ import Link from "next/link";
 
 export default function ConsoleError({
   error,
-  unstable_retry,
+  retry,
 }: {
   error: Error & { digest?: string };
-  unstable_retry: () => void;
+  retry: () => void;
 }) {
   useEffect(() => {
     console.error(error);
@@ -49,7 +49,7 @@ export default function ConsoleError({
         <div className="mt-8 flex flex-wrap gap-2.5">
           <button
             type="button"
-            onClick={() => unstable_retry()}
+            onClick={() => retry()}
             className="c-btn c-btn-primary"
           >
             ลองอีกครั้ง
