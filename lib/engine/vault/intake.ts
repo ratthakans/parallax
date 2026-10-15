@@ -6,6 +6,7 @@ import { sealRecord } from "@/lib/engine/pii";
 import { scanFile } from "@/lib/engine/vault/scan";
 import { TableTooLarge, readTable } from "@/lib/engine/vault/read";
 import { getSource, type Source } from "@/lib/engine/vault/sources";
+import { contactKeys, erasedKeys, erasedReason } from "@/lib/engine/vault/erasure";
 import {
   IDENTIFYING_FIELDS, VAULT_FIELDS, sensitiveReason, type ImportRowStatus, type VaultField,
 } from "@/lib/shared/vault";
@@ -109,6 +110,15 @@ export function judgeRow(cells: string[], columns: ColumnPlan[], issue: string |
   return { status: "pending_review", reason: notes.length ? notes.join(" · ") : null, values };
 }
 
+/* แถวที่อีเมลหรือเบอร์ตรงกับคนที่ถูกลบ (ทะเบียนการลบ · erasure.ts) → พักไว้ ไม่เข้าสู่การตรวจตัวตน */
+function withErasure(
+  tenantId: string, j: ReturnType<typeof judgeRow>, erased: Awaited<ReturnType<typeof erasedKeys>>,
+): ReturnType<typeof judgeRow> & { erased?: boolean } {
+  if (j.status === "rejected" || !erased.size) return j;
+  const hit = contactKeys(tenantId, j.values).map((k) => erased.get(k)).find(Boolean);
+  return hit ? { status: "suspended", reason: erasedReason(hit), values: {}, erased: true } : j;
+}
+
 type ScanRead =
   | { error: string; threat: boolean }
   | { scan: Extract<Awaited<ReturnType<typeof scanFile>>, { ok: true }>; table: ReturnType<typeof readTable> };
@@ -152,7 +162,8 @@ export async function analyseUpload(
   });
   const columns = planColumns(table.headers, suggested, source.fields);
   const estimate: Record<ImportRowStatus, number> = { accepted: 0, rejected: 0, pending_review: 0, suspended: 0 };
-  table.rows.forEach((r, i) => estimate[judgeRow(r, columns, table.issues[i]).status]++);
+  const erased = await erasedKeys(tenantId);
+  table.rows.forEach((r, i) => estimate[withErasure(tenantId, judgeRow(r, columns, table.issues[i]), erased).status]++);
 
   return {
     ok: true, filename, sha256: digest, bytes: bytes.byteLength, kind: scan.kind, encoding: table.encoding,
@@ -189,11 +200,13 @@ export async function commitUpload(
   const batchId = randomUUID();
   const now = new Date().toISOString();
   const counts: Record<ImportRowStatus, number> = { accepted: 0, rejected: 0, pending_review: 0, suspended: 0 };
+  const erased = await erasedKeys(tenantId);
   const rows = table.rows.map((cells, i) => {
     const line = table.lines[i]; // บรรทัดจริงในไฟล์ (หรือแถวในชีต)
-    const j = judgeRow(cells, columns, table.issues[i]);
+    const j = withErasure(tenantId, judgeRow(cells, columns, table.issues[i]), erased);
     counts[j.status]++;
-    const payload = j.status === "rejected" ? null : sealRecord(tenantId, "import_row", JSON.stringify(j.values));
+    /* แถวที่ถูกปฏิเสธ หรือตรงกับคนที่ถูกลบ ไม่เก็บค่า — คนที่ขอให้ลบต้องไม่กลับเข้ามาทางไฟล์เก่า */
+    const payload = j.status === "rejected" || j.erased ? null : sealRecord(tenantId, "import_row", JSON.stringify(j.values));
     return [tenantId, batchId, line, j.status, j.reason, `${filename}#${line}`, null, payload, now];
   });
 

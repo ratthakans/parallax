@@ -129,7 +129,8 @@ export async function deleteCustomerAction(_prev: ActionState, fd: FormData): Pr
     if (role !== "owner") return { error: "เฉพาะเจ้าของบัญชีเท่านั้นที่ลบลูกค้าได้" };
   }
   const id = field(fd, "customerId");
-  const res = await deleteCustomer(tenantId, id, actor);
+  const reason = (["request", "retention", "manual"] as const).find((r) => r === field(fd, "reason")) ?? "manual";
+  const res = await deleteCustomer(tenantId, id, actor, { reason, requestRef: field(fd, "requestRef") || null });
   if (!res.ok) return { error: res.error };
   refresh(id);
   // ไม่ใส่ชื่อใน URL — ชื่อคือข้อมูลส่วนบุคคล และ URL ไปอยู่ใน log กับประวัติเบราว์เซอร์

@@ -1,10 +1,11 @@
 import { createHash } from "node:crypto";
-import { all, insertMany, tx, type Param } from "@/lib/engine/sql";
+import { all, insertMany, run, tx, type Param } from "@/lib/engine/sql";
 import { logActivity } from "@/lib/engine/db";
 import {
   CONTACT_POINT_COLUMNS, contactPointRow, customerIdFor, matchKey, normaliseContact, openRecord,
 } from "@/lib/engine/pii";
 import { detectDateOrder, normaliseDate } from "@/lib/engine/ingest";
+import { contactKeys, erasedKeys, erasedReason } from "@/lib/engine/vault/erasure";
 import {
   compareNames, emailInfo, nameInfo, nameKey, orgInfo, type EmailInfo, type NameInfo,
 } from "@/lib/shared/identity";
@@ -73,7 +74,17 @@ async function loadPending(tenantId: string): Promise<Row[]> {
      ORDER BY b.uploaded_at, r.batch_id, r.line`,
     tenantId,
   );
-  const decoded = raw.map((r) => ({ r, v: JSON.parse(openRecord(tenantId, "import_row", r.payload_enc)) as Row["v"] }));
+  const all_ = raw.map((r) => ({ r, v: JSON.parse(openRecord(tenantId, "import_row", r.payload_enc)) as Row["v"] }));
+  /* แถวรอตรวจที่ตรงกับคนที่ถูกลบหลังนำเข้า (แถวยังไม่ผูกกับคน จึงไม่ถูกลบไปพร้อมคน) → พัก และลบค่าในแถวทิ้ง
+     ไม่งั้นรอบตรวจตัวตนนี้จะสร้างคนที่ถูกลบกลับขึ้นมาใหม่ (B6 · erasure.ts) */
+  const erased = await erasedKeys(tenantId);
+  const decoded: typeof all_ = [];
+  for (const d of all_) {
+    const hit = erased.size ? contactKeys(tenantId, d.v).map((k) => erased.get(k)).find(Boolean) : undefined;
+    if (!hit) { decoded.push(d); continue; }
+    await run("UPDATE import_rows SET status = 'suspended', reason = ?, payload_enc = NULL, customer_id = NULL WHERE tenant_id = ? AND batch_id = ? AND line = ?",
+      erasedReason(hit), tenantId, d.r.batch_id, d.r.line);
+  }
   /* ลำดับวันที่ต่อชุด — ไฟล์หนึ่งเขียนแบบเดียว (วัน/เดือน หรือ เดือน/วัน) */
   const orderByBatch = new Map<string, "dmy" | "mdy">();
   for (const b of new Set(decoded.map((d) => d.r.batch_id))) {

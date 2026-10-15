@@ -799,6 +799,19 @@ export async function ensureSchema(): Promise<void> {
       updated_at TEXT NOT NULL,
       PRIMARY KEY (tenant_id, user_id, item_kind, item_id)
     );
+
+    /* ══ ทะเบียนการลบ (B6 · plan 7.5) — สเปกเดียวกับ supabase/migrations/0014_deletion_registry.sql ══ */
+    -- HMAC ของอีเมล/เบอร์ของคนที่ถูกลบ — กันการนำเข้าซ้ำและใช้ซ้ำหลังกู้คืน backup · ไม่มีชื่อ · เพิ่มอย่างเดียว
+    CREATE TABLE IF NOT EXISTS deletion_registry (
+      id TEXT NOT NULL PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      keys TEXT NOT NULL,
+      reason TEXT NOT NULL,
+      request_ref TEXT,
+      deleted_by TEXT NOT NULL,
+      deleted_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS ix_deletion_registry_tenant ON deletion_registry (tenant_id, deleted_at);
   `);
 
   /* บัญชีเดโมสังเคราะห์ได้สถานะ demo — เฉพาะบัญชีในทะเบียนเดโม ไม่ใช่ทุกแถวใน tenants

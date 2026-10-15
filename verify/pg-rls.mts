@@ -12,6 +12,7 @@
    7. "ฉันรู้จัก" · เส้นทางเข้าถึง · คนที่รู้จักย้ายบริษัท — query ของกราฟและการย้ายรันได้ในนามผู้ใช้
    8. เลือกแม่แบบวัตถุประสงค์ในนามผู้ใช้ และฐานที่ผูกกับบริษัทจับการย้ายบน Postgres (0013)
    9. ตั้งกฎอายุข้อมูลและคำนวณวันครบอายุในนามผู้ใช้ (B6)
+   10. ทะเบียนการลบเขียนได้ระหว่างลบตามคำขอ และผู้ใช้ลบแถวทะเบียนไม่ได้ (0014)
 
    ต้องมี DATABASE_URL ของฐานทดสอบที่ใช้ migration แล้ว (npm run pg:test-db) — ไม่มีก็ข้าม
    ⚠ ห้ามชี้ไปที่ production: ชุดนี้สร้างบัญชีและผู้ใช้ทดสอบ */
@@ -153,6 +154,12 @@ if (adopted.ok) {
   const ret = await as(() => retentionForPeople(T, viewerPg));
   ok(rule.ok && Array.isArray(ret), `ตั้งกฎอายุและคำนวณอายุข้อมูลในนามผู้ใช้บน Postgres ได้${rule.ok ? "" : ` (${rule.error})`}`);
 }
+
+// ── 10 · ทะเบียนการลบ (0014) ── การลบในข้อ 1 ต้องเขียนทะเบียนผ่าน RLS ได้ · ผู้ใช้ลบแถวทะเบียนไม่ได้ (ลบได้ = คนที่ถูกลบกลับมา)
+const regRows = await countFor("deletion_registry", "tenant_id = ?", T);
+ok(regRows >= 1, `การลบตามคำขอในนามผู้ใช้เขียนทะเบียนการลบได้ (${regRows} รายการ)`);
+const wiped = await as(async () => { try { await run("DELETE FROM deletion_registry WHERE tenant_id = ?", T); return true; } catch { return false; } });
+ok(!wiped && await countFor("deletion_registry", "tenant_id = ?", T) === regRows, "ผู้ใช้ลบแถวในทะเบียนการลบไม่ได้ (เพิ่มอย่างเดียว)");
 
 // เก็บกวาด — บัญชีทดสอบหายพร้อมทุกแถว (on delete cascade)
 await asSystem(() => run("DELETE FROM ai_cache WHERE kind = 'map_columns' AND created_at >= ?", now));
