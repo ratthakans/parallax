@@ -434,6 +434,7 @@ export default async function CustomerPage({
             <p className="c-thai mt-1.5 text-[0.82rem] text-[var(--c-text-3)]">
               ลบชื่อ ช่องทางติดต่อ ประวัติ{v.purchase} และความยินยอมของคนนี้ออกทั้งหมด ย้อนกลับไม่ได้ —
               ใช้เมื่อลูกค้าขอให้ลบข้อมูล ผลวัดของแคมเปญที่สรุปไปแล้วไม่เปลี่ยน เพราะเป็นตัวเลขรวมของกลุ่ม
+              · อีเมลและเบอร์ถูกจำไว้แบบเข้ารหัสทางเดียวในทะเบียนการลบ เพื่อไม่ให้นำเข้าซ้ำจากไฟล์เก่า
             </p>
             <ActionForm
               action={deleteCustomerAction}
@@ -443,8 +444,19 @@ export default async function CustomerPage({
               pendingLabel="กำลังลบ…"
               variant="danger"
               size="sm"
-              className="mt-3"
-            />
+              className="mt-3 grid gap-3 sm:grid-cols-2"
+            >
+              <label className="c-thai flex min-w-0 flex-col gap-1 text-[0.8rem] text-[var(--c-text-3)]">เหตุที่ลบ
+                <select name="reason" className="c-select" defaultValue="request">
+                  <option value="request">ตามคำขอของเจ้าของข้อมูล</option>
+                  <option value="retention">ครบอายุข้อมูล</option>
+                  <option value="manual">อื่น ๆ (ผู้ใช้ลบ)</option>
+                </select>
+              </label>
+              <label className="c-thai flex min-w-0 flex-col gap-1 text-[0.8rem] text-[var(--c-text-3)]">อ้างอิงคำขอ (ถ้ามี)
+                <input name="requestRef" className="c-input" placeholder="เช่น เลขเรื่อง DSAR-2026-014" maxLength={120} />
+              </label>
+            </ActionForm>
           </Panel>
         </div>
       </div>

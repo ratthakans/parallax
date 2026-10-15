@@ -162,6 +162,10 @@ jobs:
       - name: Retention
         run: npm run verify:retention
 
+      # ลบแล้วไม่กลับ: นำเข้าไฟล์เก่า · แถวรอตรวจในไฟล์อื่น · กู้คืน backup (ใช้ทะเบียนซ้ำ)
+      - name: Deletion registry
+        run: npm run verify:erasure
+
       # ── สคีมาสองฝั่งตรงกันไหม ──
       # ต้องมี DATABASE_URL ถึงจะเทียบได้ ไม่มีก็ข้ามโดยไม่ล้มเหลว เพราะ PR
       # จากคนนอกไม่ควรต้องมีรหัสฐานข้อมูล แต่บน push เข้า main ที่ตั้ง secret

@@ -2,6 +2,7 @@ import { all, get, insertMany, tx, type Param, type Sql } from "@/lib/engine/sql
 import { logActivity } from "@/lib/engine/db";
 import { PERSON_LINKED, deletePersonData, erasePersonHistory } from "@/lib/engine/tenant-data";
 import { RETAIL, mergePersons } from "@/lib/engine/vault/merge";
+import { recordErasure, type ErasureReason } from "@/lib/engine/vault/erasure";
 import { findCustomersByContact, listContactPoints, type ContactPoint } from "@/lib/engine/contacts";
 import {
   CONTACT_KINDS,
@@ -533,10 +534,20 @@ export async function setConsent(tenantId: string, id: string, granted: boolean,
    wipeCustomerData แต่จำกัดที่คนเดียว ผลการวัดของแคมเปญที่สรุปไปแล้ว
    (attributions) เป็นตัวเลขรวมของกลุ่ม ไม่มีตัวคนอยู่ข้างใน จึงไม่ต้องแตะ
    activity_log เก็บแค่รหัส ไม่มีชื่อหรือเบอร์ — หลังลบแล้วสืบกลับเป็นตัวคนไม่ได้ */
-export async function deleteCustomer(tenantId: string, id: string, actor: string): Promise<Result<{ name: string }>> {
+export async function deleteCustomer(
+  tenantId: string, id: string, actor: string, opts: { reason?: ErasureReason; requestRef?: string | null } = {},
+): Promise<Result<{ name: string }>> {
   const c = await get<{ name: string }>("SELECT name FROM customers WHERE tenant_id = ? AND id = ?", tenantId, id);
   if (!c) return { ok: false, error: "ไม่พบลูกค้าคนนี้ในบัญชีนี้" };
   await tx(async (q) => {
+    /* ทะเบียนการลบก่อน — ต้องอ่านช่องทางติดต่อของทุกรหัสที่ถูกรวมเข้ามา ก่อนที่มันจะหายไปกับการลบ (B6 · erasure.ts) */
+    const merged = [id];
+    for (let i = 0; i < merged.length; i++) {
+      for (const r of await q.all<{ merged_id: string }>(
+        "SELECT merged_id FROM merge_log WHERE tenant_id = ? AND survivor_id = ? AND undone_at IS NULL", tenantId, merged[i],
+      )) if (!merged.includes(r.merged_id)) merged.push(r.merged_id);
+    }
+    await recordErasure(q, tenantId, merged, opts.reason ?? "manual", actor, opts.requestRef ?? null);
     const ids = await deletePersonData(q, tenantId, id);
     await q.run("DELETE FROM customers WHERE tenant_id = ? AND id = ?", tenantId, id);
     await erasePersonHistory(q, tenantId, ids);
