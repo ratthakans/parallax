@@ -34,6 +34,7 @@
     "verify:today": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/today.mts",
     "verify:paths": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/paths.mts",
     "verify:templates": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/templates.mts",
+    "verify:retention": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/retention.mts",
     "pg:test-db": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs scripts/pg-test-db.mts",
     "verify:pg": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/pg-rls.mts"
   },

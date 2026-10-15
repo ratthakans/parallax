@@ -3,6 +3,7 @@ import { MASKED_ORG, MASKED_PERSON, type Viewer } from "@/lib/engine/accounts";
 import { targetDecision } from "@/lib/engine/campaigns";
 import { loadPathGraph } from "@/lib/engine/accounts/paths";
 import { jobMoves } from "@/lib/engine/today/moves";
+import { retentionForPeople } from "@/lib/engine/retention";
 import { SIGNAL_TH } from "@/lib/engine/vault/review";
 import { canSee } from "@/lib/shared/accounts";
 import { bangkokDay, thaiDate } from "@/lib/shared/format";
@@ -181,7 +182,28 @@ export async function todayQueue(tenantId: string, viewer: Viewer, now = new Dat
     });
   }
 
-  /* ── 6 · บัญชีที่เงียบ ── มีโอกาสเปิด แต่ไม่มีปฏิสัมพันธ์ ≥ QUIET_DAYS วัน (หรือไม่เคยมี) */
+  /* ── 6 · ข้อมูลครบอายุ (B6) ── ระบบไม่ลบเอง: การลบย้อนไม่ได้ จึงให้คนตัดสินที่หน้าคน
+     คนที่เกินสิทธิ์ยังขึ้น (ข้อมูลต้องถูกจัดการไม่ว่าใครเห็นได้) แต่ชื่อถูกปิดบังและไม่มีลิงก์ */
+  const TRIGGER_TH: Record<string, string> = {
+    last_interaction: "นับจากติดต่อล่าสุด", received: "นับจากวันที่ได้รับข้อมูล", last_participation: "นับจากร่วมงานล่าสุด",
+    withdrawal: "นับจากวันที่ถอนความยินยอม", referred: "นับจากได้รับการแนะนำหรือคุยล่าสุด",
+  };
+  for (const r of await retentionForPeople(tenantId, viewer, now)) {
+    if (r.status !== "due" && r.status !== "due_soon") continue;
+    const last = r.purposes.find((x) => x.dueAt === r.dueAt) ?? r.purposes[0];
+    keep({
+      section: "expiring", kind: "customer", id: r.customerId,
+      title: `${r.visible ? r.name : MASKED_PERSON} · ${r.status === "due" ? "ครบอายุแล้ว" : "จะครบอายุ"} ${thaiDate(r.dueAt)}`,
+      detail: [
+        ...r.purposes.map((x) => `${x.purpose}: เก็บ ${x.days} วัน ${TRIGGER_TH[x.trigger ?? ""] ?? ""} (${thaiDate(x.anchor)})`),
+        r.purposes.length > 1 ? `ใช้วันที่ช้าที่สุดของทุกวัตถุประสงค์ (${last.purpose})` : "",
+      ].filter(Boolean),
+      href: r.visible ? `/app/customers/${r.customerId}` : null,
+      at: r.dueAt ?? "", eligibility: null, snoozable: true, ackable: false,
+    });
+  }
+
+  /* ── 7 · บัญชีที่เงียบ ── มีโอกาสเปิด แต่ไม่มีปฏิสัมพันธ์ ≥ QUIET_DAYS วัน (หรือไม่เคยมี) */
   const quietBefore = new Date(+now - QUIET_DAYS * 864e5).toISOString();
   const quiet = await all<{ id: string; name: string; classification: string | null; account_owner_id: string | null; data_owner_id: string | null;
     last_at: string | null; open_opps: number | string }>(
@@ -218,12 +240,12 @@ export async function todayQueue(tenantId: string, viewer: Viewer, now = new Dat
 /* ── เลื่อน / รับทราบ ── ของผู้ใช้แต่ละคน · ไม่มีข้อความอิสระ (คิวไม่ควรเป็นที่เก็บข้อมูลส่วนบุคคลแห่งใหม่) */
 
 async function itemExists(tenantId: string, kind: QueueItemKind, id: string) {
-  const table = { preference: "preferences", task: "tasks", review: "review_items", org: "orgs", affiliation: "affiliations" }[kind];
+  const table = { preference: "preferences", task: "tasks", review: "review_items", org: "orgs", affiliation: "affiliations", customer: "customers" }[kind];
   if (!table) return false;
   return Boolean(await get(`SELECT 1 AS x FROM ${table} WHERE tenant_id = ? AND id = ?`, tenantId, id));
 }
 
-const KINDS: QueueItemKind[] = ["preference", "task", "review", "org", "affiliation"];
+const KINDS: QueueItemKind[] = ["preference", "task", "review", "org", "affiliation", "customer"];
 const ACKABLE: QueueItemKind[] = ["preference", "affiliation"];
 
 export async function snoozeItem(
