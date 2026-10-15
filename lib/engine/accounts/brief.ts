@@ -182,3 +182,28 @@ export async function briefCount(tenantId: string) {
   const r = await all<{ source: string; n: number | string }>("SELECT source, COUNT(*) AS n FROM account_briefs WHERE tenant_id = ? GROUP BY source", tenantId);
   return Object.fromEntries(r.map((x) => [x.source, Number(x.n)]));
 }
+
+/* ── สรุป AI ที่เกี่ยวกับคนหนึ่งคน (คำขอสิทธิ · plan 7.4 "ค้นข้อมูลที่ AI สร้าง") ──
+   ทุกสรุปที่เก็บไว้ของบริษัทที่คนนี้เกี่ยวข้อง: ประโยคที่อ้างหลักฐานของคนนี้ (สังกัด · ปฏิสัมพันธ์ · การร่วมงาน · ความสัมพันธ์)
+   ถ้าหลักฐานเปลี่ยนไปแล้ว (hash ไม่ตรง) แม็ปรหัสหลักฐานไม่ได้ — ใช้ประโยคที่มีชื่อของคนนี้แทน
+   คืนเฉพาะประโยค ไม่คืนหลักฐานของคนอื่นในแฟ้ม */
+export async function storedBriefsAbout(
+  tenantId: string, orgIds: string[], refs: Set<string>, name: string,
+): Promise<{ orgId: string; source: string; model: string | null; createdAt: string; sentences: string[] }[]> {
+  const out: { orgId: string; source: string; model: string | null; createdAt: string; sentences: string[] }[] = [];
+  for (const orgId of [...new Set(orgIds)].sort()) {
+    const rows = await all<{ clearance: Classification; evidence_hash: string; sentences: string; source: string; model: string | null; created_at: string }>(
+      "SELECT clearance, evidence_hash, sentences, source, model, created_at FROM account_briefs WHERE tenant_id = ? AND org_id = ? ORDER BY clearance",
+      tenantId, orgId);
+    for (const r of rows) {
+      const sentences = JSON.parse(r.sentences) as { text: string; cites: string[] }[];
+      const d = await getDossier(tenantId, orgId, { id: "dsar", clearance: r.clearance });
+      const pack = d && !d.masked ? evidencePack(d, r.clearance) : [];
+      const exact = d && pack.length && hashOf(pack, unknownsOf(d)) === r.evidence_hash;
+      const mine = new Set(exact ? pack.filter((e) => refs.has(e.ref)).map((e) => e.id) : []);
+      const hit = sentences.filter((s) => (exact && s.cites.some((c) => mine.has(c))) || (name && s.text.includes(name)));
+      if (hit.length) out.push({ orgId, source: r.source, model: r.model, createdAt: r.created_at, sentences: hit.map((s) => s.text) });
+    }
+  }
+  return out;
+}

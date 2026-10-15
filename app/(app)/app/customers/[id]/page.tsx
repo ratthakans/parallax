@@ -3,6 +3,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { activeTenantId } from "@/app/(app)/tenant";
 import { findDuplicates, getCustomer, type TimelineItem } from "@/lib/engine/customers";
+import { requestsFor } from "@/lib/engine/dsar";
+import { DSAR_KIND_TH } from "@/lib/shared/dsar";
+import { DueBadge } from "@/components/console/dsar-badge";
 import { profileFor } from "@/lib/shared/tenants";
 import { CONTACT_KIND_LABEL, CONTACT_KIND_ORDER } from "@/lib/shared/contact-kinds";
 import { FIELD_LABEL } from "@/lib/shared/ingest-types";
@@ -141,7 +144,7 @@ export default async function CustomerPage({
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   const tenantId = await activeTenantId();
   const cid = decodeURIComponent(id);
-  const [c, dupes] = await Promise.all([getCustomer(tenantId, cid), findDuplicates(tenantId, cid)]);
+  const [c, dupes, requests] = await Promise.all([getCustomer(tenantId, cid), findDuplicates(tenantId, cid), requestsFor(tenantId, cid)]);
   if (!c) notFound();
   const v = profileFor(tenantId).vocab.th;
 
@@ -428,6 +431,30 @@ export default async function CustomerPage({
               </ul>
             </Panel>
           )}
+
+          <Panel className="p-5 md:p-6">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 className="c-h2 text-[var(--c-text)]">คำขอสิทธิ</h2>
+              <Link href={`/app/requests?subject=${encodeURIComponent(c.id)}`} className="c-thai text-[0.84rem] text-[var(--c-cyan)] underline underline-offset-4">
+                บันทึกคำขอของคนนี้
+              </Link>
+            </div>
+            <p className="c-thai mt-1 text-[0.8rem] text-[var(--c-text-3)]">
+              คนนี้ขอดูข้อมูล ขอลบ ถอน หรือคัดค้าน — บันทึกเป็นคำขอเพื่อเริ่มนับ 30 วัน และให้ระบบทำตามคำขอเมื่อปิดเรื่อง
+            </p>
+            {requests.length > 0 && (
+              <ul className="mt-3 flex flex-col divide-y divide-[var(--c-line)]">
+                {requests.map((r) => (
+                  <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
+                    <Link href={`/app/requests/${r.id}`} className="c-thai text-[0.86rem] text-[var(--c-text)] underline-offset-4 hover:underline">
+                      <span className="c-mono">{r.ref}</span> · {DSAR_KIND_TH[r.kind]}
+                    </Link>
+                    <DueBadge r={r} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Panel>
 
           <Panel flat className="border-[var(--c-bad)]/40 p-5">
             <h2 className="c-h2 text-[var(--c-text)]">ลบ{v.person}คนนี้</h2>

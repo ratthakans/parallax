@@ -2,13 +2,15 @@
 
    ลำดับเป็นหมวดตายตัว ไม่ใช่คะแนนความสำคัญ — อธิบายได้เสมอว่าทำไมรายการนี้อยู่บนสุด
    ภายในหมวดเรียงตามเวลา (เก่าสุด/ใกล้สุดก่อน) · รันซ้ำบนข้อมูลเดียวกันต้องได้ลำดับเดิม
-   หมวด "ข้อมูลครบอายุ" มาจากเครื่องคิดอายุข้อมูล (lib/engine/retention · B6) */
+   หมวด "ข้อมูลครบอายุ" มาจากเครื่องคิดอายุข้อมูล (lib/engine/retention · B6)
+   หมวด "คำขอสิทธิ" มาจากทะเบียนคำขอ (lib/engine/dsar · B6) — มีกำหนดตามกฎหมาย จึงอยู่รองจาก "ต้องหยุด" */
 
-export const QUEUE_SECTIONS = ["stop", "due", "overdue", "moved", "review", "expiring", "quiet"] as const;
+export const QUEUE_SECTIONS = ["stop", "requests", "due", "overdue", "moved", "review", "expiring", "quiet"] as const;
 export type QueueSection = (typeof QUEUE_SECTIONS)[number];
 
 export const QUEUE_SECTION_TH: Record<QueueSection, { title: string; hint: string }> = {
   stop: { title: "ต้องหยุด", hint: "ถอนความยินยอม คัดค้าน หรือขอจำกัดใน 7 วันที่ผ่านมา — งานที่เกี่ยวข้องถูกยกเลิกแล้ว" },
+  requests: { title: "คำขอสิทธิที่เปิดอยู่", hint: "ต้องตอบภายใน 30 วันนับจากวันที่ได้รับ — ใกล้ครบกำหนดก่อน · เลื่อนไม่ได้" },
   due: { title: "ครบกำหนดวันนี้–พรุ่งนี้", hint: "งานติดต่อของคุณและงานที่ยังไม่มีผู้รับผิดชอบ" },
   overdue: { title: "เลยกำหนด", hint: "เก่าสุดก่อน" },
   moved: { title: "คนที่รู้จักย้ายบริษัท", hint: "คนที่ทีมรู้จัก เคยอยู่ในโอกาสขาย หรือเคยนัดประชุม มีสังกัดใหม่ — ย้ายล่าสุดก่อน" },
@@ -18,7 +20,7 @@ export const QUEUE_SECTION_TH: Record<QueueSection, { title: string; hint: strin
 };
 
 /** รายการต่อหมวดที่แสดง — เกินนี้แสดงเป็นจำนวนพร้อมลิงก์ไปหน้าเต็ม */
-export const QUEUE_SECTION_CAP: Record<QueueSection, number> = { stop: 10, due: 10, overdue: 10, moved: 5, review: 5, expiring: 5, quiet: 5 };
+export const QUEUE_SECTION_CAP: Record<QueueSection, number> = { stop: 10, requests: 10, due: 10, overdue: 10, moved: 5, review: 5, expiring: 5, quiet: 5 };
 
 /** การย้ายที่เก่ากว่านี้ (นับจากวันเริ่มสังกัดใหม่) ไม่ขึ้นคิว — ยังดูได้ในแฟ้มบริษัท */
 export const MOVED_WINDOW_DAYS = 365;
@@ -30,7 +32,7 @@ export const QUIET_DAYS = 30;
 export const MAX_SNOOZES = 3;
 
 /** ชนิดของสิ่งที่รายการชี้ไป — ใช้เป็นกุญแจของการเลื่อน/รับทราบ */
-export type QueueItemKind = "preference" | "task" | "review" | "org" | "affiliation" | "customer";
+export type QueueItemKind = "preference" | "task" | "review" | "org" | "affiliation" | "customer" | "dsar";
 
 export type QueueItem = {
   section: QueueSection;

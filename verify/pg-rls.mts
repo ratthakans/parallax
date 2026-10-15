@@ -13,6 +13,7 @@
    8. เลือกแม่แบบวัตถุประสงค์ในนามผู้ใช้ และฐานที่ผูกกับบริษัทจับการย้ายบน Postgres (0013)
    9. ตั้งกฎอายุข้อมูลและคำนวณวันครบอายุในนามผู้ใช้ (B6)
    10. ทะเบียนการลบเขียนได้ระหว่างลบตามคำขอ และผู้ใช้ลบแถวทะเบียนไม่ได้ (0014)
+   11. คำขอสิทธิ: เปิด · ยืนยัน · รายงาน · ปิดด้วยการลบ ในนามผู้ใช้ · อีกบัญชีมองไม่เห็น · ลบแถวคำขอไม่ได้ (0015)
 
    ต้องมี DATABASE_URL ของฐานทดสอบที่ใช้ migration แล้ว (npm run pg:test-db) — ไม่มีก็ข้าม
    ⚠ ห้ามชี้ไปที่ production: ชุดนี้สร้างบัญชีและผู้ใช้ทดสอบ */
@@ -160,6 +161,29 @@ const regRows = await countFor("deletion_registry", "tenant_id = ?", T);
 ok(regRows >= 1, `การลบตามคำขอในนามผู้ใช้เขียนทะเบียนการลบได้ (${regRows} รายการ)`);
 const wiped = await as(async () => { try { await run("DELETE FROM deletion_registry WHERE tenant_id = ?", T); return true; } catch { return false; } });
 ok(!wiped && await countFor("deletion_registry", "tenant_id = ?", T) === regRows, "ผู้ใช้ลบแถวในทะเบียนการลบไม่ได้ (เพิ่มอย่างเดียว)");
+
+// ── 11 · คำขอสิทธิ (0015) ── ทุกขั้นในนามผู้ใช้ · รายงานอ่านหลายตาราง (LIKE บน activity_log · อายุข้อมูล · สรุป AI) ผ่าน RLS
+{
+  const { openRequest, verifyIdentity, buildReport, closeRequest, getRequest } = await import("@/lib/engine/dsar");
+  const subj = await as(() => createCustomer(T, { name: "ขอสิทธิ ทดสอบ", contacts: [{ kind: "email", value: "dsar@pg.example" }], profile: {}, consent: false }, "verify"));
+  if (!subj.ok) throw new Error(subj.error);
+  const accR = await as(() => openRequest(T, { kind: "access", channel: "email", receivedAt: now.slice(0, 10), contactKind: "email", contactValue: "dsar@pg.example" }, viewerPg.id));
+  const ver = accR.ok ? await as(() => verifyIdentity(T, accR.id, "ตอบกลับจากอีเมลในระบบ (สมมุติ)", viewerPg.id)) : { ok: false as const, error: "ไม่ได้เปิด" };
+  const rep = accR.ok ? await as(() => buildReport(T, accR.id, viewerPg.id)) : null;
+  ok(accR.ok && accR.found && ver.ok && Boolean(rep?.ok && rep.report.contacts.some((c) => c.value === "dsar@pg.example")),
+    `เปิดคำขอ · ยืนยันตัวตน · สร้างรายงานในนามผู้ใช้บน Postgres ได้${rep && !rep.ok ? ` (${rep.error})` : ""}`);
+  const peekReq = await withIdentity(stranger, () => all<{ id: string }>("SELECT id FROM dsar_requests WHERE tenant_id = ?", T));
+  ok(peekReq.length === 0, "ผู้ใช้นอกบัญชีมองไม่เห็นคำขอสิทธิ");
+  const erR = await as(() => openRequest(T, { kind: "erase", channel: "email", receivedAt: now.slice(0, 10), subjectId: subj.id }, viewerPg.id));
+  if (erR.ok) await as(() => verifyIdentity(T, erR.id, "ตอบกลับจากอีเมลในระบบ (สมมุติ)", viewerPg.id));
+  const closed = erR.ok ? await as(() => closeRequest(T, erR.id, { outcome: "done", note: "แจ้งผู้ขอแล้ว (สมมุติ)" }, viewerPg.id)) : null;
+  const after = erR.ok ? await as(() => getRequest(T, erR.id)) : null;
+  ok(Boolean(closed?.ok && after?.status === "done" && after.subjectGone),
+    `ปิดคำขอลบในนามผู้ใช้ = ลบคนจริง และคำขออยู่ต่อ${closed && !closed.ok ? ` (${closed.error})` : ""}`);
+  const nReq = await countFor("dsar_requests", "tenant_id = ?", T);
+  const gone = await as(async () => { try { await run("DELETE FROM dsar_requests WHERE tenant_id = ?", T); return true; } catch { return false; } });
+  ok(!gone && await countFor("dsar_requests", "tenant_id = ?", T) === nReq, "ผู้ใช้ลบแถวคำขอสิทธิไม่ได้ (หลักฐานว่าทำตามคำขอ)");
+}
 
 // เก็บกวาด — บัญชีทดสอบหายพร้อมทุกแถว (on delete cascade)
 await asSystem(() => run("DELETE FROM ai_cache WHERE kind = 'map_columns' AND created_at >= ?", now));
