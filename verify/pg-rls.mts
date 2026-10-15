@@ -8,6 +8,7 @@
    2. ลบประวัติในตารางเพิ่มอย่างเดียวของคนที่ยังอยู่ไม่ได้ — ลบ "คัดค้าน" ทิ้งแล้วติดต่อต่อไม่ได้
    3. สาย audit ไม่แตกเมื่อเขียนพร้อมกันหลายคำขอ
    4. ผล AI ที่สำเร็จถึงผู้ใช้และถูกแคช — ai_cache เปิด RLS โดยไม่มีนโยบาย
+   6. คิว "วันนี้" รันได้ในนามผู้ใช้ และการเลื่อนผ่าน RLS โดยไม่รั่วข้ามบัญชี (0012)
 
    ต้องมี DATABASE_URL ของฐานทดสอบที่ใช้ migration แล้ว (npm run pg:test-db) — ไม่มีก็ข้าม
    ⚠ ห้ามชี้ไปที่ production: ชุดนี้สร้างบัญชีและผู้ใช้ทดสอบ */
@@ -91,6 +92,24 @@ ok(!ledger.some((l) => l.outcome === "error"), `ledger ไม่นับกา�
 // ── 5 · บทบาทจาก tenant_users (ด่านของ Server Action) ──
 ok(await tenantRole(T, op) === "operator" && await tenantRole(T, randomUUID()) === "viewer" && await tenantRole(T, null) === "viewer",
   "บทบาทอ่านจาก tenant_users · ไม่พบสมาชิก = viewer (สิทธิ์น้อยสุด) ไม่ใช่ owner");
+
+// ── 6 · หน้า "วันนี้" ในนามผู้ใช้ (0012) ── SQL ของคิวต้องรันบน Postgres และการเลื่อนต้องผ่าน RLS
+const { todayQueue, snoozeItem } = await import("@/lib/engine/today");
+const taskId = randomUUID();
+const due = new Date(Date.now() - 864e5).toISOString().slice(0, 10);
+await run("INSERT INTO tasks (id, tenant_id, title, status, due_at, owner_id, created_by, created_at) VALUES (?,?,?,?,?,?,?,?)",
+  taskId, T, "งานทดสอบ (สมมุติ)", "open", due, `${op}@pg.example`, "verify", now);
+const viewerPg = { id: `${op}@pg.example`, clearance: "confidential" as const };
+const q1 = await as(() => todayQueue(T, viewerPg));
+ok(q1.sections.some((s) => s.items.some((i) => i.id === taskId && i.section === "overdue")), "คิววันนี้รันบน Postgres ในนามผู้ใช้ และเห็นงานเลยกำหนด");
+const tomorrowPg = new Date(Date.now() + 2 * 864e5).toISOString().slice(0, 10);
+const sn = await as(() => snoozeItem(T, viewerPg.id, "task", taskId, tomorrowPg));
+const again = await as(() => snoozeItem(T, viewerPg.id, "task", taskId, tomorrowPg));
+ok(sn.ok && again.ok && await countFor("queue_marks", "tenant_id = ? AND item_id = ? AND count = 2", T, taskId) === 1,
+  `เลื่อนงานในนามผู้ใช้ได้ และเลื่อนซ้ำอัปเดตแถวเดิม (ON CONFLICT ผ่าน RLS)${sn.ok ? "" : ` (${sn.error})`}`);
+const stranger = randomUUID();
+const peek = await withIdentity(stranger, () => all<{ item_id: string }>("SELECT item_id FROM queue_marks WHERE tenant_id = ?", T));
+ok(peek.length === 0, "ผู้ใช้ที่ไม่ได้อยู่ในบัญชีอ่านการเลื่อนของบัญชีนี้ไม่ได้");
 
 // เก็บกวาด — บัญชีทดสอบหายพร้อมทุกแถว (on delete cascade)
 await asSystem(() => run("DELETE FROM ai_cache WHERE kind = 'map_columns' AND created_at >= ?", now));

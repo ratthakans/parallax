@@ -57,7 +57,7 @@ export const B2B_DATA_TABLES = [
   "participations", "opportunity_people", "tasks", "opportunities", "org_domains", "orgs",
   "preferences", "evidence", "record_versions", "merge_log",
   "review_items", "resolution_overrides", "sample_checks", "account_briefs",
-  "campaign_targets", "sales_campaigns", "work_log",
+  "campaign_targets", "sales_campaigns", "work_log", "queue_marks",
 ] as const;
 
 /* ── ทุกที่ที่ข้อมูลของคนหนึ่งคนอยู่ ─────────────────────────────
