@@ -12,7 +12,7 @@ import { ensurePurpose, registerSource } from "@/lib/engine/vault/sources";
 import { commitUpload } from "@/lib/engine/vault/intake";
 import { resolveTenant } from "@/lib/engine/vault/resolve";
 import { recordPreference } from "@/lib/engine/policy/preferences";
-import { matchCriteria } from "@/lib/engine/campaigns";
+import { buildTargets, createCampaign, matchCriteria } from "@/lib/engine/campaigns";
 import { getDossier } from "@/lib/engine/accounts";
 import { addMemberLink, addRelationship, endRelationship } from "@/lib/engine/accounts/edit";
 import { loadPathGraph, pathsToOrg, pathsToPerson, suggestKnows } from "@/lib/engine/accounts/paths";
@@ -104,6 +104,15 @@ m = await matchCriteria(T, { titleKeywords: ["การตลาด"], interacte
 ok(ids(m).has(chat) && !ids(m).has(kong), "เกณฑ์ \"มีปฏิสัมพันธ์ภายใน 30 วัน\" ได้เฉพาะบริษัทที่คุยกันล่าสุด");
 m = await matchCriteria(T, { titleKeywords: ["การตลาด"], quietForDays: 30, maxPerOrg: 5 });
 ok(!ids(m).has(chat) && ids(m).has(kong), "เกณฑ์ \"เงียบมาแล้ว 30 วัน\" ไม่รวมบริษัทที่เพิ่งคุย แต่รวมบริษัทที่ไม่เคยคุย");
+
+// ── สังกัดปัจจุบันสองแห่ง (บริษัทเดียวกันที่เขียนต่างกัน) — เดิมการสร้างรายชื่อล้มทั้งธุรกรรม ──
+await run("INSERT INTO affiliations (id, tenant_id, customer_id, org_id, title, valid_from, valid_to, confirmed_by, recorded_at) VALUES (?,?,?,?,?,?,?,?,?)",
+  randomUUID(), T, chat, orgA, "ผู้จัดการฝ่ายการตลาด", d40, null, "verify", new Date().toISOString());
+m = await matchCriteria(T, { titleKeywords: ["การตลาด"], maxPerOrg: 5 });
+ok(m.matches.filter((x) => x.customerId === chat).length === 1, "คนที่มีสังกัดปัจจุบันสองแห่ง อยู่ในรายชื่อครั้งเดียว");
+const dupCamp = await createCampaign(T, { name: "ทดสอบสังกัดซ้อน (สมมุติ)", purposeId: await ensurePurpose(T, "ขายสปอนเซอร์ (เส้นทาง)", "verify"), channel: "email", messageKind: "marketing", criteria: { titleKeywords: ["การตลาด"], maxPerOrg: 5 } }, ME.id);
+ok(dupCamp.ok && (await buildTargets(T, dupCamp.id, ME.id)).ok, "สร้างรายชื่อได้ ไม่ล้มเพราะคนเดียวกันซ้ำ");
+await run("DELETE FROM affiliations WHERE tenant_id = ? AND customer_id = ? AND org_id = ?", T, chat, orgA);
 
 // ── S2 · คนกลางที่คัดค้าน / เกินสิทธิ์ / ความสัมพันธ์ที่สิ้นสุด ──
 await run("UPDATE customers SET classification = 'restricted_high' WHERE tenant_id = ? AND id = ?", T, khwan);

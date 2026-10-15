@@ -158,7 +158,12 @@ export async function matchCriteria(tenantId: string, raw: Criteria): Promise<{ 
     byOrg.set(a.org_id, [...(byOrg.get(a.org_id) ?? []), { customerId: a.customer_id, orgId: a.org_id, reasons, rank }]);
   }
   const orgs = [...byOrg.entries()].sort((x, y) => Math.max(...y[1].map((m) => m.rank)) - Math.max(...x[1].map((m) => m.rank)));
-  const matches = orgs.slice(0, MAX_ORGS).flatMap(([, ms]) => ms.sort((x, y) => y.rank - x.rank).slice(0, c.maxPerOrg ?? 2));
+  /* คนหนึ่งมีสังกัดปัจจุบันได้หลายแห่ง (บริษัทเดียวกันที่เขียนต่างกันและยังรอตรวจ · ทำงานสองที่) — เป้าหมายต้องมีคนละครั้ง
+     ไม่งั้นการสร้างรายชื่อชนดัชนี unique (campaign_id, customer_id) แล้วล้มทั้งธุรกรรม · เก็บบริษัทที่อันดับดีกว่า (มาก่อน) */
+  const seenPeople = new Set<string>();
+  const matches = orgs.slice(0, MAX_ORGS)
+    .flatMap(([, ms]) => ms.sort((x, y) => y.rank - x.rank).slice(0, c.maxPerOrg ?? 2))
+    .filter((m) => (seenPeople.has(m.customerId) ? false : (seenPeople.add(m.customerId), true)));
   return { matches, orgsOverCap: Math.max(0, orgs.length - MAX_ORGS) };
 }
 
