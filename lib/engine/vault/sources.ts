@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { all, get, run, tx } from "@/lib/engine/sql";
 import { logActivity } from "@/lib/engine/db";
 import { VAULT_FIELDS, type SourceKind, type VaultField } from "@/lib/shared/vault";
@@ -20,15 +20,21 @@ export async function listPurposes(tenantId: string): Promise<Purpose[]> {
   return all<Purpose>("SELECT id, code, name FROM purposes WHERE tenant_id = ? ORDER BY name", tenantId);
 }
 
+/* รหัสวัตถุประสงค์จากชื่อ — ชื่อภาษาไทยใช้แฮชของชื่อเต็ม
+   เดิมใช้ 6 ไบต์แรกของชื่อ (≈ อักษรไทยสองตัว) ทำให้ "ขายสปอนเซอร์" กับ "ขายบูธ" ได้รหัสเดียวกัน
+   แล้ววัตถุประสงค์ใหม่ไปผูกกับฐานและความยินยอมของวัตถุประสงค์เก่าเงียบ ๆ */
 function codeFor(name: string): string {
   const latin = name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
-  return latin || `p_${Buffer.from(name).toString("hex").slice(0, 12)}`;
+  return latin || `p_${createHash("sha256").update(name).digest("hex").slice(0, 16)}`;
 }
 
 export async function ensurePurpose(tenantId: string, name: string, actor: string): Promise<string> {
   const clean = name.trim().slice(0, 120);
+  /* ชื่อตรงกันทุกตัวก่อน — วัตถุประสงค์ที่สร้างด้วยรหัสแบบเดิมยังหาเจอ */
+  const byName = await get<{ id: string }>("SELECT id FROM purposes WHERE tenant_id = ? AND name = ?", tenantId, clean);
+  if (byName) return byName.id;
   const code = codeFor(clean);
-  const found = await get<{ id: string }>("SELECT id FROM purposes WHERE tenant_id = ? AND code = ?", tenantId, code);
+  const found = await get<{ id: string; name: string }>("SELECT id, name FROM purposes WHERE tenant_id = ? AND code = ?", tenantId, code);
   if (found) return found.id;
   const id = randomUUID();
   await run(
