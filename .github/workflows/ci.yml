@@ -150,6 +150,10 @@ jobs:
       - name: Today queue
         run: npm run verify:today
 
+      # ใครในทีมรู้จักใคร (ไม่เกินสองทอด · ไม่ผ่านคนที่คัดค้านหรือเกินสิทธิ์) และคนที่รู้จักย้ายบริษัท
+      - name: Warm paths and job moves
+        run: npm run verify:paths
+
       # ── สคีมาสองฝั่งตรงกันไหม ──
       # ต้องมี DATABASE_URL ถึงจะเทียบได้ ไม่มีก็ข้ามโดยไม่ล้มเหลว เพราะ PR
       # จากคนนอกไม่ควรต้องมีรหัสฐานข้อมูล แต่บน push เข้า main ที่ตั้ง secret

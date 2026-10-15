@@ -9,6 +9,7 @@
    3. สาย audit ไม่แตกเมื่อเขียนพร้อมกันหลายคำขอ
    4. ผล AI ที่สำเร็จถึงผู้ใช้และถูกแคช — ai_cache เปิด RLS โดยไม่มีนโยบาย
    6. คิว "วันนี้" รันได้ในนามผู้ใช้ และการเลื่อนผ่าน RLS โดยไม่รั่วข้ามบัญชี (0012)
+   7. "ฉันรู้จัก" · เส้นทางเข้าถึง · คนที่รู้จักย้ายบริษัท — query ของกราฟและการย้ายรันได้ในนามผู้ใช้
 
    ต้องมี DATABASE_URL ของฐานทดสอบที่ใช้ migration แล้ว (npm run pg:test-db) — ไม่มีก็ข้าม
    ⚠ ห้ามชี้ไปที่ production: ชุดนี้สร้างบัญชีและผู้ใช้ทดสอบ */
@@ -110,6 +111,27 @@ ok(sn.ok && again.ok && await countFor("queue_marks", "tenant_id = ? AND item_id
 const stranger = randomUUID();
 const peek = await withIdentity(stranger, () => all<{ item_id: string }>("SELECT item_id FROM queue_marks WHERE tenant_id = ?", T));
 ok(peek.length === 0, "ผู้ใช้ที่ไม่ได้อยู่ในบัญชีอ่านการเลื่อนของบัญชีนี้ไม่ได้");
+
+// ── 7 · เส้นทางเข้าถึงและคนที่รู้จักย้ายบริษัท (S2 · S3) ในนามผู้ใช้ ── query ของกราฟและการย้ายต้องรันบน Postgres
+const { addMemberLink } = await import("@/lib/engine/accounts/edit");
+const { loadPathGraph, pathsToPerson } = await import("@/lib/engine/accounts/paths");
+const mover = await as(() => createCustomer(T, { name: "ย้าย ทดสอบ", contacts: [{ kind: "email", value: "mover@pg.example" }], profile: {}, consent: false }, "verify"));
+if (!mover.ok) throw new Error(mover.error);
+const [oldOrg, newOrg] = [randomUUID(), randomUUID()];
+for (const [id, name] of [[oldOrg, "บริษัทเก่า (สมมุติ)"], [newOrg, "บริษัทใหม่ (สมมุติ)"]]) {
+  await run("INSERT INTO orgs (id, tenant_id, name, name_norm, created_at) VALUES (?,?,?,?,?)", id, T, name, name, now);
+}
+const moveAff = randomUUID();
+const ago = (n: number) => new Date(Date.now() - n * 864e5).toISOString().slice(0, 10);
+await run("INSERT INTO affiliations (id, tenant_id, customer_id, org_id, valid_from, valid_to, confirmed_by, recorded_at) VALUES (?,?,?,?,?,?,?,?)",
+  randomUUID(), T, mover.id, oldOrg, ago(400), ago(20), "verify", now);
+await run("INSERT INTO affiliations (id, tenant_id, customer_id, org_id, valid_from, valid_to, confirmed_by, recorded_at) VALUES (?,?,?,?,?,?,?,?)",
+  moveAff, T, mover.id, newOrg, ago(20), null, "verify", now);
+const link = await as(() => addMemberLink(T, { personId: mover.id, type: "knows", context: "พบที่งานสัมมนา (สมมุติ)" }, viewerPg));
+const paths = await as(async () => pathsToPerson(await loadPathGraph(T, "confidential"), mover.id, newOrg));
+ok(link.ok && paths.length === 1 && paths[0].hops === 1, `บันทึก "ฉันรู้จัก" และหาเส้นทางในนามผู้ใช้ได้${link.ok ? "" : ` (${link.error})`}`);
+const q2 = await as(() => todayQueue(T, viewerPg));
+ok(q2.sections.some((s) => s.section === "moved" && s.items.some((i) => i.id === moveAff)), "คนที่รู้จักย้ายบริษัทขึ้นในคิว (query การย้ายรันบน Postgres)");
 
 // เก็บกวาด — บัญชีทดสอบหายพร้อมทุกแถว (on delete cascade)
 await asSystem(() => run("DELETE FROM ai_cache WHERE kind = 'map_columns' AND created_at >= ?", now));

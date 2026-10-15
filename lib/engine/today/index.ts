@@ -1,6 +1,8 @@
 import { all, get, run } from "@/lib/engine/sql";
 import { MASKED_ORG, MASKED_PERSON, type Viewer } from "@/lib/engine/accounts";
 import { targetDecision } from "@/lib/engine/campaigns";
+import { loadPathGraph } from "@/lib/engine/accounts/paths";
+import { jobMoves } from "@/lib/engine/today/moves";
 import { SIGNAL_TH } from "@/lib/engine/vault/review";
 import { canSee } from "@/lib/shared/accounts";
 import { bangkokDay, thaiDate } from "@/lib/shared/format";
@@ -13,7 +15,7 @@ import { PREFERENCE_TH, type Classification, type PreferenceKind } from "@/lib/s
 
 /* ── หน้า "วันนี้" (docs/solo-plan.md S1) ─────────────────────────────
 
-   คิวเดียวแทนการเดินห้าหน้า: ต้องหยุด → ครบกำหนด → เลยกำหนด → รอตรวจที่กระทบงาน → บัญชีที่เงียบ
+   คิวเดียวแทนการเดินห้าหน้า: ต้องหยุด → ครบกำหนด → เลยกำหนด → คนที่รู้จักย้ายบริษัท → รอตรวจที่กระทบงาน → บัญชีที่เงียบ
    - อ่านอย่างเดียวจากตารางเดิม + queue_marks (การเลื่อน/รับทราบของผู้ใช้แต่ละคน)
    - ลำดับเป็นหมวดตายตัว ภายในหมวดเรียงตามเวลาแล้วตามรหัส — รันซ้ำได้ลำดับเดิม ไม่มีคะแนน
    - รายการติดต่อตรวจนโยบายซ้ำตอนแสดง (ไม่เชื่อสถานะตอนสร้างรายชื่อ) และไม่เขียนผลกลับ — หน้าจอไม่ใช่ที่เปลี่ยนข้อมูล
@@ -119,7 +121,25 @@ export async function todayQueue(tenantId: string, viewer: Viewer, now = new Dat
     });
   }
 
-  /* ── 4 · รอตรวจที่กระทบงาน ── คนในเป้าหมายที่ยังไม่จบ หรือมีงานเปิด · องค์กรที่มีงาน/โอกาสเปิด
+  /* ── 4 · คนที่รู้จักย้ายบริษัท (S3) ── ไม่มีปุ่มติดต่อ: ย้ายบริษัทไม่ได้แปลว่าฐานการติดต่อย้ายตาม */
+  const moves = await jobMoves(tenantId, viewer, await loadPathGraph(tenantId, viewer.clearance, now.toISOString()), now);
+  const MOVE_TH = { moved_in: "เข้ามาอยู่ในบัญชีที่คุณกำลังขาย", moved_out: "ออกจากบริษัทที่มีโอกาสขายเปิดอยู่ — ใครแทน?", moved: "ย้ายบริษัท" } as const;
+  for (const m of moves) {
+    keep({
+      section: "moved", kind: "affiliation", id: m.affiliationId,
+      title: `${m.name}: ${m.from.name} → ${m.to.name}`,
+      detail: [
+        MOVE_TH[m.kind],
+        m.since ? `เริ่มที่ใหม่ ${thaiDate(m.since)}` : "ไม่ทราบวันเริ่มที่ใหม่",
+        ...m.why,
+        "ตรวจฐานการติดต่อก่อน — ฐานเดิมอาจผูกกับบริษัทเก่า",
+      ],
+      href: m.kind === "moved_out" && !m.from.hidden ? `/app/accounts/${m.from.id}` : !m.to.hidden ? `/app/accounts/${m.to.id}` : null,
+      at: m.since ?? "", eligibility: null, snoozable: true, ackable: true,
+    });
+  }
+
+  /* ── 5 · รอตรวจที่กระทบงาน ── คนในเป้าหมายที่ยังไม่จบ หรือมีงานเปิด · องค์กรที่มีงาน/โอกาสเปิด
      ที่เหลือแสดงแค่จำนวน: คิวตรวจทั้งหมดคืองานของวันที่ว่าง ไม่ใช่ของทุกเช้า */
   const [busyPeople, busyOrgs, reviews] = await Promise.all([
     all<{ id: string }>(
@@ -161,7 +181,7 @@ export async function todayQueue(tenantId: string, viewer: Viewer, now = new Dat
     });
   }
 
-  /* ── 5 · บัญชีที่เงียบ ── มีโอกาสเปิด แต่ไม่มีปฏิสัมพันธ์ ≥ QUIET_DAYS วัน (หรือไม่เคยมี) */
+  /* ── 6 · บัญชีที่เงียบ ── มีโอกาสเปิด แต่ไม่มีปฏิสัมพันธ์ ≥ QUIET_DAYS วัน (หรือไม่เคยมี) */
   const quietBefore = new Date(+now - QUIET_DAYS * 864e5).toISOString();
   const quiet = await all<{ id: string; name: string; classification: string | null; account_owner_id: string | null; data_owner_id: string | null;
     last_at: string | null; open_opps: number | string }>(
@@ -198,12 +218,13 @@ export async function todayQueue(tenantId: string, viewer: Viewer, now = new Dat
 /* ── เลื่อน / รับทราบ ── ของผู้ใช้แต่ละคน · ไม่มีข้อความอิสระ (คิวไม่ควรเป็นที่เก็บข้อมูลส่วนบุคคลแห่งใหม่) */
 
 async function itemExists(tenantId: string, kind: QueueItemKind, id: string) {
-  const table = { preference: "preferences", task: "tasks", review: "review_items", org: "orgs" }[kind];
+  const table = { preference: "preferences", task: "tasks", review: "review_items", org: "orgs", affiliation: "affiliations" }[kind];
   if (!table) return false;
   return Boolean(await get(`SELECT 1 AS x FROM ${table} WHERE tenant_id = ? AND id = ?`, tenantId, id));
 }
 
-const KINDS: QueueItemKind[] = ["preference", "task", "review", "org"];
+const KINDS: QueueItemKind[] = ["preference", "task", "review", "org", "affiliation"];
+const ACKABLE: QueueItemKind[] = ["preference", "affiliation"];
 
 export async function snoozeItem(
   tenantId: string, userId: string, kind: string, id: string, until: string, now = new Date(),
@@ -229,11 +250,11 @@ export async function snoozeItem(
 export async function acknowledgeItem(
   tenantId: string, userId: string, kind: string, id: string, now = new Date(),
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  if (kind !== "preference") return { ok: false, error: "รับทราบได้เฉพาะรายการที่ต้องหยุด" };
-  if (!(await itemExists(tenantId, "preference", id))) return { ok: false, error: "ไม่พบรายการนี้" };
+  if (!ACKABLE.includes(kind as QueueItemKind)) return { ok: false, error: "รับทราบได้เฉพาะรายการที่ต้องหยุดและคนที่ย้ายบริษัท" };
+  if (!(await itemExists(tenantId, kind as QueueItemKind, id))) return { ok: false, error: "ไม่พบรายการนี้" };
   await run(
     `INSERT INTO queue_marks (tenant_id, user_id, item_kind, item_id, mark, until, count, updated_at) VALUES (?,?,?,?,?,?,?,?)
      ON CONFLICT (tenant_id, user_id, item_kind, item_id) DO UPDATE SET mark = excluded.mark, until = excluded.until, updated_at = excluded.updated_at`,
-    tenantId, userId, "preference", id, "ack", null, 0, now.toISOString());
+    tenantId, userId, kind, id, "ack", null, 0, now.toISOString());
   return { ok: true };
 }

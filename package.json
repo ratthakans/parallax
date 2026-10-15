@@ -31,6 +31,7 @@
     "verify:ai-brief": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/ai-brief.mts",
     "verify:policy": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/policy.mts",
     "verify:today": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/today.mts",
+    "verify:paths": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/paths.mts",
     "pg:test-db": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs scripts/pg-test-db.mts",
     "verify:pg": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/pg-rls.mts"
   },
