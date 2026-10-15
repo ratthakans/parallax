@@ -6,6 +6,7 @@ import { denied, viewer } from "@/app/(app)/viewer";
 import { assignTarget, buildTargets, createCampaign, recordOutcome, updateCriteria } from "@/lib/engine/campaigns";
 import { setBasis } from "@/lib/engine/policy";
 import { adoptTemplate } from "@/lib/engine/policy/templates";
+import { setRetentionRule } from "@/lib/engine/retention";
 import { recordPreference } from "@/lib/engine/policy/preferences";
 import type { ActionState } from "@/lib/shared/action-state";
 import type { Criteria } from "@/lib/shared/policy";
@@ -128,4 +129,18 @@ export async function adoptTemplateAction(_p: ActionState, fd: FormData): Promis
   if (!res.ok) return { error: res.error };
   revalidatePath("/app/sales/purposes");
   return { ok: res.existed ? "บัญชีนี้ใช้แม่แบบนี้อยู่แล้ว" : "สร้างวัตถุประสงค์และฐานรุ่น 1 จากแม่แบบแล้ว" };
+}
+
+/* กฎอายุข้อมูลต่อวัตถุประสงค์ (B6) — การตัดสินของเจ้าของบัญชีเหมือนการตั้งฐาน */
+export async function setRetentionRuleAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  const v = await viewer();
+  const no = denied(v, "policy");
+  if (no) return { error: no };
+  const res = await setRetentionRule(v.tenantId, str(fd, "purposeId"), {
+    days: Number(str(fd, "days")), trigger: str(fd, "trigger"), legalHold: fd.get("legalHold") === "1", note: str(fd, "note"),
+  }, v.actor);
+  if (!res.ok) return { error: res.error };
+  revalidatePath("/app/sales/purposes");
+  revalidatePath("/app/today");
+  return { ok: "บันทึกกฎอายุข้อมูลแล้ว — กฎเดิมยังอยู่ในประวัติ" };
 }

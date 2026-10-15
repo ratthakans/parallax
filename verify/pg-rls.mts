@@ -11,6 +11,7 @@
    6. คิว "วันนี้" รันได้ในนามผู้ใช้ และการเลื่อนผ่าน RLS โดยไม่รั่วข้ามบัญชี (0012)
    7. "ฉันรู้จัก" · เส้นทางเข้าถึง · คนที่รู้จักย้ายบริษัท — query ของกราฟและการย้ายรันได้ในนามผู้ใช้
    8. เลือกแม่แบบวัตถุประสงค์ในนามผู้ใช้ และฐานที่ผูกกับบริษัทจับการย้ายบน Postgres (0013)
+   9. ตั้งกฎอายุข้อมูลและคำนวณวันครบอายุในนามผู้ใช้ (B6)
 
    ต้องมี DATABASE_URL ของฐานทดสอบที่ใช้ migration แล้ว (npm run pg:test-db) — ไม่มีก็ข้าม
    ⚠ ห้ามชี้ไปที่ production: ชุดนี้สร้างบัญชีและผู้ใช้ทดสอบ */
@@ -143,6 +144,14 @@ if (adopted.ok) {
   const dmove = await as(() => decide(T, { customerId: mover.id, purposeId: adopted.purposeId, channel: "email", messageKind: "marketing" }));
   ok(dmove.status === "review_required" && dmove.reasons.some((r) => /ย้ายไป/.test(r)) && !dmove.failed,
     `ฐานที่ผูกกับบริษัทจับการย้ายบน Postgres (${dmove.status}${dmove.failed ? " · บริการล้ม" : ""})`);
+}
+
+// ── 9 · อายุข้อมูล (B6) ในนามผู้ใช้ ── query รวม UNION/MAX ต้องรันบน Postgres และตั้งกฎผ่าน RLS ได้
+const { retentionForPeople, setRetentionRule } = await import("@/lib/engine/retention");
+if (adopted.ok) {
+  const rule = await as(() => setRetentionRule(T, adopted.purposeId, { days: 365, trigger: "received" }, viewerPg.id));
+  const ret = await as(() => retentionForPeople(T, viewerPg));
+  ok(rule.ok && Array.isArray(ret), `ตั้งกฎอายุและคำนวณอายุข้อมูลในนามผู้ใช้บน Postgres ได้${rule.ok ? "" : ` (${rule.error})`}`);
 }
 
 // เก็บกวาด — บัญชีทดสอบหายพร้อมทุกแถว (on delete cascade)
