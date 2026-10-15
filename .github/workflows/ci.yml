@@ -154,6 +154,10 @@ jobs:
       - name: Warm paths and job moves
         run: npm run verify:paths
 
+      # แม่แบบวัตถุประสงค์: ขอบเขตช่องทาง/ชนิดข้อความ · ฐานที่ผูกกับบริษัท + ย้ายบริษัท = ต้องตรวจจนมีหลักฐานใหม่
+      - name: Purpose templates
+        run: npm run verify:templates
+
       # ── สคีมาสองฝั่งตรงกันไหม ──
       # ต้องมี DATABASE_URL ถึงจะเทียบได้ ไม่มีก็ข้ามโดยไม่ล้มเหลว เพราะ PR
       # จากคนนอกไม่ควรต้องมีรหัสฐานข้อมูล แต่บน push เข้า main ที่ตั้ง secret

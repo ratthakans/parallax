@@ -10,6 +10,7 @@
    4. ผล AI ที่สำเร็จถึงผู้ใช้และถูกแคช — ai_cache เปิด RLS โดยไม่มีนโยบาย
    6. คิว "วันนี้" รันได้ในนามผู้ใช้ และการเลื่อนผ่าน RLS โดยไม่รั่วข้ามบัญชี (0012)
    7. "ฉันรู้จัก" · เส้นทางเข้าถึง · คนที่รู้จักย้ายบริษัท — query ของกราฟและการย้ายรันได้ในนามผู้ใช้
+   8. เลือกแม่แบบวัตถุประสงค์ในนามผู้ใช้ และฐานที่ผูกกับบริษัทจับการย้ายบน Postgres (0013)
 
    ต้องมี DATABASE_URL ของฐานทดสอบที่ใช้ migration แล้ว (npm run pg:test-db) — ไม่มีก็ข้าม
    ⚠ ห้ามชี้ไปที่ production: ชุดนี้สร้างบัญชีและผู้ใช้ทดสอบ */
@@ -132,6 +133,17 @@ const paths = await as(async () => pathsToPerson(await loadPathGraph(T, "confide
 ok(link.ok && paths.length === 1 && paths[0].hops === 1, `บันทึก "ฉันรู้จัก" และหาเส้นทางในนามผู้ใช้ได้${link.ok ? "" : ` (${link.error})`}`);
 const q2 = await as(() => todayQueue(T, viewerPg));
 ok(q2.sections.some((s) => s.section === "moved" && s.items.some((i) => i.id === moveAff)), "คนที่รู้จักย้ายบริษัทขึ้นในคิว (query การย้ายรันบน Postgres)");
+
+// ── 8 · แม่แบบวัตถุประสงค์และฐานที่ผูกกับบริษัท (S4 · 0013) ในนามผู้ใช้ ──
+const { adoptTemplate } = await import("@/lib/engine/policy/templates");
+const { decide } = await import("@/lib/engine/policy");
+const adopted = await as(() => adoptTemplate(T, "b2b_followup_existing", "ลูกค้าเคยซื้อบริการ (สมมุติ)", viewerPg.id));
+ok(adopted.ok, `เลือกแม่แบบในนามผู้ใช้ได้ (วัตถุประสงค์ · ฐาน · กฎอายุ ผ่าน RLS)${adopted.ok ? "" : ` (${adopted.error})`}`);
+if (adopted.ok) {
+  const dmove = await as(() => decide(T, { customerId: mover.id, purposeId: adopted.purposeId, channel: "email", messageKind: "marketing" }));
+  ok(dmove.status === "review_required" && dmove.reasons.some((r) => /ย้ายไป/.test(r)) && !dmove.failed,
+    `ฐานที่ผูกกับบริษัทจับการย้ายบน Postgres (${dmove.status}${dmove.failed ? " · บริการล้ม" : ""})`);
+}
 
 // เก็บกวาด — บัญชีทดสอบหายพร้อมทุกแถว (on delete cascade)
 await asSystem(() => run("DELETE FROM ai_cache WHERE kind = 'map_columns' AND created_at >= ?", now));

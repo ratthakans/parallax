@@ -1,6 +1,6 @@
 # PARALLAX · โหมดคนเดียว (Solo Operator) — แผนละเอียด
 
-> **สถานะ:** เจ้าของอนุมัติชุด 1 (2026-10-15) · **S1 เสร็จ** (`verify:today` 31 ข้อ) · **S2 + S3 เสร็จ** (`verify:paths` 37 ข้อ) · S4 ถัดไป · ชุด 2 รอตัดสินที่จุดทบทวน A (15 พ.ย. 2026)
+> **สถานะ:** เจ้าของอนุมัติชุด 1 (2026-10-15) · **S1 เสร็จ** (`verify:today` 31 ข้อ) · **S2 + S3 เสร็จ** (`verify:paths` 37 ข้อ) · **S4 เสร็จ** (`verify:templates` 22 ข้อ · ข้อความกฎหมายยังเป็นร่างรอ O3) · **ชุด 1 ครบ** · ชุด 2 รอตัดสินที่จุดทบทวน A (15 พ.ย. 2026)
 > **ร่าง:** 2026-10-15 · อ้างอิง `docs/plan.md` (Blueprint 2.0) ฉบับที่ B0–B5 เสร็จแล้ว
 > **ไม่แทนแผนหลัก** — แผนนี้วางอยู่บนเครื่องยนต์เดิมทั้งหมด และแบ่งงานเป็นสองชุด: ชุดที่ช่วย pilot SETA ได้ทันที กับชุดที่ทำต่อเมื่อเจ้าของเลือกเปิดตลาดคนเดียว
 
@@ -11,7 +11,7 @@
 2. ผู้ใช้และงานที่ต้องทำได้
 3. หลักการ — อะไรคงไว้ อะไรเปลี่ยน
 4. ฟีเจอร์ S1–S9 (สเปกละเอียด)
-5. โครงสร้างข้อมูลที่เพิ่ม (migration 0012–0016)
+5. โครงสร้างข้อมูลที่เพิ่ม (migration 0012–0014)
 6. บทบาทเมื่อคนเดียวถือทุกบทบาท (ผูกกับ B6)
 7. PDPA และ security สำหรับโหมดคนเดียว
 8. AI ในโหมดคนเดียว
@@ -285,7 +285,11 @@
 - **ไม่มีแม่แบบ "ใช้ได้ทุกอย่าง"** — แต่ละแม่แบบจำกัดช่องทางและชนิดข้อความ (`message_kind`)
 - **คำเตือนตายตัว:** "แม่แบบเป็นจุดเริ่มต้น ไม่ใช่คำแนะนำทางกฎหมายสำหรับกรณีของคุณ"
 
-**ข้อมูล:** migration 0015 — `purpose_templates` (ระดับระบบ ไม่มี `tenant_id` · อ่านได้ทุกบัญชี · เขียนได้เฉพาะ staff) · เพิ่ม `purposes.template_code` + `template_version`
+**ข้อมูล (ที่ทำจริง):** migration **0013** — `purposes.template_code` + `template_version` · `processing_records.employer_scoped` + `allowed_channels` + `allowed_message_kinds`
+- **ตัวแม่แบบอยู่ในโค้ด** (`lib/shared/purpose-templates.ts`) ไม่ใช่ตาราง `purpose_templates` — ทุกการแก้ข้อความทางกฎหมายผ่าน PR และมีประวัติใน git · ไม่ต้องมีหน้าจอ staff
+- ขอบเขต (ช่องทาง · ชนิดข้อความ · ผูกบริษัท) อยู่ที่ **ฐานรุ่น** ไม่ใช่ที่แม่แบบ — ตั้งฐานรุ่นใหม่โดยไม่ระบุขอบเขต = ใช้ขอบเขตของรุ่นก่อน (ไม่หายเงียบ)
+- ผู้อนุมัติต้อง **พิมพ์ยืนยันข้อเท็จจริง** ของแม่แบบ (เก็บใน `data_scope`) ไม่ใช่ checkbox
+- **ฐานที่ผูกกับบริษัท** (`employer_scoped`) + คนย้ายบริษัท = Review required จนกว่ามีบันทึกการคุยกันที่บริษัทใหม่หลังวันที่ย้าย หรือความยินยอมของวัตถุประสงค์นั้นหลังวันที่ย้าย — ปิดงานค้างจาก S3 · `RULES_VERSION` = `2026-10-15.1`
 
 **โค้ด:** `lib/engine/policy/templates.ts` — `listTemplates()` · `adoptTemplate(tenantId, code, overrides, actor)` · ตรวจด้วย `denied(v, "policy")` (owner เท่านั้น — ในโหมดคนเดียวคือผู้ใช้เอง)
 
@@ -311,7 +315,7 @@
 4. **สัญญาณอ่อนยังไม่รวม** — ชุดที่เหตุผลมีแค่ "ชื่อเหมือน + โดเมนเดียวกัน" ไม่ถูกเสนอให้ยืนยันเป็นชุด ต้องตรวจทีละคู่ตามกติกา 4.4
 5. **สุ่มตรวจหลังรวม** — ทุกชุด ≥ 20 คู่ ระบบสุ่ม 3 คู่เข้า `sample_checks` ภายหลัง 7 วัน → วัดความแม่นจริง ถ้าพบผิด ≥ 1 ใน 3 → ชุดนั้นถูกส่งกลับไปตรวจทีละคู่
 
-**ข้อมูล:** `review_batches` (ใหม่ · migration 0016) · `review_items.batch_id`
+**ข้อมูล:** `review_batches` (ใหม่ · migration 0014) · `review_items.batch_id`
 
 **AI:** ผ่าน `lib/engine/ai/` เท่านั้น (กฎ boundary) · ฟังก์ชันใหม่ `judgeNamePairs()` · ปิดเมื่อ `aiPolicy()` ไม่อนุญาต → ชุดยังทำได้จากกติกาอย่างเดียว ส่วนที่ AI ช่วยจะขึ้นเป็น "ต้องตรวจทีละคู่"
 
@@ -418,8 +422,8 @@
 | **0012_today_queue** ✅ | `queue_marks` (`tenant_id` · `user_id` · `item_kind` · `item_id` · `mark` snooze/ack · `until` · `count` · `updated_at`) · PK `(tenant_id, user_id, item_kind, item_id)` | S1 | แยกต่อผู้ใช้ — ในโหมดทีม คนหนึ่งเลื่อนไม่ทำให้อีกคนไม่เห็น · ไม่มีข้อความอิสระ |
 | ~~0013_member_relationships~~ | ไม่ต้องมี — ไม่มี check constraint บนชนิดปลายทาง · ดัชนีมีอยู่แล้ว | S2 | ✅ ไม่มี migration |
 | ~~0014_signals~~ | ไม่ต้องมี — คำนวณสดจาก `affiliations` · รับทราบ/เลื่อนใช้ `queue_marks` | S3 | ✅ ไม่มี migration · ลบตามคำขอสิทธิไม่มีอะไรต้องตามลบเพิ่ม |
-| **0015_purpose_templates** | `purpose_templates` (`code` · `version` · `name` · `lawful_basis` · `channels` · `message_kinds` · `retention_days` · `retention_trigger` · `lia_text` · `published_at`) · PK `(code, version)` · `purposes.template_code` · `purposes.template_version` · `tenant_settings` | S4 · S9 | `purpose_templates` อ่านได้ทุกบัญชี · เขียนได้เฉพาะ service role |
-| **0016_review_batches** | `review_batches` (`id` · `tenant_id` · `rule` · `ai_assisted` · `size` · `status` · `decided_by` · `decided_at` · `merge_group_id`) · `review_items.batch_id` | S5 | `merge_group_id` ผูกกับการรวมกลุ่มจาก B5.5 เพื่อย้อนทั้งชุด |
+| **0013_purpose_templates** ✅ | `purposes.template_code/template_version` · `processing_records.employer_scoped/allowed_channels/allowed_message_kinds` | S4 | แม่แบบอยู่ในโค้ด ไม่มีตารางระดับระบบ · `tenant_settings` ย้ายไปทำพร้อม S9 |
+| **0014_review_batches** (เดิม 0016) | `review_batches` (`id` · `tenant_id` · `rule` · `ai_assisted` · `size` · `status` · `decided_by` · `decided_at` · `merge_group_id`) · `review_items.batch_id` | S5 | `merge_group_id` ผูกกับการรวมกลุ่มจาก B5.5 เพื่อย้อนทั้งชุด |
 
 **การลบตามคำขอสิทธิ (PDPA):** ทุกตารางใหม่ที่อ้าง `customer_id` ต้องถูกจัดการใน `app.erase_person_history` — **แก้ฟังก์ชันใน 0014 และเพิ่มข้อทดสอบใน `verify:pg`** (บทเรียนจาก B5.5: ลบตามคำขอสิทธิเคยพังเพราะ grant)
 
@@ -514,7 +518,7 @@ B6 วางแผนบทบาท 6 แบบ · โหมดคนเดี�
 |---|---|---|---|
 | **S-1** | ✅ 2026-10-15 | S1 หน้า "วันนี้" (หมวด 1–3, 5, 7) · migration 0012 · เมนู "งานของฉัน" | `verify:today` 31 ข้อ · `verify:pg` +3 ข้อ · `npm run check` · `verify:demo` 57 ไม่ถอย |
 | **S-2** | ✅ 2026-10-15 | S2 ความสัมพันธ์ `member` + warm path + เกณฑ์แคมเปญ · S3 คนที่รู้จักย้ายบริษัท (หมวดใหม่ของ S1) · ไม่มี migration | `verify:paths` 37 ข้อ · `verify:pg` +2 ข้อ · ชุดเดิมไม่ถอย |
-| **S-3** | 9–13 พ.ย. | S4 แม่แบบ (ร่าง 5 ตัว — **ข้อความ LIA รอนักกฎหมาย**) · migration 0015 · อัปเดตเกณฑ์เดโมข้อ 4 ให้แสดงเส้นทาง | `verify:templates` · สคริปต์เดโม 5 นาทีใช้ S1–S4 |
+| **S-3** | ✅ 2026-10-15 | S4 แม่แบบ 5 ตัว (**ร่าง — ข้อความ LIA รอนักกฎหมาย**) · migration 0013 · ฐานที่ผูกกับบริษัทใน `decide()` | `verify:templates` 22 ข้อ · `verify:pg` +2 ข้อ · ชุดเดิมไม่ถอย · สคริปต์เดโม 5 นาทียังไม่ได้เขียน |
 | — | **15 พ.ย.** | **จุดทบทวน A** — เจ้าของตัดสิน: pilot SETA · เปิดตลาดคนเดียว · ทั้งสอง · พัก | หัวข้อ 13 |
 
 **ทำไมชุด 1 ไม่ต้องรอจุดทบทวน:** ใช้ข้อมูลที่มีอยู่แล้ว ไม่มี AI ไม่มีผู้ให้บริการใหม่ และทำให้เดโมขาย SETA แข็งขึ้นโดยตรง (เกณฑ์เดโมข้อ 4 จะมีเหตุผลครบทุกมิติ)
@@ -532,7 +536,7 @@ B6 วางแผนบทบาท 6 แบบ · โหมดคนเดี�
 
 | | ช่วง (ประมาณ) | งาน | ผ่านเมื่อ |
 |---|---|---|---|
-| **S-4** | 2 สัปดาห์ | S5 รวมเป็นชุด — กติกาก่อน แล้ว AI · migration 0016 · ชุดทดสอบ precision | `verify:batch-merge` · precision ≥ กติกาเดิม |
+| **S-4** | 2 สัปดาห์ | S5 รวมเป็นชุด — กติกาก่อน แล้ว AI · migration 0014 · ชุดทดสอบ precision | `verify:batch-merge` · precision ≥ กติกาเดิม |
 | **S-5** | 2 สัปดาห์ | S6a นามบัตร (มือถือ · OCR · คิว) | `verify:capture` 6a |
 | **S-6** | 2 สัปดาห์ | S6b โน้ต · S7 ร่างข้อความ · ชุดทดสอบ injection | `verify:capture` 6b · `verify:draft` |
 | **S-7** | 2 สัปดาห์ | S9 สมัครเอง · ชำระเงิน · ขั้นตั้งต้น · S8 สรุปรายสัปดาห์ | ตั้งระบบถึงแคมเปญแรก ≤ 30 นาที (ทดสอบกับคนจริง 5 คน) |
@@ -550,7 +554,7 @@ B6 วางแผนบทบาท 6 แบบ · โหมดคนเดี�
 |---|---|---|---|
 | `verify:today` ✅ | `verify/today.mts` | 31 (S1) | 1 |
 | `verify:paths` ✅ | `verify/paths.mts` | 37 (S2 + S3 รวมกัน) | 1 |
-| `verify:templates` | `verify/templates.mts` | 5 (S4) | 1 |
+| `verify:templates` ✅ | `verify/templates.mts` | 22 (S4 + ฐานที่ผูกบริษัท) | 1 |
 | `verify:batch-merge` | `verify/batch-merge.mts` | 5 + precision (S5) | 2 |
 | `verify:capture` | `verify/capture.mts` | 6 (S6) | 2 |
 | `verify:draft` | `verify/draft.mts` | 4 (S7) | 2 |
