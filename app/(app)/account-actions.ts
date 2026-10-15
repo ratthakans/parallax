@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { denied, viewer } from "@/app/(app)/viewer";
 import {
-  addRelationship, confirmAffiliation, endAffiliation, endRelationship, logInteraction, setAccountOwner,
+  addMemberLink, addRelationship, confirmAffiliation, endAffiliation, endRelationship, logInteraction, setAccountOwner,
   setClassification, setParent, updateOrgField, verifyOrg,
 } from "@/lib/engine/accounts/edit";
 import { generateBrief } from "@/lib/engine/accounts/brief";
@@ -139,4 +139,18 @@ export async function generateBriefAction(_p: ActionState, fd: FormData): Promis
       ? `สร้างสรุปแล้ว ${res.sentences.length} ประโยค${res.dropped ? ` · ทิ้ง ${res.dropped} ประโยคที่ไม่มีหลักฐาน` : ""}`
       : `AI ไม่ได้ใช้ — ${res.note ?? "แสดงสรุปจากสูตร"}`,
   };
+}
+
+/* "ฉันรู้จักคนนี้" — ผู้บันทึกคือปลายต้นทางเสมอ (ไม่มีช่องให้เลือกว่าใครรู้จัก) */
+export async function addMemberLinkAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  const v = await viewer();
+  const no = denied(v, "write");
+  if (no) return { error: no };
+  const orgId = str(fd, "orgId");
+  const access = await orgAccess(v.tenantId, orgId, who(v));
+  if (!access.ok) return { error: access.error };
+  const res = await addMemberLink(v.tenantId, { personId: str(fd, "personId"), type: str(fd, "type"), context: str(fd, "context"), validFrom: str(fd, "validFrom") }, who(v));
+  if (!res.ok) return { error: res.error };
+  revalidatePath(`/app/accounts/${orgId}`);
+  return { ok: res.existed ? "บันทึกไว้แล้วก่อนหน้านี้" : "บันทึกแล้ว — คุณเป็นเส้นทางเข้าถึงคนนี้ของทีม" };
 }

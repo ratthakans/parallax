@@ -24,6 +24,9 @@ function criteriaOf(fd: FormData): Criteria {
     industry: str(fd, "industry"),
     excludeOpenOpportunities: fd.get("excludeOpenOpportunities") === "1",
     maxPerOrg: Number(str(fd, "maxPerOrg")) || 2,
+    warmPath: (["direct", "any"] as const).find((w) => w === str(fd, "warmPath")),
+    interactedWithinDays: Number(str(fd, "interactedWithinDays")) || undefined,
+    quietForDays: Number(str(fd, "quietForDays")) || undefined,
   };
 }
 

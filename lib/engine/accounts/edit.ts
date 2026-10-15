@@ -2,8 +2,8 @@ import { randomUUID } from "node:crypto";
 import { get, tx, type Sql } from "@/lib/engine/sql";
 import { logActivity } from "@/lib/engine/db";
 import {
-  INTERACTION_KINDS, ORG_EDITABLE, RELATIONSHIP_ENDS, RELATIONSHIP_TYPES,
-  type InteractionKind, type OrgEditable, type RelationshipType,
+  INTERACTION_KINDS, MEMBER_RELATIONSHIP_TYPES, ORG_EDITABLE, RELATIONSHIP_ENDS, RELATIONSHIP_TYPES, canSee,
+  type InteractionKind, type MemberRelationshipType, type OrgEditable, type RelationshipType,
 } from "@/lib/shared/accounts";
 import { CLASSIFICATIONS, type Classification } from "@/lib/shared/vault";
 
@@ -161,6 +161,7 @@ export async function addRelationship(
   if (!(RELATIONSHIP_TYPES as readonly string[]).includes(input.type)) return { ok: false, error: "เลือกชนิดความสัมพันธ์" };
   const type = input.type as RelationshipType;
   const [fk, tk] = RELATIONSHIP_ENDS[type];
+  if (fk === "member") return { ok: false, error: "ความรู้จักของคนในทีมบันทึกได้โดยเจ้าตัวเท่านั้น (ปุ่ม \"ฉันรู้จักคนนี้\")" };
   if (input.fromKind !== fk || input.toKind !== tk) return { ok: false, error: "ชนิดความสัมพันธ์นี้ใช้กับคู่ปลายทางแบบนี้ไม่ได้" };
   if (!input.fromId || !input.toId) return { ok: false, error: "เลือกทั้งสองฝั่งของความสัมพันธ์" };
   if (input.fromKind === input.toKind && input.fromId === input.toId) return { ok: false, error: "ความสัมพันธ์กับตัวเองไม่ได้" };
@@ -187,6 +188,45 @@ export async function addRelationship(
   });
   await logActivity(tenantId, actor, "relationship_add", `${id} · ${type}`);
   return { ok: true, id };
+}
+
+/* ── "ฉันรู้จักคนนี้" (docs/solo-plan.md S2) ──
+   ปลายต้นทางคือผู้บันทึกเองเสมอ — ไม่มีทางบันทึกว่าคนอื่นในทีมรู้จักใคร
+   บริบท (พบที่ไหน เมื่อไร) เป็นหลักฐาน · คนที่ระดับความลับเกินสิทธิ์ผู้บันทึกบันทึกไม่ได้ (ไม่เป็นทางยืนยันว่ามีคนนี้อยู่)
+   ซ้ำ = ไม่สร้างใหม่ (ความสัมพันธ์ชนิดเดียวกันที่ยังไม่สิ้นสุด) */
+export async function addMemberLink(
+  tenantId: string,
+  input: { personId: string; type: string; context: string; validFrom?: string },
+  member: { id: string; clearance: Classification },
+): Promise<{ ok: true; id: string; existed: boolean } | { ok: false; error: string }> {
+  if (!(MEMBER_RELATIONSHIP_TYPES as readonly string[]).includes(input.type)) return { ok: false, error: "เลือก: รู้จัก หรือ เคยร่วมงาน" };
+  const type = input.type as MemberRelationshipType;
+  if (!member.id) return { ok: false, error: "ไม่รู้ว่าใครกำลังบันทึก" };
+  const person = await get<{ classification: string | null }>("SELECT classification FROM customers WHERE tenant_id = ? AND id = ?", tenantId, input.personId);
+  if (!person || !canSee(member.clearance, (person.classification ?? "confidential") as Classification)) return { ok: false, error: "ไม่พบบุคคลนี้" };
+  const note = clean(input.context, 300);
+  if (note.length < 5) return { ok: false, error: "บอกว่ารู้จักจากที่ไหน เมื่อไร (เช่น \"ประชุมสมาคม ต.ค. 2568\")" };
+  const validFrom = clean(input.validFrom, 10) || null;
+  if (validFrom && !/^\d{4}-\d{2}-\d{2}$/.test(validFrom)) return { ok: false, error: "วันที่เริ่มไม่ถูกรูปแบบ" };
+  const dup = await get<{ id: string }>(
+    `SELECT id FROM relationship_assertions WHERE tenant_id = ? AND from_kind = 'member' AND from_id = ? AND to_kind = 'person' AND to_id = ?
+       AND type = ? AND valid_to IS NULL`, tenantId, member.id, input.personId, type);
+  if (dup) return { ok: true, id: dup.id, existed: true };
+  const id = randomUUID(), evidenceId = randomUUID(), at = now();
+  await tx(async (q) => {
+    await q.run("INSERT INTO evidence (id, tenant_id, kind, ref, note, captured_by, captured_at) VALUES (?,?,?,?,?,?,?)",
+      evidenceId, tenantId, "self_attestation", `relationship:${id}`, note, member.id, at);
+    await q.run(
+      `INSERT INTO relationship_assertions (id, tenant_id, from_kind, from_id, to_kind, to_id, type, context, evidence_id,
+         confirmed_by, confirmed_at, valid_from, valid_to, source_id, lifecycle_state, recorded_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      id, tenantId, "member", member.id, "person", input.personId, type, note, evidenceId,
+      member.id, at, validFrom, null, null, "confirmed", at,
+    );
+    await clearBriefsFor(q, tenantId, ["person", input.personId]);
+  });
+  await logActivity(tenantId, member.id, "relationship_add", `${id} · ${type}`);
+  return { ok: true, id, existed: false };
 }
 
 export async function endRelationship(tenantId: string, id: string, endedOn: string, reason: string, actor: string): Promise<EditResult> {

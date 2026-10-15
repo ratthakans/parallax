@@ -8,7 +8,15 @@ import type { Classification } from "@/lib/shared/vault";
 export const RELATIONSHIP_TYPES = [
   "decision_maker", "influencer", "champion", "reports_to", "works_with", "introduced_by", "former_colleague",
   "partner_of", "supplier_of", "customer_of", "sponsor_of",
+  "knows", "has_worked_with",
 ] as const;
+/* ── คนในทีมรู้จักคนในฐาน (docs/solo-plan.md S2) ──
+   ปลายต้นทางเป็นสมาชิกทีม (member · รหัสเดียวกับเจ้าของบัญชีและผู้รับผิดชอบงาน) ไม่ใช่คนในฐาน
+   บันทึกได้เฉพาะสมาชิกเองว่า "ฉันรู้จัก" พร้อมบริบท (พบที่ไหน เมื่อไร) — ไม่มีใครยืนยันแทนกันได้ และระบบไม่สร้างเอง */
+export const MEMBER_RELATIONSHIP_TYPES = ["knows", "has_worked_with"] as const;
+export type MemberRelationshipType = (typeof MEMBER_RELATIONSHIP_TYPES)[number];
+/** ความสัมพันธ์คน↔คนที่ใช้เป็นทอดที่สองของเส้นทางได้ (ไม่มีทิศ — ใครรู้จักใคร ไม่ใช่ใครรายงานใคร) */
+export const BRIDGE_TYPES = ["works_with", "former_colleague", "reports_to", "introduced_by"] as const;
 export type RelationshipType = (typeof RELATIONSHIP_TYPES)[number];
 export const RELATIONSHIP_TH: Record<RelationshipType, string> = {
   decision_maker: "ผู้ตัดสินใจของ",
@@ -22,9 +30,12 @@ export const RELATIONSHIP_TH: Record<RelationshipType, string> = {
   supplier_of: "ผู้ขาย/ผู้ให้บริการของ",
   customer_of: "ลูกค้าของ",
   sponsor_of: "สปอนเซอร์ของ",
+  knows: "รู้จัก",
+  has_worked_with: "เคยร่วมงานกับ",
 };
 /** ชนิดที่ใช้ได้ต่อคู่ปลายทาง — คน→องค์กร · คน→คน · องค์กร→องค์กร */
-export const RELATIONSHIP_ENDS: Record<RelationshipType, ["person" | "org", "person" | "org"]> = {
+export type RelationshipEnd = "person" | "org" | "member";
+export const RELATIONSHIP_ENDS: Record<RelationshipType, [RelationshipEnd, RelationshipEnd]> = {
   decision_maker: ["person", "org"],
   influencer: ["person", "org"],
   champion: ["person", "org"],
@@ -36,6 +47,8 @@ export const RELATIONSHIP_ENDS: Record<RelationshipType, ["person" | "org", "per
   supplier_of: ["org", "org"],
   customer_of: ["org", "org"],
   sponsor_of: ["org", "org"],
+  knows: ["member", "person"],
+  has_worked_with: ["member", "person"],
 };
 
 export const INTERACTION_KINDS = ["meeting", "call", "email", "event", "note"] as const;

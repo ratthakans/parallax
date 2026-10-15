@@ -4,6 +4,7 @@ import { logActivity } from "@/lib/engine/db";
 import { bangkokDay } from "@/lib/shared/format";
 import { decide, type Decision } from "@/lib/engine/policy";
 import { personIdsOf } from "@/lib/engine/vault/merge";
+import { loadPathGraph, pathsToPerson } from "@/lib/engine/accounts/paths";
 import {
   CHANNELS, MESSAGE_KINDS, OUTCOMES, TARGET_STATUS_TH, describeCriteria,
   type Channel, type Criteria, type MessageKind, type TargetStatus,
@@ -41,8 +42,14 @@ function normaliseCriteria(c: Criteria): Criteria {
     titleKeywords: list(c.titleKeywords), program: clean(c.program, 120) || undefined, roles: list(c.roles),
     sinceEdition: clean(c.sinceEdition, 10) || undefined, industry: clean(c.industry, 80) || undefined,
     excludeOpenOpportunities: Boolean(c.excludeOpenOpportunities), maxPerOrg: max,
+    warmPath: c.warmPath === "direct" || c.warmPath === "any" ? c.warmPath : undefined,
+    interactedWithinDays: days(c.interactedWithinDays), quietForDays: days(c.quietForDays),
   };
 }
+const days = (v: unknown) => {
+  const n = Math.round(Number(v));
+  return Number.isFinite(n) && n >= 1 ? Math.min(n, 3650) : undefined;
+};
 
 export async function createCampaign(tenantId: string, input: CampaignInput, actor: string): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const name = clean(input.name, 120);
@@ -106,10 +113,23 @@ export async function matchCriteria(tenantId: string, raw: Criteria): Promise<{ 
   const openOpp = c.excludeOpenOpportunities
     ? new Set((await all<{ org_id: string }>("SELECT DISTINCT org_id FROM opportunities WHERE tenant_id = ? AND stage NOT IN ('won','lost')", tenantId)).map((r) => r.org_id))
     : new Set<string>();
+  /* เส้นทางเข้าถึงและปฏิสัมพันธ์ล่าสุด: เป็นเหตุผลของทุกเป้าหมายเสมอ (เห็นครบทุกมิติ) และเป็นเงื่อนไขเมื่อเกณฑ์ขอ
+     ระดับสิทธิ์ของการสร้างรายชื่อ = ระดับตั้งต้นของผู้ใช้ — คนกลางที่สูงกว่านั้นไม่ถูกใช้และไม่ถูกเอ่ยชื่อในเหตุผล */
+  const graph = await loadPathGraph(tenantId, "confidential");
+  const lastTouch = new Map((await all<{ org_id: string; last_at: string }>(
+    "SELECT org_id, MAX(occurred_at) AS last_at FROM interactions WHERE tenant_id = ? AND org_id IS NOT NULL GROUP BY org_id", tenantId,
+  )).map((r) => [r.org_id, r.last_at]));
+  const ago = (n: number) => new Date(Date.now() - n * 864e5).toISOString();
   const kw = (c.titleKeywords ?? []).map((k) => k.toLowerCase());
   const byOrg = new Map<string, Match[]>();
   for (const a of affs) {
     if (openOpp.has(a.org_id)) continue;
+    const touched = lastTouch.get(a.org_id) ?? null;
+    if (c.interactedWithinDays && !(touched && touched >= ago(c.interactedWithinDays))) continue;
+    if (c.quietForDays && touched && touched >= ago(c.quietForDays)) continue;
+    const paths = pathsToPerson(graph, a.customer_id, a.org_id);
+    if (c.warmPath === "direct" && !paths.some((p) => p.hops === 1)) continue;
+    if (c.warmPath === "any" && !paths.length) continue;
     if (c.industry && !(a.industry ?? "").toLowerCase().includes(c.industry.toLowerCase())) continue;
     const reasons = [`${a.org} · ${a.title ?? "ไม่ทราบตำแหน่ง"} (ยังสังกัด${a.valid_from ? ` ตั้งแต่ ${a.valid_from.slice(0, 10)}` : ""}${a.confirmed_by ? " · คนยืนยันแล้ว" : ""})`];
     let rank = a.confirmed_by ? 1 : 0;
@@ -129,6 +149,12 @@ export async function matchCriteria(tenantId: string, raw: Criteria): Promise<{ 
       rank += 2 + mine.length;
     }
     if (c.industry) reasons.push(`อุตสาหกรรม: ${a.industry}`);
+    if (paths.length) {
+      reasons.push(`เส้นทางเข้าถึง: ${paths[0].text}${paths.length > 1 ? ` (และอีก ${paths.length - 1} เส้นทาง)` : ""}`);
+      rank += paths[0].hops === 1 ? 3 : 1;
+    }
+    if (touched) reasons.push(`ปฏิสัมพันธ์ล่าสุดกับบริษัท ${touched.slice(0, 10)}`);
+    else if (c.quietForDays) reasons.push("ยังไม่เคยมีปฏิสัมพันธ์ที่บันทึกกับบริษัทนี้");
     byOrg.set(a.org_id, [...(byOrg.get(a.org_id) ?? []), { customerId: a.customer_id, orgId: a.org_id, reasons, rank }]);
   }
   const orgs = [...byOrg.entries()].sort((x, y) => Math.max(...y[1].map((m) => m.rank)) - Math.max(...x[1].map((m) => m.rank)));
