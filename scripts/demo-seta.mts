@@ -1,7 +1,8 @@
 /* ── ฉากเดโม 5 นาทีสำหรับขาย pilot (ผู้จัดงานที่ขายสปอนเซอร์ แบบ SETA) ─────────────
 
-   ใช้: npm run demo:seta            → ฐานแยก .data/demo-seta.db บัญชี mst-golf (บัญชีแรกที่เบราว์เซอร์ใหม่เปิด)
-        npm run demo:seta -- hongmove → บัญชีอื่น
+   ใช้: npm run demo:seta            → ฐานแยก .data/demo-seta.db บัญชี "Sunline Expo (สมมุติ)" (sunline-demo)
+        npm run demo:seta -- mst-golf → ใส่ฉากลงบัญชีเดโมอื่นแทน
+   ในคอนโซล: แถบข้าง › บัญชีที่กำลังดู › สลับ › Sunline Expo (สมมุติ)
    แล้วเปิด dev server บนฐานนี้: PARALLAX_DB_PATH=.data/demo-seta.db npm run dev
 
    ข้อมูลทั้งหมดสมมุติ (Sunline Energy Week · lib/shared/synthetic-b2b.ts) — ไฟล์เละแบบที่ผู้จัดงานมีจริง:
@@ -30,12 +31,21 @@ const { addMemberLink, addRelationship, setAccountOwner } = await import("@/lib/
 const { assignTarget, buildTargets, createCampaign, getCampaign } = await import("@/lib/engine/campaigns");
 const { fileBytes, generateSynthetic } = await import("@/lib/shared/synthetic-b2b");
 
-const T = process.argv[2] ?? "mst-golf";
+const T = process.argv[2] ?? "sunline-demo";
 const ME = "owner";                       // ผู้ใช้ใน dev server ที่ไม่ได้ login
 const MATE = "nok.bd@sunline.example";    // เพื่อนร่วมทีม BD (สมมุติ)
 const ago = (d: number) => new Date(Date.now() - d * 864e5).toISOString();
 const day = (d: number) => ago(d).slice(0, 10);
 await ensureReady();
+/* บัญชีเดโม B2B ไม่ถูก seed ค้าปลีก (lib/shared/tenants.ts) — สร้างแถวบัญชีเอง ด้วยค่าจากโปรไฟล์ */
+{
+  const { profileFor } = await import("@/lib/shared/tenants");
+  const p = profileFor(T);
+  await run(
+    `INSERT INTO tenants (id, name, cycle_shape, tier, created_at, max_messages_per_week, quiet_hours_start, quiet_hours_end, max_discount_pct, message_credits, billing_day)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING`,
+    T, p.name, p.cycleShape, p.tier, ago(400), p.limits.weeklyCap, p.limits.quietStart, p.limits.quietEnd, p.limits.maxDiscountPct, p.limits.credits, 1);
+}
 
 // ── 1 · วัตถุประสงค์จากแม่แบบ ──
 const sponsor = await adoptTemplate(T, "b2b_sponsor_offer", "บริษัทในไฟล์เคยออกบูธหรือเป็นสปอนเซอร์ Sunline Energy Week (สมมุติ)", ME);
@@ -121,6 +131,7 @@ for (const [i, t] of eligible.slice(0, 2).entries()) await assignTarget(T, t.id,
 const stopper = view.targets.find((t) => t.eligibility === "eligible" && !eligible.slice(0, 2).includes(t)) ?? view.targets.at(-1);
 if (stopper) await recordPreference(T, stopper.customerId, { kind: "objection", evidence: "ตอบอีเมลว่าไม่ต้องการรับข้อเสนอแล้ว (สมมุติ)", effectiveAt: ago(1) }, ME);
 
+const finalView = (await getCampaign(T, camp.id))!;
 const moved = await get<{ n: number | string }>(
   "SELECT COUNT(*) AS n FROM affiliations WHERE tenant_id = ? AND customer_id = ? AND valid_to IS NOT NULL", T, moverId);
 console.log([
@@ -129,7 +140,7 @@ console.log([
   `ตรวจตัวตน: ${stats.rows} แถว → ${stats.people} คน · ${stats.orgs} บริษัท · คิวตรวจ ${stats.personPairs} คู่ / ${stats.orgGroups} กลุ่มบริษัท`,
   `แฟ้มบริษัทหลัก (ฉาก 3): /app/accounts/${A.id} — ${A.name}`,
   `บัญชีเงียบ + ปลายทางคนย้าย: /app/accounts/${D.id} — ${D.name}`,
-  `แคมเปญ (ฉาก 4): /app/sales/${camp.id} — เป้าหมาย ${view.targets.length} คน · ใช้ได้ ${eligible.length}`,
+  `แคมเปญ (ฉาก 4): /app/sales/${camp.id} — เป้าหมาย ${finalView.targets.length} คน · ใช้ได้ ${finalView.targets.filter((t) => t.eligibility === "eligible").length} · ต้องตรวจ ${finalView.targets.filter((t) => t.eligibility === "review_required").length} · ห้ามติดต่อ ${finalView.targets.filter((t) => t.eligibility === "suppressed").length}`,
   `คนย้ายบริษัท (ฉาก 5): ${Number(moved?.n ?? 0) ? `${mover}: ${A.name} → ${D.name}` : "ไม่สำเร็จ — ดูหัวข้อ 'ถ้าเดโมพัง'"}`,
-  `เปิด: PARALLAX_DB_PATH=${dbPath} npm run dev → http://localhost:3000/app/today`,
+  `เปิด: PARALLAX_DB_PATH=${dbPath} npm run dev → http://localhost:3000/app/today · แถบข้าง › สลับ › ${T === "sunline-demo" ? "Sunline Expo (สมมุติ)" : T}`,
 ].join("\n"));

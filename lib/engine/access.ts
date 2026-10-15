@@ -3,7 +3,7 @@ import { all, get, usingPostgres } from "@/lib/engine/sql";
 import {
   DEFAULT_TENANT_ID,
   isKnownTenant,
-  TENANT_PROFILES,
+  CONSOLE_PROFILES,
 } from "@/lib/shared/tenants";
 
 /* ── ใครแตะบัญชีไหนได้ ─────────────────────────────────────────
@@ -90,6 +90,6 @@ export async function resolveTenant(
 export async function switchableTenants(
   userId: string | null,
 ): Promise<string[]> {
-  if (!membershipEnforced()) return TENANT_PROFILES.map((t) => t.id);
+  if (!membershipEnforced()) return CONSOLE_PROFILES.map((t) => t.id);
   return userId ? tenantsForUser(userId) : [];
 }

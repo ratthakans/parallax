@@ -1,5 +1,5 @@
 import { all, exec, run, usingPostgres } from "@/lib/engine/sql";
-import { TENANT_PROFILES } from "@/lib/shared/tenants";
+import { CONSOLE_PROFILES } from "@/lib/shared/tenants";
 import { appendAudit } from "@/lib/engine/audit";
 
 /* ── ชั้นเก็บข้อมูล ────────────────────────────────────────────
@@ -803,7 +803,7 @@ export async function ensureSchema(): Promise<void> {
 
   /* บัญชีเดโมสังเคราะห์ได้สถานะ demo — เฉพาะบัญชีในทะเบียนเดโม ไม่ใช่ทุกแถวใน tenants
      บัญชีลูกค้าจริงต้องถูกสร้างพร้อมแถวของตัวเอง (is_customer = 1) ไม่มีแถว = AI ปิด */
-  for (const p of TENANT_PROFILES) {
+  for (const p of CONSOLE_PROFILES) {
     await run(
       `INSERT OR IGNORE INTO tenant_billing (tenant_id, state, is_customer, updated_at, updated_by)
        VALUES (?, 'demo', 0, ?, 'schema')`,
