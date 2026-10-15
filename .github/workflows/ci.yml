@@ -166,6 +166,10 @@ jobs:
       - name: Deletion registry
         run: npm run verify:erasure
 
+      # คำขอสิทธิ: ตัวนับ 30 วัน · ยืนยันตัวตนก่อน · รายงานรวมข้อมูลที่ AI สร้างและปิดชื่อคนอื่น · ปิดคำขอลบ/ถอน = ทำจริง
+      - name: Data subject requests
+        run: npm run verify:dsar
+
       # ── สคีมาสองฝั่งตรงกันไหม ──
       # ต้องมี DATABASE_URL ถึงจะเทียบได้ ไม่มีก็ข้ามโดยไม่ล้มเหลว เพราะ PR
       # จากคนนอกไม่ควรต้องมีรหัสฐานข้อมูล แต่บน push เข้า main ที่ตั้ง secret

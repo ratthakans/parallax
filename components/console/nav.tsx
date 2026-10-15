@@ -39,6 +39,7 @@ function groupsFor(baseLabelTh: string, personLabelTh: string) {
         },
         { href: "/app/vault", label: "แหล่งข้อมูลและนำเข้า", hint: "ลงทะเบียนแหล่ง · Excel หรือ CSV" },
         { href: "/app/vault/review", label: "คิวตรวจตัวตน", hint: "คู่ที่อาจเป็นคนเดียวกัน · ย้อนการรวม" },
+        { href: "/app/requests", label: "คำขอสิทธิ", hint: "เข้าถึง · ลบ · ถอน · ตัวนับ 30 วัน" },
       ],
     },
     {

@@ -812,6 +812,32 @@ export async function ensureSchema(): Promise<void> {
       deleted_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS ix_deletion_registry_tenant ON deletion_registry (tenant_id, deleted_at);
+
+    /* ══ คำขอสิทธิ (B6 · plan 7.4) — สเปกเดียวกับ supabase/migrations/0015_dsar_requests.sql ══ */
+    -- subject_id ไม่ใช่ customer_id โดยตั้งใจ: แถวต้องอยู่ต่อหลังลบคน (หลักฐานว่าทำตามคำขอแล้ว) · ไม่มีชื่อหรือค่าติดต่อ
+    CREATE TABLE IF NOT EXISTS dsar_requests (
+      id TEXT NOT NULL PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      ref TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      subject_id TEXT,
+      channel TEXT NOT NULL,
+      received_at TEXT NOT NULL,
+      due_at TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'open',
+      owner_id TEXT NOT NULL,
+      verified_at TEXT,
+      verified_by TEXT,
+      verification_note TEXT,
+      report_at TEXT,
+      outcome_note TEXT,
+      closed_at TEXT,
+      closed_by TEXT,
+      created_by TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS ux_dsar_requests_ref ON dsar_requests (tenant_id, ref);
+    CREATE INDEX IF NOT EXISTS ix_dsar_requests_open ON dsar_requests (tenant_id, status, due_at);
   `);
 
   /* บัญชีเดโมสังเคราะห์ได้สถานะ demo — เฉพาะบัญชีในทะเบียนเดโม ไม่ใช่ทุกแถวใน tenants

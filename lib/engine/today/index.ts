@@ -4,6 +4,8 @@ import { targetDecision } from "@/lib/engine/campaigns";
 import { loadPathGraph } from "@/lib/engine/accounts/paths";
 import { jobMoves } from "@/lib/engine/today/moves";
 import { retentionForPeople } from "@/lib/engine/retention";
+import { listRequests } from "@/lib/engine/dsar";
+import { DSAR_KIND_TH } from "@/lib/shared/dsar";
 import { SIGNAL_TH } from "@/lib/engine/vault/review";
 import { canSee } from "@/lib/shared/accounts";
 import { bangkokDay, thaiDate } from "@/lib/shared/format";
@@ -80,6 +82,22 @@ export async function todayQueue(tenantId: string, viewer: Viewer, now = new Dat
       ],
       href: visible ? `/app/customers/${s.customer_id}` : null,
       at: s.recorded_at, eligibility: null, snoozable: false, ackable: true,
+    });
+  }
+
+  /* ── คำขอสิทธิที่เปิดอยู่ (B6) ── ทุกคำขอที่ยังไม่ปิด ใกล้ครบกำหนดก่อน · เลื่อน/รับทราบไม่ได้ (กำหนดตามกฎหมาย ไม่ใช่ของผู้ใช้)
+     ชื่อผู้ขอไม่ขึ้นในคิว — คิวไม่ใช่ที่รวมว่าใครใช้สิทธิอะไร (หน้าคำขอแสดงเมื่อเปิดดู) */
+  for (const r of await listRequests(tenantId, now)) {
+    if (r.status !== "open") continue;
+    items.push({
+      section: "requests", kind: "dsar", id: r.id,
+      title: `${r.ref} · ${DSAR_KIND_TH[r.kind]} · ${r.daysLeft < 0 ? `เลยกำหนด ${-r.daysLeft} วัน` : r.daysLeft === 0 ? "ครบกำหนดวันนี้" : `เหลือ ${r.daysLeft} วัน`}`,
+      detail: [
+        `รับเมื่อ ${thaiDate(r.receivedAt)} · ครบกำหนด ${thaiDate(r.dueAt)}`,
+        r.verifiedAt ? "ยืนยันตัวตนแล้ว" : "ยังไม่ยืนยันตัวตน",
+        r.subjectId ? "" : "ไม่พบข้อมูลของผู้ขอในระบบ — ตอบผู้ขอว่าไม่มีข้อมูล",
+      ].filter(Boolean),
+      href: `/app/requests/${r.id}`, at: r.dueAt, eligibility: null, snoozable: false, ackable: false, snoozes: 0,
     });
   }
 
@@ -240,7 +258,7 @@ export async function todayQueue(tenantId: string, viewer: Viewer, now = new Dat
 /* ── เลื่อน / รับทราบ ── ของผู้ใช้แต่ละคน · ไม่มีข้อความอิสระ (คิวไม่ควรเป็นที่เก็บข้อมูลส่วนบุคคลแห่งใหม่) */
 
 async function itemExists(tenantId: string, kind: QueueItemKind, id: string) {
-  const table = { preference: "preferences", task: "tasks", review: "review_items", org: "orgs", affiliation: "affiliations", customer: "customers" }[kind];
+  const table = { preference: "preferences", task: "tasks", review: "review_items", org: "orgs", affiliation: "affiliations", customer: "customers", dsar: "dsar_requests" }[kind];
   if (!table) return false;
   return Boolean(await get(`SELECT 1 AS x FROM ${table} WHERE tenant_id = ? AND id = ?`, tenantId, id));
 }
