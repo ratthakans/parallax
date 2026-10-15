@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { denied, viewer } from "@/app/(app)/viewer";
 import { assignTarget, buildTargets, createCampaign, recordOutcome, updateCriteria } from "@/lib/engine/campaigns";
 import { setBasis } from "@/lib/engine/policy";
+import { adoptTemplate } from "@/lib/engine/policy/templates";
 import { recordPreference } from "@/lib/engine/policy/preferences";
 import type { ActionState } from "@/lib/shared/action-state";
 import type { Criteria } from "@/lib/shared/policy";
@@ -24,6 +25,9 @@ function criteriaOf(fd: FormData): Criteria {
     industry: str(fd, "industry"),
     excludeOpenOpportunities: fd.get("excludeOpenOpportunities") === "1",
     maxPerOrg: Number(str(fd, "maxPerOrg")) || 2,
+    warmPath: (["direct", "any"] as const).find((w) => w === str(fd, "warmPath")),
+    interactedWithinDays: Number(str(fd, "interactedWithinDays")) || undefined,
+    quietForDays: Number(str(fd, "quietForDays")) || undefined,
   };
 }
 
@@ -113,4 +117,15 @@ export async function setBasisAction(_p: ActionState, fd: FormData): Promise<Act
   if (!res.ok) return { error: res.error };
   revalidatePath("/app/sales/purposes");
   return { ok: `บันทึกฐานรุ่น ${res.version} แล้ว — รุ่นเดิมยังอยู่ในประวัติ` };
+}
+
+/* แม่แบบวัตถุประสงค์ (docs/solo-plan.md S4) — การเลือกฐานเป็นการตัดสินของเจ้าของบัญชีเหมือนตั้งฐานเอง */
+export async function adoptTemplateAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  const v = await viewer();
+  const no = denied(v, "policy");
+  if (no) return { error: no };
+  const res = await adoptTemplate(v.tenantId, str(fd, "code"), str(fd, "confirmation"), v.actor);
+  if (!res.ok) return { error: res.error };
+  revalidatePath("/app/sales/purposes");
+  return { ok: res.existed ? "บัญชีนี้ใช้แม่แบบนี้อยู่แล้ว" : "สร้างวัตถุประสงค์และฐานรุ่น 1 จากแม่แบบแล้ว" };
 }

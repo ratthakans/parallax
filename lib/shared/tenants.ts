@@ -380,13 +380,53 @@ export const TENANT_PROFILES: TenantProfile[] = [
    และไม่รับงานการเมืองทุกรูปแบบ แถวเก่าในฐานข้อมูลไม่มีผู้ใช้ผูกอยู่ จึงไม่มีใครเปิดได้
    ร้านค้าปลีกสามบัญชีที่เหลือเป็นข้อมูลเดโมชั่วคราว จนตัวสร้างข้อมูล B2B (B1) มาแทน */
 
+/* ══════════════════════════════════════════════════════════════
+   บัญชีเดโม B2B — ผู้จัดงานที่ขายสปอนเซอร์ (แบบลูกค้า pilot)
+   ข้อมูลมาจาก `npm run demo:seta` (ตัวสร้าง B2B · lib/shared/synthetic-b2b.ts) ไม่ใช่จาก seed ค้าปลีก
+   จึงอยู่นอก TENANT_PROFILES: bootstrap/seed ค้าปลีกไม่แตะบัญชีนี้ (seed ล้างบัญชีที่ "ยังไม่มีลูกค้า"
+   แล้วสร้างลูกค้าค้าปลีกใหม่ — ถ้าอยู่ในรายการเดียวกัน ข้อมูลเดโม B2B จะถูกล้างทุกครั้งที่ฐานว่าง)
+   ค่าค้าปลีก (scale · catalogue · events) สืบจาก MST_GOLF เพื่อให้ชนิดครบ แต่ไม่มีอะไรอ่านมันสำหรับบัญชีนี้
+   ══════════════════════════════════════════════════════════════ */
+
+const SUNLINE_DEMO: TenantProfile = {
+  ...MST_GOLF,
+  id: "sunline-demo",
+  name: "Sunline Expo (สมมุติ)",
+  industry: "ผู้จัดงานแสดงสินค้าและสัมมนา B2B",
+  source: "ข้อมูลสมมุติจากตัวสร้าง B2B — ไม่ใช่ข้อมูลของใคร",
+  cycleShape: "considered",
+  vocab: {
+    person: "contact",
+    people: "contacts",
+    purchase: "sponsorship",
+    spend: "contract value",
+    item: "package",
+    base: "contact base",
+    topGroup: "sponsors",
+    cycleExample: "a sponsor renewing every year is nothing like an exhibitor who books once every few editions",
+    orgKind: "company",
+    purchaseVerb: "sponsor",
+    th: {
+      person: "ผู้ติดต่อ", people: "ผู้ติดต่อ", purchase: "การซื้อแพ็กเกจ",
+      spend: "มูลค่าสัญญา", item: "แพ็กเกจ", base: "ฐานผู้ติดต่อ",
+      topGroup: "สปอนเซอร์", orgKind: "บริษัท", purchaseVerb: "ซื้อแพ็กเกจ",
+    },
+  },
+  seedKey: 4242,
+};
+
+/** บัญชีเดโม B2B — เห็นและสลับได้ในคอนโซล แต่ไม่ถูก seed ค้าปลีก */
+export const B2B_DEMO_PROFILES: TenantProfile[] = [SUNLINE_DEMO];
+/** ทุกบัญชีที่คอนโซลรู้จัก (ตัวสลับบัญชี · ชื่อบนแถบข้าง · คำเรียก) */
+export const CONSOLE_PROFILES: TenantProfile[] = [...TENANT_PROFILES, ...B2B_DEMO_PROFILES];
+
 /** บัญชีตั้งต้นเมื่อยังไม่ได้เลือก */
 export const DEFAULT_TENANT_ID = MST_GOLF.id;
 
 export function profileFor(tenantId: string): TenantProfile {
-  return TENANT_PROFILES.find((t) => t.id === tenantId) ?? MST_GOLF;
+  return CONSOLE_PROFILES.find((t) => t.id === tenantId) ?? MST_GOLF;
 }
 
 export function isKnownTenant(tenantId: string): boolean {
-  return TENANT_PROFILES.some((t) => t.id === tenantId);
+  return CONSOLE_PROFILES.some((t) => t.id === tenantId);
 }

@@ -8,7 +8,7 @@ import { ensureReady } from "@/lib/engine/bootstrap";
 import { getTenant } from "@/lib/engine/match";
 
 import { planById } from "@/lib/shared/plans";
-import { TENANT_PROFILES, profileFor } from "@/lib/shared/tenants";
+import { CONSOLE_PROFILES, profileFor } from "@/lib/shared/tenants";
 import { featuresComputedAt } from "@/lib/engine/derive";
 import { hasSyntheticData } from "@/lib/engine/synthetic";
 import { switchTenantAction } from "./actions";
@@ -47,7 +47,7 @@ export default async function ConsoleLayout({
           credits={tenant?.message_credits ?? 0}
           planName={planById(tenant?.tier ?? "growth").name}
           computedAt={computedAt}
-          tenants={TENANT_PROFILES.filter((t) => allowed.includes(t.id)).map((t) => ({
+          tenants={CONSOLE_PROFILES.filter((t) => allowed.includes(t.id)).map((t) => ({
             id: t.id,
             name: t.name,
             industry: t.industry,

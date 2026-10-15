@@ -1,5 +1,5 @@
 import { all, exec, run, usingPostgres } from "@/lib/engine/sql";
-import { TENANT_PROFILES } from "@/lib/shared/tenants";
+import { CONSOLE_PROFILES } from "@/lib/shared/tenants";
 import { appendAudit } from "@/lib/engine/audit";
 
 /* ── ชั้นเก็บข้อมูล ────────────────────────────────────────────
@@ -803,7 +803,7 @@ export async function ensureSchema(): Promise<void> {
 
   /* บัญชีเดโมสังเคราะห์ได้สถานะ demo — เฉพาะบัญชีในทะเบียนเดโม ไม่ใช่ทุกแถวใน tenants
      บัญชีลูกค้าจริงต้องถูกสร้างพร้อมแถวของตัวเอง (is_customer = 1) ไม่มีแถว = AI ปิด */
-  for (const p of TENANT_PROFILES) {
+  for (const p of CONSOLE_PROFILES) {
     await run(
       `INSERT OR IGNORE INTO tenant_billing (tenant_id, state, is_customer, updated_at, updated_by)
        VALUES (?, 'demo', 0, ?, 'schema')`,
@@ -878,6 +878,18 @@ export async function ensureSchema(): Promise<void> {
   {
     const have = await columnsOf("opportunities");
     if (!have.has("campaign_id")) await exec("ALTER TABLE opportunities ADD COLUMN campaign_id TEXT");
+  }
+  /* แม่แบบวัตถุประสงค์และขอบเขตของฐาน (docs/solo-plan.md S4 · 0013) */
+  {
+    const have = await columnsOf("purposes");
+    if (!have.has("template_code")) await exec("ALTER TABLE purposes ADD COLUMN template_code TEXT");
+    if (!have.has("template_version")) await exec("ALTER TABLE purposes ADD COLUMN template_version INTEGER");
+  }
+  {
+    const have = await columnsOf("processing_records");
+    if (!have.has("employer_scoped")) await exec("ALTER TABLE processing_records ADD COLUMN employer_scoped INTEGER NOT NULL DEFAULT 0");
+    if (!have.has("allowed_channels")) await exec("ALTER TABLE processing_records ADD COLUMN allowed_channels TEXT");
+    if (!have.has("allowed_message_kinds")) await exec("ALTER TABLE processing_records ADD COLUMN allowed_message_kinds TEXT");
   }
 }
 

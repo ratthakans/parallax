@@ -193,6 +193,7 @@ export async function getDossier(tenantId: string, orgId: string, viewer: Viewer
   const peopleById = new Map(affs.map((a) => [a.customer_id, hiddenPerson(a.person_class) ? MASKED_PERSON : a.name]));
   const nameOf = async (kind: string | null, id: string | null): Promise<string> => {
     if (!kind || !id) return "ไม่ทราบ";
+    if (kind === "member") return id; // สมาชิกทีม — รหัสเดียวกับเจ้าของบัญชีและผู้รับผิดชอบงาน
     if (kind === "org") {
       if (id === orgId) return o.name!;
       const other = await get<{ name: string; classification: string | null }>("SELECT name, classification FROM orgs WHERE tenant_id = ? AND id = ?", tenantId, id);

@@ -24,6 +24,7 @@
     "verify:vault": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/vault.mts",
     "verify:synthetic": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/synthetic.mts",
     "synthetic": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs scripts/gen-synthetic.mts",
+    "demo:seta": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs scripts/demo-seta.mts",
     "verify:intake": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/intake.mts",
     "verify:resolution": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/resolution.mts",
     "verify:merge": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/merge.mts",
@@ -31,6 +32,8 @@
     "verify:ai-brief": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/ai-brief.mts",
     "verify:policy": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/policy.mts",
     "verify:today": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/today.mts",
+    "verify:paths": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/paths.mts",
+    "verify:templates": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/templates.mts",
     "pg:test-db": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs scripts/pg-test-db.mts",
     "verify:pg": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/pg-rls.mts"
   },

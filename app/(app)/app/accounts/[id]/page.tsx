@@ -3,13 +3,14 @@ import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { viewer } from "@/app/(app)/viewer";
 import {
-  addRelationshipAction, claimAccountAction, confirmAffiliationAction, endAffiliationAction, endRelationshipAction,
+  addMemberLinkAction, addRelationshipAction, claimAccountAction, confirmAffiliationAction, endAffiliationAction, endRelationshipAction,
   generateBriefAction, logInteractionAction, setClassificationAction, setParentAction, updateOrgFieldAction, verifyOrgAction,
 } from "@/app/(app)/account-actions";
 import { getDossier, orgOptions, unknownsOf, type Dossier, type RowRef, type Version } from "@/lib/engine/accounts";
 import { currentBrief } from "@/lib/engine/accounts/brief";
+import { loadPathGraph, pathsToOrg, suggestKnows } from "@/lib/engine/accounts/paths";
 import {
-  INTERACTION_KINDS, INTERACTION_TH, ORG_FIELD_TH, RELATIONSHIP_ENDS, RELATIONSHIP_TH, RELATIONSHIP_TYPES,
+  INTERACTION_KINDS, INTERACTION_TH, MEMBER_RELATIONSHIP_TYPES, ORG_FIELD_TH, RELATIONSHIP_ENDS, RELATIONSHIP_TH, RELATIONSHIP_TYPES,
   type OrgEditable,
 } from "@/lib/shared/accounts";
 import { CLASSIFICATIONS, CLASSIFICATION_TH, LIFECYCLE_TH, type LifecycleState } from "@/lib/shared/vault";
@@ -98,7 +99,11 @@ export default async function AccountPage({ params }: { params: Promise<{ id: st
     );
   }
 
-  const [brief, others] = await Promise.all([currentBrief(v.tenantId, id, who), orgOptions(v.tenantId, id)]);
+  const [brief, others, graph, suggested] = await Promise.all([
+    currentBrief(v.tenantId, id, who), orgOptions(v.tenantId, id), loadPathGraph(v.tenantId, v.clearance), suggestKnows(v.tenantId, who, id),
+  ]);
+  const paths = pathsToOrg(graph, id);
+  const knownByMe = new Set(paths.filter((p) => p.hops === 1 && p.member === v.actor).map((p) => p.person.id));
   const unknowns = unknownsOf(d);
   const current = d.people.filter((p) => p.current);
   const former = d.people.filter((p) => !p.current);
@@ -228,6 +233,51 @@ export default async function AccountPage({ params }: { params: Promise<{ id: st
             )}
           </Panel>
 
+          {/* ── เส้นทางเข้าถึง (docs/solo-plan.md S2) ── */}
+          <Panel className="p-5 md:p-6">
+            <h2 className="c-h2 text-[var(--c-text)]">เส้นทางเข้าถึง</h2>
+            <p className="c-thai mt-1 text-[0.82rem] text-[var(--c-text-3)]">ใครในทีมรู้จักคนที่อยู่บริษัทนี้ตอนนี้ — ไม่เกินสองทอด ทุกทอดยืนยันแล้ว ไม่มีคะแนน · ไม่ผ่านคนที่คัดค้านหรือเกินสิทธิ์ของคุณ</p>
+            {paths.length ? (
+              <ul className="c-thai mt-4 grid gap-2 text-[0.88rem] text-[var(--c-text-2)]">
+                {paths.slice(0, 12).map((p) => (
+                  <li key={`${p.member}|${p.via?.id ?? ""}|${p.person.id}`}>
+                    <span className={`c-pill mr-2 ${p.hops === 1 ? "c-pill-good" : ""}`}>{p.hops === 1 ? "ตรง" : "สองทอด"}</span>{p.text}
+                  </li>
+                ))}
+                {paths.length > 12 && <li className="text-[var(--c-text-4)]">และอีก {num(paths.length - 12)} เส้นทาง</li>}
+              </ul>
+            ) : (
+              <p className="c-thai mt-4 text-[0.88rem] text-[var(--c-text-3)]">ไม่ทราบ — ยังไม่มีใครในทีมบันทึกว่ารู้จักคนในบริษัทนี้</p>
+            )}
+            {suggested.filter((s) => !knownByMe.has(s.personId)).length > 0 && (
+              <p className="c-thai mt-4 text-[0.82rem] text-[var(--c-text-3)]">
+                คุณคุยกับ {suggested.filter((s) => !knownByMe.has(s.personId)).slice(0, 3).map((s) => `${s.name} (${num(s.interactions)} ครั้ง)`).join(" · ")} แล้ว — ถ้ารู้จักจริง บันทึกไว้ด้านล่าง
+              </p>
+            )}
+            {current.some((p) => !p.masked && !knownByMe.has(p.personId)) && (
+              <details className="mt-4">
+                <summary className="c-btn c-btn-ghost inline-flex cursor-pointer">ฉันรู้จักคนในบริษัทนี้</summary>
+                <ActionForm action={addMemberLinkAction} fields={{ orgId: o.id }} label="บันทึก" pendingLabel="กำลังบันทึก…" variant="primary" className="mt-4 grid gap-3 md:grid-cols-3">
+                  <label className={LABEL}>คน
+                    <select name="personId" className="c-select" required defaultValue={suggested.find((s) => !knownByMe.has(s.personId))?.personId ?? ""}>
+                      <option value="" disabled>เลือก</option>
+                      {current.filter((p) => !p.masked && !knownByMe.has(p.personId)).map((p) => <option key={p.personId} value={p.personId}>{p.name}</option>)}
+                    </select>
+                  </label>
+                  <label className={LABEL}>แบบไหน
+                    <select name="type" className="c-select" defaultValue="knows">
+                      {MEMBER_RELATIONSHIP_TYPES.map((t) => <option key={t} value={t}>{RELATIONSHIP_TH[t]}</option>)}
+                    </select>
+                  </label>
+                  <label className={LABEL}>ตั้งแต่ (ถ้าทราบ)<input type="date" name="validFrom" className="c-input" /></label>
+                  <label className={`${LABEL} md:col-span-3`}>รู้จักจากที่ไหน เมื่อไร (เป็นหลักฐาน)
+                    <input name="context" className="c-input" placeholder="เช่น ประชุมสมาคม ต.ค. 2568 · เคยทำโครงการด้วยกันปี 2566" required />
+                  </label>
+                </ActionForm>
+              </details>
+            )}
+          </Panel>
+
           {/* ── ความสัมพันธ์ที่ยืนยัน ── */}
           <Panel className="p-5 md:p-6">
             <h2 className="c-h2 text-[var(--c-text)]">ความสัมพันธ์</h2>
@@ -271,7 +321,7 @@ export default async function AccountPage({ params }: { params: Promise<{ id: st
                 <label className={LABEL}>ความสัมพันธ์
                   <select name="type" className="c-select" required defaultValue="">
                     <option value="" disabled>เลือก</option>
-                    {RELATIONSHIP_TYPES.map((t) => (
+                    {RELATIONSHIP_TYPES.filter((t) => RELATIONSHIP_ENDS[t][0] !== "member").map((t) => (
                       <option key={t} value={t}>{RELATIONSHIP_TH[t]} ({RELATIONSHIP_ENDS[t].map((k) => (k === "org" ? "บริษัท" : "คน")).join("→")})</option>
                     ))}
                   </select>

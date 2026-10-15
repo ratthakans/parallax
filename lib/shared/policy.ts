@@ -57,6 +57,12 @@ export type Criteria = {
   excludeOpenOpportunities?: boolean;
   /** คนต่อบริษัทไม่เกิน (ค่าตั้งต้น 2) */
   maxPerOrg?: number;
+  /** มีคนในทีมรู้จัก (ยืนยันแล้ว) — "direct" = รู้จักตัวเขาเอง · "any" = ภายในสองทอด (ผ่านคนกลางหรือเพื่อนร่วมบริษัท) */
+  warmPath?: "direct" | "any";
+  /** บริษัทมีปฏิสัมพันธ์ภายใน N วัน */
+  interactedWithinDays?: number;
+  /** บริษัทไม่มีปฏิสัมพันธ์มาแล้วอย่างน้อย N วัน (รวมที่ไม่เคยมี) — ใช้หาบัญชีที่เงียบ */
+  quietForDays?: number;
 };
 
 export function describeCriteria(c: Criteria): string[] {
@@ -66,6 +72,10 @@ export function describeCriteria(c: Criteria): string[] {
   else if (c.roles?.length) out.push(`เคยร่วมงานในบทบาท ${c.roles.join(" / ")}`);
   if (c.industry) out.push(`อุตสาหกรรมของบริษัทคือ “${c.industry}” (บริษัทที่ไม่ทราบอุตสาหกรรมไม่เข้าเกณฑ์)`);
   if (c.excludeOpenOpportunities) out.push("ไม่รวมบริษัทที่มีโอกาสขายเปิดอยู่แล้ว");
+  if (c.warmPath === "direct") out.push("มีคนในทีมรู้จักตัวเขาโดยตรง (ยืนยันแล้ว)");
+  else if (c.warmPath === "any") out.push("มีคนในทีมเข้าถึงได้ภายในสองทอด (รู้จักเอง หรือผ่านคนกลางที่ยืนยันแล้ว)");
+  if (c.interactedWithinDays) out.push(`บริษัทมีปฏิสัมพันธ์ภายใน ${c.interactedWithinDays} วัน`);
+  if (c.quietForDays) out.push(`บริษัทไม่มีปฏิสัมพันธ์มาแล้วอย่างน้อย ${c.quietForDays} วัน (รวมที่ไม่เคยมี)`);
   out.push(`ไม่เกิน ${c.maxPerOrg ?? 2} คนต่อบริษัท`);
   return out;
 }
