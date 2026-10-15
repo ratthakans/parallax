@@ -82,6 +82,12 @@ const askFor = (c: CampaignRow, customerId: string) => ({
   customerId, purposeId: c.purpose_id, channel: c.channel, messageKind: c.message_kind, disclosurePurposeId: c.disclosure_purpose_id,
 });
 
+/** ผลนโยบาย ณ ตอนนี้ของคนหนึ่งในแคมเปญหนึ่ง — สำหรับหน้าที่แสดงงานติดต่อ (เช่น "วันนี้") · อ่านอย่างเดียว ไม่เขียนผลกลับ */
+export async function targetDecision(tenantId: string, campaignId: string, customerId: string): Promise<Decision | null> {
+  const c = await loadCampaign(tenantId, campaignId);
+  return c ? decide(tenantId, askFor(c, customerId)) : null;
+}
+
 /* ── เกณฑ์ → คนที่เข้าเกณฑ์ พร้อมเหตุผล ── */
 type Match = { customerId: string; orgId: string; reasons: string[]; rank: number };
 

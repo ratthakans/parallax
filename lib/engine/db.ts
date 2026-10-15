@@ -785,6 +785,20 @@ export async function ensureSchema(): Promise<void> {
       at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS ix_work_log_tenant ON work_log (tenant_id, at);
+
+    /* ══ หน้า "วันนี้" (docs/solo-plan.md S1) — สเปกเดียวกับ supabase/migrations/0012_today_queue.sql ══ */
+    -- การเลื่อน/รับทราบรายการในคิวของผู้ใช้แต่ละคน — ไม่มีข้อความอิสระ · ไม่มีข้อมูลส่วนบุคคล
+    CREATE TABLE IF NOT EXISTS queue_marks (
+      tenant_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      item_kind TEXT NOT NULL,
+      item_id TEXT NOT NULL,
+      mark TEXT NOT NULL,
+      until TEXT,
+      count INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (tenant_id, user_id, item_kind, item_id)
+    );
   `);
 
   /* บัญชีเดโมสังเคราะห์ได้สถานะ demo — เฉพาะบัญชีในทะเบียนเดโม ไม่ใช่ทุกแถวใน tenants

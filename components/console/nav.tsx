@@ -24,6 +24,11 @@ function groupsFor(baseLabelTh: string, personLabelTh: string) {
      หน้าค้าปลีกเดิม (บรีฟเช้า แคมเปญ ผลที่วัดได้ คลัง play ค่าใช้จ่าย ภาพรวมผู้บริหาร) ออกจากเมนูแล้ว */
   return [
     {
+      /* คิวเดียวข้ามทุกพื้นที่ (docs/solo-plan.md S1) — คนที่ถือหลายบทบาทเริ่มที่นี่ */
+      title: "งานของฉัน",
+      links: [{ href: "/app/today", label: "วันนี้", hint: "ต้องหยุด · ครบกำหนด · รอตรวจที่กระทบงาน" }],
+    },
+    {
       title: "Data Vault",
       links: [
         { href: "/app", label: "ภาพรวม", hint: "ตัวเลขที่นับได้จริงของฐาน" },
