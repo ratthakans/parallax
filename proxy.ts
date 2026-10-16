@@ -32,7 +32,8 @@ function consoleCsp(nonce: string): string {
   return [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${dev ? " 'unsafe-eval'" : ""}`,
-    `style-src 'self' 'nonce-${nonce}'`,
+    /* dev: Next ฉีด <style> ของ HMR โดยไม่มี nonce — มี nonce อยู่ unsafe-inline จะถูกเมิน จึงตัด nonce ออกเฉพาะ dev */
+    dev ? "style-src 'self' 'unsafe-inline'" : `style-src 'self' 'nonce-${nonce}'`,
     "style-src-attr 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self'",
