@@ -7,7 +7,7 @@ import Link from "next/link";
    SortTh      หัวคอลัมน์กดเรียง · กดซ้ำสลับทิศ · มีลูกศรบอกทิศ
    Pager       ก่อนหน้า/ถัดไป */
 
-export type ListState = { q?: string; view?: string; sort?: string; dir?: string; page?: number; mode?: string; defaultView?: string };
+export type ListState = { q?: string; view?: string; sort?: string; dir?: string; page?: number; mode?: string; defaultView?: string; extra?: Record<string, string> };
 
 /** ลิงก์ของสถานะรายการ — มุมมองเริ่มต้น (state.defaultView · ปกติ "all") ไม่ใส่ใน URL */
 export function listHref(base: string, state: ListState, patch: ListState): string {
@@ -19,6 +19,8 @@ export function listHref(base: string, state: ListState, patch: ListState): stri
   if (next.dir) qs.set("dir", next.dir);
   if (next.page && next.page > 1) qs.set("page", String(next.page));
   if (next.mode) qs.set("mode", next.mode);
+  /* ตัวกรองที่เลือกเอง (C5) ติดไปกับทุกลิงก์ของรายการ */
+  for (const [k, v] of Object.entries(next.extra ?? {})) if (v) qs.set(k, v);
   const s = qs.toString();
   return s ? `${base}?${s}` : base;
 }

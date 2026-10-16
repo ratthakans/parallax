@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { denied, viewer } from "@/app/(app)/viewer";
 import { archiveField, createField, setValue, type FieldEntity } from "@/lib/engine/custom-fields";
+import { deleteView, saveView } from "@/lib/engine/saved-views";
+import { can } from "@/lib/shared/roles";
 import type { ActionState } from "@/lib/shared/action-state";
 
 /* ── ฟิลด์กำหนดเอง (docs/crm-plan.md C4) ── นิยามฟิลด์ = สิทธิ์ fields · กรอกค่า = สิทธิ์ write
@@ -40,4 +42,29 @@ export async function setFieldValueAction(_p: ActionState, fd: FormData): Promis
   if (!res.ok) return { error: res.error };
   revalidatePath(entity === "deal" ? `/app/deals/${id}` : `/app/accounts/${id}`);
   return { ok: "บันทึกแล้ว" };
+}
+
+/* ── มุมมองรายการที่บันทึกไว้ (C5) ── ส่วนตัว = สิทธิ์ write · แชร์ให้ทั้งบัญชี = สิทธิ์ fields */
+const LIST_PATH: Record<string, string> = { accounts: "/app/accounts", deals: "/app/deals", pivot: "/app/reports/pivot" };
+
+export async function saveViewAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  const v = await viewer();
+  const no = denied(v, "write");
+  if (no) return { error: no };
+  const shared = str(fd, "shared") === "1";
+  if (shared && !can(v.role, "fields")) return { error: "แชร์มุมมองให้ทั้งบัญชีได้เฉพาะ Data steward หัวหน้าทีม หรือเจ้าของบัญชี — บันทึกเป็นมุมมองส่วนตัวแทน" };
+  const res = await saveView(v.tenantId, { list: str(fd, "list"), name: str(fd, "name"), query: str(fd, "query"), shared }, v.actor);
+  if (!res.ok) return { error: res.error };
+  revalidatePath(LIST_PATH[str(fd, "list")] ?? "/app");
+  return { ok: "บันทึกมุมมองแล้ว" };
+}
+
+export async function deleteViewAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  const v = await viewer();
+  const no = denied(v, "write");
+  if (no) return { error: no };
+  const res = await deleteView(v.tenantId, str(fd, "viewId"), v.actor);
+  if (!res.ok) return { error: res.error };
+  revalidatePath(LIST_PATH[str(fd, "list")] ?? "/app");
+  return { ok: "ลบมุมมองแล้ว" };
 }

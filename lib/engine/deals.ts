@@ -27,11 +27,25 @@ type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 
 const lv = (c: string | null) => (c ?? "confidential") as Classification;
 
+/* ตัวกรองที่ผู้ใช้เลือกเอง (docs/crm-plan.md C5) — ค่าเป็นพารามิเตอร์เสมอ */
+export type DealFilters = { owner?: string; minValue?: number; closeFrom?: string; closeTo?: string; package?: string; custom?: { fieldId: string; value: string }[] };
+
 export async function listDeals(
-  tenantId: string, opts: { view?: DealView; sort?: DealSort; dir?: "asc" | "desc"; q?: string }, viewer: Viewer,
+  tenantId: string, opts: { view?: DealView; sort?: DealSort; dir?: "asc" | "desc"; q?: string; filters?: DealFilters; limit?: number }, viewer: Viewer,
 ): Promise<DealRow[]> {
   const where = ["p.tenant_id = ?"];
-  const params: string[] = [tenantId];
+  const params: (string | number)[] = [tenantId];
+  const f = opts.filters;
+  if (f?.owner) { where.push("p.owner_id = ?"); params.push(f.owner); }
+  if (f?.minValue != null && Number.isFinite(f.minValue)) { where.push("COALESCE(p.value, 0) >= ?"); params.push(f.minValue); }
+  if (f?.closeFrom) { where.push("p.expected_close >= ?"); params.push(f.closeFrom); }
+  if (f?.closeTo) { where.push("p.expected_close <= ?"); params.push(f.closeTo); }
+  if (f?.package) { where.push("EXISTS (SELECT 1 FROM deal_items di WHERE di.tenant_id = p.tenant_id AND di.opportunity_id = p.id AND di.package = ?)"); params.push(f.package); }
+  for (const c of f?.custom ?? []) {
+    where.push(`(SELECT v.value FROM custom_values v WHERE v.tenant_id = p.tenant_id AND v.entity = 'deal' AND v.record_id = p.id AND v.field_id = ?
+      ORDER BY v.recorded_at DESC, v.id DESC LIMIT 1) = ?`);
+    params.push(c.fieldId, c.value);
+  }
   const view = opts.view && (DEAL_VIEWS as readonly string[]).includes(opts.view) ? opts.view : "open";
   if (view === "open" || view === "mine") { where.push(`p.stage IN (${OPEN_STAGES.map(() => "?").join(",")})`); params.push(...OPEN_STAGES); }
   if (view === "mine") { where.push("p.owner_id = ?"); params.push(viewer.id); }
@@ -47,7 +61,7 @@ export async function listDeals(
        o.account_owner_id AS acc_owner, o.data_owner_id AS data_owner, p.campaign_id, c.name AS campaign, p.updated_at, p.created_at
      FROM opportunities p JOIN orgs o ON o.id = p.org_id AND o.tenant_id = p.tenant_id
      LEFT JOIN sales_campaigns c ON c.id = p.campaign_id AND c.tenant_id = p.tenant_id
-     WHERE ${where.join(" AND ")} ORDER BY ${SORT_SQL[sort]} ${dir}, p.id LIMIT 500`, ...params);
+     WHERE ${where.join(" AND ")} ORDER BY ${SORT_SQL[sort]} ${dir}, p.id LIMIT ?`, ...params, Math.min(Math.max(opts.limit ?? 500, 1), 20000));
   return rows
     .filter((r) => canSee(viewer.clearance, lv(r.classification)) || [r.acc_owner, r.data_owner].includes(viewer.id))
     .map((r) => ({

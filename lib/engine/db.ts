@@ -879,6 +879,18 @@ export async function ensureSchema(): Promise<void> {
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
+    /* ══ มุมมองรายการที่บันทึกไว้ (docs/crm-plan.md C5) — สเปกเดียวกับ supabase/migrations/0023_saved_views.sql ══ */
+    CREATE TABLE IF NOT EXISTS saved_views (
+      id TEXT NOT NULL PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      list TEXT NOT NULL CHECK (list IN ('accounts', 'deals', 'pivot')),
+      name TEXT NOT NULL,
+      query TEXT NOT NULL,
+      shared INTEGER NOT NULL DEFAULT 0 CHECK (shared IN (0, 1)),
+      owner_id TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS ix_saved_views_list ON saved_views (tenant_id, list);
     /* ══ ฟิลด์กำหนดเอง · แพ็กเกจในดีล (docs/crm-plan.md C4) — สเปกเดียวกับ supabase/migrations/0022_custom_fields.sql ══ */
     CREATE TABLE IF NOT EXISTS custom_fields (
       id TEXT NOT NULL PRIMARY KEY,
