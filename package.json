@@ -39,6 +39,7 @@
     "verify:dsar": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/dsar.mts",
     "verify:export": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/export.mts",
     "verify:roles": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/roles.mts",
+    "verify:digest": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/digest.mts",
     "verify:load": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/load.mts",
     "erasures": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs scripts/erasures.mts",
     "pg:test-db": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs scripts/pg-test-db.mts",

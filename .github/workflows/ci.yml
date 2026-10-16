@@ -178,6 +178,10 @@ jobs:
       - name: Roles
         run: npm run verify:roles
 
+      # สรุปรายสัปดาห์ถึงตัวเอง (S8): อีเมลมีแค่จำนวน (ไม่มีชื่อ/อีเมล/เบอร์ของคนในฐาน) · ปิดแล้วไม่ส่ง · ข้ามบัญชีไม่ปน · secret ผิด = 401 · วันละครั้ง
+      - name: Weekly digest
+        run: npm run verify:digest
+
       # ขนาด pilot บน sqlite — จับ query ที่โตแบบกำลังสองตั้งแต่ PR (Postgres วัดซ้ำใน job ด้านล่าง)
       - name: Load at pilot size
         run: npm run verify:load

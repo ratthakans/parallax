@@ -858,6 +858,20 @@ export async function ensureSchema(): Promise<void> {
       cancelled_at TEXT
     );
     CREATE INDEX IF NOT EXISTS ix_export_requests_tenant ON export_requests (tenant_id, requested_at);
+
+    /* ══ สรุปรายสัปดาห์ถึงตัวเอง (S8) — สเปกเดียวกับ supabase/migrations/0020_digest_prefs.sql ══ */
+    -- ต่อ (บัญชี, ผู้ใช้) · weekday 1 = จันทร์ … 7 = อาทิตย์ · last_sent_day กันส่งซ้ำในวันเดียวกัน · ไม่เก็บอีเมล
+    CREATE TABLE IF NOT EXISTS digest_prefs (
+      tenant_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)),
+      weekday INTEGER NOT NULL DEFAULT 1 CHECK (weekday BETWEEN 1 AND 7),
+      last_sent_day TEXT,
+      last_sent_at TEXT,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (tenant_id, user_id)
+    );
+    CREATE INDEX IF NOT EXISTS ix_digest_prefs_due ON digest_prefs (weekday, enabled);
   `);
 
   /* บัญชีเดโมสังเคราะห์ได้สถานะ demo — เฉพาะบัญชีในทะเบียนเดโม ไม่ใช่ทุกแถวใน tenants
