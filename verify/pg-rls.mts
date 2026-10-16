@@ -18,6 +18,7 @@
    13. บทบาทหกแบบ: BD และผู้ดูแลข้อมูลส่วนบุคคลเขียนผ่าน RLS ได้ · viewer เขียนไม่ได้ · ค่าบทบาทที่ไม่รู้จักบันทึกไม่ได้ (0017)
    14. สมัครเอง (0019): app.create_signup_tenant สร้างบัญชีให้ auth.uid() ครั้งเดียว (แม้กดพร้อมกัน) · เรียกโดยไม่มีตัวตนไม่ได้
        · เข้าบัญชีคนอื่นไม่ได้ · ผู้ใช้เปลี่ยนสถานะการชำระหรือ signup_source เองไม่ได้ · ขั้นตั้งต้นรันในนามผู้ใช้ได้
+   16. สรุปรายสัปดาห์: ตั้งได้เฉพาะแถวของตัวเอง · เพื่อนร่วมบัญชีมองไม่เห็น/แก้ไม่ได้ · cron อ่าน auth.users และนับในนามผู้ใช้ (0020)
 
    ต้องมี DATABASE_URL ของฐานทดสอบที่ใช้ migration แล้ว (npm run pg:test-db) — ไม่มีก็ข้าม
    ⚠ ห้ามชี้ไปที่ production: ชุดนี้สร้างบัญชีและผู้ใช้ทดสอบ */
@@ -287,6 +288,28 @@ ok(!wiped && await countFor("deletion_registry", "tenant_id = ?", T) === regRows
     for (const t of await all<{ tenant_id: string }>("SELECT tenant_id FROM tenant_users WHERE user_id = ?", id)) await run("DELETE FROM tenants WHERE id = ?", t.tenant_id);
   }
   await run("DELETE FROM auth.users WHERE id IN (?, ?, ?)", u, racer, other);
+}
+
+// ── 16 · สรุปรายสัปดาห์ (0020) ── ตั้งได้เฉพาะแถวของตัวเอง · เพื่อนร่วมบัญชีมองไม่เห็นและแก้ไม่ได้ · cron นับในนามผู้ใช้บน Postgres
+{
+  const { setDigestPrefs, digestPrefs, runWeeklyDigests } = await import("@/lib/engine/digest");
+  const { bangkokWeekday } = await import("@/lib/shared/digest");
+  const wd = bangkokWeekday();
+  const set = await as(() => setDigestPrefs(T, op, { enabled: true, weekday: wd }));
+  const mine = await as(() => digestPrefs(T, op));
+  ok(set.ok && mine.enabled && mine.weekday === wd, `ตั้งสรุปรายสัปดาห์ของตัวเองในนามผู้ใช้ได้ (insert/update ผ่าน RLS)${set.ok ? "" : ` (${set.error})`}`);
+  const peer = randomUUID();
+  await run("INSERT INTO auth.users (id, email) VALUES (?, ?)", peer, `${peer}@pg.example`);
+  await run("INSERT INTO tenant_users (user_id, tenant_id, role) VALUES (?, ?, 'bd')", peer, T);
+  const peek = await withIdentity(peer, () => all<{ user_id: string }>("SELECT user_id FROM digest_prefs WHERE tenant_id = ?", T));
+  const flip = await withIdentity(peer, () => run("UPDATE digest_prefs SET enabled = 0 WHERE tenant_id = ? AND user_id = ?", T, op));
+  ok(peek.length === 0 && flip.changes === 0 && (await as(() => digestPrefs(T, op))).enabled,
+    "เพื่อนร่วมบัญชีมองไม่เห็นและปิดสรุปของคนอื่นไม่ได้");
+  const got: string[] = [];
+  const r = await runWeeklyDigests({ send: async (m) => { got.push(m.to); return { status: "sent" }; }, consoleUrl: "https://console.example" });
+  ok(r.failed === 0 && got.includes(`${op}@pg.example`), `cron อ่านอีเมลจาก auth.users และนับคิวในนามผู้ใช้บน Postgres (ส่ง ${r.sent} · ล้ม ${r.failed})`);
+  await run("DELETE FROM tenant_users WHERE tenant_id = ? AND user_id = ?", T, peer);
+  await run("DELETE FROM auth.users WHERE id = ?", peer);
 }
 
 // เก็บกวาด — บัญชีทดสอบหายพร้อมทุกแถว (on delete cascade)
