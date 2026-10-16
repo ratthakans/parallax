@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { deriveFeatures } from "@/lib/engine/derive";
 import { guessProductRoles } from "@/lib/engine/ai";
 import { contactCapBlockedReason } from "@/lib/engine/billing";
+import { importBlockedReason } from "@/lib/engine/signup/gate";
 import {
   CONTACT_POINT_COLUMNS,
   contactPointRow,
@@ -750,6 +751,9 @@ export async function commitImport(
       "ยังไม่ได้ตั้งกุญแจเข้ารหัสข้อมูลติดต่อ (PII_KEY · PII_HMAC_KEY) — ระบบจึงยังไม่รับไฟล์",
     );
   }
+  /* บัญชีสมัครเองไม่รับไฟล์จริง (S9) — ตัวนำเข้า CSV นี้ไม่มีทางเป็นไฟล์สมมุติของระบบ จึงปิดทั้งเส้น */
+  const blocked = await importBlockedReason(tenantId);
+  if (blocked) throw new Error(blocked);
   const read = fieldReader(parsed, mapping);
   const preview = buildPreview(parsed, mapping);
   if (preview.missing.length) {

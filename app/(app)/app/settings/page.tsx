@@ -1,5 +1,5 @@
 import { activeTenantId } from "@/app/(app)/tenant";
-import { all } from "@/lib/engine/sql";
+import { all, withIdentity } from "@/lib/engine/sql";
 import { aiCacheStats, aiConfigured } from "@/lib/engine/ai";
 import { getTenant } from "@/lib/engine/match";
 import { demoState } from "@/lib/engine/demo";
@@ -24,6 +24,9 @@ import { supabaseServer } from "@/lib/shared/supabase";
 import { membershipEnforced } from "@/lib/engine/access";
 import { thaiDate } from "@/lib/shared/format";
 import { demoToolsEnabled } from "@/lib/shared/demo-tools";
+import { digestPrefs } from "@/lib/engine/digest";
+import { saveDigestPrefsAction } from "../../digest-actions";
+import { DIGEST_WEEKDAYS, WEEKDAY_TH } from "@/lib/shared/digest";
 
 export const dynamic = "force-dynamic";
 
@@ -84,6 +87,8 @@ export default async function SettingsPage() {
       />
 
       <MfaPanel />
+
+      <DigestPanel tenantId={tenantId} />
 
       {/* ── โปรไฟล์บัญชี ── */}
       <Panel className="mb-6 p-5 md:p-6">
@@ -426,6 +431,47 @@ export default async function SettingsPage() {
         </ActionForm>
       </Panel>
     </>
+  );
+}
+
+/* ── สรุปรายสัปดาห์ถึงตัวเอง (S8) ── ของผู้ใช้คนนี้ในบัญชีนี้ · อีเมลมีแค่จำนวน ไม่มีชื่อหรือข้อมูลติดต่อของคนในฐาน */
+async function DigestPanel({ tenantId }: { tenantId: string }) {
+  const user = membershipEnforced() ? await currentUser() : null;
+  /* ผูกตัวตนตรงนี้เอง — คอมโพเนนต์ลูกไม่ได้รับประกันว่าอยู่ใน async context เดียวกับ activeTenantId() */
+  const prefs = user ? await withIdentity(user.userId, () => digestPrefs(tenantId, user.userId)) : null;
+  return (
+    <Panel className="mb-6 p-5 md:p-6">
+      <h2 className="c-h2 text-[var(--c-text)]">สรุปรายสัปดาห์ถึงตัวเอง</h2>
+      <p className="c-thai mt-1 max-w-2xl text-[0.82rem] text-[var(--c-text-3)]">
+        อีเมลสั้น ๆ เวลา 08:00 ของวันที่เลือก ถึงอีเมลที่คุณใช้เข้าสู่ระบบ: จำนวนงานต่อหมวดของหน้า &quot;วันนี้&quot; · โอกาสที่ขยับ/ค้าง ·
+        คนที่รู้จักย้ายบริษัท · ข้อมูลใกล้หมดอายุ · คำขอสิทธิที่เปิดอยู่ — มีแค่จำนวนและลิงก์ ไม่มีชื่อหรือข้อมูลติดต่อของคนในฐาน
+      </p>
+      {!user || !prefs ? (
+        <p className="c-thai mt-3 text-[0.84rem] text-[var(--c-text-4)]">โหมดเดโมไม่มีการเข้าสู่ระบบ — ใช้ได้เมื่อเชื่อม Supabase</p>
+      ) : (
+        <ActionForm
+          action={saveDigestPrefsAction}
+          label="บันทึก"
+          pendingLabel="กำลังบันทึก…"
+          size="sm"
+          className="mt-4 flex flex-wrap items-center gap-3"
+          note={
+            <p className="c-thai text-[0.76rem] text-[var(--c-text-4)]">
+              {prefs.lastSentAt ? `ส่งล่าสุด ${thaiDate(prefs.lastSentAt)}` : "ยังไม่เคยส่ง"} · ส่งผ่านผู้ให้บริการอีเมล (Resend) ซึ่งเห็นอีเมลของคุณและจำนวนในสรุปเท่านั้น
+            </p>
+          }
+        >
+          <label className="c-thai flex items-center gap-2 text-[0.86rem] text-[var(--c-text-2)]">
+            <input type="checkbox" name="enabled" value="1" defaultChecked={prefs.enabled} className="h-5 w-5" /> ส่งสรุปถึง {user.email}
+          </label>
+          <select name="weekday" defaultValue={String(prefs.weekday)} className="c-select" aria-label="วันที่ส่ง">
+            {DIGEST_WEEKDAYS.map((d) => (
+              <option key={d} value={d}>ทุก{WEEKDAY_TH[d]}</option>
+            ))}
+          </select>
+        </ActionForm>
+      )}
+    </Panel>
   );
 }
 

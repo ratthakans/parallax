@@ -348,7 +348,9 @@ export async function ensureSchema(): Promise<void> {
       state TEXT NOT NULL DEFAULT 'demo',
       is_customer INTEGER NOT NULL DEFAULT 0,
       updated_at TEXT NOT NULL,
-      updated_by TEXT NOT NULL
+      updated_by TEXT NOT NULL,
+      -- ทดลองใช้ของบัญชีสมัครเอง (S9 · 0019) — state = 'trial' ถึงวันนี้
+      trial_ends_at TEXT
     );
 
     /* ── บันทึกการเรียก AI ทุกครั้ง (lib/engine/ai/ledger.ts) — ไม่เก็บ prompt หรือคำตอบ ── */
@@ -859,6 +861,37 @@ export async function ensureSchema(): Promise<void> {
     );
     CREATE INDEX IF NOT EXISTS ix_export_requests_tenant ON export_requests (tenant_id, requested_at);
 
+    /* ══ ค่าตั้งของบัญชี + สมัครเอง (S9) — สเปกเดียวกับ supabase/migrations/0019_tenant_settings.sql ══ */
+    -- ไม่มีแถว = ค่าตั้งต้น (team · invite) · signup_source = 'self' คือบัญชีสมัครเอง ซึ่งรับได้แค่ข้อมูลสมมุติ
+    CREATE TABLE IF NOT EXISTS tenant_settings (
+      tenant_id TEXT NOT NULL PRIMARY KEY,
+      mode TEXT NOT NULL DEFAULT 'team',
+      today_quiet_days INTEGER NOT NULL DEFAULT 30,
+      weekly_digest_day INTEGER,
+      signup_source TEXT NOT NULL DEFAULT 'invite',
+      dpa_version TEXT,
+      dpa_accepted_at TEXT,
+      dpa_accepted_by TEXT,
+      mfa_confirmed_at TEXT,
+      templates_chosen_at TEXT,
+      demo_loaded_at TEXT,
+      onboarded_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    /* ══ สรุปรายสัปดาห์ถึงตัวเอง (S8) — สเปกเดียวกับ supabase/migrations/0020_digest_prefs.sql ══ */
+    -- ต่อ (บัญชี, ผู้ใช้) · weekday 1 = จันทร์ … 7 = อาทิตย์ · last_sent_day กันส่งซ้ำในวันเดียวกัน · ไม่เก็บอีเมล
+    CREATE TABLE IF NOT EXISTS digest_prefs (
+      tenant_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)),
+      weekday INTEGER NOT NULL DEFAULT 1 CHECK (weekday BETWEEN 1 AND 7),
+      last_sent_day TEXT,
+      last_sent_at TEXT,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (tenant_id, user_id)
+    );
+    CREATE INDEX IF NOT EXISTS ix_digest_prefs_due ON digest_prefs (weekday, enabled);
     /* ══ ยืนยันการรวมเป็นชุด (docs/solo-plan.md S5) — สเปกเดียวกับ supabase/migrations/0018_review_batches.sql ══ */
     -- ไม่มีรหัสคน ชื่อ หรือค่าติดต่อ · merge_group_id = merge_log.rule ของทุกการรวมในชุด (ย้อนทั้งชุด)
     CREATE TABLE IF NOT EXISTS review_batches (
@@ -904,6 +937,9 @@ export async function ensureSchema(): Promise<void> {
     await exec(
       "ALTER TABLE attributions ADD COLUMN matured INTEGER NOT NULL DEFAULT 0",
     );
+  }
+  if (!(await columnsOf("tenant_billing")).has("trial_ends_at")) {
+    await exec("ALTER TABLE tenant_billing ADD COLUMN trial_ends_at TEXT");
   }
   if (!(await columnsOf("tenants")).has("billing_day")) {
     await exec(

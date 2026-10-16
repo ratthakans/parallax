@@ -8,7 +8,9 @@ import { ensureReady } from "@/lib/engine/bootstrap";
 import { getTenant } from "@/lib/engine/match";
 
 import { planById } from "@/lib/shared/plans";
-import { CONSOLE_PROFILES, profileFor } from "@/lib/shared/tenants";
+import { CONSOLE_PROFILES, isSignupTenantId, profileFor } from "@/lib/shared/tenants";
+import { consoleGate, signupInfo } from "@/lib/engine/signup/gate";
+import { membershipEnforced } from "@/lib/engine/access";
 import { featuresComputedAt } from "@/lib/engine/derive";
 import { hasSyntheticData } from "@/lib/engine/synthetic";
 import { switchTenantAction } from "./actions";
@@ -36,6 +38,12 @@ export default async function ConsoleLayout({
   const user = await currentUser();
   /* รหัสผ่านถูกแต่ยังไม่ได้ใส่รหัสจากแอป — ยังล็อกอินไม่ครบ */
   if (user?.mfa === "pending") redirect("/login/mfa");
+  /* บัญชีสมัครเอง (S9): ต้องตั้งค่าครบ (รวมยืนยันสองชั้นในรอบนี้) และยังอยู่ในช่วงทดลองหรือชำระแล้ว
+     หน้า /onboarding กับ /upgrade อยู่นอกกลุ่มนี้โดยตั้งใจ — อยู่ในนี้แล้วจะ redirect วนตัวเอง */
+  const signup = await signupInfo(tenantId, membershipEnforced() ? (user?.mfa ?? "none") : "verified");
+  const gateTo = consoleGate(signup);
+  if (gateTo) redirect(gateTo);
+  const currentName = tenant?.name ?? profile.name;
 
   return (
     <div className="console">
@@ -45,14 +53,17 @@ export default async function ConsoleLayout({
       <div className="c-shell">
         <ConsoleNav
           tenantId={tenantId}
-          tenantName={tenant?.name ?? profile.name}
+          tenantName={currentName}
           industry={profile.industry}
           credits={tenant?.message_credits ?? 0}
           planName={planById(tenant?.tier ?? "growth").name}
           computedAt={computedAt}
-          tenants={CONSOLE_PROFILES.filter((t) => allowed.includes(t.id)).map((t) => ({
+          tenants={[
+            ...CONSOLE_PROFILES.filter((t) => allowed.includes(t.id)),
+            ...allowed.filter(isSignupTenantId).map(profileFor),
+          ].map((t) => ({
             id: t.id,
-            name: t.name,
+            name: t.id === tenantId ? currentName : t.name,
             industry: t.industry,
           }))}
           switchAction={switchTenantAction}
@@ -74,7 +85,7 @@ export default async function ConsoleLayout({
 
               บรรทัดเดียว ไม่กินพื้นที่จอ — สิ่งที่หน้านี้ต้องการให้อ่านคือ
               สามการตัดสินใจ ไม่ใช่ป้ายประกาศ */}
-          {synthetic && (
+          {synthetic && !signup.selfSignup && (
             <div className="c-demobar">
               <span>
                 <strong>เดโม</strong> · ข้อมูลสังเคราะห์จากธุรกิจไทย 4 รูปแบบ
@@ -83,6 +94,18 @@ export default async function ConsoleLayout({
               <span>การอนุมัติและส่งทำงานครบ แต่ไม่มีข้อความออกจากระบบจริง</span>
               <Link href="/" className="c-demobar__back">
                 ← parallax
+              </Link>
+            </div>
+          )}
+          {signup.selfSignup && signup.billingState !== "paid" && (
+            <div className="c-demobar">
+              <span>
+                <strong>ทดลองใช้</strong> · เหลือ {signup.daysLeft} วัน · ข้อมูลสมมุติเท่านั้น
+              </span>
+              <span className="c-demobar__sep" aria-hidden />
+              <span>AI ปิดระหว่างทดลอง</span>
+              <Link href="/upgrade" className="c-demobar__back">
+                อัปเกรด →
               </Link>
             </div>
           )}

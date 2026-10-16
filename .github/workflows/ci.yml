@@ -193,6 +193,14 @@ jobs:
       - name: Roles
         run: npm run verify:roles
 
+      # สมัครเอง (S9): ธงปิด = สมัครไม่ได้ · ผู้ใช้หนึ่งคนได้บัญชีเดียว (ทดลอง 14 วัน · AI ปิด)
+      # · ขั้นตั้งต้นข้ามไม่ได้ · บัญชีสมัครเองรับแต่ไฟล์สมมุติของระบบ · หมดช่วงทดลอง = ไปหน้าอัปเกรด
+      - name: Self sign-up
+        run: npm run verify:signup
+      # สรุปรายสัปดาห์ถึงตัวเอง (S8): อีเมลมีแค่จำนวน (ไม่มีชื่อ/อีเมล/เบอร์ของคนในฐาน) · ปิดแล้วไม่ส่ง · ข้ามบัญชีไม่ปน · secret ผิด = 401 · วันละครั้ง
+      - name: Weekly digest
+        run: npm run verify:digest
+
       # ขนาด pilot บน sqlite — จับ query ที่โตแบบกำลังสองตั้งแต่ PR (Postgres วัดซ้ำใน job ด้านล่าง)
       - name: Load at pilot size
         run: npm run verify:load

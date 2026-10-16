@@ -1,6 +1,6 @@
 # PARALLAX · โหมดคนเดียว (Solo Operator) — แผนละเอียด
 
-> **สถานะ:** เจ้าของอนุมัติชุด 1 (2026-10-15) · **S1 เสร็จ** (`verify:today` 31 ข้อ) · **S2 + S3 เสร็จ** (`verify:paths` 37 ข้อ) · **S4 เสร็จ** (`verify:templates` 22 ข้อ · ข้อความกฎหมายยังเป็นร่างรอ O3) · **ชุด 1 ครบ** · **S5 เสร็จ** (`verify:batch-merge` 59 ข้อ · precision ไม่ลด) · **S6 เสร็จบางส่วน** (`verify:capture` 43 ข้อ · นามบัตรกรอกมือ · โน้ตหลังพบลูกค้า — OCR/รูปนามบัตรรอเจ้าของตัดสิน) · **S7 เสร็จ** (`verify:draft` 39 ข้อ · ข้อความยกเลิกรับยังเป็นร่างรอ O3) · ชุด 2 ที่เหลือกำลังทำ (2026-10-16)
+> **สถานะ:** เจ้าของอนุมัติชุด 1 (2026-10-15) · **S1 เสร็จ** (`verify:today` 31 ข้อ) · **S2 + S3 เสร็จ** (`verify:paths` 37 ข้อ) · **S4 เสร็จ** (`verify:templates` 22 ข้อ · ข้อความกฎหมายยังเป็นร่างรอ O3) · **ชุด 1 ครบ** · **S5 เสร็จ** (`verify:batch-merge` 59 ข้อ · precision ไม่ลด) · **S6 เสร็จบางส่วน** (`verify:capture` 43 ข้อ · นามบัตรกรอกมือ · โน้ตหลังพบลูกค้า — OCR/รูปนามบัตรรอเจ้าของตัดสิน) · **S7 เสร็จ** (`verify:draft` 39 ข้อ · ข้อความยกเลิกรับยังเป็นร่างรอ O3) · **S9 เสร็จ (ปิดไว้จนกว่า SIGNUP_ENABLED=1)** (`verify:signup` 71 ข้อ · ไม่มีระบบชำระเงิน) · **S8 เสร็จ** (`verify:digest` 36 ข้อ · ส่งจริงเมื่อตั้ง RESEND_API_KEY) · ชุด 2 ที่เหลือกำลังทำ (2026-10-16)
 > **ร่าง:** 2026-10-15 · อ้างอิง `docs/plan.md` (Blueprint 2.0) ฉบับที่ B0–B5 เสร็จแล้ว
 > **ไม่แทนแผนหลัก** — แผนนี้วางอยู่บนเครื่องยนต์เดิมทั้งหมด และแบ่งงานเป็นสองชุด: ชุดที่ช่วย pilot SETA ได้ทันที กับชุดที่ทำต่อเมื่อเจ้าของเลือกเปิดตลาดคนเดียว
 
@@ -411,6 +411,13 @@
 
 **ผ่านเมื่อ:** อีเมลไม่มี PII ของคนในฐาน (ตรวจด้วย regex เบอร์/อีเมล/ชื่อจากข้อมูลสมมุติ) · ปิดแล้วไม่ส่ง · ข้ามบัญชีไม่ปน
 
+**สถานะ:** ✅ 2026-10-16 (ทำก่อนจุดทบทวน A เพราะใช้ข้อมูลเดิมทั้งหมด ไม่มี AI) — `verify:digest` 36 ข้อ · `verify:pg` +3 ข้อ
+- `lib/shared/digest.ts` ประกอบอีเมลจาก `DigestCounts` (จำนวนล้วน — ไม่มีช่องรับชื่อ) · `lib/engine/digest` นับจาก `todayQueue` · `weeklyReview` · `jobMoves` · `retentionSummary` · `listRequests`
+- `app/api/cron/digest` ตรวจ `Authorization: Bearer <CRON_SECRET>` (เทียบ hash เวลาคงที่ · ไม่ได้ตั้ง = ปฏิเสธทุกคำขอ) · `vercel.json` ยิงวันละครั้ง 01:00 UTC (Hobby ยิงได้วันละครั้ง) แล้วเลือกผู้ใช้ตามวันที่เลือก
+- ต่อ (บัญชี, ผู้ใช้) · นับในนามผู้ใช้ (RLS) · วันละครั้ง (จองวันก่อนส่ง · ส่งล้มคืนค่า) · ถูกถอดจากบัญชีแล้วหยุดได้รับ
+- **เปิดใช้เอง** (ไม่มีแถว = ไม่ส่ง) ที่หน้าตั้งค่า · ส่งผ่าน Resend HTTP API เมื่อตั้ง `RESEND_API_KEY` + `DIGEST_FROM` — ไม่ตั้ง = ข้ามและ log ว่า not configured · Resend อยู่ในทะเบียนผู้ให้บริการช่วง (แผนหลัก 7.3) แบบ "เมื่อเปิดใช้"
+- ยังไม่มี: วันที่ส่งเลือกได้แค่ "วัน" (เวลาคงที่ 08:00) · `tenant_settings.weekly_digest_day` ของ S9 ไม่ใช้ — ความชอบเป็นของผู้ใช้แต่ละคน (`digest_prefs`)
+
 ---
 
 ### S9 · สมัครเองและชำระเงิน (ชุด 2)
@@ -432,6 +439,15 @@
 
 **ข้อจำกัดก่อนประตูข้อมูลจริง:** ก่อน pentest ผ่าน การสมัครเองเปิดได้แค่ **บัญชีเดโมที่ใช้ข้อมูลสมมุติ** (`npm run synthetic`) — ไม่รับไฟล์จริง
 
+**สถานะ (2026-10-16): โครงเสร็จ · ปิดไว้โดยปริยาย** — `verify:signup` 71 ข้อ · `verify:pg` ข้อ 14 · migration `0019_tenant_settings`
+- เปิดด้วย `SIGNUP_ENABLED=1` เท่านั้น (ไม่ตั้ง = `/signup` แสดง "ยังไม่เปิดรับสมัคร" และ action/engine ปฏิเสธ) · ระหว่างปิด ให้ปิด "Allow new users to sign up" ที่ Supabase ด้วย
+- สมัคร `/signup` (อีเมล + รหัสผ่าน ≥ 12 ตัว · ยืนยันอีเมลผ่าน `/auth/confirm`) → ล็อกอินครั้งแรกที่ไม่มีบัญชีไป `/onboarding`
+- สร้างบัญชีผ่าน `app.create_signup_tenant` (security definer · ทำให้ `auth.uid()` ครั้งเดียว · advisory lock กันกดซ้ำ) — owner · `mode = 'solo'` · `signup_source = 'self'` · `tenant_billing.state = 'trial'` + `trial_ends_at` 14 วัน · เครดิตข้อความ 0 · AI ปิด
+- ขั้นตั้งต้นบังคับตามลำดับที่ engine (`lib/engine/signup`): DPA (**ร่าง — รอนักกฎหมาย (O3)** · เก็บรุ่น) → ยืนยันสองชั้น (อ่านจาก session ทุกครั้ง) → แม่แบบ 1–3 ตัว (`adoptTemplate`) → ข้อมูลสมมุติ 200 แถวผ่านเส้นทางนำเข้าจริง → `/app/today` · ยังตั้งค่าไม่ครบ = layout พาไป `/onboarding` และทุก action ถูกปฏิเสธ (`Viewer.locked`)
+- **"ลงทะเบียนแหล่งแรก + นำเข้าไฟล์จริง" ถูกแทนด้วยข้อมูลสมมุติ** ตามข้อจำกัดข้างบน — บัญชีสมัครเองนำเข้าได้เฉพาะไฟล์ที่ hash ตรงกับไฟล์จากตัวสร้างของระบบ (Data Vault · CSV ค้าปลีก · เพิ่มคนเอง ถูกปิด) · `signup_source` เจ้าของแก้เองไม่ได้ (สิทธิ์ระดับคอลัมน์)
+- หมดช่วงทดลอง/ระงับ = คอนโซลพาไป `/upgrade` (ติดต่อทีม — **ยังไม่มีผู้ให้บริการรับชำระเงิน**) · ทีมเปลี่ยน `tenant_billing.state = 'paid'` จากฝั่งระบบ → AI เปิด · ข้อมูลไม่ถูกลบเอง
+- ยังไม่ทำ: ราคาโหมดคนเดียว (แยกจาก `PlanId`) · ระบบชำระเงิน · `today_quiet_days`/`weekly_digest_day` ยังไม่ถูกอ่านโดยคิววันนี้/S8 · ลบบัญชีทดลองที่หมดอายุ · ลืมรหัสผ่าน · ทดสอบกับคนจริง 5 คน (≤ 30 นาที)
+
 ---
 
 ## 5 · โครงสร้างข้อมูลที่เพิ่ม
@@ -444,6 +460,8 @@
 | ~~0013_member_relationships~~ | ไม่ต้องมี — ไม่มี check constraint บนชนิดปลายทาง · ดัชนีมีอยู่แล้ว | S2 | ✅ ไม่มี migration |
 | ~~0014_signals~~ | ไม่ต้องมี — คำนวณสดจาก `affiliations` · รับทราบ/เลื่อนใช้ `queue_marks` | S3 | ✅ ไม่มี migration · ลบตามคำขอสิทธิไม่มีอะไรต้องตามลบเพิ่ม |
 | **0013_purpose_templates** ✅ | `purposes.template_code/template_version` · `processing_records.employer_scoped/allowed_channels/allowed_message_kinds` | S4 | แม่แบบอยู่ในโค้ด ไม่มีตารางระดับระบบ · `tenant_settings` ย้ายไปทำพร้อม S9 |
+| **0019_tenant_settings** ✅ | `tenant_settings` (`mode` solo/team · `today_quiet_days` · `weekly_digest_day` · `signup_source` invite/self · `dpa_version/accepted_at/accepted_by` · `mfa_confirmed_at` · `templates_chosen_at` · `demo_loaded_at` · `onboarded_at`) · `tenant_billing.trial_ends_at` + สถานะ `trial` · `app.create_signup_tenant()` | S9 | อ่านได้ทุกสมาชิก · แก้ได้เฉพาะ owner และเฉพาะคอลัมน์ที่ตั้งเองได้ (`signup_source` แก้ไม่ได้) · บัญชีเดิมได้แถว `team · invite` |
+| **0020_digest_prefs** ✅ | `digest_prefs` (`tenant_id` · `user_id` · `enabled` · `weekday` 1–7 · `last_sent_day` · `last_sent_at` · `updated_at`) · PK `(tenant_id, user_id)` | S8 | RLS: อ่าน/ตั้งได้เฉพาะแถวของตัวเองในบัญชีที่เป็นสมาชิก · ไม่เก็บอีเมล (อ่าน `auth.users` ตอนส่ง) · ไม่มี `customer_id` |
 | **0018_review_batches** ✅ (เดิม 0014 — เลขถูกใช้ไปแล้ว) | `review_batches` (`id` · `tenant_id` · `rule` · `ai_assisted` · `size` · `status` · `decided_by` · `decided_at` · `merge_group_id` · `undone_by` · `undone_at` · `created_at`) · `review_items.batch_id/ai_verdict` · `sample_checks.batch_id/due_at` | S5 | `merge_group_id` = `merge_log.rule` ของทุกการรวมในชุด → ย้อนทั้งชุด · ไม่มีรหัสคนใน `review_batches` จึงไม่ต้องแก้ `app.erase_person_history` (คู่ใน `review_items` ถูกลบตามคนอยู่แล้ว) |
 
 **การลบตามคำขอสิทธิ (PDPA):** ทุกตารางใหม่ที่อ้าง `customer_id` ต้องถูกจัดการใน `app.erase_person_history` — **แก้ฟังก์ชันใน 0014 และเพิ่มข้อทดสอบใน `verify:pg`** (บทเรียนจาก B5.5: ลบตามคำขอสิทธิเคยพังเพราะ grant)
@@ -560,7 +578,7 @@ B6 วางแผนบทบาท 6 แบบ · โหมดคนเดี�
 | **S-4** | ✅ 2026-10-16 (ทำล่วงหน้า) | S5 รวมเป็นชุด — กติกาก่อน แล้ว AI · migration 0018 · ชุดทดสอบ precision | `verify:batch-merge` 59 ข้อ · precision ≥ กติกาเดิม (ทั้งสองกลุ่ม) · `verify:pg` +4 ข้อ |
 | **S-5** | ✅ บางส่วน 2026-10-16 | S6a นามบัตร — **กรอกมือ + คิวตรวจทำแล้ว** · มือถือ/รูป/OCR รอเจ้าของเลือกผู้ให้บริการ | `verify:capture` 6a |
 | **S-6** | ✅ 2026-10-16 | S6b โน้ต (ชุดทดสอบ injection 12 แบบ) ✅ · S7 ร่างข้อความ ✅ | `verify:capture` 6b ✅ · `verify:draft` ✅ 39 ข้อ |
-| **S-7** | 2 สัปดาห์ | S9 สมัครเอง · ชำระเงิน · ขั้นตั้งต้น · S8 สรุปรายสัปดาห์ | ตั้งระบบถึงแคมเปญแรก ≤ 30 นาที (ทดสอบกับคนจริง 5 คน) |
+| **S-7** | 2 สัปดาห์ | S9 สมัครเอง · ชำระเงิน · ขั้นตั้งต้น · ~~S8 สรุปรายสัปดาห์~~ (✅ 2026-10-16) | ตั้งระบบถึงแคมเปญแรก ≤ 30 นาที (ทดสอบกับคนจริง 5 คน) |
 | **S-8** | 1–2 สัปดาห์ | beta ปิด 10–20 คน (เดโมก่อน → ข้อมูลจริงเมื่อประตูผ่าน) | หัวข้อ 11.2 |
 
 **ชุด 2 เดินคู่กับ pilot SETA ได้** — แต่ช่วง pilot แผนหลักบอกว่า "งานพัฒนาคือแก้ปัญหาที่พบ ไม่เพิ่มฟีเจอร์" → ถ้าเลือกทั้งสองทาง เจ้าของต้องยอมรับว่างานแก้ของ pilot มาก่อนเสมอ และชุด 2 อาจเลื่อน
@@ -576,6 +594,7 @@ B6 วางแผนบทบาท 6 แบบ · โหมดคนเดี�
 | `verify:today` ✅ | `verify/today.mts` | 31 (S1) | 1 |
 | `verify:paths` ✅ | `verify/paths.mts` | 37 (S2 + S3 รวมกัน) | 1 |
 | `verify:templates` ✅ | `verify/templates.mts` | 22 (S4 + ฐานที่ผูกบริษัท) | 1 |
+| `verify:digest` ✅ | `verify/digest.mts` | 36 (S8 — ไม่มี PII · ปิดไม่ส่ง · ข้ามบัญชีไม่ปน · 401 · วันละครั้ง) | 2 |
 | `verify:batch-merge` ✅ | `verify/batch-merge.mts` | 59 (S5 ข้อ 1–5 + precision) | 2 |
 | `verify:capture` ✅ | `verify/capture.mts` | 43 (S6 ข้อ 1–6 · injection 12 แบบ · คำขอไม่มีอีเมล/เบอร์) | 2 |
 | `verify:draft` ✅ | `verify/draft.mts` | 39 (S7 ข้อ 1–4 + ยกเลิกรับ · AI ปิด · ไม่เก็บร่าง) | 2 |

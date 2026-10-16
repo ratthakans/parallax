@@ -7,6 +7,7 @@ import { scanFile } from "@/lib/engine/vault/scan";
 import { TableTooLarge, readTable } from "@/lib/engine/vault/read";
 import { getSource, type Source } from "@/lib/engine/vault/sources";
 import { contactKeys, erasedKeys, erasedReason } from "@/lib/engine/vault/erasure";
+import { importBlockedReason } from "@/lib/engine/signup/gate";
 import {
   IDENTIFYING_FIELDS, VAULT_FIELDS, sensitiveReason, type ImportRowStatus, type VaultField,
 } from "@/lib/shared/vault";
@@ -143,6 +144,9 @@ export async function analyseUpload(
 ): Promise<AnalyseResult> {
   const source = await loadSource(tenantId, sourceId);
   if (typeof source === "string") return { ok: false, error: source };
+  /* บัญชีสมัครเองรับได้แค่ไฟล์สมมุติจนกว่า pentest จะผ่าน (S9) — ตัดก่อนอ่านเนื้อไฟล์ */
+  const blocked = await importBlockedReason(tenantId, sha256(bytes));
+  if (blocked) return { ok: false, error: blocked };
   const read = await scanAndRead(bytes, filename);
   if ("error" in read) {
     if (read.threat) await logActivity(tenantId, actor, "upload_blocked", `${sourceId} · ${sha256(bytes).slice(0, 16)}`);
@@ -185,6 +189,8 @@ export async function commitUpload(
   if (typeof source === "string") return { ok: false, error: source };
   const digest = sha256(bytes);
   if (digest !== expectedSha) return { ok: false, error: "ไฟล์ที่ส่งมาไม่ใช่ไฟล์เดียวกับที่ตรวจไว้ — เริ่มใหม่อีกครั้ง" };
+  const blocked = await importBlockedReason(tenantId, digest);
+  if (blocked) return { ok: false, error: blocked };
   const read = await scanAndRead(bytes, filename);
   if ("error" in read) return { ok: false, error: read.error };
   const { scan, table } = read;

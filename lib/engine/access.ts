@@ -3,6 +3,7 @@ import { all, get, usingPostgres } from "@/lib/engine/sql";
 import {
   DEFAULT_TENANT_ID,
   isKnownTenant,
+  isStaticTenant,
   CONSOLE_PROFILES,
 } from "@/lib/shared/tenants";
 import { roleFrom, type Role } from "@/lib/shared/roles";
@@ -29,8 +30,8 @@ import { roleFrom, type Role } from "@/lib/shared/roles";
    (resolveTenant) อีกครั้งตอนวาดตัวสลับบัญชีบนแถบข้าง (switchableTenants)
    ทั้งสองอยู่คนละต้นไม้ของ React จึงแชร์ผลกันเองไม่ได้ถ้าไม่แคช
 
-   ไม่มีจุดไหนในระบบเขียน tenant_users เลย (คำเชิญยังทำมือผ่าน SQL)
-   คำตอบจึงคงที่ตลอดคำขอโดยนิยาม */
+   จุดเดียวที่เขียน tenant_users จากคำขอคือการสมัครเอง (app.create_signup_tenant · S9)
+   ซึ่งจบด้วย redirect ไม่อ่านต่อ (คำเชิญยังทำมือผ่าน SQL) คำตอบจึงคงที่ตลอดคำขอ */
 export const tenantsForUser = cache(async function tenantsForUser(
   userId: string,
 ): Promise<string[]> {
@@ -70,8 +71,9 @@ export async function resolveTenant(
   userId: string | null,
   wanted: string,
 ): Promise<string> {
+  /* โหมดเดโมเปิดได้เฉพาะบัญชีในทะเบียนนิ่ง — บัญชีสมัครเองมีได้เฉพาะบนฐานที่บังคับสมาชิก */
   if (!membershipEnforced()) {
-    return isKnownTenant(wanted) ? wanted : DEFAULT_TENANT_ID;
+    return isStaticTenant(wanted) ? wanted : DEFAULT_TENANT_ID;
   }
 
   if (!userId) throw new Error("ต้องล็อกอินก่อนจึงจะเปิดบัญชีได้");

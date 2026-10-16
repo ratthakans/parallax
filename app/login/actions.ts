@@ -59,7 +59,8 @@ export async function verifyMfaAction(_prev: ActionState, formData: FormData): P
   if (error) return { error: "รหัสไม่ถูกต้องหรือหมดเวลา — ลองรหัสใหม่จากแอป" };
   revalidatePath("/app", "layout");
   if (formData.get("factorId")) return { ok: "เปิดยืนยันตัวตนสองชั้นแล้ว — ครั้งหน้าเข้าสู่ระบบต้องใช้รหัสจากแอปด้วย" };
-  redirect(next.startsWith("/app") ? next : "/app");
+  /* /onboarding · /upgrade: บัญชีสมัครเองที่เข้าสู่ระบบพร้อมแอปยืนยันแล้ว กลับไปขั้นที่ค้างอยู่ (S9) */
+  redirect(/^\/(app|onboarding|upgrade)(\/|$)/.test(next) ? next : "/app");
 }
 
 export async function signOutAction() {
