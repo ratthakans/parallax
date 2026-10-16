@@ -16,6 +16,7 @@ import {
 import { CLASSIFICATIONS, CLASSIFICATION_TH, LIFECYCLE_TH, type LifecycleState } from "@/lib/shared/vault";
 import { thaiDate, thaiDateTime } from "@/lib/shared/format";
 import { ActionForm } from "@/components/console/action-form";
+import { NoteCapture } from "@/components/console/note-capture";
 import { Panel, num } from "@/components/console/ui";
 
 export const dynamic = "force-dynamic";
@@ -121,7 +122,16 @@ export default async function AccountPage({ params }: { params: Promise<{ id: st
       title: `${INTERACTION_TH[i.kind] ?? i.kind}${i.personName ? ` · ${i.personName}` : ""}`,
       body: i.masked
         ? <span className="text-[var(--c-text-4)]">บันทึกระดับ “{CLASSIFICATION_TH[i.classification]}” — เห็นเฉพาะผู้บันทึก</span>
-        : <>{i.summary}{i.outcome && <span className="block text-[var(--c-text-3)]">ผล: {i.outcome}</span>}</>,
+        : <>
+            <span className="whitespace-pre-line">{i.summary}</span>
+            {i.outcome && <span className="block text-[var(--c-text-3)]">ผล: {i.outcome}</span>}
+            {i.note && (
+              <details className="mt-1 text-[0.78rem] text-[var(--c-text-3)]">
+                <summary className="inline-block cursor-pointer py-1 text-[var(--c-text-4)] hover:text-[var(--c-text-2)]">โน้ตต้นฉบับ</summary>
+                <p className="whitespace-pre-line border-l border-[var(--c-line)] pl-3">{i.note}</p>
+              </details>
+            )}
+          </>,
       who: i.owner,
     })),
     ...d.participations.map((p) => ({ at: p.occurredAt ?? "", title: `ร่วม ${p.program}${p.edition ? ` ${p.edition}` : ""}`, body: <>{p.personName ?? "ไม่ทราบชื่อ"} · {p.role}</> })),
@@ -345,7 +355,14 @@ export default async function AccountPage({ params }: { params: Promise<{ id: st
           <Panel className="p-5 md:p-6">
             <h2 className="c-h2 text-[var(--c-text)]">ไทม์ไลน์</h2>
             <details className="mt-3">
-              <summary className="c-btn c-btn-primary inline-flex cursor-pointer">บันทึกการติดต่อ</summary>
+              <summary className="c-btn c-btn-primary inline-flex cursor-pointer">จดโน้ตหลังพบลูกค้า</summary>
+              <div className="mt-4">
+                <NoteCapture orgId={o.id} people={d.people.filter((p) => !p.masked).map((p) => ({ personId: p.personId, name: p.name }))
+                  .filter((p, i, xs) => xs.findIndex((x) => x.personId === p.personId) === i)} />
+              </div>
+            </details>
+            <details className="mt-3">
+              <summary className="c-btn c-btn-ghost inline-flex cursor-pointer">บันทึกการติดต่อแบบฟอร์ม</summary>
               <ActionForm action={logInteractionAction} fields={{ orgId: o.id }} label="บันทึก" pendingLabel="กำลังบันทึก…" variant="primary" className="mt-4 grid gap-3 md:grid-cols-3">
                 <label className={LABEL}>ชนิด
                   <select name="kind" className="c-select" defaultValue="meeting">

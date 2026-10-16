@@ -277,6 +277,46 @@ export async function resolveTenant(tenantId: string, actor: string): Promise<Re
 
   // ── องค์กร ──
   const orgKeyOf = (r: Row) => (r.orgKey ? orgAlias.get(r.orgKey) ?? r.orgKey : "");
+
+  /* ── ชื่อเดียวกันกับคนเดิมในบริษัทเดียวกัน (ข้ามชุด) → คิวตรวจ ──
+     เดิมเทียบชื่อเฉพาะแถวในรอบเดียวกัน: นามบัตรหรือไฟล์ใหม่ที่ชื่อและบริษัทตรงกับคนเดิม แต่อีเมล/เบอร์ใหม่
+     (เปลี่ยนอีเมล · นามบัตรใบใหม่) ได้คนใหม่เงียบ ๆ โดยไม่มีใครเห็นว่าอาจเป็นคนเดิม (docs/solo-plan.md S6 ข้อ 1)
+     ไม่รวมเอง — แค่เสนอคู่ · คนที่ "ต่างคน" แล้วไม่ถูกเสนอซ้ำ (addPair ตรวจ apart) */
+  {
+    const orgOfKey = (k: string) => (k.startsWith("o-") ? k : orgIdFor(tenantId, k));
+    const fresh = personRows.filter((i) => !exInCluster.get(uf.find(i))?.length && nameKey(rows[i].name));
+    const orgIds = new Set(fresh.map((i) => orgKeyOf(rows[i])).filter(Boolean).map(orgOfKey));
+    const domains = [...new Set(fresh.flatMap((i) => rows[i].emails.filter((e) => !e.free).map((e) => e.domain)))];
+    const orgsOfDomain = new Map<string, string[]>();
+    for (let i = 0; i < domains.length; i += 500) {
+      const chunk = domains.slice(i, i + 500);
+      for (const d of await all<{ domain: string; org_id: string }>(
+        `SELECT domain, org_id FROM org_domains WHERE tenant_id = ? AND domain IN (${chunk.map(() => "?").join(",")})`, tenantId, ...chunk,
+      )) { orgsOfDomain.set(d.domain, [...(orgsOfDomain.get(d.domain) ?? []), d.org_id]); orgIds.add(d.org_id); }
+    }
+    const byOrgName = new Map<string, Set<string>>();
+    const ids = [...orgIds];
+    for (let i = 0; i < ids.length; i += 500) {
+      const chunk = ids.slice(i, i + 500);
+      for (const a of await all<{ customer_id: string; org_id: string; name: string }>(
+        `SELECT a.customer_id, a.org_id, c.name FROM affiliations a JOIN customers c ON c.id = a.customer_id AND c.tenant_id = a.tenant_id
+         WHERE a.tenant_id = ? AND a.org_id IN (${chunk.map(() => "?").join(",")})`, tenantId, ...chunk,
+      )) {
+        const k = `${a.org_id}|${nameKey(nameInfo(a.name))}`;
+        byOrgName.set(k, (byOrgName.get(k) ?? new Set()).add(a.customer_id));
+      }
+    }
+    for (const i of fresh) {
+      const nk = nameKey(rows[i].name);
+      const orgs = new Set([
+        ...(orgKeyOf(rows[i]) ? [orgOfKey(orgKeyOf(rows[i]))] : []),
+        ...rows[i].emails.filter((e) => !e.free).flatMap((e) => orgsOfDomain.get(e.domain) ?? []),
+      ]);
+      const me = personOfNode(i);
+      for (const o of orgs) for (const ex of byOrgName.get(`${o}|${nk}`) ?? []) if (ex !== me) addPair(me, ex, "same_name_same_org");
+    }
+  }
+
   const orgRows = new Map<string, Row[]>();
   for (const r of rows) if (orgKeyOf(r)) orgRows.set(orgKeyOf(r), [...(orgRows.get(orgKeyOf(r)) ?? []), r]);
   const mostCommon = (xs: string[]) => {
