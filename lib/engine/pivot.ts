@@ -2,7 +2,7 @@ import { all } from "@/lib/engine/sql";
 import { listDeals, type DealView } from "@/lib/engine/deals";
 import { listFields, valuesFor, type CustomField } from "@/lib/engine/custom-fields";
 import type { Viewer } from "@/lib/engine/accounts";
-import { stageTh } from "@/lib/shared/deals";
+import { FORECAST_TH, effectiveForecast, stageTh } from "@/lib/shared/deals";
 
 /* ── รายงานแบบเลือกมิติเอง (docs/crm-plan.md C5) ─────────────────────────────
 
@@ -20,6 +20,7 @@ const BASE_DIMS: PivotDim[] = [
   { key: "stage", label: "ขั้น" }, { key: "owner", label: "เจ้าของดีล" }, { key: "company", label: "บริษัท" },
   { key: "industry", label: "อุตสาหกรรม" }, { key: "group", label: "กลุ่มบริษัท" }, { key: "close_month", label: "เดือนปิดคาด" },
   { key: "created_month", label: "เดือนที่สร้าง" }, { key: "package", label: "แพ็กเกจ" }, { key: "campaign", label: "แคมเปญ" },
+  { key: "team", label: "ทีมที่ดูแลบริษัท" }, { key: "forecast", label: "หมวดพยากรณ์" },
 ];
 
 export async function pivotDims(tenantId: string): Promise<PivotDim[]> {
@@ -50,6 +51,17 @@ export async function pivot(
     for (const o of await chunked<{ id: string; industry: string | null; parent_id: string | null; name: string }>(orgIds, (m) => `SELECT id, industry, parent_id, name FROM orgs WHERE tenant_id = ? AND id IN (${m})`)) {
       orgInfo.set(o.id, { industry: o.industry, parent: o.parent_id, name: o.name });
     }
+  }
+  const teamOfOrg = new Map<string, string>();
+  if (need("team")) {
+    const names = new Map((await all<{ id: string; name: string }>("SELECT id, name FROM teams WHERE tenant_id = ?", tenantId)).map((t) => [t.id, t.name]));
+    for (const o of await chunked<{ id: string; team_id: string | null }>(orgIds, (m) => `SELECT id, team_id FROM orgs WHERE tenant_id = ? AND id IN (${m})`)) {
+      if (o.team_id && names.has(o.team_id)) teamOfOrg.set(o.id, names.get(o.team_id)!);
+    }
+  }
+  const fcSet = new Map<string, string | null>();
+  if (need("forecast")) {
+    for (const r of await chunked<{ id: string; forecast_category: string | null }>(dealIds, (m) => `SELECT id, forecast_category FROM opportunities WHERE tenant_id = ? AND id IN (${m})`)) fcSet.set(r.id, r.forecast_category);
   }
   /* กลุ่ม = ชื่อบริษัทบนสุดของสาย parent (อ่านบริษัทแม่ที่ยังไม่โหลดทีละชั้น · เพดาน 20 ชั้น) */
   const rootName = async (id: string): Promise<string> => {
@@ -87,6 +99,8 @@ export async function pivot(
       case "close_month": return [[month(d.expectedClose), v]];
       case "created_month": return [[month(d.createdAt), v]];
       case "campaign": return [[d.campaign ?? NONE, v]];
+      case "team": return [[teamOfOrg.get(d.orgId) ?? NONE, v]];
+      case "forecast": { const c = effectiveForecast(d.stage, fcSet.get(d.id) ?? null); return [[c ? FORECAST_TH[c] : stageTh(d.stage), v]]; }
       case "package": { const its = itemsOf.get(d.id); return its?.length ? its.map((i) => [i.package, i.total] as [string, number]) : [[NONE, v]]; }
     }
     const [kind, id] = dim.split(".");

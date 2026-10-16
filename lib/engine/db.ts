@@ -879,6 +879,30 @@ export async function ensureSchema(): Promise<void> {
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
+    /* ══ เป้ายอดขาย · ทีม (docs/crm-plan.md C6) — สเปกเดียวกับ supabase/migrations/0024_forecast_teams.sql ══ */
+    CREATE TABLE IF NOT EXISTS quotas (
+      tenant_id TEXT NOT NULL,
+      owner_id TEXT NOT NULL,
+      period TEXT NOT NULL,
+      amount REAL NOT NULL CHECK (amount >= 0),
+      set_by TEXT NOT NULL,
+      set_at TEXT NOT NULL,
+      PRIMARY KEY (tenant_id, owner_id, period)
+    );
+    CREATE TABLE IF NOT EXISTS teams (
+      id TEXT NOT NULL PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS ix_teams_tenant ON teams (tenant_id);
+    CREATE TABLE IF NOT EXISTS team_members (
+      tenant_id TEXT NOT NULL,
+      team_id TEXT NOT NULL,
+      member_id TEXT NOT NULL,
+      PRIMARY KEY (team_id, member_id)
+    );
+    CREATE INDEX IF NOT EXISTS ix_team_members_tenant ON team_members (tenant_id, member_id);
     /* ══ มุมมองรายการที่บันทึกไว้ (docs/crm-plan.md C5) — สเปกเดียวกับ supabase/migrations/0023_saved_views.sql ══ */
     CREATE TABLE IF NOT EXISTS saved_views (
       id TEXT NOT NULL PRIMARY KEY,
@@ -1039,6 +1063,12 @@ export async function ensureSchema(): Promise<void> {
   {
     const have = await columnsOf("opportunities");
     if (!have.has("campaign_id")) await exec("ALTER TABLE opportunities ADD COLUMN campaign_id TEXT");
+    /* หมวดพยากรณ์ (C6 · 0024) */
+    if (!have.has("forecast_category")) await exec("ALTER TABLE opportunities ADD COLUMN forecast_category TEXT");
+  }
+  {
+    const have = await columnsOf("orgs");
+    if (!have.has("team_id")) await exec("ALTER TABLE orgs ADD COLUMN team_id TEXT");
   }
   /* แม่แบบวัตถุประสงค์และขอบเขตของฐาน (docs/solo-plan.md S4 · 0013) */
   {

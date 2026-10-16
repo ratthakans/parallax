@@ -41,6 +41,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     <>
       <PageHead label="รายงาน" title="รายงาน" actions={<>
         <Link href="/app/reports/pivot" className="c-btn c-btn-primary">รายงานเลือกมิติเอง</Link>
+        <Link href="/app/reports/forecast" className="c-btn c-btn-ghost">พยากรณ์และเป้า</Link>
         <Link href="/app/sales/weekly" className="c-btn c-btn-ghost">ทบทวนรายสัปดาห์แบบละเอียด</Link>
       </>} />
       <div className="grid gap-5 lg:grid-cols-2">

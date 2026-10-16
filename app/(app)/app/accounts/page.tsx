@@ -5,6 +5,7 @@ import { displayValue, listFields, valuesFor } from "@/lib/engine/custom-fields"
 import { cleanQuery, listViews } from "@/lib/engine/saved-views";
 import { can } from "@/lib/shared/roles";
 import { SavedViews } from "@/components/console/saved-views";
+import { listTeams } from "@/lib/engine/forecast";
 import { CLASSIFICATION_TH, LIFECYCLE_TH, type LifecycleState } from "@/lib/shared/vault";
 import { thaiDate } from "@/lib/shared/format";
 import { PageHead, Panel, num } from "@/components/console/ui";
@@ -32,15 +33,17 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
   const sp = await searchParams;
   const v = await viewer();
   /* ── ตัวกรองที่เลือกเอง (docs/crm-plan.md C5) ── อุตสาหกรรม · เจ้าของ · กลุ่ม · เลขนิติบุคคล · ฟิลด์ของบัญชี (cf.<id>) */
-  const [fields, opts, saved] = await Promise.all([listFields(v.tenantId, "org"), accountFilterOptions(v.tenantId), listViews(v.tenantId, "accounts", v.actor)]);
+  const [fields, opts, saved, teams] = await Promise.all([
+    listFields(v.tenantId, "org"), accountFilterOptions(v.tenantId), listViews(v.tenantId, "accounts", v.actor), listTeams(v.tenantId),
+  ]);
   const filters: AccountFilters = {
-    industry: sp.industry || undefined, owner: sp.owner || undefined,
+    industry: sp.industry || undefined, owner: sp.owner || undefined, team: sp.team || undefined,
     group: sp.group === "in" || sp.group === "none" ? sp.group : undefined,
     taxId: sp.tax === "has" || sp.tax === "missing" ? sp.tax : undefined,
     custom: fields.filter((f) => sp[`cf.${f.id}`]).map((f) => ({ fieldId: f.id, value: sp[`cf.${f.id}`]! })),
   };
   const extra: Record<string, string> = Object.fromEntries(Object.entries({
-    industry: filters.industry, owner: filters.owner, group: filters.group, tax: filters.taxId,
+    industry: filters.industry, owner: filters.owner, team: filters.team, group: filters.group, tax: filters.taxId,
     ...Object.fromEntries((filters.custom ?? []).map((c) => [`cf.${c.fieldId}`, c.value])),
   }).filter((e): e is [string, string] => Boolean(e[1])));
   const nFilters = Object.keys(extra).length;
@@ -87,6 +90,13 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
               <option value="">ทั้งหมด</option><option value="-">ยังไม่มีเจ้าของ</option>{opts.owners.map((x) => <option key={x} value={x}>{x}</option>)}
             </select>
           </label>
+          {teams.length > 0 && (
+            <label className={LABEL}>ทีมที่ดูแล
+              <select name="team" defaultValue={filters.team ?? ""} className="c-select">
+                <option value="">ทั้งหมด</option><option value="-">ยังไม่ระบุทีม</option>{teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </label>
+          )}
           <label className={LABEL}>บริษัทในเครือ
             <select name="group" defaultValue={filters.group ?? ""} className="c-select">
               <option value="">ทั้งหมด</option><option value="in">อยู่ในกลุ่ม</option><option value="none">ไม่อยู่ในกลุ่ม</option>

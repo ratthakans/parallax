@@ -12,7 +12,7 @@ export type ViewList = (typeof VIEW_LISTS)[number];
 export type SavedView = { id: string; name: string; query: string; shared: boolean; mine: boolean };
 
 /** query ที่เก็บได้: เฉพาะคีย์ที่หน้ารายการรู้จัก · ไม่เก็บคำค้น q (อาจเป็นชื่อคน) */
-const KEY_RE = /^(view|sort|dir|mode|industry|owner|group|tax|minValue|closeFrom|closeTo|package|role|rows|cols|measure|stage|cf\.[\w-]+|df\.[\w-]+)$/;
+const KEY_RE = /^(view|sort|dir|mode|industry|owner|team|period|group|tax|minValue|closeFrom|closeTo|package|role|rows|cols|measure|stage|cf\.[\w-]+|df\.[\w-]+)$/;
 export function cleanQuery(raw: string): string {
   const out = new URLSearchParams();
   for (const [k, v] of new URLSearchParams(raw.replace(/^\?/, ""))) if (KEY_RE.test(k) && v.length <= 120) out.append(k, v);

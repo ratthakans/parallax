@@ -62,7 +62,7 @@ const SORT_SQL: Record<AccountSort, string> = {
 };
 
 /* ── ตัวกรองที่ผู้ใช้เลือกเอง (docs/crm-plan.md C5) ── ค่าเป็นพารามิเตอร์เสมอ · ฟิลด์กำหนดเองเทียบกับค่าล่าสุดของฟิลด์ */
-export type AccountFilters = { industry?: string; owner?: string; custom?: { fieldId: string; value: string }[]; group?: "in" | "none"; taxId?: "has" | "missing" };
+export type AccountFilters = { team?: string; industry?: string; owner?: string; custom?: { fieldId: string; value: string }[]; group?: "in" | "none"; taxId?: "has" | "missing" };
 const LATEST_ORG_VALUE = `(SELECT v.value FROM custom_values v WHERE v.tenant_id = o.tenant_id AND v.entity = 'org' AND v.record_id = o.id AND v.field_id = ?
   ORDER BY v.recorded_at DESC, v.id DESC LIMIT 1)`;
 
@@ -74,6 +74,7 @@ export async function listAccounts(
   const params: (string | number)[] = [tenantId];
   const f = opts.filters;
   if (f?.industry) { where.push("o.industry = ?"); params.push(f.industry); }
+  if (f?.team) { where.push(f.team === "-" ? "o.team_id IS NULL" : "o.team_id = ?"); if (f.team !== "-") params.push(f.team); }
   if (f?.owner) { where.push(f.owner === "-" ? "o.account_owner_id IS NULL" : "o.account_owner_id = ?"); if (f.owner !== "-") params.push(f.owner); }
   for (const c of f?.custom ?? []) { where.push(`${LATEST_ORG_VALUE} = ?`); params.push(c.fieldId, c.value); }
   if (f?.group === "in") where.push("(o.parent_id IS NOT NULL OR EXISTS (SELECT 1 FROM orgs k WHERE k.tenant_id = o.tenant_id AND k.parent_id = o.id))");

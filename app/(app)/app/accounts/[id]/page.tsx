@@ -24,6 +24,9 @@ import { orgGroup } from "@/lib/engine/accounts/group";
 import { listFields, valuesFor } from "@/lib/engine/custom-fields";
 import { orgEditions } from "@/lib/engine/editions";
 import { CustomFieldsPanel } from "@/components/console/custom-fields";
+import { listTeams } from "@/lib/engine/forecast";
+import { setOrgTeamAction } from "@/app/(app)/field-actions";
+import { get as getRow } from "@/lib/engine/sql";
 
 const baht = (n: number) => `฿${n.toLocaleString("th-TH", { maximumFractionDigits: 0 })}`;
 
@@ -158,7 +161,11 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
   ].filter((e) => e.at).sort((a, b) => (sortKey(a) < sortKey(b) ? 1 : -1));
 
   const inGroup = Boolean(group && group.members.length + group.hidden > 1);
-  const [cFields, cValues, editions] = await Promise.all([listFields(v.tenantId, "org"), valuesFor(v.tenantId, "org", [id]), orgEditions(v.tenantId, id)]);
+  const [cFields, cValues, editions, teams, teamRow] = await Promise.all([
+    listFields(v.tenantId, "org"), valuesFor(v.tenantId, "org", [id]), orgEditions(v.tenantId, id), listTeams(v.tenantId),
+    getRow<{ team_id: string | null }>("SELECT team_id FROM orgs WHERE tenant_id = ? AND id = ?", v.tenantId, id),
+  ]);
+  const team = teams.find((t) => t.id === teamRow?.team_id) ?? null;
   const TABS = ["overview", "details", "people", "deals", "events", "group", "relationships"] as const;
   const sp = await searchParams;
   const tab = pickTab(TABS, sp.tab);
@@ -337,6 +344,17 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
               <Link href="/app/settings/fields" className="c-thai text-[0.8rem] text-[var(--c-accent)] hover:underline">จัดการฟิลด์</Link>
             </div>
             <div className="mt-3"><CustomFieldsPanel entity="org" recordId={o.id} fields={cFields} values={cValues.get(o.id)} /></div>
+            {teams.length > 0 && (
+              <div className="c-thai mt-4 border-t border-[var(--c-line)] pt-3 text-[0.9rem]">
+                <p className="text-[0.75rem] text-[var(--c-text-4)]">ทีมที่ดูแล</p>
+                <p>{team?.name ?? "ยังไม่ระบุ"}</p>
+                <ActionForm action={setOrgTeamAction} fields={{ orgId: o.id }} label="บันทึก" pendingLabel="…" size="sm" className="mt-1 flex flex-wrap items-end gap-2">
+                  <select name="teamId" defaultValue={team?.id ?? ""} className="c-select max-w-[14rem]" aria-label="ทีมที่ดูแล">
+                    <option value="">ไม่ระบุ</option>{teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                </ActionForm>
+              </div>
+            )}
           </Panel>
           <Panel className="p-5 md:p-6">
             <h2 className="c-h2 text-[var(--c-text)]">ข้อมูลบริษัท</h2>
