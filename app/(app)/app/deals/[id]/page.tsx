@@ -50,6 +50,9 @@ export default async function DealPage({ params, searchParams }: { params: Promi
   const pathStages = [...OPEN_STAGES, closed ? (d.stage as "won" | "lost") : "won"];
   const at = isDealStage(d.stage) ? pathStages.indexOf(d.stage) : -1;
   /* วันปิดจริง = ครั้งล่าสุดที่ย้ายเข้าขั้นปัจจุบัน (ประวัติเรียงใหม่ก่อน) — ไม่ต้องเก็บคอลัมน์ซ้ำ */
+  /* อยู่ขั้นนี้มากี่วัน (C3) — จากการย้ายเข้าขั้นปัจจุบันครั้งล่าสุด */
+  const enteredAt = d.history.find((h) => h.field === "stage" && h.newValue === d.stage)?.at ?? d.createdAt;
+  const daysHere = Math.max(0, Math.floor((Date.now() - Date.parse(enteredAt)) / 864e5));
   const closedAt = closed ? d.history.find((h) => h.field === "stage" && h.newValue === d.stage)?.at ?? d.updatedAt : null;
 
   return (
@@ -58,7 +61,10 @@ export default async function DealPage({ params, searchParams }: { params: Promi
         back={{ href: "/app/deals", label: "ดีลทั้งหมด" }}
         kind="ดีล"
         title={d.name}
-        badges={<span className={`c-pill ${d.stage === "won" ? "c-pill-good" : d.stage === "lost" ? "c-pill-bad" : "c-pill-reach"}`}>{stageTh(d.stage)}</span>}
+        badges={<>
+          <span className={`c-pill ${d.stage === "won" ? "c-pill-good" : d.stage === "lost" ? "c-pill-bad" : "c-pill-reach"}`}>{stageTh(d.stage)}</span>
+          {!closed && <span className={`c-pill ${daysHere > 30 ? "c-pill-warn" : ""}`}>อยู่ขั้นนี้ {daysHere} วัน</span>}
+        </>}
         highlights={[
           { label: "บริษัท", value: <Link href={`/app/accounts/${d.orgId}`} className="text-[var(--c-accent)] hover:underline">{d.org}</Link> },
           { label: "มูลค่า", value: d.value != null ? baht(d.value) : "ไม่ระบุ" },

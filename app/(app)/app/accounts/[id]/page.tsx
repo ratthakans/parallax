@@ -83,7 +83,7 @@ function Fact({ d, field, value }: { d: Dossier; field: OrgEditable; value: stri
   );
 }
 
-export default async function AccountPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string }> }) {
+export default async function AccountPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string; asof?: string }> }) {
   const { id } = await params;
   const v = await viewer();
   const who = { id: v.actor, clearance: v.clearance };
@@ -156,7 +156,11 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
 
   const inGroup = Boolean(group && group.members.length + group.hidden > 1);
   const TABS = ["overview", "details", "people", "deals", "group", "relationships"] as const;
-  const tab = pickTab(TABS, (await searchParams).tab);
+  const sp = await searchParams;
+  const tab = pickTab(TABS, sp.tab);
+  /* ณ วันที่ (C3): ใครสังกัดบริษัทนี้ในวันนั้น — ช่วงเวลาจากสังกัดตามเวลา */
+  const asof = /^\d{4}-\d{2}-\d{2}$/.test(sp.asof ?? "") ? sp.asof! : null;
+  const atDate = asof ? d.people.filter((p) => (!p.from || p.from.slice(0, 10) <= asof) && (!p.to || p.to.slice(0, 10) > asof)) : null;
   const base = `/app/accounts/${o.id}`;
   const lastTouch = d.interactions.map((i) => i.occurredAt).sort().at(-1);
 
@@ -395,10 +399,18 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
           {/* ── คนในบริษัทตามเวลา ── */}
           <Panel className="p-5 md:p-6">
             <h2 className="c-h2 text-[var(--c-text)]">คนในบริษัท</h2>
-            <p className="c-thai mt-1 text-[0.82rem] text-[var(--c-text-3)]">ยังสังกัด {num(current.length)} คน · เคยสังกัด {num(former.length)} คน — ช่วงเวลามาจากวันที่ในไฟล์หรือที่คนแก้</p>
-            {d.people.length ? (
+            <p className="c-thai mt-1 text-[0.82rem] text-[var(--c-text-3)]">
+              {atDate ? `สังกัด ณ ${thaiDate(asof!)} ${num(atDate.length)} คน` : `ยังสังกัด ${num(current.length)} คน · เคยสังกัด ${num(former.length)} คน`} — ช่วงเวลามาจากวันที่ในไฟล์หรือที่คนแก้
+            </p>
+            <form className="c-thai mt-2 flex flex-wrap items-end gap-2 text-[0.8rem] text-[var(--c-text-3)]" action={base}>
+              <input type="hidden" name="tab" value="people" />
+              <label className="flex flex-col gap-1">ดูว่าใครอยู่ ณ วันที่<input type="date" name="asof" defaultValue={asof ?? ""} className="c-input min-h-9 py-1" /></label>
+              <button type="submit" className="c-btn c-btn-ghost c-btn-sm">ดู</button>
+              {asof && <Link href={`${base}?tab=people`} className="c-btn c-btn-ghost c-btn-sm">ทุกช่วงเวลา</Link>}
+            </form>
+            {(atDate ?? d.people).length ? (
               <ul className="mt-4 grid gap-0">
-                {[...current, ...former].map((p) => (
+                {(atDate ?? [...current, ...former]).map((p) => (
                   <li key={p.affiliationId} className="border-t border-[var(--c-line)] py-3 first:border-t-0">
                     <div className="flex flex-wrap items-baseline justify-between gap-2">
                       <p className="c-thai min-w-0 text-[0.94rem]">
