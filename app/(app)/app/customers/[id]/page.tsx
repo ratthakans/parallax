@@ -209,6 +209,7 @@ export default async function CustomerPage({
           {openRequests > 0 && <span className="c-pill c-pill-warn">คำขอสิทธิเปิดอยู่ {openRequests}</span>}
           {p?.nickname && <span className="c-pill">ชื่อเล่น {p.nickname}</span>}
         </>}
+        actions={b2b ? <a href="#activity" className="c-btn c-btn-ghost c-btn-sm xl:hidden">บันทึกกิจกรรม</a> : undefined}
         highlights={b2b ? [
           { label: "ตำแหน่ง", value: currentJob?.title ?? "ไม่ทราบ" },
           { label: "บริษัท", value: currentJob ? (currentJob.visible ? <Link href={`/app/accounts/${currentJob.orgId}`} className="text-[var(--c-accent)] hover:underline">{currentJob.org}</Link> : currentJob.org) : "ไม่ทราบ" },
@@ -558,7 +559,7 @@ export default async function CustomerPage({
           </div>
         </div>
         {b2b && (
-          <aside className="grid min-w-0 content-start gap-5">
+          <aside id="activity" className="grid min-w-0 scroll-mt-28 content-start gap-5">
           <Panel className="p-4 md:p-5">
             <h2 className="c-h2 text-[var(--c-text)]">กิจกรรม</h2>
             {currentJob?.visible && (
