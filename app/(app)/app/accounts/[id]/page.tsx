@@ -19,6 +19,7 @@ import { ActionForm } from "@/components/console/action-form";
 import { NoteCapture } from "@/components/console/note-capture";
 import { Panel, num } from "@/components/console/ui";
 import { RecordHeader, RecordTabs, pickTab } from "@/components/console/record";
+import { stageTh } from "@/lib/shared/deals";
 
 export const dynamic = "force-dynamic";
 
@@ -174,6 +175,7 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
             label={mineAccount ? "ปล่อยบัญชี" : o.accountOwner ? "รับเป็นเจ้าของแทน" : "รับเป็นเจ้าของบัญชี"} pendingLabel="กำลังบันทึก…"
             confirm={o.accountOwner && !mineAccount ? `ยืนยันรับแทน ${o.accountOwner}` : undefined} />
           <ActionForm action={verifyOrgAction} fields={{ orgId: o.id }} label="ยืนยันว่าข้อมูลถูกต้อง" pendingLabel="กำลังบันทึก…" size="sm" />
+          <Link href={`/app/deals/new?org=${o.id}`} className="c-btn c-btn-primary c-btn-sm">+ ดีล</Link>
         </>}
       />
 
@@ -290,7 +292,7 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
             <Panel className="p-5 md:p-6">
               <h2 className="c-h2 text-[var(--c-text)]">โอกาสขาย</h2>
               <ul className="c-thai mt-3 grid gap-1 text-[0.86rem] text-[var(--c-text-2)]">
-                {d.opportunities.map((x) => <li key={x.id}>{x.name} · {x.stage}{x.expectedClose ? ` · ปิด ${thaiDate(x.expectedClose)}` : ""}</li>)}
+                {d.opportunities.map((x) => <li key={x.id}><Link href={`/app/deals/${x.id}`} className="text-[var(--c-accent)] hover:underline">{x.name}</Link> · {stageTh(x.stage)}{x.expectedClose ? ` · ปิด ${thaiDate(x.expectedClose)}` : ""}</li>)}
               </ul>
             </Panel>
           )}

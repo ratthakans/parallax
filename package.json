@@ -46,6 +46,7 @@
     "verify:digest": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/digest.mts",
     "verify:load": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/load.mts",
     "verify:lists": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/lists.mts",
+    "verify:deals": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/deals.mts",
     "erasures": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs scripts/erasures.mts",
     "pg:test-db": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs scripts/pg-test-db.mts",
     "verify:pg": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/pg-rls.mts"
