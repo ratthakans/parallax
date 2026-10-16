@@ -154,6 +154,11 @@ jobs:
       - name: Warm paths and job moves
         run: npm run verify:paths
 
+      # ร่างข้อความหลังผ่านนโยบาย (S7): ต้องตรวจก่อน/ห้ามติดต่อไม่มีปุ่มร่าง · ถอนก่อนกด "ส่งแล้ว" = บันทึกไม่ได้
+      # · คำขอและร่างไม่มีสิ่งที่ผู้ร่างเปิดไม่ได้ · ไม่อ้างการแนะนำที่ไม่มีหลักฐาน
+      - name: Policy-gated drafts
+        run: npm run verify:draft
+
       # แม่แบบวัตถุประสงค์: ขอบเขตช่องทาง/ชนิดข้อความ · ฐานที่ผูกกับบริษัท + ย้ายบริษัท = ต้องตรวจจนมีหลักฐานใหม่
       - name: Purpose templates
         run: npm run verify:templates
