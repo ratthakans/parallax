@@ -28,6 +28,24 @@ const mask = (kind: "email" | "phone", v?: string) => {
   return n ? maskContact(kind, n) : "";
 };
 
+/** แถวต้นทางของคนหนึ่งคน (ช่องทางแบบปิดบาง) — ใช้ทั้งการสุ่มตรวจปกติและการสุ่มตรวจหลังรวมเป็นชุด (S5) */
+export async function sampleRowsOf(tenantId: string, customerId: string): Promise<SampleRow[]> {
+  const raw = await all<{ filename: string; line: number | string; payload_enc: string }>(
+    `SELECT b.filename, r.line, r.payload_enc FROM import_rows r
+     JOIN import_batches b ON b.id = r.batch_id AND b.tenant_id = r.tenant_id
+     WHERE r.tenant_id = ? AND r.customer_id = ? AND r.payload_enc IS NOT NULL ORDER BY b.uploaded_at, r.line LIMIT 50`,
+    tenantId, customerId,
+  );
+  return raw.map((r) => {
+    const v = JSON.parse(openRecord(tenantId, "import_row", r.payload_enc)) as Record<string, string | undefined>;
+    const name = v.customer_name || [v.first_name, v.last_name].filter(Boolean).join(" ");
+    return {
+      file: r.filename, line: Number(r.line), name, company: v.company ?? "", title: v.job_title ?? "",
+      email: mask("email", v.email), phone: mask("phone", v.phone),
+    };
+  });
+}
+
 export async function drawSample(tenantId: string, mode: SampleMode): Promise<Sample | null> {
   /* merge: คนที่มีแถวต้นทาง ≥ 2 แถว (ระบบตัดสินรวม) · missed: คนที่มาจาก Data Vault คนใดก็ได้ */
   const pick = await get<{ id: string; name: string }>(
@@ -40,20 +58,7 @@ export async function drawSample(tenantId: string, mode: SampleMode): Promise<Sa
     tenantId, mode === "merge" ? 2 : 1,
   );
   if (!pick) return null;
-  const raw = await all<{ filename: string; line: number | string; payload_enc: string }>(
-    `SELECT b.filename, r.line, r.payload_enc FROM import_rows r
-     JOIN import_batches b ON b.id = r.batch_id AND b.tenant_id = r.tenant_id
-     WHERE r.tenant_id = ? AND r.customer_id = ? AND r.payload_enc IS NOT NULL ORDER BY b.uploaded_at, r.line LIMIT 50`,
-    tenantId, pick.id,
-  );
-  const rows = raw.map((r) => {
-    const v = JSON.parse(openRecord(tenantId, "import_row", r.payload_enc)) as Record<string, string | undefined>;
-    const name = v.customer_name || [v.first_name, v.last_name].filter(Boolean).join(" ");
-    return {
-      file: r.filename, line: Number(r.line), name, company: v.company ?? "", title: v.job_title ?? "",
-      email: mask("email", v.email), phone: mask("phone", v.phone),
-    };
-  });
+  const rows = await sampleRowsOf(tenantId, pick.id);
   let candidates: Sample["candidates"] = [];
   if (mode === "missed") {
     /* ชื่อคล้าย: มีคำใดคำหนึ่งของชื่อ (ยาว ≥ 3) ร่วมกัน — ตัวช่วยให้ steward ไม่ใช่คำตัดสิน */
