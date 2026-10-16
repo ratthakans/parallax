@@ -9,6 +9,13 @@ updates:
     groups:
       minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      # ตามรุ่น Node ที่ใช้จริง (.nvmrc = 24) — เปลี่ยนพร้อมกันเมื่ออัป runtime
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      # TypeScript 7 (compiler ใหม่) เป็นงานย้ายแยก ไม่ใช่ PR อัปเดตอัตโนมัติ
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
