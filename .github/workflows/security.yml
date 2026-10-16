@@ -1,0 +1,64 @@
+# ── สแกนความปลอดภัย (docs/plan.md B7 · ASVS V14) ─────────────────────
+#
+# สามเรื่องที่ชุดตรวจของเราเองมองไม่เห็น:
+#   dependency  ช่องโหว่ที่ประกาศแล้วในแพ็กเกจที่ใช้จริงบน production (ไม่นับ devDependencies)
+#   secret      คีย์/รหัสที่เผลอ commit — ไล่ทั้งประวัติ ไม่ใช่แค่ไฟล์ปัจจุบัน
+#   SAST        CodeQL หา injection · XSS · path traversal ในโค้ด TypeScript
+# รันทุก PR · ทุก push เข้า main · และทุกสัปดาห์ (ช่องโหว่ใหม่ถูกประกาศแม้โค้ดไม่เปลี่ยน)
+
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 2 * * 1" # จันทร์ 09:17 เวลาไทย
+  workflow_dispatch:
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: Dependencies (npm audit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      # high ขึ้นไปเท่านั้นที่ทำให้ตก — moderate ดูในรายงาน Dependabot แทน ไม่ให้ PR ติดเพราะเรื่องที่แก้ไม่ได้ทันที
+      - run: npm audit --omit=dev --audit-level=high
+
+  secrets:
+    name: Secrets (gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  codeql:
+    name: SAST (CodeQL)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+      - uses: github/codeql-action/analyze@v3
