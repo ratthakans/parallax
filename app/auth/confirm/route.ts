@@ -11,10 +11,10 @@ export async function GET(req: NextRequest) {
   const tokenHash = url.searchParams.get("token_hash") ?? "";
   const code = url.searchParams.get("code") ?? "";
   const sb = await supabaseServer();
-  /* ผลตัดสินมาจาก Supabase เท่านั้น — ค่าใน URL เป็นแค่ token ที่ส่งต่อไปตรวจ */
-  const res = tokenHash
-    ? await sb.auth.verifyOtp({ type: "email", token_hash: tokenHash })
-    : await sb.auth.exchangeCodeForSession(code);
+  /* ผลตัดสินมาจาก Supabase เท่านั้น — ค่าใน URL เป็นแค่ token ที่ส่งต่อไปตรวจ
+     ไม่มีเงื่อนไขจากค่าใน URL: ลองแบบ token_hash ก่อน ไม่ผ่านจึงลอง code (ค่าว่าง = Supabase ปฏิเสธเอง) */
+  const viaOtp = await sb.auth.verifyOtp({ type: "email", token_hash: tokenHash });
+  const res = viaOtp.error ? await sb.auth.exchangeCodeForSession(code) : viaOtp;
   const ok = !res.error && Boolean(res.data.session);
   return NextResponse.redirect(new URL(ok ? "/onboarding" : "/login", url));
 }
