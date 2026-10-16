@@ -25,6 +25,12 @@ import { editionRetention, orgEditions } from "@/lib/engine/editions";
 import { mergeOrgs } from "@/lib/engine/vault/merge";
 import { wipeCustomerData } from "@/lib/engine/tenant-data";
 import { tx } from "@/lib/engine/sql";
+import { listAccounts, type AccountFilters } from "@/lib/engine/accounts";
+import { listDeals as listDealsC5, type DealFilters } from "@/lib/engine/deals";
+import { cleanQuery, deleteView, listViews, saveView } from "@/lib/engine/saved-views";
+import { pivot } from "@/lib/engine/pivot";
+import { createTeam, forecastReport, listTeams, nearbyQuarters, setForecast, setOrgTeam, setQuota, setTeamMember } from "@/lib/engine/forecast";
+import { effectiveForecast, quarterOf, quarterRange } from "@/lib/shared/deals";
 import { searchEverything } from "@/lib/engine/search";
 import { teamMembers } from "@/lib/engine/team";
 
@@ -274,6 +280,103 @@ await tx((q) => wipeCustomerData(q, T));
 const leftV = await get<{ n: number | string }>("SELECT COUNT(*) AS n FROM custom_values WHERE tenant_id = ?", T);
 const leftI = await get<{ n: number | string }>("SELECT COUNT(*) AS n FROM deal_items WHERE tenant_id = ?", T);
 ok(Number(leftV?.n) === 0 && Number(leftI?.n) === 0 && (await listFields(T, undefined, true)).length === 3, "ล้างข้อมูลลูกค้า = ล้างค่าฟิลด์และแพ็กเกจ · นิยามฟิลด์ (การตั้งค่า) อยู่ต่อ");
+
+// ── C5 · ตัวกรอง · มุมมองที่บันทึก · รายงานเลือกมิติ ── บัญชี V (มีสามดีลของ C3 อยู่แล้ว)
+const mkOrg = async (name: string, industry: string | null, owner: string | null, tax: string | null = null, parentId: string | null = null) => {
+  const id = `o-${randomUUID().slice(0, 8)}`;
+  await run("INSERT INTO orgs (id, tenant_id, name, name_norm, industry, account_owner_id, tax_id, parent_id, classification, lifecycle_state, recorded_at, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+    id, V, name, name, industry, owner, tax, parentId, "confidential", "confirmed", now, now);
+  return id;
+};
+const oE = await mkOrg("บริษัท พลังงานตะวันออก จำกัด (สมมุติ)", "พลังงาน", ME.id, TAX_B);
+const oF = await mkOrg("บริษัท อาหารเหนือ จำกัด (สมมุติ)", "อาหาร", null, null, oE);
+const oG = await mkOrg("บริษัท พลังงานใต้ จำกัด (สมมุติ)", "พลังงาน", null);
+const vTier = await createField(V, { entity: "org", label: "Tier", kind: "choice", options: "Gold, Silver" }, ME.id);
+const vTierId = vTier.ok ? vTier.id : "";
+await setValue(V, "org", oE, vTierId, "Silver", ME);
+await setValue(V, "org", oE, vTierId, "Gold", ME);
+await setValue(V, "org", oG, vTierId, "Silver", ME);
+const names = async (filters: AccountFilters) =>
+  (await listAccounts(V, { viewer: ME, filters, limit: 100 })).rows.map((r) => r.id);
+ok((await names({ industry: "พลังงาน" })).sort().join() === [oE, oG].sort().join(), "กรองตามอุตสาหกรรม");
+ok((await names({ owner: "-", industry: "พลังงาน" })).join() === oG, "กรองบริษัทที่ยังไม่มีเจ้าของ");
+ok((await names({ custom: [{ fieldId: vTierId, value: "Gold" }] })).join() === oE, "กรองตามฟิลด์ของบัญชี ใช้ค่าล่าสุด (เคยเป็น Silver)");
+ok((await names({ group: "in" })).sort().join() === [oE, oF].sort().join() && (await names({ taxId: "has" })).join() === oE, "กรองบริษัทในเครือ · มีเลขนิติบุคคล");
+ok((await listAccounts(V, { viewer: ME, filters: { industry: "พลังงาน" } })).total === 2, "ตัวนับตรงกับตัวกรอง");
+
+const mk = async (org: string, name: string, value: number, close: string | null, owner = ME.id) => {
+  const r = await createDeal(V, { orgId: org, name, value: String(value), expectedClose: close }, { id: owner, clearance: "confidential" });
+  return r.ok ? r.id : "";
+};
+const d1 = await mk(oE, "ดีลพลังงาน 1 (สมมุติ)", 500000, "2026-11-30");
+const d2 = await mk(oG, "ดีลพลังงาน 2 (สมมุติ)", 120000, "2027-02-15", "nok@verify");
+const d3 = await mk(oF, "ดีลอาหาร (สมมุติ)", 80000, null);
+await addItem(V, d1, { package: "Gold", qty: "1", unitPrice: "400000" }, ME);
+await addItem(V, d1, { package: "บูธ", qty: "2", unitPrice: "50000" }, ME);
+await addItem(V, d2, { package: "Gold", qty: "1", unitPrice: "120000" }, ME);
+const dDue = await createField(V, { entity: "deal", label: "แหล่งที่มา", kind: "choice", options: "งานแสดงสินค้า, แนะนำ" }, ME.id);
+const dDueId = dDue.ok ? dDue.id : "";
+await setValue(V, "deal", d2, dDueId, "แนะนำ", ME);
+const dn = async (filters: DealFilters) => (await listDealsC5(V, { view: "all", filters }, ME)).map((d) => d.id).sort().join();
+ok((await dn({ owner: "nok@verify" })) === d2, "กรองดีลตามเจ้าของ");
+ok((await dn({ minValue: 100000, package: "Gold" })) === [d1, d2].sort().join(), "กรองมูลค่าขั้นต่ำ + แพ็กเกจ");
+ok((await dn({ closeFrom: "2026-11-01", closeTo: "2026-12-31" })) === d1, "กรองช่วงปิดคาด (ดีลไม่มีวันปิดไม่ติดมา)");
+ok((await dn({ custom: [{ fieldId: dDueId, value: "แนะนำ" }] })) === d2, "กรองตามฟิลด์ของดีล");
+
+ok(cleanQuery("?q=สมชาย&industry=พลังงาน&evil=1&cf.abc=Gold") === "industry=%E0%B8%9E%E0%B8%A5%E0%B8%B1%E0%B8%87%E0%B8%87%E0%B8%B2%E0%B8%99&cf.abc=Gold", "มุมมองที่บันทึกไม่เก็บคำค้น (อาจเป็นชื่อคน) และคีย์ที่ไม่รู้จัก");
+const sv = await saveView(V, { list: "accounts", name: "พลังงาน", query: "industry=พลังงาน", shared: false }, ME.id);
+const svShared = await saveView(V, { list: "deals", name: "Gold ทั้งทีม", query: "package=Gold", shared: true }, ME.id);
+ok(sv.ok && svShared.ok && !(await saveView(V, { list: "accounts", name: "ว่าง", query: "q=x", shared: false }, ME.id)).ok, "บันทึกมุมมองได้ · query ว่างหลังทำความสะอาด = ไม่บันทึก");
+ok((await listViews(V, "accounts", ME.id)).length === 1 && (await listViews(V, "accounts", "nok@verify")).length === 0, "มุมมองส่วนตัวเห็นเฉพาะเจ้าของ");
+ok((await listViews(V, "deals", "nok@verify")).some((x) => x.name === "Gold ทั้งทีม" && !x.mine), "มุมมองที่แชร์ทุกคนในบัญชีเห็น");
+ok(svShared.ok && !(await deleteView(V, svShared.id, "nok@verify")).ok && (await deleteView(V, svShared.id, ME.id)).ok, "ลบได้เฉพาะเจ้าของมุมมอง");
+ok((await listViews("mst-golf", "accounts", ME.id)).length === 0, "มุมมองไม่ข้ามบัญชี");
+
+const pv = await pivot(V, ME, { rows: "industry", measure: "value", view: "open" });
+ok(pv.rowTotals.get("พลังงาน") === 620000 && pv.rowTotals.get("อาหาร") === 80000, "รายงานเลือกมิติ: มูลค่าดีลเปิดตามอุตสาหกรรม");
+const pc = await pivot(V, ME, { rows: "industry", cols: "owner", measure: "count", view: "open" });
+ok(pc.cells.get(`พลังงาน\u0000${ME.id}`) === 1 && pc.cells.get("พลังงาน\u0000nok@verify") === 1, "แถว × คอลัมน์: จำนวนดีลตามอุตสาหกรรม × เจ้าของ");
+const pp = await pivot(V, ME, { rows: "package", measure: "value", view: "open" });
+ok(pp.rowTotals.get("Gold") === 520000 && pp.rowTotals.get("บูธ") === 100000, "มิติแพ็กเกจใช้ยอดของแพ็กเกจ ไม่ใช่มูลค่าดีลทั้งก้อน");
+const pg = await pivot(V, ME, { rows: "group", measure: "count", view: "open" });
+ok(pg.rowTotals.get("บริษัท พลังงานตะวันออก จำกัด (สมมุติ)") === 2, "มิติกลุ่มบริษัท: บริษัทลูกนับรวมใต้บริษัทบนสุด");
+const pf = await pivot(V, ME, { rows: `cf.${vTierId}`, measure: "count", view: "open" });
+ok(pf.rowTotals.get("Gold") === 1 && pf.rowTotals.get("Silver") === 1 && pf.rowTotals.get("— ไม่ระบุ —") === 2, "มิติฟิลด์ของบัญชี (ไม่ได้กรอก = ไม่ระบุ · ดีล ค ของ C3 กับดีลอาหาร)");
+ok((await pivot("mst-golf", ME, { rows: "stage", measure: "count" })).deals === 0, "รายงานไม่ข้ามบัญชี");
+
+// ── C6 · พยากรณ์ · เป้า · ทีม ── บัญชี V
+ok(quarterOf("2026-03-31T18:00:00Z") === "2026-Q2" && quarterOf("2026-03-31T16:00:00Z") === "2026-Q1", "ไตรมาสนับตามเวลาไทย (31 มี.ค. ตีหนึ่งเวลาไทย = Q2)");
+ok(quarterRange("2026-Q4").from === "2026-10-01" && quarterRange("2026-Q4").to === "2026-12-31" && quarterRange("2024-Q1").to === "2024-03-31", "ช่วงวันของไตรมาส");
+ok(nearbyQuarters(new Date("2026-01-15T00:00:00Z")).join() === "2025-Q2,2025-Q3,2025-Q4,2026-Q1,2026-Q2,2026-Q3,2026-Q4", "ไตรมาสที่เลือกได้ข้ามปีถูก");
+ok(effectiveForecast("proposal", null) === "best_case" && effectiveForecast("open", null) === "pipeline" && effectiveForecast("open", "commit") === "commit" && effectiveForecast("won", "commit") === null, "หมวดพยากรณ์: ตั้งเอง > ตามขั้น · ดีลปิดแล้วไม่อยู่ในพยากรณ์");
+ok(!(await setForecast(V, d1, "sure", ME)).ok && (await setForecast(V, d1, "commit", ME)).ok, "หมวดที่ไม่รู้จัก = ไม่บันทึก");
+ok(!(await setForecast("mst-golf", d1, "commit", ME)).ok, "ตั้งหมวดข้ามบัญชีไม่ได้");
+const fdeal = await getDeal(V, d1, ME);
+ok(fdeal !== null && fdeal !== "masked" && fdeal.history.some((h) => h.field === "forecast" && h.newValue === "commit"), "ตั้งหมวดพยากรณ์มีประวัติ");
+ok(!(await setQuota(V, ME.id, "2026-Q5", "1000", ME.id)).ok && !(await setQuota(V, ME.id, "2026-Q4", "-5", ME.id)).ok, "ไตรมาสผิด · เป้าติดลบ = ไม่บันทึก");
+await setQuota(V, ME.id, "2026-Q4", "1,000,000", ME.id);
+await setQuota(V, "nok@verify", "2026-Q4", "500000", ME.id);
+const tE = await createTeam(V, "ทีมตะวันออก", ME.id);
+ok(tE.ok && !(await createTeam(V, "ทีมตะวันออก", ME.id)).ok, "สร้างทีม · ชื่อซ้ำไม่ได้");
+const tId = tE.ok ? tE.id : "";
+await setTeamMember(V, tId, ME.id, true, ME.id);
+await setTeamMember(V, tId, ME.id, true, ME.id);
+ok((await listTeams(V)).find((t) => t.id === tId)?.members.join() === ME.id, "เพิ่มคนเข้าทีม (ซ้ำไม่เพิ่ม)");
+ok((await setOrgTeam(V, oE, tId, ME)).ok && !(await setOrgTeam(V, oE, "tm-nope", ME)).ok, "ตั้งทีมของบริษัท · ทีมที่ไม่มีไม่ได้");
+ok((await listAccounts(V, { viewer: ME, filters: { team: tId } })).rows.map((r) => r.id).join() === oE, "กรองบริษัทตามทีม");
+// d1: commit 500k ปิด 30 พ.ย. 2026 (ของ ME) · d2: proposal? เริ่มคุย → มีโอกาส 120k ปิด ก.พ. 2027 (ไม่อยู่ Q4) · ปิดได้หนึ่งดีลใน Q4
+const d4 = await mk(oG, "ดีลปิดได้ Q4 (สมมุติ)", 300000, "2026-12-01", "nok@verify");
+await run("INSERT INTO record_versions (tenant_id, record_kind, record_id, field, old_value, new_value, reason, changed_by, valid_from, recorded_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+  V, "opportunity", d4, "stage", "open", "won", "ทดสอบ", "nok@verify", null, "2026-10-10T03:00:00.000Z");
+await run("UPDATE opportunities SET stage = 'won' WHERE tenant_id = ? AND id = ?", V, d4);
+const fr = await forecastReport(V, ME, "2026-Q4");
+const me = fr.rows.find((r) => r.owner === ME.id), nok = fr.rows.find((r) => r.owner === "nok@verify");
+ok(me?.quota === 1000000 && me.commit === 500000 && me.team === "ทีมตะวันออก", "พยากรณ์ของฉัน: เป้า 1 ล้าน · แน่นอน 500k · อยู่ทีมตะวันออก");
+ok(nok?.won === 300000 && nok.pipeline === 0 && nok.quota === 500000, "ปิดได้ในไตรมาสนับจากวันเข้าขั้นปิดได้ · ดีลที่ปิดคาดไตรมาสอื่นไม่นับ");
+ok(fr.teams.some((g) => g.team === "ไม่อยู่ในทีม" && g.rows.some((r) => r.owner === "nok@verify")), "คนที่ไม่อยู่ในทีมแยกกลุ่ม");
+ok((await forecastReport(V, ME, "bad")).rows.length === 0, "ไตรมาสผิดรูปแบบ = ไม่มีผล");
+ok((await pivot(V, ME, { rows: "team", measure: "count", view: "open" })).rowTotals.get("ทีมตะวันออก") === 1, "รายงานเลือกมิติแยกตามทีมได้");
+ok((await pivot(V, ME, { rows: "forecast", measure: "value", view: "open" })).rowTotals.get("แน่นอน") === 500000, "รายงานเลือกมิติแยกตามหมวดพยากรณ์ได้");
 
 for (const line of out) console.log(line);
 const failed = out.filter((l) => l.startsWith("FAIL"));

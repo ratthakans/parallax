@@ -1,8 +1,14 @@
 import Link from "next/link";
 import { viewer } from "@/app/(app)/viewer";
-import { DEAL_SORTS, DEAL_VIEWS, listDeals, type DealSort, type DealView } from "@/lib/engine/deals";
+import { DEAL_SORTS, DEAL_VIEWS, listDeals, type DealFilters, type DealSort, type DealView } from "@/lib/engine/deals";
 import { DEAL_STAGES, OPEN_STAGES, stageTh } from "@/lib/shared/deals";
 import { thaiDate } from "@/lib/shared/format";
+import { listFields } from "@/lib/engine/custom-fields";
+import { packageNames } from "@/lib/engine/deal-items";
+import { teamMembers } from "@/lib/engine/team";
+import { cleanQuery, listViews } from "@/lib/engine/saved-views";
+import { can } from "@/lib/shared/roles";
+import { SavedViews } from "@/components/console/saved-views";
 import { PageHead, Panel, baht, num } from "@/components/console/ui";
 import { ListViews, SortTh, listHref, type ListState } from "@/components/console/list-view";
 import { DealBoard } from "@/components/console/deal-board";
@@ -20,15 +26,33 @@ const VIEWS: { key: DealView; label: string }[] = [
   { key: "lost", label: "ไม่ได้" },
 ];
 
-export default async function DealsPage({ searchParams }: { searchParams: Promise<{ view?: string; sort?: string; dir?: string; q?: string; mode?: string }> }) {
+const LABEL = "c-thai flex min-w-0 flex-col gap-1 text-[0.78rem] text-[var(--c-text-3)]";
+
+export default async function DealsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const sp = await searchParams;
   const v = await viewer();
+  /* ── ตัวกรองที่เลือกเอง (docs/crm-plan.md C5) ── เจ้าของ · มูลค่าขั้นต่ำ · ช่วงปิดคาด · แพ็กเกจ · ฟิลด์ของดีล (df.<id>) */
+  const [fields, pkgs, team, saved] = await Promise.all([
+    listFields(v.tenantId, "deal"), packageNames(v.tenantId), teamMembers(v.tenantId, v.actor), listViews(v.tenantId, "deals", v.actor),
+  ]);
+  const day = (x?: string) => (x && /^\d{4}-\d{2}-\d{2}$/.test(x) ? x : undefined);
+  const minValue = sp.minValue && Number.isFinite(Number(sp.minValue)) ? Number(sp.minValue) : undefined;
+  const filters: DealFilters = {
+    owner: sp.owner || undefined, minValue, closeFrom: day(sp.closeFrom), closeTo: day(sp.closeTo), package: sp.package || undefined,
+    custom: fields.filter((f) => sp[`df.${f.id}`]).map((f) => ({ fieldId: f.id, value: sp[`df.${f.id}`]! })),
+  };
+  const extra: Record<string, string> = Object.fromEntries(Object.entries({
+    owner: filters.owner, minValue: minValue != null ? String(minValue) : undefined, closeFrom: filters.closeFrom, closeTo: filters.closeTo, package: filters.package,
+    ...Object.fromEntries((filters.custom ?? []).map((c) => [`df.${c.fieldId}`, c.value])),
+  }).filter((e): e is [string, string] => Boolean(e[1])));
+  const nFilters = Object.keys(extra).length;
   const view = (DEAL_VIEWS as readonly string[]).includes(sp.view ?? "") ? (sp.view as DealView) : "open";
   const sort = (DEAL_SORTS as readonly string[]).includes(sp.sort ?? "") ? (sp.sort as DealSort) : undefined;
   const dir = sp.dir === "asc" || sp.dir === "desc" ? sp.dir : undefined;
   const mode = sp.mode === "list" ? "list" : "board";
-  const deals = await listDeals(v.tenantId, { view, sort, dir, q: sp.q }, { id: v.actor, clearance: v.clearance });
-  const state: ListState = { q: sp.q, view, sort, dir, defaultView: "open", mode: sp.mode === "list" || sp.mode === "board" ? sp.mode : undefined };
+  const deals = await listDeals(v.tenantId, { view, sort, dir, q: sp.q, filters }, { id: v.actor, clearance: v.clearance });
+  const state: ListState = { q: sp.q, view, sort, dir, defaultView: "open", mode: sp.mode === "list" || sp.mode === "board" ? sp.mode : undefined, extra };
+  const current = cleanQuery(new URLSearchParams(Object.entries({ view: view !== "open" ? view : "", sort: sort ?? "", dir: dir ?? "", mode: state.mode ?? "", ...extra }).filter((e) => e[1])).toString());
   const total = deals.reduce((t, d) => t + (d.value ?? 0), 0);
   const stages = view === "won" || view === "lost" ? [view] : view === "all" ? [...DEAL_STAGES] : OPEN_STAGES;
   const modeHref = (m: string) => listHref(BASE, state, { mode: m });
@@ -36,6 +60,7 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
   return (
     <>
       <PageHead label="ดีล" title="ดีล" actions={<Link href="/app/deals/new" className="c-btn c-btn-primary">+ ดีล</Link>} />
+      <SavedViews list="deals" base={BASE} views={saved} current={current} canShare={can(v.role, "fields")} />
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <ListViews base={BASE} state={state} views={VIEWS} />
@@ -47,6 +72,37 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
           </nav>
         </div>
       </div>
+
+      <datalist id="deal-pkgs">{pkgs.map((n) => <option key={n} value={n} />)}</datalist>
+      <details className="mb-4" open={nFilters > 0}>
+        <summary className="c-thai cursor-pointer text-[0.86rem] text-[var(--c-accent)]">ตัวกรอง{nFilters ? ` (${nFilters})` : ""}</summary>
+        <form action={BASE} className="c-panel mt-2 grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
+          {view !== "open" && <input type="hidden" name="view" value={view} />}
+          {state.mode && <input type="hidden" name="mode" value={state.mode} />}
+          <label className={LABEL}>เจ้าของ
+            <select name="owner" defaultValue={filters.owner ?? ""} className="c-select">
+              <option value="">ทั้งหมด</option>{team.map((x) => <option key={x} value={x}>{x}</option>)}
+            </select>
+          </label>
+          <label className={LABEL}>มูลค่าตั้งแต่ (บาท)<input name="minValue" inputMode="numeric" defaultValue={sp.minValue ?? ""} className="c-input" /></label>
+          <label className={LABEL}>ปิดคาดตั้งแต่<input type="date" name="closeFrom" defaultValue={filters.closeFrom ?? ""} className="c-input" /></label>
+          <label className={LABEL}>ปิดคาดถึง<input type="date" name="closeTo" defaultValue={filters.closeTo ?? ""} className="c-input" /></label>
+          <label className={LABEL}>มีแพ็กเกจ<input name="package" list="deal-pkgs" defaultValue={filters.package ?? ""} className="c-input" autoComplete="off" /></label>
+          {fields.map((f) => (
+            <label key={f.id} className={LABEL}>{f.label}
+              {f.kind === "choice" ? (
+                <select name={`df.${f.id}`} defaultValue={sp[`df.${f.id}`] ?? ""} className="c-select">
+                  <option value="">ทั้งหมด</option>{f.options.map((o) => <option key={o} value={o}>{o}</option>)}
+                </select>
+              ) : <input name={`df.${f.id}`} defaultValue={sp[`df.${f.id}`] ?? ""} className="c-input" placeholder="ค่าตรงทุกตัวอักษร" />}
+            </label>
+          ))}
+          <div className="flex items-end gap-2 sm:col-span-2 lg:col-span-4">
+            <button type="submit" className="c-btn c-btn-primary c-btn-sm">ใช้ตัวกรอง</button>
+            {nFilters > 0 && <Link href={listHref(BASE, { ...state, extra: {} }, {})} className="c-btn c-btn-ghost c-btn-sm">ล้างตัวกรอง</Link>}
+          </div>
+        </form>
+      </details>
 
       {deals.length === 0 ? (
         <Panel className="p-5">

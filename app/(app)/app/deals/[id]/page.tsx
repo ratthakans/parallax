@@ -2,13 +2,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { viewer } from "@/app/(app)/viewer";
 import {
-  addDealItemAction, logDealActivityAction, moveDealAction, removeDealItemAction, removeDealPersonAction, setDealPersonAction, syncDealValueAction, updateDealAction,
+  addDealItemAction, logDealActivityAction, setForecastAction, moveDealAction, removeDealItemAction, removeDealPersonAction, setDealPersonAction, syncDealValueAction, updateDealAction,
 } from "@/app/(app)/deal-actions";
 import { listFields, valuesFor } from "@/lib/engine/custom-fields";
 import { listItems, packageNames } from "@/lib/engine/deal-items";
 import { CustomFieldsPanel } from "@/components/console/custom-fields";
 import { dealCandidates, getDeal } from "@/lib/engine/deals";
-import { DEAL_ROLES, DEAL_ROLE_TH, DEAL_STAGE_TH, OPEN_STAGES, dealRoleTh, isDealStage, stageTh } from "@/lib/shared/deals";
+import { DEAL_ROLES, DEAL_ROLE_TH, DEAL_STAGE_TH, FORECAST_CATEGORIES, FORECAST_TH, OPEN_STAGES, dealRoleTh, effectiveForecast, isDealStage, stageTh } from "@/lib/shared/deals";
+import { get } from "@/lib/engine/sql";
 import { INTERACTION_KINDS, INTERACTION_TH, type InteractionKind } from "@/lib/shared/accounts";
 import { bangkokDay } from "@/lib/shared/format";
 import { thaiDate, thaiDateTime } from "@/lib/shared/format";
@@ -20,7 +21,7 @@ export const dynamic = "force-dynamic";
 
 /* ── หน้าดีล (docs/ux-plan.md U4) ── หัวสรุป + Path (กดขั้นเพื่อย้าย) + แท็บ ภาพรวม/ประวัติ */
 
-const FIELD_TH: Record<string, string> = { stage: "ขั้น", value: "มูลค่า", expected_close: "ปิดคาด", name: "ชื่อ", person: "คนในดีล" };
+const FIELD_TH: Record<string, string> = { stage: "ขั้น", value: "มูลค่า", expected_close: "ปิดคาด", name: "ชื่อ", person: "คนในดีล", forecast: "หมวดพยากรณ์" };
 const LABEL = "c-thai flex min-w-0 flex-col gap-1 text-[0.8rem] text-[var(--c-text-3)]";
 
 function Edit({ dealId, field, label, value, type = "text" }: { dealId: string; field: string; label: string; value: string; type?: string }) {
@@ -48,6 +49,8 @@ export default async function DealPage({ params, searchParams }: { params: Promi
     listFields(v.tenantId, "deal"), valuesFor(v.tenantId, "deal", [d.id]), listItems(v.tenantId, d.id), packageNames(v.tenantId),
   ]);
   const itemsTotal = items.reduce((t, i) => t + (i.total ?? 0), 0);
+  const fcSet = (await get<{ forecast_category: string | null }>("SELECT forecast_category FROM opportunities WHERE tenant_id = ? AND id = ?", v.tenantId, d.id))?.forecast_category ?? null;
+  const fc = effectiveForecast(d.stage, fcSet);
   const nameOf = new Map(candidates.map((c) => [c.id, c.name]));
   /* ประวัติ field = person เก็บเป็น "<id>:<บทบาท>" — แสดงเป็นชื่อและบทบาท */
   const personVal = (raw: string | null) => {
@@ -124,6 +127,18 @@ export default async function DealPage({ params, searchParams }: { params: Promi
               <div><dt className="text-[0.75rem] text-[var(--c-text-4)]">มูลค่า</dt><dd>{d.value != null ? baht(d.value) : "ไม่ระบุ"}</dd><Edit dealId={d.id} field="value" label="มูลค่า" value={d.value != null ? String(d.value) : ""} /></div>
               <div><dt className="text-[0.75rem] text-[var(--c-text-4)]">ปิดคาด</dt><dd>{d.expectedClose ? thaiDate(d.expectedClose) : "ไม่ระบุ"}</dd><Edit dealId={d.id} field="expected_close" label="วันปิดคาด" value={d.expectedClose ?? ""} type="date" /></div>
               <div><dt className="text-[0.75rem] text-[var(--c-text-4)]">สร้างเมื่อ</dt><dd>{thaiDate(d.createdAt)}</dd></div>
+              {fc && (
+                <div>
+                  <dt className="text-[0.75rem] text-[var(--c-text-4)]">หมวดพยากรณ์</dt>
+                  <dd>{FORECAST_TH[fc]}{fcSet ? "" : <span className="text-[var(--c-text-4)]"> (ตามขั้น)</span>}</dd>
+                  <ActionForm action={setForecastAction} fields={{ dealId: d.id }} label="บันทึก" pendingLabel="กำลังบันทึก…" size="sm" className="mt-1 flex flex-wrap items-end gap-2">
+                    <select name="category" defaultValue={fcSet ?? ""} className="c-select max-w-[12rem]" aria-label="หมวดพยากรณ์">
+                      <option value="">ตามขั้น</option>
+                      {FORECAST_CATEGORIES.map((c) => <option key={c} value={c}>{FORECAST_TH[c]}</option>)}
+                    </select>
+                  </ActionForm>
+                </div>
+              )}
             </dl>
           </Panel>
           <Panel className="p-5">
@@ -236,7 +251,9 @@ export default async function DealPage({ params, searchParams }: { params: Promi
                 <span className="text-[var(--c-text-3)]">{thaiDateTime(h.at)}</span>
                 <span>
                   {FIELD_TH[h.field] ?? h.field}: {h.field === "stage" ? `${h.oldValue ? stageTh(h.oldValue) : "—"} → ${h.newValue ? stageTh(h.newValue) : "—"}`
-                    : h.field === "person" ? `${personVal(h.oldValue)} → ${personVal(h.newValue)}` : `${h.oldValue ?? "—"} → ${h.newValue ?? "—"}`}
+                    : h.field === "person" ? `${personVal(h.oldValue)} → ${personVal(h.newValue)}`
+                    : h.field === "forecast" ? `${h.oldValue ? FORECAST_TH[h.oldValue as keyof typeof FORECAST_TH] ?? h.oldValue : "ตามขั้น"} → ${h.newValue ? FORECAST_TH[h.newValue as keyof typeof FORECAST_TH] ?? h.newValue : "ตามขั้น"}`
+                    : `${h.oldValue ?? "—"} → ${h.newValue ?? "—"}`}
                   <span className="text-[var(--c-text-4)]"> · {h.by} · {h.reason}</span>
                 </span>
               </li>

@@ -3,6 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { denied, viewer } from "@/app/(app)/viewer";
 import { archiveField, createField, setValue, type FieldEntity } from "@/lib/engine/custom-fields";
+import { deleteView, saveView } from "@/lib/engine/saved-views";
+import { createTeam, setOrgTeam, setQuota, setTeamMember } from "@/lib/engine/forecast";
+import { can } from "@/lib/shared/roles";
 import type { ActionState } from "@/lib/shared/action-state";
 
 /* ── ฟิลด์กำหนดเอง (docs/crm-plan.md C4) ── นิยามฟิลด์ = สิทธิ์ fields · กรอกค่า = สิทธิ์ write
@@ -40,4 +43,72 @@ export async function setFieldValueAction(_p: ActionState, fd: FormData): Promis
   if (!res.ok) return { error: res.error };
   revalidatePath(entity === "deal" ? `/app/deals/${id}` : `/app/accounts/${id}`);
   return { ok: "บันทึกแล้ว" };
+}
+
+/* ── มุมมองรายการที่บันทึกไว้ (C5) ── ส่วนตัว = สิทธิ์ write · แชร์ให้ทั้งบัญชี = สิทธิ์ fields */
+const LIST_PATH: Record<string, string> = { accounts: "/app/accounts", deals: "/app/deals", pivot: "/app/reports/pivot" };
+
+export async function saveViewAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  const v = await viewer();
+  const no = denied(v, "write");
+  if (no) return { error: no };
+  const shared = str(fd, "shared") === "1";
+  if (shared && !can(v.role, "fields")) return { error: "แชร์มุมมองให้ทั้งบัญชีได้เฉพาะ Data steward หัวหน้าทีม หรือเจ้าของบัญชี — บันทึกเป็นมุมมองส่วนตัวแทน" };
+  const res = await saveView(v.tenantId, { list: str(fd, "list"), name: str(fd, "name"), query: str(fd, "query"), shared }, v.actor);
+  if (!res.ok) return { error: res.error };
+  revalidatePath(LIST_PATH[str(fd, "list")] ?? "/app");
+  return { ok: "บันทึกมุมมองแล้ว" };
+}
+
+export async function deleteViewAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  const v = await viewer();
+  const no = denied(v, "write");
+  if (no) return { error: no };
+  const res = await deleteView(v.tenantId, str(fd, "viewId"), v.actor);
+  if (!res.ok) return { error: res.error };
+  revalidatePath(LIST_PATH[str(fd, "list")] ?? "/app");
+  return { ok: "ลบมุมมองแล้ว" };
+}
+
+/* ── ทีม · เป้า (C6) ── ตั้งทีมและเป้า = สิทธิ์ campaign (หัวหน้าทีม/เจ้าของ) · ตั้งทีมของบริษัท = สิทธิ์ write */
+export async function createTeamAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  const v = await viewer();
+  const no = denied(v, "campaign");
+  if (no) return { error: no };
+  const res = await createTeam(v.tenantId, str(fd, "name"), v.actor);
+  if (!res.ok) return { error: res.error };
+  revalidatePath("/app/settings/teams");
+  return { ok: "สร้างทีมแล้ว" };
+}
+
+export async function teamMemberAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  const v = await viewer();
+  const no = denied(v, "campaign");
+  if (no) return { error: no };
+  const add = str(fd, "add") === "1";
+  const res = await setTeamMember(v.tenantId, str(fd, "teamId"), str(fd, "member"), add, v.actor);
+  if (!res.ok) return { error: res.error };
+  revalidatePath("/app/settings/teams");
+  return { ok: add ? "เพิ่มเข้าทีมแล้ว" : "เอาออกจากทีมแล้ว" };
+}
+
+export async function setQuotaAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  const v = await viewer();
+  const no = denied(v, "campaign");
+  if (no) return { error: no };
+  const res = await setQuota(v.tenantId, str(fd, "owner"), str(fd, "period"), str(fd, "amount"), v.actor);
+  if (!res.ok) return { error: res.error };
+  revalidatePath("/app/reports/forecast");
+  return { ok: "บันทึกเป้าแล้ว" };
+}
+
+export async function setOrgTeamAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  const v = await viewer();
+  const no = denied(v, "write");
+  if (no) return { error: no };
+  const org = str(fd, "orgId");
+  const res = await setOrgTeam(v.tenantId, org, str(fd, "teamId"), { id: v.actor, clearance: v.clearance });
+  if (!res.ok) return { error: res.error };
+  revalidatePath(`/app/accounts/${org}`);
+  return { ok: "บันทึกทีมที่ดูแลแล้ว" };
 }

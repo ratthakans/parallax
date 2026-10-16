@@ -61,12 +61,26 @@ const SORT_SQL: Record<AccountSort, string> = {
   people: "cur", name: "o.name", last: "COALESCE(i.last_at, '')", owner: "COALESCE(o.account_owner_id, '')",
 };
 
+/* ── ตัวกรองที่ผู้ใช้เลือกเอง (docs/crm-plan.md C5) ── ค่าเป็นพารามิเตอร์เสมอ · ฟิลด์กำหนดเองเทียบกับค่าล่าสุดของฟิลด์ */
+export type AccountFilters = { team?: string; industry?: string; owner?: string; custom?: { fieldId: string; value: string }[]; group?: "in" | "none"; taxId?: "has" | "missing" };
+const LATEST_ORG_VALUE = `(SELECT v.value FROM custom_values v WHERE v.tenant_id = o.tenant_id AND v.entity = 'org' AND v.record_id = o.id AND v.field_id = ?
+  ORDER BY v.recorded_at DESC, v.id DESC LIMIT 1)`;
+
 export async function listAccounts(
   tenantId: string,
-  opts: { q?: string; mine?: string; limit?: number; offset?: number; viewer?: Viewer; view?: AccountView; sort?: AccountSort; dir?: "asc" | "desc"; now?: Date } = {},
+  opts: { q?: string; mine?: string; limit?: number; offset?: number; viewer?: Viewer; view?: AccountView; sort?: AccountSort; dir?: "asc" | "desc"; now?: Date; filters?: AccountFilters } = {},
 ): Promise<{ rows: AccountRow[]; total: number }> {
   const where: string[] = [];
   const params: (string | number)[] = [tenantId];
+  const f = opts.filters;
+  if (f?.industry) { where.push("o.industry = ?"); params.push(f.industry); }
+  if (f?.team) { where.push(f.team === "-" ? "o.team_id IS NULL" : "o.team_id = ?"); if (f.team !== "-") params.push(f.team); }
+  if (f?.owner) { where.push(f.owner === "-" ? "o.account_owner_id IS NULL" : "o.account_owner_id = ?"); if (f.owner !== "-") params.push(f.owner); }
+  for (const c of f?.custom ?? []) { where.push(`${LATEST_ORG_VALUE} = ?`); params.push(c.fieldId, c.value); }
+  if (f?.group === "in") where.push("(o.parent_id IS NOT NULL OR EXISTS (SELECT 1 FROM orgs k WHERE k.tenant_id = o.tenant_id AND k.parent_id = o.id))");
+  if (f?.group === "none") where.push("(o.parent_id IS NULL AND NOT EXISTS (SELECT 1 FROM orgs k WHERE k.tenant_id = o.tenant_id AND k.parent_id = o.id))");
+  if (f?.taxId === "has") where.push("o.tax_id IS NOT NULL");
+  if (f?.taxId === "missing") where.push("o.tax_id IS NULL");
   if (opts.viewer) {
     const levels = visibleLevels(opts.viewer.clearance);
     where.push(`(COALESCE(o.classification, 'confidential') IN (${levels.map(() => "?").join(",")}) OR o.account_owner_id = ? OR o.data_owner_id = ?)`);
@@ -314,4 +328,13 @@ export async function orgOptions(tenantId: string, excludeId: string, limit = 50
   return all<{ id: string; name: string }>(
     "SELECT id, name FROM orgs WHERE tenant_id = ? AND id <> ? ORDER BY name LIMIT ?", tenantId, excludeId, limit,
   );
+}
+
+/** ค่าที่มีจริงสำหรับตัวกรอง (อุตสาหกรรม · เจ้าของบัญชี) */
+export async function accountFilterOptions(tenantId: string): Promise<{ industries: string[]; owners: string[] }> {
+  const [ind, own] = await Promise.all([
+    all<{ v: string }>("SELECT DISTINCT industry AS v FROM orgs WHERE tenant_id = ? AND industry IS NOT NULL ORDER BY industry", tenantId),
+    all<{ v: string }>("SELECT DISTINCT account_owner_id AS v FROM orgs WHERE tenant_id = ? AND account_owner_id IS NOT NULL ORDER BY account_owner_id", tenantId),
+  ]);
+  return { industries: ind.map((r) => r.v), owners: own.map((r) => r.v) };
 }

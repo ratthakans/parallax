@@ -7,6 +7,7 @@ import { createDeal, moveDeal, removeDealPerson, setDealPerson, updateDeal } fro
 import { logInteraction, orgByName } from "@/lib/engine/accounts/edit";
 import { get } from "@/lib/engine/sql";
 import { addItem, listItems, removeItem } from "@/lib/engine/deal-items";
+import { setForecast } from "@/lib/engine/forecast";
 import { orgAccess } from "@/lib/engine/accounts";
 import type { ActionState } from "@/lib/shared/action-state";
 
@@ -143,4 +144,16 @@ export async function syncDealValueAction(_p: ActionState, fd: FormData): Promis
   if (!res.ok) return { error: res.error };
   refresh(id);
   return { ok: "ตั้งมูลค่าดีลตามยอดรวมแพ็กเกจแล้ว" };
+}
+
+/** หมวดพยากรณ์ (C6) — คนขายบอกเองว่าแน่นอนแค่ไหน · มีรุ่นในประวัติ */
+export async function setForecastAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  const v = await viewer();
+  const no = denied(v, "write");
+  if (no) return { error: no };
+  const id = str(fd, "dealId");
+  const res = await setForecast(v.tenantId, id, str(fd, "category"), { id: v.actor, clearance: v.clearance });
+  if (!res.ok) return { error: res.error };
+  refresh(id);
+  return { ok: "บันทึกแล้ว" };
 }

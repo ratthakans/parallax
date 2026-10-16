@@ -31,3 +31,28 @@ export const DEAL_ROLE_TH: Record<DealRole, string> = {
 };
 export const isDealRole = (r: string): r is DealRole => (DEAL_ROLES as readonly string[]).includes(r);
 export const dealRoleTh = (r: string | null) => (r == null ? "" : isDealRole(r) ? DEAL_ROLE_TH[r] : r);
+
+/* ── หมวดพยากรณ์ (docs/crm-plan.md C6) ── คนขายบอกเองว่าดีลไหน "แน่นอน" — ไม่ตั้ง = ตามขั้น (ไม่มีการเดาของระบบ) */
+export const FORECAST_CATEGORIES = ["commit", "best_case", "pipeline", "omitted"] as const;
+export type ForecastCategory = (typeof FORECAST_CATEGORIES)[number];
+export const FORECAST_TH: Record<ForecastCategory, string> = { commit: "แน่นอน", best_case: "น่าจะได้", pipeline: "มีโอกาส", omitted: "ไม่นับ" };
+export const isForecast = (s: string): s is ForecastCategory => (FORECAST_CATEGORIES as readonly string[]).includes(s);
+/** หมวดที่ใช้จริง: ตั้งเอง > ตามขั้น (ต่อรอง/เสนอราคา = น่าจะได้ · ก่อนหน้านั้น = มีโอกาส · ปิดแล้ว = ไม่อยู่ในพยากรณ์) */
+export function effectiveForecast(stage: string, set: string | null): ForecastCategory | null {
+  if (stage === "won" || stage === "lost") return null;
+  if (set && isForecast(set)) return set;
+  return stage === "proposal" || stage === "negotiation" ? "best_case" : "pipeline";
+}
+
+/** ไตรมาส 'YYYY-Qn' ของวันที่ (เวลาไทย) และช่วงวันของมัน */
+export const quarterOf = (iso: string) => {
+  const d = new Date(Date.parse(iso) + 7 * 3600_000);
+  return `${d.getUTCFullYear()}-Q${Math.floor(d.getUTCMonth() / 3) + 1}`;
+};
+export const quarterRange = (period: string): { from: string; to: string } => {
+  const [y, q] = [Number(period.slice(0, 4)), Number(period.slice(6))];
+  const m = (q - 1) * 3;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const end = new Date(Date.UTC(y, m + 3, 0));
+  return { from: `${y}-${pad(m + 1)}-01`, to: `${y}-${pad(m + 3)}-${pad(end.getUTCDate())}` };
+};
