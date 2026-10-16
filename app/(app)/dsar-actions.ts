@@ -46,7 +46,8 @@ export async function verifyIdentityAction(_p: ActionState, fd: FormData): Promi
 
 export async function closeRequestAction(_p: ActionState, fd: FormData): Promise<ActionState> {
   const v = await viewer();
-  if (v.role !== "owner") return { error: "เฉพาะเจ้าของบัญชีเท่านั้นที่ปิดคำขอสิทธิได้" };
+  const no = denied(v, "privacy");
+  if (no) return { error: no };
   const id = str(fd, "requestId");
   const res = await closeRequest(v.tenantId, id, { outcome: str(fd, "outcome"), note: str(fd, "note"), purposeId: str(fd, "purposeId") || null }, v.actor);
   if (!res.ok) return { error: res.error };

@@ -1,4 +1,4 @@
-import { viewer } from "@/app/(app)/viewer";
+import { denied, viewer } from "@/app/(app)/viewer";
 import { buildReport } from "@/lib/engine/dsar";
 
 /* ── รายงานข้อมูลของผู้ขอ (คำขอเข้าถึง · โอนย้าย) ──
@@ -7,7 +7,8 @@ import { buildReport } from "@/lib/engine/dsar";
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const v = await viewer();
-  if (v.role !== "owner") return new Response("เฉพาะเจ้าของบัญชีเท่านั้นที่สร้างรายงานคำขอสิทธิได้", { status: 403 });
+  const no = denied(v, "privacy");
+  if (no) return new Response(no, { status: 403, headers: { "Content-Type": "text/plain; charset=utf-8" } });
   const res = await buildReport(v.tenantId, id, v.actor);
   if (!res.ok) return new Response(res.error, { status: 409, headers: { "Content-Type": "text/plain; charset=utf-8" } });
   // ชื่อไฟล์มีแค่เลขเรื่อง ไม่มีชื่อผู้ขอ

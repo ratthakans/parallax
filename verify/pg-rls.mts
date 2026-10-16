@@ -15,6 +15,7 @@
    10. ทะเบียนการลบเขียนได้ระหว่างลบตามคำขอ และผู้ใช้ลบแถวทะเบียนไม่ได้ (0014)
    11. คำขอสิทธิ: เปิด · ยืนยัน · รายงาน · ปิดด้วยการลบ ในนามผู้ใช้ · อีกบัญชีมองไม่เห็น · ลบแถวคำขอไม่ได้ (0015)
    12. ส่งออกแบบขออนุมัติ: มีเจ้าของสองคน = อนุมัติคำขอของตัวเองไม่ได้ · อีกคนอนุมัติแล้วผู้ขอดาวน์โหลดได้ครั้งเดียว (0016)
+   13. บทบาทหกแบบ: BD และผู้ดูแลข้อมูลส่วนบุคคลเขียนผ่าน RLS ได้ · viewer เขียนไม่ได้ · ค่าบทบาทที่ไม่รู้จักบันทึกไม่ได้ (0017)
 
    ต้องมี DATABASE_URL ของฐานทดสอบที่ใช้ migration แล้ว (npm run pg:test-db) — ไม่มีก็ข้าม
    ⚠ ห้ามชี้ไปที่ production: ชุดนี้สร้างบัญชีและผู้ใช้ทดสอบ */
@@ -44,7 +45,7 @@ const op = randomUUID();
 const now = new Date().toISOString();
 await run("INSERT INTO tenants (id, name, cycle_shape, created_at) VALUES (?, ?, ?, ?)", T, "บัญชีทดสอบ Postgres", "event", now);
 await run("INSERT INTO auth.users (id, email) VALUES (?, ?)", op, `${op}@pg.example`);
-await run("INSERT INTO tenant_users (user_id, tenant_id, role) VALUES (?, ?, 'operator')", op, T);
+await run("INSERT INTO tenant_users (user_id, tenant_id, role) VALUES (?, ?, 'lead')", op, T);
 await run("INSERT INTO tenant_billing (tenant_id, state, is_customer, updated_at, updated_by) VALUES (?, 'paid', 1, ?, 'verify')", T, now);
 const as = <R,>(fn: () => Promise<R>) => withIdentity(op, fn);
 const countFor = async (table: string, where: string, ...p: string[]) =>
@@ -96,7 +97,7 @@ const ledger = await all<{ outcome: string }>("SELECT outcome FROM ai_ledger WHE
 ok(!ledger.some((l) => l.outcome === "error"), `ledger ไม่นับการเรียกที่สำเร็จเป็น error (${ledger.map((l) => l.outcome).join(", ")})`);
 
 // ── 5 · บทบาทจาก tenant_users (ด่านของ Server Action) ──
-ok(await tenantRole(T, op) === "operator" && await tenantRole(T, randomUUID()) === "viewer" && await tenantRole(T, null) === "viewer",
+ok(await tenantRole(T, op) === "lead" && await tenantRole(T, randomUUID()) === "viewer" && await tenantRole(T, null) === "viewer",
   "บทบาทอ่านจาก tenant_users · ไม่พบสมาชิก = viewer (สิทธิ์น้อยสุด) ไม่ใช่ owner");
 
 // ── 6 · หน้า "วันนี้" ในนามผู้ใช้ (0012) ── SQL ของคิวต้องรันบน Postgres และการเลื่อนต้องผ่าน RLS
@@ -207,6 +208,29 @@ ok(!wiped && await countFor("deletion_registry", "tenant_id = ?", T) === regRows
   ok(!gone, "ผู้ใช้ลบแถวคำขอส่งออกไม่ได้");
   await run("DELETE FROM tenant_users WHERE tenant_id = ? AND user_id IN (?, ?)", T, o1, o2);
   await run("DELETE FROM auth.users WHERE id IN (?, ?)", o1, o2);
+}
+
+// ── 13 · บทบาทหกแบบ (0017) ── RLS แยกแค่เขียนได้/อ่านอย่างเดียว · การแยกละเอียดอยู่ที่ Server Action (verify:roles)
+{
+  const users = { bd: randomUUID(), privacy: randomUUID(), viewer: randomUUID() };
+  for (const [role, u] of Object.entries(users)) {
+    await run("INSERT INTO auth.users (id, email) VALUES (?, ?)", u, `${u}@pg.example`);
+    await run("INSERT INTO tenant_users (user_id, tenant_id, role) VALUES (?, ?, ?)", u, T, role);
+  }
+  const write = (u: string) => withIdentity(u, async () => {
+    try {
+      await run("INSERT INTO interactions (id, tenant_id, kind, occurred_at, summary, recorded_at) VALUES (?,?,?,?,?,?)", randomUUID(), T, "call", now, "บทบาท (สมมุติ)", now);
+      return true;
+    } catch { return false; }
+  });
+  ok(await write(users.bd) && await write(users.privacy) && !(await write(users.viewer)),
+    "BD และผู้ดูแลข้อมูลส่วนบุคคลบันทึกปฏิสัมพันธ์ผ่าน RLS ได้ · viewer ไม่ได้");
+  ok(await tenantRole(T, users.privacy) === "privacy" && await tenantRole(T, users.bd) === "bd", "อ่านบทบาทใหม่จาก tenant_users ได้");
+  let bad = false;
+  try { await run("INSERT INTO tenant_users (user_id, tenant_id, role) VALUES (?, ?, 'superuser')", randomUUID(), T); bad = true; } catch { /* ถูกปฏิเสธตามที่ควร */ }
+  ok(!bad, "ค่าบทบาทที่ไม่รู้จักบันทึกไม่ได้ (check constraint)");
+  await run(`DELETE FROM tenant_users WHERE tenant_id = ? AND user_id IN (?, ?, ?)`, T, users.bd, users.privacy, users.viewer);
+  await run(`DELETE FROM auth.users WHERE id IN (?, ?, ?)`, users.bd, users.privacy, users.viewer);
 }
 
 // เก็บกวาด — บัญชีทดสอบหายพร้อมทุกแถว (on delete cascade)

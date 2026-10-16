@@ -1,6 +1,7 @@
 import { currentUser } from "@/lib/shared/session";
 import { adminData } from "@/lib/engine/admin";
 import { PLANS, PLAN_ORDER } from "@/lib/shared/plans";
+import { ROLE_TH, roleFrom } from "@/lib/shared/roles";
 import { daysAgoLabel, thaiDate, thaiDateTime } from "@/lib/shared/format";
 import { Metric, PageHead, Panel, num } from "@/components/console/ui";
 import { ActionForm } from "@/components/console/action-form";
@@ -155,7 +156,7 @@ export default async function AdminPage() {
                   <tr key={`${u.email}-${u.tenantId}`}>
                     <td className="c-mono text-[0.82rem]">{u.email}</td>
                     <td className="c-thai">{shops.find((s) => s.id === u.tenantId)?.name ?? u.tenantId}</td>
-                    <td className="c-thai">{u.role === "owner" ? "เจ้าของ" : u.role}</td>
+                    <td className="c-thai">{ROLE_TH[roleFrom(u.role)].name}</td>
                     <td className="c-thai text-[0.8rem]">{u.lastSignInAt ? thaiDateTime(u.lastSignInAt) : "ยังไม่เคย"}</td>
                   </tr>
                 ))}
