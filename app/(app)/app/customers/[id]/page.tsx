@@ -11,7 +11,15 @@ import { CONTACT_KIND_LABEL, CONTACT_KIND_ORDER } from "@/lib/shared/contact-kin
 import { FIELD_LABEL } from "@/lib/shared/ingest-types";
 import { notConnectedTh } from "@/lib/shared/plays";
 import { daysAgoLabel, thaiDate } from "@/lib/shared/format";
-import { Metric, Panel, baht, num } from "@/components/console/ui";
+import { Panel, baht, num } from "@/components/console/ui";
+import { RecordHeader, RecordTabs, pickTab } from "@/components/console/record";
+import { NoteCapture } from "@/components/console/note-capture";
+import { viewer } from "@/app/(app)/viewer";
+import { personB2B } from "@/lib/engine/accounts/person";
+import { isB2BTenant } from "@/lib/shared/tenants";
+import { INTERACTION_TH, type InteractionKind } from "@/lib/shared/accounts";
+import { ELIGIBILITY_TH, PREFERENCE_TH, type Eligibility } from "@/lib/shared/vault";
+import { TARGET_STATUS_TH, type TargetStatus } from "@/lib/shared/policy";
 import { ActionForm } from "@/components/console/action-form";
 import {
   addContactAction,
@@ -147,6 +155,10 @@ export default async function CustomerPage({
   const [c, dupes, requests] = await Promise.all([getCustomer(tenantId, cid), findDuplicates(tenantId, cid), requestsFor(tenantId, cid)]);
   if (!c) notFound();
   const v = profileFor(tenantId).vocab.th;
+  /* บัญชี B2B ได้หน้าระเบียนแบบผู้ติดต่อ (สังกัด · แคมเปญ · กิจกรรม) — บัญชีค้าปลีกเดิมได้ตัวเลขการซื้อตามเดิม */
+  const me = await viewer();
+  const b2b = isB2BTenant(tenantId) ? await personB2B(tenantId, cid, { id: me.actor, clearance: me.clearance }) : null;
+  const currentJob = b2b?.jobs.find((j) => j.current) ?? null;
 
   const s = c.stats;
   const cycle = s.cycleDays ?? s.modelCycleDays;
@@ -166,12 +178,14 @@ export default async function CustomerPage({
   const p = c.profile;
   const shown = c.timeline.slice(0, 80);
 
+  const TABS = ["overview", "details", "consent", "manage"] as const;
+  const tab = pickTab(TABS, typeof sp.tab === "string" ? sp.tab : undefined);
+  const base = `/app/customers/${encodeURIComponent(c.id)}`;
+  const kinds = [...new Set(c.contacts.map((x) => x.kind))];
+  const openRequests = requests.filter((r) => r.status === "open").length;
+
   return (
     <>
-      <Link href="/app/customers" className="c-thai text-[0.85rem] text-[var(--c-text-3)] hover:text-[var(--c-text)]">
-        ← {v.people}ทั้งหมด
-      </Link>
-
       {sp.created === "1" && (
         <p role="status" className="c-msg c-msg-ok mt-4">
           เพิ่ม{v.person}แล้ว — ไฟล์ที่นำเข้าทีหลังซึ่งมีเบอร์ อีเมล หรือรหัสเดียวกัน จะเติมประวัติให้คนนี้
@@ -184,47 +198,166 @@ export default async function CustomerPage({
         </p>
       )}
 
-      <header className="mt-4 mb-6">
-        <h1 className="c-h1 text-[var(--c-text)]">{c.name}</h1>
-        <p className="c-thai mt-2 text-[0.84rem] text-[var(--c-text-3)]">
-          เพิ่มเมื่อ {thaiDate(c.createdAt)}
-          {c.membership && (
-            <>
-              {" · "}สมาชิกตั้งแต่ {thaiDate(c.membership.startedAt)}
-              {c.membership.expiresAt && ` · หมดอายุ ${thaiDate(c.membership.expiresAt)}`}
-            </>
-          )}
-          {p?.nickname && ` · ชื่อเล่น ${p.nickname}`}
-        </p>
-      </header>
 
-      <Panel flat className="mb-6 grid grid-cols-2 gap-x-6 gap-y-6 p-5 md:grid-cols-4 md:p-6">
-        <Metric label={`${v.spend}รวม`} value={s.orders ? baht(s.spent) : "—"} />
-        <Metric
-          label={`${v.purchase}ทั้งหมด`}
-          value={s.orders ? `${num(s.orders)} ครั้ง` : "—"}
-          sub={s.orders ? `เฉลี่ยครั้งละ ${baht(s.avgOrder)}` : undefined}
-        />
-        <Metric
-          label={`${v.purchase}ล่าสุด`}
-          value={s.lastAt ? daysAgoLabel(s.lastAt) : "—"}
-          sub={s.lastAt ? thaiDate(s.lastAt) : undefined}
-        />
-        <Metric
-          label="รอบปกติของคนนี้"
-          value={status.text}
-          tone={status.tone}
-          size="sm"
-          sub={
-            cycle
-              ? `${v.purchaseVerb}ทุกราว ${num(cycle)} วัน${s.cycleDays == null ? " (ประมาณจากคนที่ซื้อแบบเดียวกัน)" : ""}`
-              : undefined
-          }
-        />
-      </Panel>
+      <RecordHeader
+        back={{ href: "/app/customers", label: `${v.people}ทั้งหมด` }}
+        kind={b2b ? "ผู้ติดต่อ" : v.person}
+        title={c.name}
+        badges={<>
+          {b2b?.stop && <span className="c-pill c-pill-bad">{PREFERENCE_TH[b2b.stop]}แล้ว</span>}
+          {!b2b && <span className={`c-pill ${c.consent.granted ? "c-pill-good" : ""}`}>{c.consent.granted ? "ยินยอมรับข่าวสาร" : "ยังไม่ยินยอมรับข่าวสาร"}</span>}
+          {openRequests > 0 && <span className="c-pill c-pill-warn">คำขอสิทธิเปิดอยู่ {openRequests}</span>}
+          {p?.nickname && <span className="c-pill">ชื่อเล่น {p.nickname}</span>}
+        </>}
+        highlights={b2b ? [
+          { label: "ตำแหน่ง", value: currentJob?.title ?? "ไม่ทราบ" },
+          { label: "บริษัท", value: currentJob ? (currentJob.visible ? <Link href={`/app/accounts/${currentJob.orgId}`} className="text-[var(--c-accent)] hover:underline">{currentJob.org}</Link> : currentJob.org) : "ไม่ทราบ" },
+          { label: "ช่องทาง", value: kinds.length ? kinds.map((k) => CONTACT_KIND_LABEL[k]).join(" · ") : "ไม่มี" },
+          { label: "ติดต่อล่าสุด", value: b2b.interactions[0] ? thaiDate(b2b.interactions[0].at) : "ยังไม่เคย" },
+          { label: "แคมเปญ", value: num(b2b.campaigns.length) },
+          { label: "เพิ่มเมื่อ", value: thaiDate(c.createdAt) },
+        ] : [
+          { label: `${v.spend}รวม`, value: s.orders ? baht(s.spent) : "—" },
+          { label: `${v.purchase}ทั้งหมด`, value: s.orders ? `${num(s.orders)} ครั้ง` : "—" },
+          { label: `${v.purchase}ล่าสุด`, value: s.lastAt ? daysAgoLabel(s.lastAt) : "—" },
+          { label: "รอบปกติ", value: status.text },
+          { label: "ช่องทาง", value: kinds.length ? kinds.map((k) => CONTACT_KIND_LABEL[k]).join(" · ") : "ไม่มี" },
+          { label: "เพิ่มเมื่อ", value: thaiDate(c.createdAt) },
+        ]}
+      />
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
-        <div className="flex min-w-0 flex-col gap-6">
+      <div className={`grid gap-5 ${b2b ? "xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]" : ""}`}>
+        <div className="min-w-0">
+          <RecordTabs base={base} active={tab} tabs={[
+            { key: "overview", label: "ภาพรวม" },
+            { key: "details", label: "รายละเอียด" },
+            { key: "consent", label: "ความยินยอม" },
+            { key: "manage", label: "จัดการ" },
+          ]} />
+          <div className="grid min-w-0 content-start gap-5">
+            {tab === "overview" && <>
+              {b2b ? <>
+          <Panel className="p-5 md:p-6">
+            <h2 className="c-h2 text-[var(--c-text)]">สังกัดตามเวลา</h2>
+            {b2b!.jobs.length ? (
+              <ul className="mt-3 divide-y divide-[var(--c-line)]">
+                {b2b!.jobs.map((j, i) => (
+                  <li key={`${j.orgId}-${i}`} className="flex flex-wrap items-baseline justify-between gap-2 py-2.5">
+                    <span className="c-thai min-w-0 text-[0.92rem]">
+                      {j.visible ? <Link href={`/app/accounts/${j.orgId}`} className="text-[var(--c-accent)] hover:underline">{j.org}</Link> : <span className="text-[var(--c-text-3)]">{j.org}</span>}
+                      <span className="text-[var(--c-text-3)]"> · {j.title ?? "ไม่ทราบตำแหน่ง"}</span>
+                      {!j.current && <span className="c-pill ml-2">ออกแล้ว</span>}
+                    </span>
+                    <span className="c-thai text-[0.8rem] text-[var(--c-text-3)]">{j.from ? thaiDate(j.from) : "ไม่ทราบวันเริ่ม"} – {j.to ? thaiDate(j.to) : "ปัจจุบัน"}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="c-thai mt-3 text-[0.88rem] text-[var(--c-text-3)]">ไม่ทราบ — ยังไม่มีสังกัดในฐาน</p>}
+          </Panel>
+          <Panel className="p-5 md:p-6">
+            <h2 className="c-h2 text-[var(--c-text)]">แคมเปญ</h2>
+            {b2b!.campaigns.length ? (
+              <ul className="mt-3 divide-y divide-[var(--c-line)]">
+                {b2b!.campaigns.map((x) => (
+                  <li key={x.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
+                    <Link href={`/app/sales/${x.id}`} className="c-thai text-[0.92rem] text-[var(--c-accent)] hover:underline">{x.name}</Link>
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      <span className={`c-pill ${x.eligibility === "eligible" ? "c-pill-good" : x.eligibility === "suppressed" ? "c-pill-bad" : "c-pill-warn"}`}>{ELIGIBILITY_TH[x.eligibility as Eligibility] ?? x.eligibility}</span>
+                      <span className="c-pill">{TARGET_STATUS_TH[x.status as TargetStatus] ?? x.status}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="c-thai mt-3 text-[0.88rem] text-[var(--c-text-3)]">ยังไม่อยู่ในแคมเปญใด</p>}
+          </Panel>
+              </> : <>
+          <Panel className="p-5 md:p-6">
+            <h2 className="c-h2 text-[var(--c-text)]">ประวัติ</h2>
+            <p className="c-thai mt-1 text-[0.78rem] text-[var(--c-text-4)]">
+              {v.purchase} ข้อความ แคมเปญ และความยินยอม เรียงจากล่าสุด
+            </p>
+            <ol className="mt-3">
+              {shown.map((item, i) => (
+                <TimelineRow key={`${item.kind}-${item.at}-${i}`} item={item} verb={v.purchaseVerb} />
+              ))}
+            </ol>
+            {c.timeline.length > shown.length && (
+              <p className="c-thai mt-3 text-[0.8rem] text-[var(--c-text-4)]">
+                แสดง {num(shown.length)} รายการล่าสุด จากทั้งหมด {num(c.timeline.length)}
+              </p>
+            )}
+          </Panel>
+
+              </>}
+          <Panel className="p-5 md:p-6">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 className="c-h2 text-[var(--c-text)]">คำขอสิทธิ</h2>
+              <Link href={`/app/requests?subject=${encodeURIComponent(c.id)}`} className="c-thai text-[0.84rem] text-[var(--c-cyan)] underline underline-offset-4">
+                บันทึกคำขอของคนนี้
+              </Link>
+            </div>
+            <p className="c-thai mt-1 text-[0.8rem] text-[var(--c-text-3)]">
+              คนนี้ขอดูข้อมูล ขอลบ ถอน หรือคัดค้าน — บันทึกเป็นคำขอเพื่อเริ่มนับ 30 วัน และให้ระบบทำตามคำขอเมื่อปิดเรื่อง
+            </p>
+            {requests.length > 0 && (
+              <ul className="mt-3 flex flex-col divide-y divide-[var(--c-line)]">
+                {requests.map((r) => (
+                  <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
+                    <Link href={`/app/requests/${r.id}`} className="c-thai text-[0.86rem] text-[var(--c-text)] underline-offset-4 hover:underline">
+                      <span className="c-mono">{r.ref}</span> · {DSAR_KIND_TH[r.kind]}
+                    </Link>
+                    <DueBadge r={r} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Panel>
+
+            </>}
+            {tab === "details" && <>
+          <Panel className="p-5">
+            <h2 className="c-h2 text-[var(--c-text)]">ข้อมูลส่วนตัว</h2>
+            <ActionForm
+              action={updateCustomerAction}
+              fields={{ tenantId, customerId: c.id }}
+              label="บันทึก"
+              pendingLabel="กำลังบันทึก…"
+              variant="primary"
+              size="sm"
+              className="mt-4 flex flex-col gap-3"
+            >
+              <label className="c-thai flex flex-col gap-1 text-[0.8rem] text-[var(--c-text-3)]">
+                ชื่อที่แสดง
+                <input name="name" defaultValue={c.name} required className="c-input" />
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                {PROFILE_INPUTS.map((f) => (
+                  <label key={f.name} className="c-thai flex min-w-0 flex-col gap-1 text-[0.8rem] text-[var(--c-text-3)]">
+                    {f.label}
+                    <input
+                      name={f.name}
+                      type={f.type ?? "text"}
+                      defaultValue={(p?.[f.name as keyof typeof p] as string | null) ?? ""}
+                      className="c-input min-w-0"
+                    />
+                  </label>
+                ))}
+                <label className="c-thai flex min-w-0 flex-col gap-1 text-[0.8rem] text-[var(--c-text-3)]">
+                  {FIELD_LABEL.gender}
+                  <select name="gender" defaultValue={p?.gender ?? ""} className="c-select">
+                    <option value="">ไม่ระบุ</option>
+                    <option value="female">หญิง</option>
+                    <option value="male">ชาย</option>
+                    <option value="other">อื่น ๆ</option>
+                  </select>
+                </label>
+              </div>
+              <label className="c-thai flex flex-col gap-1 text-[0.8rem] text-[var(--c-text-3)]">
+                {FIELD_LABEL.note}
+                <textarea name="note" rows={3} defaultValue={p?.note ?? ""} className="c-input" />
+              </label>
+            </ActionForm>
+          </Panel>
           <Panel className="p-5">
             <h2 className="c-h2 text-[var(--c-text)]">ช่องทางติดต่อ</h2>
             <p className="c-thai mt-1 text-[0.78rem] text-[var(--c-text-4)]">
@@ -303,6 +436,27 @@ export default async function CustomerPage({
             </details>
           </Panel>
 
+            </>}
+            {tab === "consent" && <>
+          {b2b && (
+            <Panel className="p-5 md:p-6">
+              <h2 className="c-h2 text-[var(--c-text)]">ความยินยอม · ถอน · คัดค้าน</h2>
+              <p className="c-thai mt-1 text-[0.8rem] text-[var(--c-text-3)]">บันทึกแบบเพิ่มอย่างเดียว พร้อมหลักฐาน — การตัดสินว่าติดต่อได้ไหมต่อแคมเปญอยู่ที่บริการนโยบาย</p>
+              {b2b.preferences.length ? (
+                <ul className="mt-3 divide-y divide-[var(--c-line)]">
+                  {b2b.preferences.map((x, i) => (
+                    <li key={i} className="py-2.5">
+                      <p className="c-thai text-[0.9rem] text-[var(--c-text)]">
+                        <span className={`c-pill mr-2 ${x.kind === "consent" ? "c-pill-good" : "c-pill-bad"}`}>{PREFERENCE_TH[x.kind]}</span>
+                        {x.purpose ?? "ทุกวัตถุประสงค์"} · {x.channel === "any" ? "ทุกช่องทาง" : x.channel}
+                      </p>
+                      <p className="c-thai mt-0.5 text-[0.78rem] text-[var(--c-text-3)]">{thaiDate(x.at)} · บันทึกโดย {x.by}{x.note ? ` · ${x.note}` : ""}</p>
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className="c-thai mt-3 text-[0.88rem] text-[var(--c-text-3)]">ยังไม่มีบันทึก</p>}
+            </Panel>
+          )}
           <Panel className="p-5">
             <h2 className="c-h2 text-[var(--c-text)]">การรับข่าวสาร</h2>
             <p
@@ -339,69 +493,8 @@ export default async function CustomerPage({
             </div>
           </Panel>
 
-          <Panel className="p-5">
-            <h2 className="c-h2 text-[var(--c-text)]">ข้อมูลส่วนตัว</h2>
-            <ActionForm
-              action={updateCustomerAction}
-              fields={{ tenantId, customerId: c.id }}
-              label="บันทึก"
-              pendingLabel="กำลังบันทึก…"
-              variant="primary"
-              size="sm"
-              className="mt-4 flex flex-col gap-3"
-            >
-              <label className="c-thai flex flex-col gap-1 text-[0.8rem] text-[var(--c-text-3)]">
-                ชื่อที่แสดง
-                <input name="name" defaultValue={c.name} required className="c-input" />
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                {PROFILE_INPUTS.map((f) => (
-                  <label key={f.name} className="c-thai flex min-w-0 flex-col gap-1 text-[0.8rem] text-[var(--c-text-3)]">
-                    {f.label}
-                    <input
-                      name={f.name}
-                      type={f.type ?? "text"}
-                      defaultValue={(p?.[f.name as keyof typeof p] as string | null) ?? ""}
-                      className="c-input min-w-0"
-                    />
-                  </label>
-                ))}
-                <label className="c-thai flex min-w-0 flex-col gap-1 text-[0.8rem] text-[var(--c-text-3)]">
-                  {FIELD_LABEL.gender}
-                  <select name="gender" defaultValue={p?.gender ?? ""} className="c-select">
-                    <option value="">ไม่ระบุ</option>
-                    <option value="female">หญิง</option>
-                    <option value="male">ชาย</option>
-                    <option value="other">อื่น ๆ</option>
-                  </select>
-                </label>
-              </div>
-              <label className="c-thai flex flex-col gap-1 text-[0.8rem] text-[var(--c-text-3)]">
-                {FIELD_LABEL.note}
-                <textarea name="note" rows={3} defaultValue={p?.note ?? ""} className="c-input" />
-              </label>
-            </ActionForm>
-          </Panel>
-        </div>
-
-        <div className="flex min-w-0 flex-col gap-6">
-          <Panel className="p-5 md:p-6">
-            <h2 className="c-h2 text-[var(--c-text)]">ประวัติ</h2>
-            <p className="c-thai mt-1 text-[0.78rem] text-[var(--c-text-4)]">
-              {v.purchase} ข้อความ แคมเปญ และความยินยอม เรียงจากล่าสุด
-            </p>
-            <ol className="mt-3">
-              {shown.map((item, i) => (
-                <TimelineRow key={`${item.kind}-${item.at}-${i}`} item={item} verb={v.purchaseVerb} />
-              ))}
-            </ol>
-            {c.timeline.length > shown.length && (
-              <p className="c-thai mt-3 text-[0.8rem] text-[var(--c-text-4)]">
-                แสดง {num(shown.length)} รายการล่าสุด จากทั้งหมด {num(c.timeline.length)}
-              </p>
-            )}
-          </Panel>
-
+            </>}
+            {tab === "manage" && <>
           {dupes.length > 0 && (
             <Panel className="p-5 md:p-6">
               <h2 className="c-h2 text-[var(--c-text)]">อาจเป็นคนเดียวกัน</h2>
@@ -432,30 +525,6 @@ export default async function CustomerPage({
             </Panel>
           )}
 
-          <Panel className="p-5 md:p-6">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h2 className="c-h2 text-[var(--c-text)]">คำขอสิทธิ</h2>
-              <Link href={`/app/requests?subject=${encodeURIComponent(c.id)}`} className="c-thai text-[0.84rem] text-[var(--c-cyan)] underline underline-offset-4">
-                บันทึกคำขอของคนนี้
-              </Link>
-            </div>
-            <p className="c-thai mt-1 text-[0.8rem] text-[var(--c-text-3)]">
-              คนนี้ขอดูข้อมูล ขอลบ ถอน หรือคัดค้าน — บันทึกเป็นคำขอเพื่อเริ่มนับ 30 วัน และให้ระบบทำตามคำขอเมื่อปิดเรื่อง
-            </p>
-            {requests.length > 0 && (
-              <ul className="mt-3 flex flex-col divide-y divide-[var(--c-line)]">
-                {requests.map((r) => (
-                  <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
-                    <Link href={`/app/requests/${r.id}`} className="c-thai text-[0.86rem] text-[var(--c-text)] underline-offset-4 hover:underline">
-                      <span className="c-mono">{r.ref}</span> · {DSAR_KIND_TH[r.kind]}
-                    </Link>
-                    <DueBadge r={r} />
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Panel>
-
           <Panel flat className="border-[var(--c-bad)]/40 p-5">
             <h2 className="c-h2 text-[var(--c-text)]">ลบ{v.person}คนนี้</h2>
             <p className="c-thai mt-1.5 text-[0.82rem] text-[var(--c-text-3)]">
@@ -485,7 +554,38 @@ export default async function CustomerPage({
               </label>
             </ActionForm>
           </Panel>
+            </>}
+          </div>
         </div>
+        {b2b && (
+          <aside className="grid min-w-0 content-start gap-5">
+          <Panel className="p-4 md:p-5">
+            <h2 className="c-h2 text-[var(--c-text)]">กิจกรรม</h2>
+            {currentJob?.visible && (
+              <div className="mt-3">
+                <NoteCapture orgId={currentJob.orgId} people={[{ personId: c.id, name: c.name }]} />
+              </div>
+            )}
+            {b2b!.interactions.length ? (
+              <ol className="mt-4 grid gap-0">
+                {b2b!.interactions.slice(0, 30).map((i) => (
+                  <li key={i.id} className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-3 border-t border-[var(--c-line)] py-3 first:border-t-0">
+                    <span className="c-thai text-[0.78rem] text-[var(--c-text-3)]">{thaiDate(i.at)}</span>
+                    <div className="c-thai min-w-0 text-[0.88rem] text-[var(--c-text-2)]">
+                      <p className="text-[var(--c-text)]">{INTERACTION_TH[i.kind as InteractionKind] ?? i.kind}{i.org ? ` · ${i.org}` : ""}</p>
+                      {i.masked ? <p className="text-[var(--c-text-4)]">บันทึกระดับสูง — เห็นเฉพาะผู้บันทึก</p> : <>
+                        {i.summary && <p className="mt-0.5 whitespace-pre-line break-words">{i.summary}</p>}
+                        {i.outcome && <p className="text-[var(--c-text-3)]">ผล: {i.outcome}</p>}
+                      </>}
+                      {i.owner && <p className="mt-0.5 text-[0.76rem] text-[var(--c-text-4)]">บันทึกโดย {i.owner}</p>}
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            ) : <p className="c-thai mt-4 text-[0.88rem] text-[var(--c-text-3)]">ยังไม่มีกิจกรรม</p>}
+          </Panel>
+          </aside>
+        )}
       </div>
     </>
   );
