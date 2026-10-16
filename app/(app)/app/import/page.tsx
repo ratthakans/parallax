@@ -1,4 +1,4 @@
-import { activeTenantId } from "@/app/(app)/tenant";
+import { activeTenantId, retailOnly } from "@/app/(app)/tenant";
 import { aiConfigured } from "@/lib/engine/ai";
 import { usageFor } from "@/lib/engine/billing";
 
@@ -23,7 +23,7 @@ export default async function ImportPage() {
      เพดานจำนวนคนก็เช่นกัน — contactCapBlockedReason ปฏิเสธการนำเข้าที่
      ทำให้เกินเพดานอยู่แล้ว แต่ปฏิเสธ *หลัง* อัปโหลดและแม็ปคอลัมน์เสร็จ
      บอกที่ว่างที่เหลือก่อนลากไฟล์เข้ามา ถูกกว่าบอกตอนงานเสียไปแล้ว */
-  const tenantId = await activeTenantId();
+  const tenantId = await retailOnly();
   const profile = profileFor(tenantId);
   const v = profile.vocab;
   const u = await usageFor(tenantId);

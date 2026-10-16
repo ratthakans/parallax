@@ -22,7 +22,7 @@ export default async function WeeklyPage() {
   return (
     <>
       <Link href="/app/sales" className="c-thai inline-block py-2 text-[0.85rem] text-[var(--c-text-3)] hover:text-[var(--c-text)]">← แคมเปญขาย</Link>
-      <PageHead label="Campaign Workspace" title="ทบทวนรายสัปดาห์" lead={`ตั้งแต่ ${thaiDate(r.since)} — นับจากงานที่มอบหมายและผลที่บันทึก ไม่นับการเข้าระบบ และไม่นับทีม PARALLAX`} />
+      <PageHead label="แคมเปญ" title="รายงานประจำสัปดาห์" lead={`ตั้งแต่ ${thaiDate(r.since)} — นับจากงานที่มอบหมายและผลที่บันทึก ไม่นับการเข้าระบบ และไม่นับทีม PARALLAX`} />
 
       <Panel className="mb-6 p-5 md:p-6">
         <h2 className="c-h2 text-[var(--c-text)]">แคมเปญที่ยังเปิด</h2>

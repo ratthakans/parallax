@@ -1,4 +1,4 @@
-import { activeTenantId } from "@/app/(app)/tenant";
+import { activeTenantId, retailOnly } from "@/app/(app)/tenant";
 import { all, get } from "@/lib/engine/sql";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -34,7 +34,7 @@ export default async function CampaignDetail({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const tenantId = await activeTenantId();
+  const tenantId = await retailOnly();
   const v = profileFor(tenantId).vocab;
 
   const camp = await get<{

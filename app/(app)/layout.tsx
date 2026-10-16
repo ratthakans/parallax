@@ -2,16 +2,16 @@ import { activeTenantId } from "@/app/(app)/tenant";
 import type { Metadata } from "next";
 import Link from "next/link";
 import "./console.css";
-import { ConsoleNav } from "@/components/console/nav";
+import { cookies } from "next/headers";
+import { AppBar } from "@/components/console/appbar";
+import { setThemeAction } from "./ui-actions";
 import { demoToolsEnabled } from "@/lib/shared/demo-tools";
 import { ensureReady } from "@/lib/engine/bootstrap";
 import { getTenant } from "@/lib/engine/match";
 
-import { planById } from "@/lib/shared/plans";
 import { CONSOLE_PROFILES, isSignupTenantId, profileFor } from "@/lib/shared/tenants";
 import { consoleGate, signupInfo } from "@/lib/engine/signup/gate";
 import { membershipEnforced } from "@/lib/engine/access";
-import { featuresComputedAt } from "@/lib/engine/derive";
 import { hasSyntheticData } from "@/lib/engine/synthetic";
 import { switchTenantAction } from "./actions";
 import { signOutAction } from "@/app/login/actions";
@@ -31,7 +31,7 @@ export default async function ConsoleLayout({
   const tenantId = await activeTenantId();
   const tenant = await getTenant(tenantId);
   const profile = profileFor(tenantId);
-  const computedAt = await featuresComputedAt(tenantId);
+  const theme = (await cookies()).get("parallax_theme")?.value === "dark" ? "dark" : "light";
   /* แถบเดโมขึ้นตามข้อมูลจริงของบัญชี ไม่ใช่ตามสวิตช์เครื่องมือเดโม (ดู lib/engine/synthetic.ts) */
   const synthetic = await hasSyntheticData(tenantId);
   const allowed = await myTenants();
@@ -46,18 +46,15 @@ export default async function ConsoleLayout({
   const currentName = tenant?.name ?? profile.name;
 
   return (
-    <div className="console">
+    <div className="console" data-theme={theme}>
       <a href="#console-main" className="c-skip c-btn c-btn-primary">
         ข้ามไปยังเนื้อหา
       </a>
       <div className="c-shell">
-        <ConsoleNav
+        <AppBar
           tenantId={tenantId}
           tenantName={currentName}
           industry={profile.industry}
-          credits={tenant?.message_credits ?? 0}
-          planName={planById(tenant?.tier ?? "growth").name}
-          computedAt={computedAt}
           tenants={[
             ...CONSOLE_PROFILES.filter((t) => allowed.includes(t.id)),
             ...allowed.filter(isSignupTenantId).map(profileFor),
@@ -67,10 +64,10 @@ export default async function ConsoleLayout({
             industry: t.industry,
           }))}
           switchAction={switchTenantAction}
-          baseLabel={profile.vocab.th.base}
-          personLabel={profile.vocab.th.person}
           userEmail={user?.email}
           signOutAction={signOutAction}
+          theme={theme}
+          setThemeAction={setThemeAction}
         />
         <main id="console-main" tabIndex={-1} className="c-main">
           {/* ── ปฐมนิเทศคนที่เพิ่งกดเข้ามาจากหน้าเว็บ ────────────

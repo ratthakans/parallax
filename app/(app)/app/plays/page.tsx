@@ -1,4 +1,4 @@
-import { activeTenantId } from "@/app/(app)/tenant";
+import { activeTenantId, retailOnly } from "@/app/(app)/tenant";
 import { all } from "@/lib/engine/sql";
 import { effectiveGuards, getTenantPlays, runMatch } from "@/lib/engine/match";
 
@@ -20,7 +20,7 @@ import { ActionForm } from "@/components/console/action-form";
 export const dynamic = "force-dynamic";
 
 export default async function PlaysPage() {
-  const tenantId = await activeTenantId();
+  const tenantId = await retailOnly();
   const v = profileFor(tenantId).vocab;
   const [{ candidates }, cfgs, perfRows] = await Promise.all([
     runMatch(tenantId),

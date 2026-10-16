@@ -26,7 +26,7 @@ export default async function OverviewPage() {
   return (
     <>
       <PageHead
-        label="Data Vault"
+        label="ข้อมูล"
         title={`ภาพรวม${v.base}`}
         lead="ตัวเลขทุกตัวในหน้านี้นับจากข้อมูลที่อยู่ในระบบจริง ไม่มีประมาณการหรือคะแนนที่ระบบคิดขึ้น"
         actions={

@@ -7,6 +7,7 @@ import { currentUser } from "@/lib/shared/session";
 import { membershipEnforced, resolveTenant, switchableTenants, tenantsForUser } from "@/lib/engine/access";
 import { redirect } from "next/navigation";
 import { enterIdentity } from "@/lib/engine/sql";
+import { isB2BTenant } from "@/lib/shared/tenants";
 
 /* ── บัญชีที่เปิดอยู่ ประกอบจากสามอย่าง ──────────────────────────
 
@@ -55,3 +56,11 @@ export const myTenants = cache(async (): Promise<string[]> => {
   const user = await currentUser();
   return switchableTenants(user?.userId ?? null);
 });
+
+/* ── หน้ายุคค้าปลีก (บรีฟเช้า · คลัง play · ผลที่วัดได้ · ผู้บริหาร · แคมเปญค้าปลีก · ค่าใช้จ่าย · นำเข้า CSV เดิม) ──
+   บัญชี B2B ไม่มีข้อมูลแบบนั้น หน้าจึงขึ้นตัวเลขศูนย์จนดูเหมือนระบบพัง (docs/ux-plan.md P3/P9) — พากลับหน้าแรกแทน */
+export async function retailOnly(): Promise<string> {
+  const tenantId = await activeTenantId();
+  if (isB2BTenant(tenantId)) redirect("/app/today");
+  return tenantId;
+}

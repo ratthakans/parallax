@@ -1,4 +1,4 @@
-import { activeTenantId } from "@/app/(app)/tenant";
+import { activeTenantId, retailOnly } from "@/app/(app)/tenant";
 import Link from "next/link";
 import { demoToolsEnabled } from "@/lib/shared/demo-tools";
 import { hasSyntheticData } from "@/lib/engine/synthetic";
@@ -52,7 +52,7 @@ function Bar({ pct }: { pct: number }) {
 }
 
 export default async function BillingPage() {
-  const tenantId = await activeTenantId();
+  const tenantId = await retailOnly();
   const profile = profileFor(tenantId);
   const v = profile.vocab;
   const [u, costs, roi] = await Promise.all([

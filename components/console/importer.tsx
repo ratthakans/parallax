@@ -382,8 +382,8 @@ export function Importer() {
         }}
         className={`flex flex-col items-center justify-center border-2 border-dashed px-6 py-16 text-center transition-colors ${
           dragging
-            ? "border-[var(--c-cyan)] bg-[rgba(53,200,255,0.07)]"
-            : "border-[var(--c-line-2)] bg-[rgba(8,16,31,0.5)]"
+            ? "border-[var(--c-cyan)] bg-[var(--c-hover)]"
+            : "border-[var(--c-line-2)] bg-[var(--c-panel-2)]"
         }`}
       >
         <p className="c-label-th">ขั้นที่ 1 จาก 3</p>

@@ -430,6 +430,10 @@ export const DEFAULT_TENANT_ID = MST_GOLF.id;
 export const SIGNUP_TENANT_RE = /^s-[0-9a-f]{12}$/;
 export const isSignupTenantId = (tenantId: string): boolean => SIGNUP_TENANT_RE.test(tenantId);
 
+/** บัญชี B2B (เดโม B2B หรือสมัครเอง) — หน้ายุคค้าปลีกไม่เปิดให้บัญชีเหล่านี้ (docs/ux-plan.md D2) */
+export const isB2BTenant = (tenantId: string): boolean =>
+  isSignupTenantId(tenantId) || B2B_DEMO_PROFILES.some((p) => p.id === tenantId);
+
 const SIGNUP_PROFILE: TenantProfile = {
   ...SUNLINE_DEMO,
   id: "signup",

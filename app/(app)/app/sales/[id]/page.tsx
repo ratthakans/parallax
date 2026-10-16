@@ -124,7 +124,7 @@ export default async function CampaignPage({ params, searchParams }: { params: P
     <>
       <Link href="/app/sales" className="c-thai inline-block py-2 text-[0.85rem] text-[var(--c-text-3)] hover:text-[var(--c-text)]">← แคมเปญขาย</Link>
       <header className="mt-4 mb-6">
-        <p className="c-label-th">Campaign Workspace</p>
+        <p className="c-label-th">แคมเปญ</p>
         <h1 className="c-h1 mt-3 break-words text-[var(--c-text)]">{c.name}</h1>
         <p className="c-thai mt-2 text-[0.86rem] text-[var(--c-text-3)]">
           {c.offer ? `${c.offer} · ` : ""}วัตถุประสงค์: {c.purpose}

@@ -34,7 +34,7 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
   return (
     <>
       <PageHead
-        label="Data Vault"
+        label="ข้อมูล"
         title="คำขอสิทธิ"
         lead={`คำขอของเจ้าของข้อมูล — เข้าถึง โอน แก้ไข คัดค้าน ถอน ลบ หรือจำกัดการใช้ · ต้องตอบภายใน ${DSAR_DUE_DAYS} วันนับจากวันที่ได้รับ · ปิดคำขอลบหรือถอน = ระบบทำการนั้นจริง ไม่ใช่แค่เปลี่ยนสถานะ`}
       />

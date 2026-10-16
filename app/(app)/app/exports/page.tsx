@@ -38,7 +38,7 @@ export default async function ExportsPage({ searchParams }: { searchParams: Prom
     <>
       <Link href="/app/customers" className="c-thai inline-block py-2 text-[0.85rem] text-[var(--c-text-3)] hover:text-[var(--c-text)]">← รายชื่อ</Link>
       <PageHead
-        label="Data Vault"
+        label="ข้อมูล"
         title="ส่งออกรายชื่อ"
         lead="ไฟล์ส่งออกมีเบอร์และอีเมลแบบอ่านได้ ออกไปแล้วตามคืนไม่ได้ — จึงต้องขอพร้อมเหตุผลและได้รับอนุมัติก่อน · ผู้อนุมัติอีกคน (เจ้าของหรือผู้ดูแลข้อมูลส่วนบุคคล) อนุมัติ = ดาวน์โหลดได้ทันที · บัญชีที่มีผู้อนุมัติคนเดียวอนุมัติตัวเองได้ แต่ต้องรอ 1 ชั่วโมง · ผู้ขอดาวน์โหลดได้ครั้งเดียวภายใน 24 ชั่วโมง"
       />

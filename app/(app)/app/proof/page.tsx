@@ -1,4 +1,4 @@
-import { activeTenantId } from "@/app/(app)/tenant";
+import { activeTenantId, retailOnly } from "@/app/(app)/tenant";
 import { all } from "@/lib/engine/sql";
 import Link from "next/link";
 import { playById } from "@/lib/shared/plays";
@@ -26,7 +26,7 @@ import { proofBlockedReason } from "@/lib/engine/billing";
 export const dynamic = "force-dynamic";
 
 export default async function ProofPage() {
-  const tenantId = await activeTenantId();
+  const tenantId = await retailOnly();
   const synthetic = await hasSyntheticData(tenantId);
   const profile = profileFor(tenantId);
   const v = profile.vocab;
