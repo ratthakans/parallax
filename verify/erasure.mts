@@ -40,6 +40,12 @@ await commit("ชุดแรก.csv", [PIM, SOM]);
 const byEmail = async (email: string) => (await get<{ customer_id: string }>(
   "SELECT customer_id FROM contact_points WHERE tenant_id = ? AND kind = 'email' AND value_hmac = ?", T, matchKey(T, "email", email)))?.customer_id ?? null;
 const pim = (await byEmail("pim.erase@lob.example"))!;
+const createCustomerForErase = async () => {
+  const { createCustomer } = await import("@/lib/engine/customers");
+  const c = await createCustomer(T, { name: "ชั่วคราว ลบทิ้ง", contacts: [{ kind: "email", value: "chua@lobthing.example" }], profile: {}, consent: false }, "verify");
+  if (!c.ok) throw new Error(c.error);
+  return c.id;
+};
 
 // ── ลบ = บันทึกทะเบียน (ไม่มีชื่อหรือค่าติดต่อ) ──
 const del = await deleteCustomer(T, pim, "dpo@verify", { reason: "request", requestRef: "DSAR-2026-001 (สมมุติ)" });
@@ -49,6 +55,27 @@ ok(del.ok && reg.length === 1 && JSON.parse(reg[0].keys).length === 2 && reg[0].
 const raw = JSON.stringify(reg);
 ok(!/พิมพ์|pim\.erase|081-555-9001|0815559001/.test(raw), "ทะเบียนไม่มีชื่อ อีเมล หรือเบอร์แบบอ่านได้");
 ok((await byEmail("pim.erase@lob.example")) === null, "ลบแล้วไม่เหลือช่องทางติดต่อ");
+
+// ── หลักฐานของโน้ตและความสัมพันธ์ตามไปด้วย (0021) ──
+{
+  const keep = (await byEmail("somorn@ronan.example"))!;
+  const t = new Date().toISOString();
+  const mk = async (who: string, tag: string) => {
+    const intId = `int-${tag}`, relId = `rel-${tag}`;
+    await run("INSERT INTO interactions (id, tenant_id, kind, occurred_at, customer_id, summary, recorded_at) VALUES (?,?,?,?,?,?,?)", intId, T, "meeting", t, who, "โน้ต (สมมุติ)", t);
+    await run("INSERT INTO evidence (id, tenant_id, kind, ref, note, captured_by, captured_at) VALUES (?,?,?,?,?,?,?)", `ev-i-${tag}`, T, "note", `interaction:${intId}`, `คุยกับ ${tag} (สมมุติ)`, "verify", t);
+    await run("INSERT INTO relationship_assertions (id, tenant_id, from_kind, from_id, to_kind, to_id, type, evidence_id, lifecycle_state, recorded_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+      relId, T, "member", "verify", "person", who, "knows", `ev-r-${tag}`, "confirmed", t);
+    await run("INSERT INTO evidence (id, tenant_id, kind, ref, note, captured_by, captured_at) VALUES (?,?,?,?,?,?,?)", `ev-r-${tag}`, T, "statement", `relationship:${relId}`, `รู้จัก ${tag} (สมมุติ)`, "verify", t);
+  };
+  const temp = await createCustomerForErase();
+  await mk(temp, "gone");
+  await mk(keep, "stay");
+  await deleteCustomer(T, temp, "dpo@verify", { reason: "request" });
+  const left = await all<{ id: string }>("SELECT id FROM evidence WHERE tenant_id = ? AND id LIKE 'ev-%'", T);
+  ok(!left.some((e) => e.id.endsWith("gone")) && left.filter((e) => e.id.endsWith("stay")).length === 2,
+    "ลบคน = หลักฐานโน้ตและความสัมพันธ์ของเขาหายด้วย · ของคนอื่นยังอยู่");
+}
 
 // ── นำเข้าไฟล์ที่มีคนที่ถูกลบอีกครั้ง ──
 const again = file([`พิมพ์,ลบแล้ว,บริษัท ใหม่ จำกัด,ผู้อำนวยการ,pim.erase@lob.example,,${d}`, `รุ่ง,ใหม่,บริษัท ใหม่ จำกัด,ผู้จัดการ,rung@mai.example,081-555-9003,${d}`]);
