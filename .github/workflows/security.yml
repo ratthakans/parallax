@@ -30,7 +30,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
       # high ขึ้นไปเท่านั้นที่ทำให้ตก — moderate ดูในรายงาน Dependabot แทน ไม่ให้ PR ติดเพราะเรื่องที่แก้ไม่ได้ทันที
