@@ -36,7 +36,7 @@ const TABS = [
   { href: "/app/deals", label: "ดีล" },
   { href: "/app/tasks", label: "งาน" },
   { href: "/app/sales", label: "แคมเปญ" },
-  { href: "/app/sales/weekly", label: "รายงาน" },
+  { href: "/app/reports", label: "รายงาน" },
 ];
 
 /* หน้าตั้งค่าที่อยู่ใต้เส้นทางของแท็บ — ต้องไม่ทำให้แท็บนั้นติดสถานะ */
