@@ -8,7 +8,9 @@ import { all, get, run } from "@/lib/engine/sql";
 import { affiliateManual, orgByName } from "@/lib/engine/accounts/edit";
 import { orgIdFor } from "@/lib/engine/vault/resolve";
 import { orgInfo } from "@/lib/shared/identity";
-import { createDeal } from "@/lib/engine/deals";
+import { createDeal, dealCandidates, dealsOfPerson, getDeal, removeDealPerson, setDealPerson } from "@/lib/engine/deals";
+import { logInteraction } from "@/lib/engine/accounts/edit";
+import { personB2B } from "@/lib/engine/accounts/person";
 import { searchEverything } from "@/lib/engine/search";
 import { teamMembers } from "@/lib/engine/team";
 
@@ -70,5 +72,32 @@ ok((await searchEverything("mst-golf", "แพลทินัม", ME)).deals.le
 const team = await teamMembers(T, "me@verify");
 ok(team[0] === "me@verify" && team.includes(ME.id), "รายชื่อทีม = ตัวเอง + คนที่บัญชีนี้รู้จัก (เจ้าของดีล ฯลฯ)");
 ok(!(await teamMembers("mst-golf", "me@verify")).includes(ME.id), "รายชื่อทีมไม่ข้ามบัญชี");
+
+// ── C1 · คนในดีลพร้อมบทบาท ──
+const deal = r1.ok ? await createDeal(T, { orgId: r1.orgId, name: "บูธ 36 ตร.ม. (สมมุติ)" }, ME) : null;
+const dealId = deal && deal.ok ? deal.id : "";
+const cands = await dealCandidates(T, dealId, ME);
+ok(cands.some((c) => c.id === p1) && cands.some((c) => c.id === p2) && !cands.some((c) => c.id === p4), "ผู้ที่เลือกเข้าดีลได้ = คนในบริษัทของดีลเท่านั้น");
+ok(!(await setDealPerson(T, dealId, p4, "decision_maker", ME)).ok, "เพิ่มคนนอกบริษัทเข้าดีลไม่ได้");
+ok(!(await setDealPerson(T, dealId, p1, "boss", ME)).ok, "บทบาทที่ไม่รู้จัก = ไม่บันทึก");
+ok((await setDealPerson(T, dealId, p1, "decision_maker", ME)).ok && (await setDealPerson(T, dealId, p2, "budget_approver", ME)).ok, "เพิ่มผู้ตัดสินใจและผู้อนุมัติงบได้");
+await setDealPerson(T, dealId, p2, "champion", ME);
+await setDealPerson(T, dealId, p2, "champion", ME);
+const dd = await getDeal(T, dealId, ME);
+ok(dd !== null && dd !== "masked" && dd.people.length === 2 && dd.people.find((p) => p.id === p2)?.role === "champion", "เปลี่ยนบทบาทได้ ไม่ซ้ำคน");
+ok(dd !== null && dd !== "masked" && dd.history.filter((h) => h.field === "person").length === 3, "ทุกการเพิ่ม/เปลี่ยนมีประวัติ · ค่าเดิมซ้ำไม่เพิ่มประวัติ");
+ok((await dealsOfPerson(T, [p1], ME)).some((x) => x.id === dealId && x.role === "decision_maker"), "หน้าผู้ติดต่อเห็นดีลที่ตัวเองอยู่พร้อมบทบาท");
+ok((await removeDealPerson(T, dealId, p2, ME)).ok && !(await removeDealPerson(T, dealId, p2, ME)).ok, "เอาออกได้ · เอาออกซ้ำ = แจ้งว่าไม่ได้อยู่");
+ok(!(await setDealPerson("mst-golf", dealId, p1, "user", ME)).ok, "แก้คนในดีลข้ามบัญชีไม่ได้");
+
+// ── C1 · กิจกรรมเดียวขึ้นทุกที่ ──
+const day = new Date().toISOString().slice(0, 10);
+const li = r1.ok ? await logInteraction(T, r1.orgId, { kind: "meeting", occurredAt: day, personId: p1, opportunityId: dealId, summary: "นำเสนอบูธ (สมมุติ)" }, ME.id) : null;
+ok(Boolean(li?.ok), "บันทึกกิจกรรมผูกคน + บริษัท + ดีลพร้อมกัน");
+const dd2 = await getDeal(T, dealId, ME);
+ok(dd2 !== null && dd2 !== "masked" && dd2.interactions.some((i) => i.summary === "นำเสนอบูธ (สมมุติ)"), "กิจกรรมขึ้นที่หน้าดีล");
+ok((await personB2B(T, p1, ME)).interactions.some((i) => i.summary === "นำเสนอบูธ (สมมุติ)"), "กิจกรรมขึ้นที่หน้าผู้ติดต่อ");
+const otherOrg = r4.ok ? r4.orgId : "";
+ok(!(await logInteraction(T, otherOrg, { kind: "call", occurredAt: day, opportunityId: dealId, summary: "x" }, ME.id)).ok, "ผูกกิจกรรมกับดีลของบริษัทอื่นไม่ได้");
 
 for (const line of out) console.log(line);

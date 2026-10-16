@@ -121,12 +121,13 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
 
   /* sort = วันที่เกิด (ตัดเหลือวัน) แล้วตามเวลาที่บันทึก — การติดต่อเก็บวันที่อย่างเดียว ถ้าเรียงสตริงตรง ๆ
      "2026-10-16" จะน้อยกว่า "2026-10-16T…" แล้วของที่เพิ่งบันทึกตกไปอยู่กลางรายการ */
+  const dealName = new Map(d.opportunities.map((x) => [x.id, x.name]));
   type Ev = { at: string; sort?: string; title: string; body?: ReactNode; who?: string | null };
   const sortKey = (e: Ev) => `${e.at.slice(0, 10)}|${e.sort ?? e.at}`;
   const timeline: Ev[] = [
     ...d.interactions.map((i) => ({
       at: i.occurredAt, sort: i.recordedAt,
-      title: `${INTERACTION_TH[i.kind] ?? i.kind}${i.personName ? ` · ${i.personName}` : ""}`,
+      title: `${INTERACTION_TH[i.kind] ?? i.kind}${i.personName ? ` · ${i.personName}` : ""}${i.dealId && dealName.get(i.dealId) ? ` · ดีล ${dealName.get(i.dealId)}` : ""}`,
       body: i.masked
         ? <span className="text-[var(--c-text-4)]">บันทึกระดับ “{CLASSIFICATION_TH[i.classification]}” — เห็นเฉพาะผู้บันทึก</span>
         : <>
