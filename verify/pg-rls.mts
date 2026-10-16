@@ -15,8 +15,9 @@
    10. ทะเบียนการลบเขียนได้ระหว่างลบตามคำขอ และผู้ใช้ลบแถวทะเบียนไม่ได้ (0014)
    11. คำขอสิทธิ: เปิด · ยืนยัน · รายงาน · ปิดด้วยการลบ ในนามผู้ใช้ · อีกบัญชีมองไม่เห็น · ลบแถวคำขอไม่ได้ (0015)
    12. ส่งออกแบบขออนุมัติ: มีเจ้าของสองคน = อนุมัติคำขอของตัวเองไม่ได้ · อีกคนอนุมัติแล้วผู้ขอดาวน์โหลดได้ครั้งเดียว (0016)
+   15. ลบคนตามคำขอในนามผู้ใช้ = หลักฐานโน้ตของปฏิสัมพันธ์ถูกลบด้วย (0021)
    13. บทบาทหกแบบ: BD และผู้ดูแลข้อมูลส่วนบุคคลเขียนผ่าน RLS ได้ · viewer เขียนไม่ได้ · ค่าบทบาทที่ไม่รู้จักบันทึกไม่ได้ (0017)
-   14. ยืนยันการรวมเป็นชุดและย้อนทั้งชุดในนามผู้ใช้ · อีกบัญชีมองไม่เห็นชุด (0018 · solo S5)
+   17. ยืนยันการรวมเป็นชุดและย้อนทั้งชุดในนามผู้ใช้ · อีกบัญชีมองไม่เห็นชุด (0018 · solo S5)
 
    ต้องมี DATABASE_URL ของฐานทดสอบที่ใช้ migration แล้ว (npm run pg:test-db) — ไม่มีก็ข้าม
    ⚠ ห้ามชี้ไปที่ production: ชุดนี้สร้างบัญชีและผู้ใช้ทดสอบ */
@@ -234,7 +235,7 @@ ok(!wiped && await countFor("deletion_registry", "tenant_id = ?", T) === regRows
   await run(`DELETE FROM auth.users WHERE id IN (?, ?, ?)`, users.bd, users.privacy, users.viewer);
 }
 
-// ── 14 · ยืนยันการรวมเป็นชุดและย้อนทั้งชุด (S5 · 0018) ในนามผู้ใช้ ── review_batches ผ่าน RLS · ธุรกรรมเดียวบน Postgres
+// ── 17 · ยืนยันการรวมเป็นชุดและย้อนทั้งชุด (S5 · 0018) ในนามผู้ใช้ ── review_batches ผ่าน RLS · ธุรกรรมเดียวบน Postgres
 {
   const { proposeBatches, confirmBatch, undoBatch } = await import("@/lib/engine/vault/review-batches");
   const org = randomUUID();
@@ -266,6 +267,20 @@ ok(!wiped && await countFor("deletion_registry", "tenant_id = ?", T) === regRows
   ok(Boolean(ud?.ok && ud.restored === 2) && await countFor("customers", inPeople, T, ...people) === 4
     && await countFor("review_items", "tenant_id = ? AND kind = 'person_pair' AND status = 'open' AND batch_id IS NOT NULL", T) === 2,
     `ย้อนทั้งชุดในนามผู้ใช้ได้ — ทั้งสี่คนกลับมา และคู่กลับเข้าคิว${ud && !ud.ok ? ` (${ud.error})` : ""}`);
+}
+
+// ── 15 · หลักฐานโน้ตตามการลบ (0021) ── evidence ลบตรงไม่ได้ ต้องผ่าน app.erase_person_history
+{
+  const p = await as(() => createCustomer(T, { name: "โน้ต ทดสอบ", contacts: [{ kind: "email", value: "note-erase@pg.example" }], profile: {}, consent: false }, "verify"));
+  if (!p.ok) throw new Error(p.error);
+  const intId = randomUUID();
+  await as(async () => {
+    await run("INSERT INTO interactions (id, tenant_id, kind, occurred_at, customer_id, summary, recorded_at) VALUES (?,?,?,?,?,?,?)", intId, T, "meeting", now, p.id, "โน้ต (สมมุติ)", now);
+    await run("INSERT INTO evidence (id, tenant_id, kind, ref, note, captured_by, captured_at) VALUES (?,?,?,?,?,?,?)", randomUUID(), T, "note", `interaction:${intId}`, "คุยกัน (สมมุติ)", "verify", now);
+  });
+  const gone = await as(() => deleteCustomer(T, p.id, "verify", { reason: "request" }));
+  ok(gone.ok && await countFor("evidence", "tenant_id = ? AND ref = ?", T, `interaction:${intId}`) === 0,
+    "ลบคนในนามผู้ใช้บน Postgres = หลักฐานโน้ตของปฏิสัมพันธ์หายด้วย");
 }
 
 // เก็บกวาด — บัญชีทดสอบหายพร้อมทุกแถว (on delete cascade)
