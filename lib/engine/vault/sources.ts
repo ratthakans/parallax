@@ -56,7 +56,9 @@ export async function registerSource(
   const name = input.name.trim();
   if (!name) return { ok: false, error: "ตั้งชื่อแหล่งข้อมูล เช่น \"รายชื่อผู้ลงทะเบียนงาน 2016–2025\"" };
   if (input.kind === "namecard") {
-    return { ok: false, error: "นามบัตรต้องตกลงขอบเขต OCR และผู้ให้บริการก่อน — ยังไม่เปิดในเวอร์ชันนี้" };
+    /* แหล่งนามบัตรถูกสร้างโดยหน้า "กรอกนามบัตร" (vault/cards.ts) ซึ่งผูกวัตถุประสงค์จากแม่แบบนามบัตรเสมอ
+       ลงทะเบียนเองจากฟอร์มนี้ไม่ได้ — ไม่งั้นนามบัตรผูกกับวัตถุประสงค์อื่นได้ · OCR ยังไม่เปิด (solo-plan หัวข้อ 13) */
+    return { ok: false, error: "นามบัตรเพิ่มจากหน้า \"กรอกนามบัตร\" ใน Data Vault — ระบบสร้างแหล่งและผูกวัตถุประสงค์นามบัตรให้เอง" };
   }
   const acquisition = input.acquisitionNote.trim();
   if (acquisition.length < 10) {

@@ -103,7 +103,7 @@ export function sensitiveReason(header: string): string | null {
 export type SourceKind = "file" | "namecard" | "system";
 export const SOURCE_KIND_TH: Record<SourceKind, string> = {
   file: "ไฟล์ Excel / CSV",
-  namecard: "นามบัตร (ต้องตกลงขอบเขต OCR ก่อน)",
+  namecard: "นามบัตร (กรอกมือ · ยังไม่มี OCR)",
   system: "ระบบอื่น (ส่งออกเป็นไฟล์)",
 };
 

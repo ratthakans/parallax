@@ -179,6 +179,11 @@ jobs:
       - name: Export approval
         run: npm run verify:export
 
+      # จดก่อน จัดทีหลัง (S6): นามบัตรตรงคนเดิมไม่สร้างซ้ำ · ไม่มีวัตถุประสงค์ = เพิ่มไม่ได้ · โน้ตไม่เขียนจนยืนยัน
+      # AI ไม่สร้างคน/บริษัท/ความสัมพันธ์ · injection 12 แบบ · AI ปิดยังกรอก/จดได้ · คำขอไม่มีอีเมล/เบอร์
+      - name: Quick capture
+        run: npm run verify:capture
+
       # บทบาทหกแบบ: ตารางสิทธิ์ · operator เดิมไม่เสียสิทธิ์ · ทุก Server Action ของคอนโซล B2B มีด่านบทบาท
       - name: Roles
         run: npm run verify:roles
