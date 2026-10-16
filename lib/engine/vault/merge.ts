@@ -390,8 +390,9 @@ async function repointReviews(q: Sql, tenantId: string, kind: "person_pair" | "o
 
 export type Verdict = "same" | "different";
 
+/* rule = ค่าที่บันทึกใน merge_log.rule — การรวมเป็นชุด (S5) ใส่รหัสกลุ่มของชุด เพื่อย้อนทั้งชุดได้ทีเดียว */
 export async function decideReview(
-  tenantId: string, reviewId: string, verdict: Verdict, actor: string, note?: string,
+  tenantId: string, reviewId: string, verdict: Verdict, actor: string, note?: string, rule = "review",
 ): Promise<{ ok: true; mergeIds: string[] } | { ok: false; error: string }> {
   const item = await get<{ kind: string; subject_ids: string; status: string; confidence: number }>(
     "SELECT kind, subject_ids, status, confidence FROM review_items WHERE tenant_id = ? AND id = ?", tenantId, reviewId,
@@ -421,7 +422,7 @@ export async function decideReview(
         if (!claimed.changes) throw new Abort("รายการนี้ถูกตัดสินไปแล้ว");
         for (const w of weights.slice(1)) {
           const r = item.kind === "person_pair"
-            ? await mergePersons(tenantId, keep, w.id, actor, "review", Number(item.confidence))
+            ? await mergePersons(tenantId, keep, w.id, actor, rule, Number(item.confidence))
             : await mergeOrgs(tenantId, keep, w.id, actor);
           if (!r.ok) throw new Abort(r.error);
           mergeIds.push(r.mergeId);

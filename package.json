@@ -28,6 +28,7 @@
     "verify:intake": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/intake.mts",
     "verify:resolution": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/resolution.mts",
     "verify:merge": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/merge.mts",
+    "verify:batch-merge": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/batch-merge.mts",
     "verify:demo": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/demo.mts",
     "verify:ai-brief": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/ai-brief.mts",
     "verify:policy": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/policy.mts",

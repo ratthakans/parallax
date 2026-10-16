@@ -32,7 +32,7 @@ export const SIGNAL_TH: Record<string, string> = {
 
 const inList = (ids: string[]) => ids.map(() => "?").join(",");
 
-async function personSides(tenantId: string, ids: string[]): Promise<PersonSide[]> {
+export async function personSides(tenantId: string, ids: string[]): Promise<PersonSide[]> {
   if (!ids.length) return [];
   const [people, points, affs, srcs, rowN, interN, partN] = await Promise.all([
     all<{ id: string; name: string; lifecycle_state: string; restriction_status: string | null; created_at: string }>(
