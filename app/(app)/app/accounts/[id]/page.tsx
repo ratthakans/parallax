@@ -18,6 +18,7 @@ import { thaiDate, thaiDateTime } from "@/lib/shared/format";
 import { ActionForm } from "@/components/console/action-form";
 import { NoteCapture } from "@/components/console/note-capture";
 import { Panel, num } from "@/components/console/ui";
+import { RecordHeader, RecordTabs, pickTab } from "@/components/console/record";
 
 export const dynamic = "force-dynamic";
 
@@ -78,7 +79,7 @@ function Fact({ d, field, value }: { d: Dossier; field: OrgEditable; value: stri
   );
 }
 
-export default async function AccountPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function AccountPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string }> }) {
   const { id } = await params;
   const v = await viewer();
   const who = { id: v.actor, clearance: v.clearance };
@@ -144,31 +145,48 @@ export default async function AccountPage({ params }: { params: Promise<{ id: st
     })),
   ].filter((e) => e.at).sort((a, b) => (a.at < b.at ? 1 : -1));
 
+  const TABS = ["overview", "details", "people", "relationships"] as const;
+  const tab = pickTab(TABS, (await searchParams).tab);
+  const base = `/app/accounts/${o.id}`;
+  const lastTouch = d.interactions.map((i) => i.occurredAt).sort().at(-1);
+
   return (
     <>
-      <Link href="/app/accounts" className="c-thai inline-block py-2 text-[0.85rem] text-[var(--c-text-3)] hover:text-[var(--c-text)]">← บริษัททั้งหมด</Link>
-
-      <header className="mt-4 mb-6 flex flex-wrap items-end justify-between gap-5">
-        <div className="min-w-0">
-          <p className="c-label-th">บริษัท</p>
-          <h1 className="c-h1 mt-3 break-words text-[var(--c-text)]">{o.name}</h1>
-          <p className="c-thai mt-2 flex flex-wrap items-center gap-2 text-[0.84rem] text-[var(--c-text-3)]">
-            <span className="c-pill">{LIFECYCLE_TH[o.lifecycle as LifecycleState] ?? o.lifecycle}</span>
-            <span className="c-pill">{CLASSIFICATION_TH[o.classification]}</span>
-            <span>เจ้าของบัญชี: {o.accountOwner ?? "ยังไม่มี"}</span>
-            <span>· ตรวจล่าสุด {o.lastVerifiedAt ? thaiDate(o.lastVerifiedAt) : "ยังไม่เคยตรวจ"}</span>
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <ActionForm action={claimAccountAction} fields={{ orgId: o.id, release: mineAccount ? "1" : "0" }}
+      <RecordHeader
+        back={{ href: "/app/accounts", label: "บริษัททั้งหมด" }}
+        kind="บริษัท"
+        title={o.name}
+        badges={<>
+          <span className="c-pill">{LIFECYCLE_TH[o.lifecycle as LifecycleState] ?? o.lifecycle}</span>
+          <span className="c-pill">{CLASSIFICATION_TH[o.classification]}</span>
+          {o.lastVerifiedAt ? <span className="c-pill c-pill-good">ตรวจแล้ว {thaiDate(o.lastVerifiedAt)}</span> : <span className="c-pill">ยังไม่เคยตรวจ</span>}
+        </>}
+        highlights={[
+          { label: "อุตสาหกรรม", value: o.industry ?? UNKNOWN },
+          { label: "เจ้าของบัญชี", value: o.accountOwner ?? "ยังไม่มี" },
+          { label: "คนปัจจุบัน", value: num(current.length) },
+          { label: "ติดต่อล่าสุด", value: lastTouch ? thaiDate(lastTouch) : "ยังไม่เคย" },
+          { label: "ดีลที่เปิด", value: num(d.opportunities.filter((x) => !["won", "lost"].includes(x.stage)).length) },
+          { label: "โดเมน", value: o.primaryDomain ?? UNKNOWN },
+        ]}
+        actions={<>
+          <ActionForm action={claimAccountAction} fields={{ orgId: o.id, release: mineAccount ? "1" : "0" }} size="sm"
             label={mineAccount ? "ปล่อยบัญชี" : o.accountOwner ? "รับเป็นเจ้าของแทน" : "รับเป็นเจ้าของบัญชี"} pendingLabel="กำลังบันทึก…"
             confirm={o.accountOwner && !mineAccount ? `ยืนยันรับแทน ${o.accountOwner}` : undefined} />
-          <ActionForm action={verifyOrgAction} fields={{ orgId: o.id }} label="ยืนยันว่าข้อมูลถูกต้อง" pendingLabel="กำลังบันทึก…" />
-        </div>
-      </header>
+          <ActionForm action={verifyOrgAction} fields={{ orgId: o.id }} label="ยืนยันว่าข้อมูลถูกต้อง" pendingLabel="กำลังบันทึก…" size="sm" />
+        </>}
+      />
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <div className="grid min-w-0 content-start gap-6">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <div className="min-w-0">
+          <RecordTabs base={base} active={tab} tabs={[
+            { key: "overview", label: "ภาพรวม" },
+            { key: "details", label: "รายละเอียด" },
+            { key: "people", label: "คน", count: d.people.length },
+            { key: "relationships", label: "ความสัมพันธ์", count: d.relationships.length },
+          ]} />
+          <div className="grid min-w-0 content-start gap-5">
+            {tab === "overview" && <>
           {/* ── สรุปก่อนพบลูกค้า ── */}
           <Panel className="p-5 md:p-6">
             <div className="flex flex-wrap items-baseline justify-between gap-3">
@@ -205,44 +223,24 @@ export default async function AccountPage({ params }: { params: Promise<{ id: st
               note={<p className="c-thai text-[0.76rem] text-[var(--c-text-4)]">ส่งเฉพาะหลักฐานในแฟ้มนี้ ไม่ส่งอีเมล/เบอร์ และไม่ส่งรายการระดับจำกัดสูง · บัญชีที่ยังไม่ชำระได้สรุปจากสูตร</p>} />
           </Panel>
 
-          {/* ── คนในบริษัทตามเวลา ── */}
           <Panel className="p-5 md:p-6">
-            <h2 className="c-h2 text-[var(--c-text)]">คนในบริษัท</h2>
-            <p className="c-thai mt-1 text-[0.82rem] text-[var(--c-text-3)]">ยังสังกัด {num(current.length)} คน · เคยสังกัด {num(former.length)} คน — ช่วงเวลามาจากวันที่ในไฟล์หรือที่คนแก้</p>
-            {d.people.length ? (
-              <ul className="mt-4 grid gap-0">
-                {[...current, ...former].map((p) => (
-                  <li key={p.affiliationId} className="border-t border-[var(--c-line)] py-3 first:border-t-0">
-                    <div className="flex flex-wrap items-baseline justify-between gap-2">
-                      <p className="c-thai min-w-0 text-[0.94rem]">
-                        <Link href={`/app/customers/${p.personId}`} className="text-[var(--c-text)] hover:text-[var(--c-accent)]">{p.name}</Link>
-                        <span className="text-[var(--c-text-3)]"> · {p.title ?? "ไม่ทราบตำแหน่ง"}</span>
-                        {!p.current && <span className="c-pill ml-2">ออกแล้ว</span>}
-                      </p>
-                      <p className="c-thai text-[0.78rem] text-[var(--c-text-3)]">
-                        {p.from ? thaiDate(p.from) : "ไม่ทราบวันเริ่ม"} – {p.to ? thaiDate(p.to) : "ปัจจุบัน"}
-                        {p.confirmedBy ? <span className="text-[var(--c-good)]"> · ยืนยันโดย {p.confirmedBy}</span> : <span className="text-[var(--c-text-4)]"> · ยังไม่มีคนยืนยัน</span>}
-                      </p>
-                    </div>
-                    <Evidence rows={p.rows} recorded={p.recordedAt} label="ที่มา · ยืนยัน/ปิดช่วง">
-                      <div className="mt-1 flex flex-wrap gap-2">
-                        {!p.confirmedBy && <ActionForm action={confirmAffiliationAction} fields={{ orgId: o.id, affiliationId: p.affiliationId }} label="ยืนยันสังกัด" pendingLabel="กำลังบันทึก…" size="sm" />}
-                      </div>
-                      {p.current && (
-                        <ActionForm action={endAffiliationAction} fields={{ orgId: o.id, affiliationId: p.affiliationId }} label="บันทึกว่าออกแล้ว" pendingLabel="กำลังบันทึก…" size="sm" className="mt-2 grid gap-2 sm:grid-cols-2">
-                          <label className={LABEL}>วันที่ออก<input type="date" name="endedOn" defaultValue={today()} className="c-input" required /></label>
-                          <label className={LABEL}>ที่มา<input name="reason" className="c-input" placeholder="เช่น แจ้งเปลี่ยนงานทางอีเมล" required /></label>
-                        </ActionForm>
-                      )}
-                    </Evidence>
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 className="c-h2 text-[var(--c-text)]">คนสำคัญ</h2>
+              <Link href={`/app/accounts/${o.id}?tab=people`} scroll={false} className="c-thai text-[0.82rem] text-[var(--c-accent)] hover:underline">ดูทั้งหมด {num(d.people.length)} คน →</Link>
+            </div>
+            {current.length ? (
+              <ul className="mt-3 divide-y divide-[var(--c-line)]">
+                {current.slice(0, 5).map((p) => (
+                  <li key={p.affiliationId} className="flex flex-wrap items-baseline justify-between gap-2 py-2.5">
+                    <Link href={`/app/customers/${p.personId}`} className="c-thai text-[0.92rem] text-[var(--c-accent)] hover:underline">{p.name}</Link>
+                    <span className="c-thai text-[0.8rem] text-[var(--c-text-3)]">{p.title ?? "ไม่ทราบตำแหน่ง"}{p.confirmedBy ? " · ยืนยันแล้ว" : ""}</span>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="c-thai mt-4 text-[0.88rem] text-[var(--c-text-3)]">ไม่ทราบ — ยังไม่มีคนที่สังกัดบริษัทนี้ในฐาน</p>
+              <p className="c-thai mt-3 text-[0.88rem] text-[var(--c-text-3)]">ยังไม่มีคนที่สังกัดอยู่ตอนนี้</p>
             )}
           </Panel>
-
           {/* ── เส้นทางเข้าถึง (docs/solo-plan.md S2) ── */}
           <Panel className="p-5 md:p-6">
             <h2 className="c-h2 text-[var(--c-text)]">เส้นทางเข้าถึง</h2>
@@ -288,126 +286,26 @@ export default async function AccountPage({ params }: { params: Promise<{ id: st
             )}
           </Panel>
 
-          {/* ── ความสัมพันธ์ที่ยืนยัน ── */}
-          <Panel className="p-5 md:p-6">
-            <h2 className="c-h2 text-[var(--c-text)]">ความสัมพันธ์</h2>
-            <p className="c-thai mt-1 text-[0.82rem] text-[var(--c-text-3)]">บันทึกได้เฉพาะสิ่งที่รู้จริง พร้อมหลักฐานและผู้ยืนยัน — ระบบไม่สร้างความสัมพันธ์จากการเดา</p>
-            {d.relationships.length ? (
-              <ul className="mt-4 grid gap-0">
-                {d.relationships.map((r) => (
-                  <li key={r.id} className="border-t border-[var(--c-line)] py-3 first:border-t-0">
-                    <p className="c-thai text-[0.9rem] text-[var(--c-text)]">
-                      {r.fromName} <span className="text-[var(--c-text-3)]">{RELATIONSHIP_TH[r.type] ?? r.type}</span> {r.toName}
-                      {r.validTo && <span className="c-pill ml-2">สิ้นสุด {thaiDate(r.validTo)}</span>}
-                    </p>
-                    <p className="c-thai mt-0.5 text-[0.78rem] text-[var(--c-text-3)]">
-                      {r.confirmedBy ? `ยืนยันโดย ${r.confirmedBy} ${thaiDateTime(r.confirmedAt)}` : "ยังไม่มีผู้ยืนยัน"}
-                      {r.context ? ` · ${r.context}` : ""}{r.validFrom ? ` · ตั้งแต่ ${thaiDate(r.validFrom)}` : ""}
-                    </p>
-                    <Evidence label="หลักฐาน">
-                      <p>หลักฐาน: {r.evidenceNote ?? "ไม่มีบันทึก"}</p>
-                      {!r.validTo && (
-                        <ActionForm action={endRelationshipAction} fields={{ orgId: o.id, relationshipId: r.id }} label="บันทึกว่าสิ้นสุดแล้ว" pendingLabel="กำลังบันทึก…" size="sm" className="mt-2 grid gap-2 sm:grid-cols-2">
-                          <label className={LABEL}>วันที่สิ้นสุด<input type="date" name="endedOn" defaultValue={today()} className="c-input" required /></label>
-                          <label className={LABEL}>ที่มา<input name="reason" className="c-input" required /></label>
-                        </ActionForm>
-                      )}
-                    </Evidence>
-                  </li>
-                ))}
+          {d.opportunities.length > 0 && (
+            <Panel className="p-5 md:p-6">
+              <h2 className="c-h2 text-[var(--c-text)]">โอกาสขาย</h2>
+              <ul className="c-thai mt-3 grid gap-1 text-[0.86rem] text-[var(--c-text-2)]">
+                {d.opportunities.map((x) => <li key={x.id}>{x.name} · {x.stage}{x.expectedClose ? ` · ปิด ${thaiDate(x.expectedClose)}` : ""}</li>)}
               </ul>
-            ) : (
-              <p className="c-thai mt-4 text-[0.88rem] text-[var(--c-text-3)]">ไม่ทราบ — ยังไม่มีความสัมพันธ์ที่มีผู้ยืนยัน</p>
-            )}
-            <details className="mt-4">
-              <summary className="c-btn c-btn-ghost inline-flex cursor-pointer">บันทึกความสัมพันธ์</summary>
-              <ActionForm action={addRelationshipAction} fields={{ orgId: o.id }} label="บันทึก" pendingLabel="กำลังบันทึก…" variant="primary" className="mt-4 grid gap-3 md:grid-cols-3">
-                <label className={LABEL}>จาก
-                  <select name="from" className="c-select" required defaultValue="">
-                    <option value="" disabled>เลือก</option>
-                    {ends.map((e) => <option key={e.v} value={e.v}>{e.label}</option>)}
-                  </select>
-                </label>
-                <label className={LABEL}>ความสัมพันธ์
-                  <select name="type" className="c-select" required defaultValue="">
-                    <option value="" disabled>เลือก</option>
-                    {RELATIONSHIP_TYPES.filter((t) => RELATIONSHIP_ENDS[t][0] !== "member").map((t) => (
-                      <option key={t} value={t}>{RELATIONSHIP_TH[t]} ({RELATIONSHIP_ENDS[t].map((k) => (k === "org" ? "บริษัท" : "คน")).join("→")})</option>
-                    ))}
-                  </select>
-                </label>
-                <label className={LABEL}>ถึง
-                  <select name="to" className="c-select" required defaultValue="">
-                    <option value="" disabled>เลือก</option>
-                    {otherEnds.map((e) => <option key={e.v} value={e.v}>{e.label}</option>)}
-                  </select>
-                </label>
-                <label className={`${LABEL} md:col-span-2`}>หลักฐาน — รู้ได้อย่างไร จากใคร เมื่อไร
-                  <input name="evidence" className="c-input" placeholder="เช่น คุณวิภาแจ้งในที่ประชุม 3 พ.ย. ว่าคุณสมชายเป็นผู้อนุมัติงบ" required />
-                </label>
-                <label className={LABEL}>ตั้งแต่ (ถ้าทราบ)<input type="date" name="validFrom" className="c-input" /></label>
-                <label className={`${LABEL} md:col-span-3`}>บริบท (ไม่บังคับ)<input name="context" className="c-input" placeholder="เช่น งบสปอนเซอร์ปี 2027" /></label>
-              </ActionForm>
-            </details>
-          </Panel>
-
-          {/* ── ไทม์ไลน์ ── */}
+            </Panel>
+          )}
           <Panel className="p-5 md:p-6">
-            <h2 className="c-h2 text-[var(--c-text)]">ไทม์ไลน์</h2>
-            <details className="mt-3">
-              <summary className="c-btn c-btn-primary inline-flex cursor-pointer">จดโน้ตหลังพบลูกค้า</summary>
-              <div className="mt-4">
-                <NoteCapture orgId={o.id} people={d.people.filter((p) => !p.masked).map((p) => ({ personId: p.personId, name: p.name }))
-                  .filter((p, i, xs) => xs.findIndex((x) => x.personId === p.personId) === i)} />
-              </div>
-            </details>
-            <details className="mt-3">
-              <summary className="c-btn c-btn-ghost inline-flex cursor-pointer">บันทึกการติดต่อแบบฟอร์ม</summary>
-              <ActionForm action={logInteractionAction} fields={{ orgId: o.id }} label="บันทึก" pendingLabel="กำลังบันทึก…" variant="primary" className="mt-4 grid gap-3 md:grid-cols-3">
-                <label className={LABEL}>ชนิด
-                  <select name="kind" className="c-select" defaultValue="meeting">
-                    {INTERACTION_KINDS.map((k) => <option key={k} value={k}>{INTERACTION_TH[k]}</option>)}
-                  </select>
-                </label>
-                <label className={LABEL}>วันที่<input type="date" name="occurredAt" defaultValue={today()} className="c-input" required /></label>
-                <label className={LABEL}>กับใคร (ไม่บังคับ)
-                  <select name="personId" className="c-select" defaultValue="">
-                    <option value="">ไม่ระบุคน</option>
-                    {current.map((p) => <option key={p.personId} value={p.personId}>{p.name}</option>)}
-                  </select>
-                </label>
-                <label className={`${LABEL} md:col-span-3`}>คุยอะไร
-                  <textarea name="summary" rows={3} className="c-input" required />
-                </label>
-                <label className={`${LABEL} md:col-span-2`}>ผลและขั้นตอนถัดไป<input name="outcome" className="c-input" /></label>
-                <label className={LABEL}>ระดับความลับ
-                  <select name="classification" className="c-select" defaultValue="confidential">
-                    {CLASSIFICATIONS.map((c) => <option key={c} value={c}>{CLASSIFICATION_TH[c]}{c === "restricted_high" ? " (เห็นเฉพาะคุณ · ไม่ส่งให้ AI)" : ""}</option>)}
-                  </select>
-                </label>
-              </ActionForm>
-            </details>
-            {timeline.length ? (
-              <ol className="mt-5 grid gap-0">
-                {timeline.slice(0, 60).map((e, i) => (
-                  <li key={i} className="grid grid-cols-[6.5rem_minmax(0,1fr)] gap-3 border-t border-[var(--c-line)] py-3 first:border-t-0">
-                    <span className="c-thai text-[0.78rem] text-[var(--c-text-3)]">{thaiDate(e.at)}</span>
-                    <div className="c-thai min-w-0 text-[0.88rem] text-[var(--c-text-2)]">
-                      <p className="text-[var(--c-text)]">{e.title}</p>
-                      {e.body && <div className="mt-0.5 break-words">{e.body}</div>}
-                      {e.who && <p className="mt-0.5 text-[0.76rem] text-[var(--c-text-4)]">บันทึกโดย {e.who}</p>}
-                    </div>
-                  </li>
-                ))}
-              </ol>
+            <h2 className="c-h2 text-[var(--c-text)]">ยังไม่ทราบ</h2>
+            {unknowns.length ? (
+              <ul className="c-thai mt-3 grid gap-1 text-[0.86rem] text-[var(--c-text-3)]">{unknowns.map((u) => <li key={u}>· {u}</li>)}</ul>
             ) : (
-              <p className="c-thai mt-4 text-[0.88rem] text-[var(--c-text-3)]">ยังไม่มีประวัติ</p>
+              <p className="c-thai mt-3 text-[0.86rem] text-[var(--c-text-3)]">ทุกช่องหลักมีหลักฐานแล้ว</p>
             )}
+            <p className="c-thai mt-3 text-[0.76rem] text-[var(--c-text-4)]">ระบบไม่เติมช่องเหล่านี้ด้วยการเดาหรือคะแนน</p>
           </Panel>
-        </div>
 
-        {/* ── ข้อเท็จจริงของบริษัท ── */}
-        <div className="grid min-w-0 content-start gap-6">
+            </>}
+            {tab === "details" && <>
           <Panel className="p-5 md:p-6">
             <h2 className="c-h2 text-[var(--c-text)]">ข้อมูลบริษัท</h2>
             <div className="mt-3">
@@ -476,25 +374,170 @@ export default async function AccountPage({ params }: { params: Promise<{ id: st
             </div>
           </Panel>
 
+            </>}
+            {tab === "people" && <>
+          {/* ── คนในบริษัทตามเวลา ── */}
           <Panel className="p-5 md:p-6">
-            <h2 className="c-h2 text-[var(--c-text)]">ยังไม่ทราบ</h2>
-            {unknowns.length ? (
-              <ul className="c-thai mt-3 grid gap-1 text-[0.86rem] text-[var(--c-text-3)]">{unknowns.map((u) => <li key={u}>· {u}</li>)}</ul>
+            <h2 className="c-h2 text-[var(--c-text)]">คนในบริษัท</h2>
+            <p className="c-thai mt-1 text-[0.82rem] text-[var(--c-text-3)]">ยังสังกัด {num(current.length)} คน · เคยสังกัด {num(former.length)} คน — ช่วงเวลามาจากวันที่ในไฟล์หรือที่คนแก้</p>
+            {d.people.length ? (
+              <ul className="mt-4 grid gap-0">
+                {[...current, ...former].map((p) => (
+                  <li key={p.affiliationId} className="border-t border-[var(--c-line)] py-3 first:border-t-0">
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <p className="c-thai min-w-0 text-[0.94rem]">
+                        <Link href={`/app/customers/${p.personId}`} className="text-[var(--c-text)] hover:text-[var(--c-accent)]">{p.name}</Link>
+                        <span className="text-[var(--c-text-3)]"> · {p.title ?? "ไม่ทราบตำแหน่ง"}</span>
+                        {!p.current && <span className="c-pill ml-2">ออกแล้ว</span>}
+                      </p>
+                      <p className="c-thai text-[0.78rem] text-[var(--c-text-3)]">
+                        {p.from ? thaiDate(p.from) : "ไม่ทราบวันเริ่ม"} – {p.to ? thaiDate(p.to) : "ปัจจุบัน"}
+                        {p.confirmedBy ? <span className="text-[var(--c-good)]"> · ยืนยันโดย {p.confirmedBy}</span> : <span className="text-[var(--c-text-4)]"> · ยังไม่มีคนยืนยัน</span>}
+                      </p>
+                    </div>
+                    <Evidence rows={p.rows} recorded={p.recordedAt} label="ที่มา · ยืนยัน/ปิดช่วง">
+                      <div className="mt-1 flex flex-wrap gap-2">
+                        {!p.confirmedBy && <ActionForm action={confirmAffiliationAction} fields={{ orgId: o.id, affiliationId: p.affiliationId }} label="ยืนยันสังกัด" pendingLabel="กำลังบันทึก…" size="sm" />}
+                      </div>
+                      {p.current && (
+                        <ActionForm action={endAffiliationAction} fields={{ orgId: o.id, affiliationId: p.affiliationId }} label="บันทึกว่าออกแล้ว" pendingLabel="กำลังบันทึก…" size="sm" className="mt-2 grid gap-2 sm:grid-cols-2">
+                          <label className={LABEL}>วันที่ออก<input type="date" name="endedOn" defaultValue={today()} className="c-input" required /></label>
+                          <label className={LABEL}>ที่มา<input name="reason" className="c-input" placeholder="เช่น แจ้งเปลี่ยนงานทางอีเมล" required /></label>
+                        </ActionForm>
+                      )}
+                    </Evidence>
+                  </li>
+                ))}
+              </ul>
             ) : (
-              <p className="c-thai mt-3 text-[0.86rem] text-[var(--c-text-3)]">ทุกช่องหลักมีหลักฐานแล้ว</p>
+              <p className="c-thai mt-4 text-[0.88rem] text-[var(--c-text-3)]">ไม่ทราบ — ยังไม่มีคนที่สังกัดบริษัทนี้ในฐาน</p>
             )}
-            <p className="c-thai mt-3 text-[0.76rem] text-[var(--c-text-4)]">ระบบไม่เติมช่องเหล่านี้ด้วยการเดาหรือคะแนน</p>
           </Panel>
 
-          {d.opportunities.length > 0 && (
-            <Panel className="p-5 md:p-6">
-              <h2 className="c-h2 text-[var(--c-text)]">โอกาสขาย</h2>
-              <ul className="c-thai mt-3 grid gap-1 text-[0.86rem] text-[var(--c-text-2)]">
-                {d.opportunities.map((x) => <li key={x.id}>{x.name} · {x.stage}{x.expectedClose ? ` · ปิด ${thaiDate(x.expectedClose)}` : ""}</li>)}
+            </>}
+            {tab === "relationships" && <>
+          {/* ── ความสัมพันธ์ที่ยืนยัน ── */}
+          <Panel className="p-5 md:p-6">
+            <h2 className="c-h2 text-[var(--c-text)]">ความสัมพันธ์</h2>
+            <p className="c-thai mt-1 text-[0.82rem] text-[var(--c-text-3)]">บันทึกได้เฉพาะสิ่งที่รู้จริง พร้อมหลักฐานและผู้ยืนยัน — ระบบไม่สร้างความสัมพันธ์จากการเดา</p>
+            {d.relationships.length ? (
+              <ul className="mt-4 grid gap-0">
+                {d.relationships.map((r) => (
+                  <li key={r.id} className="border-t border-[var(--c-line)] py-3 first:border-t-0">
+                    <p className="c-thai text-[0.9rem] text-[var(--c-text)]">
+                      {r.fromName} <span className="text-[var(--c-text-3)]">{RELATIONSHIP_TH[r.type] ?? r.type}</span> {r.toName}
+                      {r.validTo && <span className="c-pill ml-2">สิ้นสุด {thaiDate(r.validTo)}</span>}
+                    </p>
+                    <p className="c-thai mt-0.5 text-[0.78rem] text-[var(--c-text-3)]">
+                      {r.confirmedBy ? `ยืนยันโดย ${r.confirmedBy} ${thaiDateTime(r.confirmedAt)}` : "ยังไม่มีผู้ยืนยัน"}
+                      {r.context ? ` · ${r.context}` : ""}{r.validFrom ? ` · ตั้งแต่ ${thaiDate(r.validFrom)}` : ""}
+                    </p>
+                    <Evidence label="หลักฐาน">
+                      <p>หลักฐาน: {r.evidenceNote ?? "ไม่มีบันทึก"}</p>
+                      {!r.validTo && (
+                        <ActionForm action={endRelationshipAction} fields={{ orgId: o.id, relationshipId: r.id }} label="บันทึกว่าสิ้นสุดแล้ว" pendingLabel="กำลังบันทึก…" size="sm" className="mt-2 grid gap-2 sm:grid-cols-2">
+                          <label className={LABEL}>วันที่สิ้นสุด<input type="date" name="endedOn" defaultValue={today()} className="c-input" required /></label>
+                          <label className={LABEL}>ที่มา<input name="reason" className="c-input" required /></label>
+                        </ActionForm>
+                      )}
+                    </Evidence>
+                  </li>
+                ))}
               </ul>
-            </Panel>
-          )}
+            ) : (
+              <p className="c-thai mt-4 text-[0.88rem] text-[var(--c-text-3)]">ไม่ทราบ — ยังไม่มีความสัมพันธ์ที่มีผู้ยืนยัน</p>
+            )}
+            <details className="mt-4">
+              <summary className="c-btn c-btn-ghost inline-flex cursor-pointer">บันทึกความสัมพันธ์</summary>
+              <ActionForm action={addRelationshipAction} fields={{ orgId: o.id }} label="บันทึก" pendingLabel="กำลังบันทึก…" variant="primary" className="mt-4 grid gap-3 md:grid-cols-3">
+                <label className={LABEL}>จาก
+                  <select name="from" className="c-select" required defaultValue="">
+                    <option value="" disabled>เลือก</option>
+                    {ends.map((e) => <option key={e.v} value={e.v}>{e.label}</option>)}
+                  </select>
+                </label>
+                <label className={LABEL}>ความสัมพันธ์
+                  <select name="type" className="c-select" required defaultValue="">
+                    <option value="" disabled>เลือก</option>
+                    {RELATIONSHIP_TYPES.filter((t) => RELATIONSHIP_ENDS[t][0] !== "member").map((t) => (
+                      <option key={t} value={t}>{RELATIONSHIP_TH[t]} ({RELATIONSHIP_ENDS[t].map((k) => (k === "org" ? "บริษัท" : "คน")).join("→")})</option>
+                    ))}
+                  </select>
+                </label>
+                <label className={LABEL}>ถึง
+                  <select name="to" className="c-select" required defaultValue="">
+                    <option value="" disabled>เลือก</option>
+                    {otherEnds.map((e) => <option key={e.v} value={e.v}>{e.label}</option>)}
+                  </select>
+                </label>
+                <label className={`${LABEL} md:col-span-2`}>หลักฐาน — รู้ได้อย่างไร จากใคร เมื่อไร
+                  <input name="evidence" className="c-input" placeholder="เช่น คุณวิภาแจ้งในที่ประชุม 3 พ.ย. ว่าคุณสมชายเป็นผู้อนุมัติงบ" required />
+                </label>
+                <label className={LABEL}>ตั้งแต่ (ถ้าทราบ)<input type="date" name="validFrom" className="c-input" /></label>
+                <label className={`${LABEL} md:col-span-3`}>บริบท (ไม่บังคับ)<input name="context" className="c-input" placeholder="เช่น งบสปอนเซอร์ปี 2027" /></label>
+              </ActionForm>
+            </details>
+          </Panel>
+
+            </>}
+          </div>
         </div>
+
+        {/* ── กิจกรรม: จดโน้ต · บันทึกแบบฟอร์ม · ไทม์ไลน์ (ช่องบันทึกด้านขวาแบบ Salesforce) ── */}
+        <aside className="grid min-w-0 content-start gap-5">
+          {/* ── ไทม์ไลน์ ── */}
+          <Panel className="p-4 md:p-5">
+            <h2 className="c-h2 text-[var(--c-text)]">กิจกรรม</h2>
+            <div className="mt-3">
+              <div>
+                <NoteCapture orgId={o.id} people={d.people.filter((p) => !p.masked).map((p) => ({ personId: p.personId, name: p.name }))
+                  .filter((p, i, xs) => xs.findIndex((x) => x.personId === p.personId) === i)} />
+              </div>
+            </div>
+            <details className="mt-3">
+              <summary className="c-btn c-btn-ghost inline-flex cursor-pointer">บันทึกการติดต่อแบบฟอร์ม</summary>
+              <ActionForm action={logInteractionAction} fields={{ orgId: o.id }} label="บันทึก" pendingLabel="กำลังบันทึก…" variant="primary" className="mt-4 grid gap-3">
+                <label className={LABEL}>ชนิด
+                  <select name="kind" className="c-select" defaultValue="meeting">
+                    {INTERACTION_KINDS.map((k) => <option key={k} value={k}>{INTERACTION_TH[k]}</option>)}
+                  </select>
+                </label>
+                <label className={LABEL}>วันที่<input type="date" name="occurredAt" defaultValue={today()} className="c-input" required /></label>
+                <label className={LABEL}>กับใคร (ไม่บังคับ)
+                  <select name="personId" className="c-select" defaultValue="">
+                    <option value="">ไม่ระบุคน</option>
+                    {current.map((p) => <option key={p.personId} value={p.personId}>{p.name}</option>)}
+                  </select>
+                </label>
+                <label className={`${LABEL}`}>คุยอะไร
+                  <textarea name="summary" rows={3} className="c-input" required />
+                </label>
+                <label className={`${LABEL}`}>ผลและขั้นตอนถัดไป<input name="outcome" className="c-input" /></label>
+                <label className={LABEL}>ระดับความลับ
+                  <select name="classification" className="c-select" defaultValue="confidential">
+                    {CLASSIFICATIONS.map((c) => <option key={c} value={c}>{CLASSIFICATION_TH[c]}{c === "restricted_high" ? " (เห็นเฉพาะคุณ · ไม่ส่งให้ AI)" : ""}</option>)}
+                  </select>
+                </label>
+              </ActionForm>
+            </details>
+            {timeline.length ? (
+              <ol className="mt-5 grid gap-0">
+                {timeline.slice(0, 30).map((e, i) => (
+                  <li key={i} className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-3 border-t border-[var(--c-line)] py-3 first:border-t-0">
+                    <span className="c-thai text-[0.78rem] text-[var(--c-text-3)]">{thaiDate(e.at)}</span>
+                    <div className="c-thai min-w-0 text-[0.88rem] text-[var(--c-text-2)]">
+                      <p className="text-[var(--c-text)]">{e.title}</p>
+                      {e.body && <div className="mt-0.5 break-words">{e.body}</div>}
+                      {e.who && <p className="mt-0.5 text-[0.76rem] text-[var(--c-text-4)]">บันทึกโดย {e.who}</p>}
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="c-thai mt-4 text-[0.88rem] text-[var(--c-text-3)]">ยังไม่มีประวัติ</p>
+            )}
+          </Panel>
+        </aside>
       </div>
     </>
   );
