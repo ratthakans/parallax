@@ -374,8 +374,8 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   return (
     <>
       <PageHead
-        label="Data Vault"
-        title="คิวตรวจตัวตน"
+        label="ข้อมูล"
+        title="ตรวจข้อมูลซ้ำ"
         lead="ระบบรวมเองเฉพาะหลักฐานแน่น (อีเมลหรือเบอร์เดียวกันและชื่อไม่ขัดกัน) — ชื่อเหมือนกัน โดเมนเดียวกัน หรือบริษัทในเครือ มาให้คนตัดสินที่นี่ และการรวมทุกครั้งย้อนได้"
         actions={overview.pendingReview > 0 ? (
           <ActionForm action={resolveNowAction} label={`ตรวจตัวตน ${num(overview.pendingReview)} แถวที่รออยู่`} pendingLabel="กำลังตรวจ…" variant="primary" />

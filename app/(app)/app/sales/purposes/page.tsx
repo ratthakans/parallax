@@ -29,8 +29,8 @@ export default async function PurposesPage() {
     <>
       <Link href="/app/sales" className="c-thai inline-block py-2 text-[0.85rem] text-[var(--c-text-3)] hover:text-[var(--c-text)]">← แคมเปญขาย</Link>
       <PageHead
-        label="Campaign Workspace"
-        title="วัตถุประสงค์และฐาน"
+        label="แคมเปญ"
+        title="วัตถุประสงค์และอายุข้อมูล"
         lead="แต่ละวัตถุประสงค์ต้องมีฐานการประมวลผลที่ผู้ควบคุมข้อมูลอนุมัติ ก่อนใครในรายชื่อจะ “ใช้ได้ตามนโยบาย” · ฐานเก็บเป็นรุ่น และการเปลี่ยนฐานไม่ล้างการถอนหรือคัดค้านที่มีอยู่"
       />
       {/* ── อายุข้อมูล (B6) ── */}

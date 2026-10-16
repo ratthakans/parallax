@@ -5,13 +5,15 @@ export function Panel({
   children,
   className = "",
   flat = false,
+  id,
 }: {
   children: ReactNode;
   className?: string;
   flat?: boolean;
+  id?: string;
 }) {
   return (
-    <div className={`${flat ? "c-panel-flat" : "c-panel"} ${className}`}>
+    <div id={id} className={`${flat ? "c-panel-flat" : "c-panel"} ${className}`}>
       {children}
     </div>
   );

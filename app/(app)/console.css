@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════════════════════════
-   PARALLAX Console — โทนเข้ม
+   PARALLAX Console — ธีมสว่าง (ค่าตั้งต้น) และมืด
 
    เดิมไฟล์นี้ตั้ง token ของตัวเองแยกจากเว็บโดยสิ้นเชิง (#050a18 ·
    accent #4d9bff · cyan #35c8ff) ซึ่งไม่ตรงกับทั้งเว็บและเด็ค
@@ -22,8 +22,54 @@
 
 @layer components {
 
+  /* ── ธีม (docs/ux-plan.md U1) ──
+     สว่างเป็นค่าตั้งต้น — ใช้ในออฟฟิศทั้งวันแบบ Salesforce · มืดเป็นตัวเลือก (data-theme="dark" จากคุกกี้ parallax_theme)
+     ทุกสีในไฟล์นี้มาจากตัวแปรด้านล่าง ไม่มีค่าสีฝังในกฎ — เพิ่มธีมใหม่ = เพิ่มชุดตัวแปรชุดเดียว */
   .console {
-    /* แกนเดียวกับเด็ค — ค่าเหล่านี้ต้องไม่หลุดจาก app/globals.css */
+    --c-bg: #f3f3f3;
+    --c-bg-2: #fafaf9;
+    --c-panel: #ffffff;
+    --c-panel-2: #f8f8f8;
+    --c-line: #dddbda;
+    --c-line-2: #c9c7c5;
+
+    --c-text: #181818;
+    --c-text-2: #3e3e3c;
+    --c-text-3: #5c5c5c;
+    --c-text-4: #696764;
+
+    --c-accent: #0176d3;
+    --c-accent-2: #0b5cab;
+    --c-cyan: #0b5cab;
+    --c-good: #2e844a;
+    --c-warn: #8c4b02;
+    --c-bad: #ba0517;
+
+    --c-surface: #ffffff;
+    --c-surface-flat: #ffffff;
+    --c-appbar: #ffffff;
+    --c-hover: rgba(1, 118, 211, 0.06);
+    --c-active: rgba(1, 118, 211, 0.1);
+    --c-row-line: #e5e5e5;
+    --c-row-hover: #f3f9ff;
+    --c-input: #ffffff;
+    --c-code: #f8f8f8;
+    --c-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+    --c-radius: 0.375rem;
+    --c-btn-radius: 0.25rem;
+    --c-glow-a: transparent;
+    --c-glow-b: transparent;
+    --c-grid: transparent;
+
+    background: var(--c-bg);
+    color: var(--c-text);
+    min-height: 100dvh;
+    font-family: var(--font-sans);
+    color-scheme: light;
+  }
+
+  /* ธีมมืดเดิม — แกนเดียวกับเด็คและเว็บ (ดำ #030711 · น้ำเงิน #075dff · ฟ้าเรืองแสง #62e7ff) */
+  .console[data-theme="dark"] {
     --c-bg: #030711;
     --c-bg-2: #060d1c;
     --c-panel: #091529;
@@ -43,13 +89,25 @@
     --c-warn: #fbbf24;
     --c-bad: #f87171;
 
-    background: var(--c-bg);
-    color: var(--c-text);
-    min-height: 100dvh;
-    font-family: var(--font-sans);
+    --c-surface: linear-gradient(180deg, rgba(11, 23, 48, 0.9), rgba(8, 16, 31, 0.9));
+    --c-surface-flat: rgba(8, 16, 31, 0.6);
+    --c-appbar: rgba(3, 7, 17, 0.94);
+    --c-hover: rgba(77, 155, 255, 0.09);
+    --c-active: rgba(77, 155, 255, 0.15);
+    --c-row-line: rgba(26, 43, 79, 0.6);
+    --c-row-hover: rgba(77, 155, 255, 0.045);
+    --c-input: rgba(5, 10, 24, 0.8);
+    --c-code: rgba(5, 10, 24, 0.75);
+    --c-shadow: none;
+    --c-radius: 0;
+    --c-btn-radius: 999px;
+    --c-glow-a: rgba(98, 231, 255, 0.15);
+    --c-glow-b: rgba(7, 93, 255, 0.17);
+    --c-grid: rgba(98, 231, 255, 0.035);
+    color-scheme: dark;
   }
 
-  /* พื้นหลังเรืองแสง + ตารางบาง ๆ — ภาษาเดียวกับ hero ของเว็บ */
+  /* พื้นหลังเรืองแสง + ตารางบาง ๆ — ภาษาเดียวกับ hero ของเว็บ (ธีมมืดเท่านั้น · สว่าง = โปร่งใส) */
   .console::before {
     content: "";
     position: fixed;
@@ -57,8 +115,8 @@
     z-index: 0;
     pointer-events: none;
     background:
-      radial-gradient(920px 640px at 80% -14%, rgba(98, 231, 255, 0.15), transparent 68%),
-      radial-gradient(780px 580px at 6% 2%, rgba(7, 93, 255, 0.17), transparent 66%);
+      radial-gradient(920px 640px at 80% -14%, var(--c-glow-a), transparent 68%),
+      radial-gradient(780px 580px at 6% 2%, var(--c-glow-b), transparent 66%);
   }
 
   .console::after {
@@ -68,8 +126,8 @@
     z-index: 0;
     pointer-events: none;
     background-image:
-      linear-gradient(rgba(98, 231, 255, 0.035) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(98, 231, 255, 0.028) 1px, transparent 1px);
+      linear-gradient(var(--c-grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--c-grid) 1px, transparent 1px);
     background-size: 100% 52px, 52px 100%;
     mask-image: radial-gradient(ellipse at 62% 0%, #000 6%, transparent 62%);
   }
@@ -149,104 +207,120 @@
     line-height: 1.8;
   }
 
-  /* ── shell ──────────────────────────────────────────────────── */
+  /* ── โครงหน้า: แถบบน + แท็บตามชนิดข้อมูล (docs/ux-plan.md U1 · แบบ Salesforce) ── */
 
   .c-shell {
-    display: grid;
-    grid-template-columns: 1fr;
+    display: block;
   }
 
-  @media (width >= 64rem) {
-    .c-shell {
-      grid-template-columns: 15rem 1fr;
-    }
-  }
-
-  .c-side {
-    border-inline-end: 1px solid var(--c-line);
-    background: rgba(5, 10, 24, 0.72);
-  }
-
-  /* backdrop-filter สร้าง containing block ให้ลูกที่เป็น position: fixed
-     ถ้าใส่ไว้ตลอด แถบบนของมือถือ (.c-topbar) จะถูกขังอยู่ใน .c-side
-     แล้วเลื่อนหายไปกับมันแทนที่จะติดขอบจอ (วัดได้ top: -446px)
-     เดสก์ท็อปยังได้เบลอเหมือนเดิม เพราะที่นั่นไม่มีลูกที่ fixed */
-  @media (width >= 64rem) {
-    .c-side {
-      backdrop-filter: blur(12px);
-    }
-  }
-
-  /* ── แถบบนของมือถือ ต้องตามไปด้วย ──
-
-     ต่ำกว่า lg ตัว .c-side เป็น static และหน้าบรีฟยาวหลายพันพิกเซล
-     อ่านถึงล่างสุดแล้วต้องเลื่อนกลับขึ้นบนสุดเพื่อไปหน้าอื่น
-
-     ใช้ fixed ไม่ใช่ sticky: .c-shell เป็นกริดคอลัมน์เดียว แถบนี้จึงอยู่ใน
-     แถวแรกซึ่งสูงเท่าเนื้อหาของ sidebar เท่านั้น sticky ยึดได้แค่ในกล่อง
-     ที่ครอบมันอยู่ พอเลื่อนพ้นแถวแรกก็หลุดตามไปด้วย (วัดได้ top: -455px)
-
-     เดสก์ท็อปคืนเป็น static เพราะ .c-side ทั้งแถบ sticky อยู่แล้ว */
-  .c-topbar {
-    position: fixed;
-    inset-inline: 0;
+  .c-appbar {
+    position: sticky;
     top: 0;
     z-index: 40;
-    /* เส้นคั่นมาจาก <hr class="c-hair"> ที่อยู่ในแถบอยู่แล้ว ไม่ต้องมี border ซ้ำ */
-    background: rgba(3, 7, 17, 0.94);
+    background: var(--c-appbar);
+    border-block-end: 1px solid var(--c-line);
+    box-shadow: var(--c-shadow);
     backdrop-filter: blur(12px);
   }
 
-  /* เว้นที่ให้แถบที่หลุดออกจาก flow ไปแล้ว */
-  .c-side {
-    padding-block-start: 3.4rem;
+  .c-appbar__row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 1rem;
   }
 
-  /* ── เมนูที่กดจากแถบลอย ต้องลอยตามด้วย ──
+  @media (width >= 48rem) {
+    .c-appbar__row {
+      padding-inline: 1.5rem;
+    }
+  }
 
-     แถบบนติดขอบจอแล้ว แต่ตัวเมนูยังอยู่ในลำดับปกติที่หัวหน้า เลื่อนลงไป
-     1,300px แล้วกด Menu มันจึงเปิดอยู่นอกจอ (วัดได้ top: -1314px) —
-     ปุ่มที่กดได้แต่ไม่เห็นผลแย่กว่าปุ่มที่กดไม่ได้ */
-  .c-navpanel[data-open="true"] {
-    position: fixed;
-    inset-inline: 0;
-    top: 3.4rem;
-    bottom: 0;
-    z-index: 39;
+  .c-search {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 36rem;
+    margin-inline: auto;
+  }
+
+  .c-search input {
+    width: 100%;
+    min-height: 2.4rem;
+    padding: 0.4rem 0.8rem;
+    border: 1px solid var(--c-line-2);
+    border-radius: var(--c-btn-radius);
+    background: var(--c-input);
+    color: var(--c-text);
+    font-size: 0.88rem;
+  }
+
+  .c-search input:focus {
+    border-color: var(--c-accent);
+    outline: none;
+  }
+
+  .c-tabs {
+    display: flex;
+    gap: 0.25rem;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-inline: 0.5rem;
+  }
+
+  @media (width >= 48rem) {
+    .c-tabs {
+      padding-inline: 1rem;
+    }
+  }
+
+  .c-tab {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.6rem;
+    padding: 0 0.85rem;
+    font-size: 0.9rem;
+    color: var(--c-text-2);
+    border-block-end: 3px solid transparent;
+    white-space: nowrap;
+  }
+
+  .c-tab:hover {
+    color: var(--c-text);
+    background: var(--c-hover);
+  }
+
+  .c-tab[data-active="true"] {
+    color: var(--c-text);
+    font-weight: 600;
+    border-block-end-color: var(--c-accent);
+  }
+
+  /* เมนูลอยของแถบบน (+ ใหม่ · ตั้งค่า · บัญชี) */
+  .c-menu {
+    position: relative;
+  }
+
+  .c-menu__panel {
+    position: absolute;
+    inset-inline-end: 0;
+    top: calc(100% + 0.35rem);
+    z-index: 50;
+    min-width: 15rem;
+    max-width: calc(100vw - 2rem);
+    max-height: calc(100dvh - 5rem);
     overflow-y: auto;
-    overscroll-behavior: contain;
-    background: var(--c-bg);
-    border-block-start: 1px solid var(--c-line);
+    padding: 0.35rem;
+    background: var(--c-panel);
+    border: 1px solid var(--c-line);
+    border-radius: var(--c-radius);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
   }
 
-  @media (width >= 64rem) {
-    .c-topbar {
-      position: static;
-      background: transparent;
-      backdrop-filter: none;
-    }
-
-    .c-side {
-      padding-block-start: 0;
-    }
-
-    /* ย่อจอมือถือแล้วกด Menu แล้วขยายกลับ open ยังค้างเป็น true อยู่ —
-       เดสก์ท็อปต้องไม่กลายเป็นแผงลอยเต็มจอเพราะสถานะที่ค้างมา */
-    .c-navpanel[data-open="true"] {
-      position: static;
-      overflow-y: visible;
-      background: transparent;
-      border-block-start: 0;
-    }
-  }
-
-  @media (width >= 64rem) {
-    .c-side {
-      position: sticky;
-      top: 0;
-      height: 100dvh;
-      overflow-y: auto;
-    }
+  .c-menu__label {
+    padding: 0.5rem 0.75rem 0.25rem;
+    font-size: 0.72rem;
+    color: var(--c-text-4);
   }
 
   .c-navlink {
@@ -263,12 +337,12 @@
   }
 
   .c-navlink:hover {
-    background: rgba(77, 155, 255, 0.09);
+    background: var(--c-hover);
     color: var(--c-text);
   }
 
   .c-navlink[data-active="true"] {
-    background: rgba(77, 155, 255, 0.15);
+    background: var(--c-active);
     color: var(--c-text);
     box-shadow: inset 2px 0 0 var(--c-accent);
   }
@@ -294,14 +368,15 @@
 
   .c-panel {
     border: 1px solid var(--c-line);
-    background: linear-gradient(180deg, rgba(11, 23, 48, 0.9), rgba(8, 16, 31, 0.9));
-    border-radius: 0;
+    background: var(--c-surface);
+    border-radius: var(--c-radius);
+    box-shadow: var(--c-shadow);
   }
 
   .c-panel-flat {
     border: 1px solid var(--c-line);
-    background: rgba(8, 16, 31, 0.6);
-    border-radius: 0;
+    background: var(--c-surface-flat);
+    border-radius: var(--c-radius);
   }
 
   .c-hair {
@@ -319,7 +394,7 @@
     gap: 0.45rem;
     min-height: 2.75rem;
     padding-inline: 0.95rem;
-    border-radius: 999px;
+    border-radius: var(--c-btn-radius);
     font-size: 0.83rem;
     font-weight: 500;
     white-space: nowrap;
@@ -361,13 +436,13 @@
      กับ "Clear AI cache" และเล็กกว่า "Travel forward 7 days" ที่ไม่ทำลาย
      อะไรเลย ทั้งคอนโซลจึงไม่มีอะไรแยกสองอย่างนี้ออกจากกัน */
   .c-btn-danger {
-    border-color: rgba(248, 113, 113, 0.5);
+    border-color: color-mix(in srgb, var(--c-bad) 50%, transparent);
     color: var(--c-bad);
-    background: rgba(248, 113, 113, 0.07);
+    background: color-mix(in srgb, var(--c-bad) 7%, transparent);
   }
   .c-btn-danger:not(:disabled):hover {
     border-color: var(--c-bad);
-    background: rgba(248, 113, 113, 0.14);
+    background: var(--c-bad);
     color: #fff;
   }
 
@@ -415,23 +490,23 @@
   }
 
   .c-pill-keep {
-    border-color: rgba(53, 200, 255, 0.4);
+    border-color: color-mix(in srgb, var(--c-cyan) 45%, transparent);
     color: var(--c-cyan);
   }
   .c-pill-reach {
-    border-color: rgba(77, 155, 255, 0.45);
+    border-color: color-mix(in srgb, var(--c-accent) 45%, transparent);
     color: var(--c-accent);
   }
   .c-pill-good {
-    border-color: rgba(52, 211, 153, 0.45);
+    border-color: color-mix(in srgb, var(--c-good) 45%, transparent);
     color: var(--c-good);
   }
   .c-pill-warn {
-    border-color: rgba(251, 191, 36, 0.45);
+    border-color: color-mix(in srgb, var(--c-warn) 45%, transparent);
     color: var(--c-warn);
   }
   .c-pill-bad {
-    border-color: rgba(248, 113, 113, 0.45);
+    border-color: color-mix(in srgb, var(--c-bad) 45%, transparent);
     color: var(--c-bad);
   }
 
@@ -457,13 +532,13 @@
 
   .c-table td {
     padding: 0.7rem 0.8rem 0.7rem 0;
-    border-bottom: 1px solid rgba(26, 43, 79, 0.6);
+    border-bottom: 1px solid var(--c-row-line);
     vertical-align: top;
     color: var(--c-text-2);
   }
 
   .c-table tbody tr:hover td {
-    background: rgba(77, 155, 255, 0.045);
+    background: var(--c-row-hover);
   }
 
   .c-scroll {
@@ -477,9 +552,9 @@
   .c-input,
   .c-select {
     width: 100%;
-    background: rgba(5, 10, 24, 0.8);
+    background: var(--c-input);
     border: 1px solid var(--c-line-2);
-    border-radius: 0;
+    border-radius: var(--c-btn-radius);
     padding: 0.5rem 0.7rem;
     font-size: 0.86rem;
     color: var(--c-text);
@@ -522,7 +597,7 @@
     line-height: 1.7;
     white-space: pre-wrap;
     color: var(--c-text-2);
-    background: rgba(5, 10, 24, 0.75);
+    background: var(--c-code);
     border: 1px solid var(--c-line);
     border-radius: 0;
     padding: 0.9rem 1rem;
@@ -588,9 +663,9 @@
     top: 1rem;
   }
 
-  /* ทำให้ focus ring เห็นชัดบนพื้นเข้ม */
+  /* focus ring เห็นชัดทั้งสองธีม */
   .console :focus-visible {
-    outline: 2px solid var(--c-cyan);
+    outline: 2px solid var(--c-accent);
     outline-offset: 2px;
   }
 }

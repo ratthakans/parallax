@@ -22,8 +22,8 @@ export default async function VaultPage() {
   return (
     <>
       <PageHead
-        label="Data Vault"
-        title="แหล่งข้อมูล"
+        label="ข้อมูล"
+        title="นำเข้าข้อมูล"
         lead="ทุกไฟล์ต้องมาจากแหล่งที่ลงทะเบียนไว้ — บอกวัตถุประสงค์ ที่มาของข้อมูล และเลือกเฉพาะฟิลด์ที่จำเป็น คอลัมน์นอกนั้นไม่ถูกเก็บ"
         actions={<>
           <Link href="/app/vault/cards" className="c-btn c-btn-ghost">กรอกนามบัตร</Link>

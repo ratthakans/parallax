@@ -27,7 +27,7 @@ export default async function SalesPage() {
   return (
     <>
       <PageHead
-        label="Campaign Workspace"
+        label="แคมเปญ"
         title="แคมเปญขาย"
         lead="หนึ่งแคมเปญ = หนึ่งข้อเสนอ หนึ่งวัตถุประสงค์ หนึ่งช่องทาง · รายชื่อมาจากเกณฑ์ที่อ่านได้ และทุกคนผ่านการตรวจนโยบายพร้อมเหตุผลก่อนมอบหมาย"
         actions={<>
@@ -73,7 +73,7 @@ export default async function SalesPage() {
         )}
       </Panel>
 
-      <Panel className="p-5 md:p-6">
+      <Panel id="new" className="scroll-mt-28 p-5 md:p-6">
         <h2 className="c-h2 text-[var(--c-text)]">สร้างแคมเปญ</h2>
         {!withBasis.length && (
           <p className="c-thai mt-3 text-[0.86rem] text-[var(--c-warn)]">

@@ -25,7 +25,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
   return (
     <>
       <PageHead
-        label="Account Workspace"
+        label="บริษัท"
         title="บัญชีบริษัท"
         lead="แฟ้มของแต่ละบริษัท: คนที่สังกัดตามช่วงเวลา ความสัมพันธ์ที่มีผู้ยืนยัน ประวัติการติดต่อ และสรุปก่อนพบลูกค้าที่ทุกประโยคชี้หลักฐาน — สิ่งที่ไม่มีหลักฐานแสดงว่าไม่ทราบ"
       />

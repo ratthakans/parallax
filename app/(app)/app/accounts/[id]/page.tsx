@@ -89,7 +89,7 @@ export default async function AccountPage({ params }: { params: Promise<{ id: st
   if (d.masked) {
     return (
       <>
-        <Link href="/app/accounts" className="c-thai inline-block py-2 text-[0.85rem] text-[var(--c-text-3)] hover:text-[var(--c-text)]">← บัญชีบริษัท</Link>
+        <Link href="/app/accounts" className="c-thai inline-block py-2 text-[0.85rem] text-[var(--c-text-3)] hover:text-[var(--c-text)]">← บริษัททั้งหมด</Link>
         <h1 className="c-h1 mt-4 text-[var(--c-text)]">{o.name}</h1>
         <Panel className="mt-6 p-5 md:p-6">
           <p className="c-thai text-[0.9rem] text-[var(--c-text-2)]">
@@ -146,11 +146,11 @@ export default async function AccountPage({ params }: { params: Promise<{ id: st
 
   return (
     <>
-      <Link href="/app/accounts" className="c-thai inline-block py-2 text-[0.85rem] text-[var(--c-text-3)] hover:text-[var(--c-text)]">← บัญชีบริษัท</Link>
+      <Link href="/app/accounts" className="c-thai inline-block py-2 text-[0.85rem] text-[var(--c-text-3)] hover:text-[var(--c-text)]">← บริษัททั้งหมด</Link>
 
       <header className="mt-4 mb-6 flex flex-wrap items-end justify-between gap-5">
         <div className="min-w-0">
-          <p className="c-label-th">Account Workspace</p>
+          <p className="c-label-th">บริษัท</p>
           <h1 className="c-h1 mt-3 break-words text-[var(--c-text)]">{o.name}</h1>
           <p className="c-thai mt-2 flex flex-wrap items-center gap-2 text-[0.84rem] text-[var(--c-text-3)]">
             <span className="c-pill">{LIFECYCLE_TH[o.lifecycle as LifecycleState] ?? o.lifecycle}</span>

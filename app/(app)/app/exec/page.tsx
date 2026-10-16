@@ -1,3 +1,4 @@
+import { retailOnly } from "@/app/(app)/tenant";
 import { myTenants } from "@/app/(app)/tenant";
 import { execOverview } from "@/lib/engine/exec";
 import { daysAgoLabel } from "@/lib/shared/format";
@@ -20,6 +21,7 @@ function change(now: number, before: number): { text: string; tone: "good" | "ba
 }
 
 export default async function ExecPage() {
+  await retailOnly();
   const ids = await myTenants();
   const { shops, totals, monthly } = await execOverview(ids);
   const delta = change(totals.revenue90, totals.revenuePrev90);
