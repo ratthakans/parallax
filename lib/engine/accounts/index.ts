@@ -44,8 +44,26 @@ export const MASKED_ORG = "บริษัทที่จำกัดการ�
 const visibleLevels = (clearance: Classification) =>
   (Object.keys(CLEARANCE_RANK) as Classification[]).filter((c) => canSee(clearance, c));
 
+/* มุมมองและการเรียงของหน้ารายการบริษัท (docs/ux-plan.md U3) — ค่ามาจากรายการคงที่เท่านั้น จึงประกอบเป็น SQL ได้ */
+export const ACCOUNT_VIEWS = ["all", "mine", "open_deals", "quiet", "no_owner"] as const;
+export type AccountView = (typeof ACCOUNT_VIEWS)[number];
+export const ACCOUNT_SORTS = ["people", "name", "last", "owner"] as const;
+export type AccountSort = (typeof ACCOUNT_SORTS)[number];
+const VIEW_SQL: Record<AccountView, string> = {
+  all: "",
+  mine: "",
+  open_deals: "EXISTS (SELECT 1 FROM opportunities p WHERE p.tenant_id = o.tenant_id AND p.org_id = o.id AND p.stage NOT IN ('won', 'lost'))",
+  /* เงียบ = มีคนสังกัดอยู่ แต่ไม่มีปฏิสัมพันธ์ใน 30 วัน (หรือไม่เคยมี) */
+  quiet: "COALESCE(a.cur, 0) > 0 AND (i.last_at IS NULL OR i.last_at < ?)",
+  no_owner: "o.account_owner_id IS NULL",
+};
+const SORT_SQL: Record<AccountSort, string> = {
+  people: "cur", name: "o.name", last: "COALESCE(i.last_at, '')", owner: "COALESCE(o.account_owner_id, '')",
+};
+
 export async function listAccounts(
-  tenantId: string, opts: { q?: string; mine?: string; limit?: number; offset?: number; viewer?: Viewer } = {},
+  tenantId: string,
+  opts: { q?: string; mine?: string; limit?: number; offset?: number; viewer?: Viewer; view?: AccountView; sort?: AccountSort; dir?: "asc" | "desc"; now?: Date } = {},
 ): Promise<{ rows: AccountRow[]; total: number }> {
   const where: string[] = [];
   const params: (string | number)[] = [tenantId];
@@ -61,11 +79,19 @@ export async function listAccounts(
   }
   if (opts.mine) { where.push("o.account_owner_id = ?"); params.push(opts.mine); }
   const extra = where.length ? ` AND ${where.join(" AND ")}` : "";
-  const total = await get<{ n: number | string }>(`SELECT COUNT(*) AS n FROM orgs o WHERE o.tenant_id = ?${extra}`, ...params);
+  const view = opts.view && VIEW_SQL[opts.view] ? opts.view : "all";
+  const viewParams: (string | number)[] = view === "quiet" ? [new Date(+(opts.now ?? new Date()) - 30 * 864e5).toISOString()] : [];
+  const viewSql = VIEW_SQL[view] ? ` AND ${VIEW_SQL[view]}` : "";
+  /* นับด้วยโครงเดียวกับรายการ — มุมมอง "เงียบ" อ้างยอดที่ join มา */
+  const total = await get<{ n: number | string }>(
+    `SELECT COUNT(*) AS n FROM (${LIST_SQL}${extra}${viewSql}) x`, tenantId, tenantId, ...params, ...viewParams);
+  const sort = opts.sort && SORT_SQL[opts.sort] ? opts.sort : "people";
+  const dir = opts.dir === "asc" ? "ASC" : opts.dir === "desc" ? "DESC" : sort === "name" || sort === "owner" ? "ASC" : "DESC";
+  const order = `${SORT_SQL[sort]} ${dir}, o.name ASC, o.id ASC`;
   const rows = await all<{
     id: string; name: string; primary_domain: string | null; lifecycle_state: string; account_owner_id: string | null;
     classification: Classification; people: number | string; cur: number | string; last_at: string | null;
-  }>(`${LIST_SQL}${extra} ORDER BY cur DESC, o.name LIMIT ? OFFSET ?`, tenantId, tenantId, ...params, opts.limit ?? 50, opts.offset ?? 0);
+  }>(`${LIST_SQL}${extra}${viewSql} ORDER BY ${order} LIMIT ? OFFSET ?`, tenantId, tenantId, ...params, ...viewParams, opts.limit ?? 50, opts.offset ?? 0);
   return {
     total: Number(total?.n ?? 0),
     rows: rows.map((r) => ({

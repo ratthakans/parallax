@@ -23,6 +23,7 @@ const { resolveTenant } = await import("@/lib/engine/vault/resolve");
 const { searchCustomers } = await import("@/lib/engine/customers");
 const { listAccounts, getDossier } = await import("@/lib/engine/accounts");
 const { todayQueue } = await import("@/lib/engine/today");
+const { listContacts } = await import("@/lib/engine/accounts/contacts-list");
 const { adoptTemplate } = await import("@/lib/engine/policy/templates");
 const { createCampaign, buildTargets } = await import("@/lib/engine/campaigns");
 const { fileBytes, generateSynthetic } = await import("@/lib/shared/synthetic-b2b");
@@ -83,6 +84,8 @@ const cases: { name: string; fn: (i: number) => Promise<number> }[] = [
   { name: "ค้นบัญชีบริษัท", fn: async (i) => (await listAccounts(T, { q: pick(orgs, i).name.slice(0, 6), viewer: VIEWER })).rows.length },
   { name: "เปิดแฟ้มบริษัท", fn: async (i) => (await getDossier(T, pick(orgs, i).id, VIEWER))?.people.length ?? 0 },
   { name: "หน้าวันนี้", fn: async () => (await todayQueue(T, VIEWER)).sections.length },
+  { name: "รายการผู้ติดต่อ เรียงตามบริษัท", fn: async (i) => (await listContacts(T, { sort: "org", page: 1 + (i % 3) }, VIEWER)).rows.length },
+  { name: "รายการบริษัท มุมมองเงียบ", fn: async () => (await listAccounts(T, { view: "quiet", viewer: VIEWER })).rows.length },
 ];
 
 const out: string[] = [];
