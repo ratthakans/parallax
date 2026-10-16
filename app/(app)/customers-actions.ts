@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { activeTenantId } from "@/app/(app)/tenant";
 import { denied, viewer } from "@/app/(app)/viewer";
+import { affiliateManual } from "@/lib/engine/accounts/edit";
+import { isB2BTenant } from "@/lib/shared/tenants";
 import { currentUser } from "@/lib/shared/session";
 import { membershipEnforced } from "@/lib/engine/access";
 import { get } from "@/lib/engine/sql";
@@ -53,6 +55,8 @@ function refresh(id?: string) {
 
 export async function createCustomerAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
   const { tenantId, actor } = await scope(fd);
+  const no = denied(await viewer(), "write");
+  if (no) return { error: no };
   const contacts = CONTACT_KIND_ORDER.map((kind) => ({ kind, value: field(fd, `contact_${kind}`) }));
   const res = await createCustomer(
     tenantId,
@@ -60,6 +64,14 @@ export async function createCustomerAction(_prev: ActionState, fd: FormData): Pr
     actor,
   );
   if (!res.ok) return { error: res.error };
+  /* บัญชี B2B: ผูกบริษัทและตำแหน่งเป็นสังกัด (ไม่ใช่แค่ช่องในโปรไฟล์) — หน้าคน หน้าบริษัท และแคมเปญจึงเห็น */
+  if (isB2BTenant(tenantId) && (field(fd, "company").trim() || field(fd, "prefillOrgId"))) {
+    const prefilled = field(fd, "prefillOrgId") && field(fd, "company").trim() === field(fd, "prefillOrgName") ? field(fd, "prefillOrgId") : undefined;
+    const aff = await affiliateManual(tenantId, res.id, {
+      orgId: prefilled, company: field(fd, "company"), title: field(fd, "job_title"), email: field(fd, "contact_email"),
+    }, actor);
+    if (aff.ok) revalidatePath(`/app/accounts/${aff.orgId}`);
+  }
   refresh(res.id);
   redirect(`/app/customers/${res.id}?created=1`);
 }

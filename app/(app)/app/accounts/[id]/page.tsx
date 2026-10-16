@@ -21,6 +21,8 @@ import { Panel, num } from "@/components/console/ui";
 import { RecordHeader, RecordTabs, pickTab } from "@/components/console/record";
 import { stageTh } from "@/lib/shared/deals";
 
+const baht = (n: number) => `฿${n.toLocaleString("th-TH", { maximumFractionDigits: 0 })}`;
+
 export const dynamic = "force-dynamic";
 
 /* ── แฟ้มบริษัท (docs/plan.md B4 · หัวข้อ 3.5 ข้อ 1–2) ─────────────────
@@ -117,10 +119,13 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
   ];
   const otherEnds = [...ends, ...others.map((x) => ({ v: `org:${x.id}`, label: x.name }))];
 
-  type Ev = { at: string; title: string; body?: ReactNode; who?: string | null };
+  /* sort = วันที่เกิด (ตัดเหลือวัน) แล้วตามเวลาที่บันทึก — การติดต่อเก็บวันที่อย่างเดียว ถ้าเรียงสตริงตรง ๆ
+     "2026-10-16" จะน้อยกว่า "2026-10-16T…" แล้วของที่เพิ่งบันทึกตกไปอยู่กลางรายการ */
+  type Ev = { at: string; sort?: string; title: string; body?: ReactNode; who?: string | null };
+  const sortKey = (e: Ev) => `${e.at.slice(0, 10)}|${e.sort ?? e.at}`;
   const timeline: Ev[] = [
     ...d.interactions.map((i) => ({
-      at: i.occurredAt,
+      at: i.occurredAt, sort: i.recordedAt,
       title: `${INTERACTION_TH[i.kind] ?? i.kind}${i.personName ? ` · ${i.personName}` : ""}`,
       body: i.masked
         ? <span className="text-[var(--c-text-4)]">บันทึกระดับ “{CLASSIFICATION_TH[i.classification]}” — เห็นเฉพาะผู้บันทึก</span>
@@ -144,9 +149,9 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
     ...d.relationships.filter((r) => r.confirmedAt).map((r) => ({
       at: r.confirmedAt!, title: "บันทึกความสัมพันธ์", body: <>{r.fromName} {RELATIONSHIP_TH[r.type]} {r.toName}</>, who: r.confirmedBy,
     })),
-  ].filter((e) => e.at).sort((a, b) => (a.at < b.at ? 1 : -1));
+  ].filter((e) => e.at).sort((a, b) => (sortKey(a) < sortKey(b) ? 1 : -1));
 
-  const TABS = ["overview", "details", "people", "relationships"] as const;
+  const TABS = ["overview", "details", "people", "deals", "relationships"] as const;
   const tab = pickTab(TABS, (await searchParams).tab);
   const base = `/app/accounts/${o.id}`;
   const lastTouch = d.interactions.map((i) => i.occurredAt).sort().at(-1);
@@ -176,6 +181,7 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
             confirm={o.accountOwner && !mineAccount ? `ยืนยันรับแทน ${o.accountOwner}` : undefined} />
           <ActionForm action={verifyOrgAction} fields={{ orgId: o.id }} label="ยืนยันว่าข้อมูลถูกต้อง" pendingLabel="กำลังบันทึก…" size="sm" />
           <Link href={`/app/deals/new?org=${o.id}`} className="c-btn c-btn-primary c-btn-sm">+ ดีล</Link>
+          <Link href={`/app/customers/new?org=${o.id}`} className="c-btn c-btn-ghost c-btn-sm">+ ผู้ติดต่อ</Link>
           {/* มือถือ: ช่องบันทึกกิจกรรมอยู่ท้ายหน้า — ปุ่มนี้พาไปทันที (docs/ux-plan.md U7) */}
           <a href="#activity" className="c-btn c-btn-ghost c-btn-sm xl:hidden">บันทึกกิจกรรม</a>
         </>}
@@ -187,6 +193,7 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
             { key: "overview", label: "ภาพรวม" },
             { key: "details", label: "รายละเอียด" },
             { key: "people", label: "คน", count: d.people.length },
+            { key: "deals", label: "ดีล", count: d.opportunities.length },
             { key: "relationships", label: "ความสัมพันธ์", count: d.relationships.length },
           ]} />
           <div className="grid min-w-0 content-start gap-5">
@@ -207,7 +214,7 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
                     {s.text}
                     {s.cites.length > 0 && (
                       <details className="mt-0.5 text-[0.76rem] text-[var(--c-text-4)]">
-                        <summary className="inline-block cursor-pointer py-0.5 hover:text-[var(--c-text-2)]">หลักฐาน {s.cites.map((c) => c.id).join(" ")}</summary>
+                        <summary className="inline-block cursor-pointer py-0.5 hover:text-[var(--c-text-2)]">ที่มา ({s.cites.length})</summary>
                         <ul className="mt-1 grid gap-1 border-l border-[var(--c-line)] pl-3">
                           {s.cites.map((c) => <li key={c.id}><span className="c-mono">{c.id}</span> {c.text}</li>)}
                         </ul>
@@ -419,6 +426,35 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
           </Panel>
 
             </>}
+            {tab === "deals" && (
+              <Panel className="p-0">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--c-line)] px-5 py-3">
+                  <p className="c-thai text-[0.84rem] text-[var(--c-text-3)]">
+                    {num(d.opportunities.length)} ดีล · เปิดอยู่ {baht(d.opportunities.filter((x) => !["won", "lost"].includes(x.stage)).reduce((t, x) => t + (x.value ?? 0), 0))}
+                  </p>
+                  <Link href={`/app/deals/new?org=${o.id}`} className="c-btn c-btn-primary c-btn-sm">+ ดีล</Link>
+                </div>
+                {d.opportunities.length ? (
+                  <div className="c-scroll px-5 pb-2" tabIndex={0} role="region" aria-label="ดีลของบริษัทนี้">
+                    <table className="c-table min-w-[36rem]">
+                      <thead><tr><th>ดีล</th><th>ขั้น</th><th className="text-right">มูลค่า</th><th>ปิดคาด</th><th>เจ้าของ</th></tr></thead>
+                      <tbody>
+                        {d.opportunities.map((x) => (
+                          <tr key={x.id}>
+                            <td><Link href={`/app/deals/${x.id}`} className="c-thai text-[var(--c-accent)] hover:underline">{x.name}</Link></td>
+                            <td className="c-thai text-[0.84rem]">{stageTh(x.stage)}</td>
+                            <td className="c-mono text-right">{x.value != null ? baht(x.value) : "—"}</td>
+                            <td className="c-thai text-[0.84rem]">{x.expectedClose ? thaiDate(x.expectedClose) : "—"}</td>
+                            <td className="c-thai text-[0.84rem]">{x.owner ?? "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : <p className="c-thai px-5 py-5 text-[0.88rem] text-[var(--c-text-3)]">ยังไม่มีดีลกับบริษัทนี้</p>}
+              </Panel>
+            )}
+
             {tab === "relationships" && <>
           {/* ── ความสัมพันธ์ที่ยืนยัน ── */}
           <Panel className="p-5 md:p-6">

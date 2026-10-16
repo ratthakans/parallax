@@ -1,4 +1,7 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import { emailInfo, orgInfo } from "@/lib/shared/identity";
+import { normaliseContact } from "@/lib/engine/pii";
+import { orgIdFor } from "@/lib/engine/vault/resolve";
 import { get, tx, type Sql } from "@/lib/engine/sql";
 import { logActivity } from "@/lib/engine/db";
 import {
@@ -285,4 +288,76 @@ export async function logInteraction(
   });
   await logActivity(tenantId, actor, "interaction_log", `${orgId} · ${input.kind}`);
   return { ok: true, id };
+}
+
+/* ── ผูกคนที่เพิ่มด้วยมือเข้ากับบริษัท (docs/crm-plan.md C0 ข้อ 2) ──────────
+
+   ใช้กุญแจบริษัทเดียวกับการนำเข้าไฟล์ (orgInfo · orgIdFor) — ไฟล์ที่นำเข้าทีหลังที่เขียนชื่อบริษัทแบบเดียวกัน
+   จึงเติมบริษัทเดิม ไม่สร้างบริษัทซ้ำ · ชื่อไม่ตรงแต่โดเมนอีเมลบริษัทตรง = ใช้บริษัทของโดเมนนั้น
+   สังกัดที่คนกรอกเองถือว่ายืนยันแล้ว (confirmed_by = ผู้กรอก) — ไฟล์ทีหลังไม่ทับตำแหน่งที่ยืนยัน */
+export async function affiliateManual(
+  tenantId: string, personId: string,
+  input: { orgId?: string; company?: string; title?: string; email?: string },
+  actor: string,
+): Promise<{ ok: true; orgId: string; created: boolean } | { ok: false; error: string }> {
+  const person = await get<{ id: string }>("SELECT id FROM customers WHERE tenant_id = ? AND id = ?", tenantId, personId);
+  if (!person) return { ok: false, error: "ไม่พบผู้ติดต่อนี้" };
+  const title = clean(input.title, 120) || null;
+  const domainOf = () => {
+    const e = emailInfo(normaliseContact("email", input.email ?? ""));
+    return e && !e.free ? e.domain : null;
+  };
+
+  let orgId = clean(input.orgId, 64);
+  let created = false;
+  let newOrg: { name: string; key: string; domain: string | null } | null = null;
+  if (orgId) {
+    if (!(await orgExists(tenantId, orgId))) return { ok: false, error: "ไม่พบบริษัทนี้" };
+  } else {
+    const info = orgInfo(clean(input.company, 200));
+    if (!info.key) return { ok: false, error: "ใส่ชื่อบริษัท" };
+    /* ชื่อตรงกับบริษัทที่มีอยู่ (เลือกจากรายการ) ก่อน — บริษัทที่รวมแล้วมี id ไม่ตรงกับกุญแจชื่อ */
+    orgId = (await orgByName(tenantId, info.display)) ?? orgIdFor(tenantId, info.key);
+    if (!(await orgExists(tenantId, orgId))) {
+      const domain = domainOf();
+      const byDomain = domain
+        ? await get<{ org_id: string }>("SELECT org_id FROM org_domains WHERE tenant_id = ? AND domain = ?", tenantId, domain)
+        : undefined;
+      if (byDomain) orgId = byDomain.org_id;
+      else newOrg = { name: info.display, key: info.key, domain };
+    }
+  }
+
+  const at = now();
+  const affId = `a-${createHash("sha256").update(`${tenantId}|${personId}|${orgId}`).digest("hex").slice(0, 24)}`;
+  await tx(async (q) => {
+    if (newOrg) {
+      await q.run(
+        "INSERT INTO orgs (id, tenant_id, name, name_norm, primary_domain, created_at, recorded_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING",
+        orgId, tenantId, newOrg.name, newOrg.key, newOrg.domain, at, at);
+      if (newOrg.domain) {
+        await q.run("INSERT INTO org_domains (tenant_id, org_id, domain) VALUES (?,?,?) ON CONFLICT DO NOTHING", tenantId, orgId, newOrg.domain);
+      }
+      created = true;
+    }
+    await q.run(
+      `INSERT INTO affiliations (id, tenant_id, customer_id, org_id, title, valid_from, valid_to, last_seen_at, source_id, confirmed_by, recorded_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)
+       ON CONFLICT(id) DO UPDATE SET title = COALESCE(excluded.title, affiliations.title), valid_to = NULL, confirmed_by = excluded.confirmed_by`,
+      affId, tenantId, personId, orgId, title, at.slice(0, 10), null, at, null, actor, at);
+    await version(q, tenantId, "affiliation", affId, "org_id", null, orgId, "เพิ่มผู้ติดต่อด้วยมือ", actor);
+  });
+  await logActivity(tenantId, actor, "affiliation_manual", `${personId} → ${orgId}${created ? " (บริษัทใหม่)" : ""}`);
+  return { ok: true, orgId, created };
+}
+
+/** บริษัทที่ชื่อตรงทุกตัวอักษร (ช่องเลือกบริษัทแบบพิมพ์ค้นหาส่งชื่อมา) — หลายบริษัทชื่อซ้ำ = เอาที่มีคนสังกัดมากสุด */
+export async function orgByName(tenantId: string, name: string): Promise<string | null> {
+  const n = name.normalize("NFC").replace(/\s+/g, " ").trim();
+  if (!n) return null;
+  const r = await get<{ id: string }>(
+    `SELECT o.id FROM orgs o WHERE o.tenant_id = ? AND o.name = ?
+     ORDER BY (SELECT COUNT(*) FROM affiliations a WHERE a.tenant_id = o.tenant_id AND a.org_id = o.id AND a.valid_to IS NULL) DESC, o.id LIMIT 1`,
+    tenantId, n);
+  return r?.id ?? null;
 }

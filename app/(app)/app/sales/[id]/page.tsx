@@ -5,6 +5,7 @@ import {
   assignTargetAction, bulkAssignAction, buildTargetsAction, draftMessageAction, markDraftSentAction, recordOutcomeAction, recordPreferenceAction, updateCriteriaAction,
 } from "@/app/(app)/sales-actions";
 import { getCampaign, type TargetView } from "@/lib/engine/campaigns";
+import { teamMembers } from "@/lib/engine/team";
 import { draftableTargets } from "@/lib/engine/campaigns/draft";
 import { listBases } from "@/lib/engine/policy";
 import {
@@ -62,7 +63,11 @@ function Target({ t, campaignId, me, purposes, draftable }: { t: TargetView; cam
         </div>
       )}
       <details className="c-thai mt-2 text-[0.78rem] text-[var(--c-text-3)]">
-        <summary className="inline-block cursor-pointer py-1 text-[var(--c-text-4)] hover:text-[var(--c-text-2)]">เหตุผลของนโยบาย · {open ? "มอบหมาย / บันทึกผล" : "ผล"}</summary>
+        <summary className={open && t.eligibility === "eligible"
+          ? "c-btn c-btn-ghost c-btn-sm inline-flex cursor-pointer list-none"
+          : "inline-block cursor-pointer py-1 text-[var(--c-text-4)] hover:text-[var(--c-text-2)]"}>
+          {open && t.status !== "open" ? "บันทึกผล · มอบหมายใหม่" : open && t.eligibility === "eligible" ? "มอบหมาย" : "เหตุผลของนโยบาย"}
+        </summary>
         <div className="mt-2 grid gap-3 border-l border-[var(--c-line)] pl-3">
           <div>
             <p>{t.eligibilityReasons.join(" · ") || "—"}</p>
@@ -71,7 +76,7 @@ function Target({ t, campaignId, me, purposes, draftable }: { t: TargetView; cam
           </div>
           {open && t.eligibility === "eligible" && (
             <ActionForm action={assignTargetAction} fields={{ campaignId, targetId: t.id }} label={t.assignedTo ? "มอบหมายใหม่" : "มอบหมาย"} pendingLabel="กำลังตรวจนโยบาย…" size="sm" className="grid gap-2 sm:grid-cols-2">
-              <label className={LABEL}>ผู้รับผิดชอบ<input name="assignee" defaultValue={t.assignedTo ?? me} className="c-input" required /></label>
+              <label className={LABEL}>ผู้รับผิดชอบ<input name="assignee" list="team-list" defaultValue={t.assignedTo ?? me} className="c-input" autoComplete="off" required /></label>
               <label className={LABEL}>ครบกำหนด<input type="date" name="dueOn" defaultValue={inDays(7)} className="c-input" required /></label>
             </ActionForm>
           )}
@@ -118,7 +123,7 @@ export default async function CampaignPage({ params, searchParams }: { params: P
   const { id } = await params;
   const sp = await searchParams;
   const v = await viewer();
-  const [c, bases] = await Promise.all([getCampaign(v.tenantId, id), listBases(v.tenantId)]);
+  const [c, bases, team] = await Promise.all([getCampaign(v.tenantId, id), listBases(v.tenantId), teamMembers(v.tenantId, v.actor)]);
   if (!c) notFound();
   const show = (FILTERS as string[]).includes(sp.show ?? "") ? (sp.show as Eligibility | "all") : "all";
   const count = (e: Eligibility) => c.targets.filter((t) => t.eligibility === e).length;
@@ -130,6 +135,7 @@ export default async function CampaignPage({ params, searchParams }: { params: P
 
   return (
     <>
+      <datalist id="team-list">{team.map((m) => <option key={m} value={m} />)}</datalist>
       <RecordHeader
         back={{ href: "/app/sales", label: "แคมเปญทั้งหมด" }}
         kind="แคมเปญ"
@@ -171,7 +177,7 @@ export default async function CampaignPage({ params, searchParams }: { params: P
           <ActionForm id="bulk" action={bulkAssignAction} fields={{ campaignId: c.id }} label="มอบหมายที่เลือก" pendingLabel="กำลังตรวจนโยบายทีละคน…" size="sm"
             className="mt-4 flex flex-wrap items-end gap-2 rounded-[var(--c-radius)] border border-[var(--c-line)] bg-[var(--c-panel-2)] p-3">
             <span className="c-thai self-center text-[0.8rem] text-[var(--c-text-3)]">ติ๊กคนที่ “ใช้ได้ตามนโยบาย” แล้วมอบหมายทีเดียว ·</span>
-            <label className={LABEL}>ให้<input name="assignee" defaultValue={v.actor} className="c-input min-h-9 py-1" /></label>
+            <label className={LABEL}>ให้<input name="assignee" list="team-list" defaultValue={v.actor} className="c-input min-h-9 py-1" autoComplete="off" /></label>
             <label className={LABEL}>ครบกำหนด<input type="date" name="dueOn" defaultValue={inDays(7)} className="c-input min-h-9 py-1" required /></label>
           </ActionForm>
         )}

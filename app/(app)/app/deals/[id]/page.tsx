@@ -39,6 +39,8 @@ export default async function DealPage({ params, searchParams }: { params: Promi
   const closed = d.stage === "won" || d.stage === "lost";
   const pathStages = [...OPEN_STAGES, closed ? (d.stage as "won" | "lost") : "won"];
   const at = isDealStage(d.stage) ? pathStages.indexOf(d.stage) : -1;
+  /* วันปิดจริง = ครั้งล่าสุดที่ย้ายเข้าขั้นปัจจุบัน (ประวัติเรียงใหม่ก่อน) — ไม่ต้องเก็บคอลัมน์ซ้ำ */
+  const closedAt = closed ? d.history.find((h) => h.field === "stage" && h.newValue === d.stage)?.at ?? d.updatedAt : null;
 
   return (
     <>
@@ -50,7 +52,9 @@ export default async function DealPage({ params, searchParams }: { params: Promi
         highlights={[
           { label: "บริษัท", value: <Link href={`/app/accounts/${d.orgId}`} className="text-[var(--c-accent)] hover:underline">{d.org}</Link> },
           { label: "มูลค่า", value: d.value != null ? baht(d.value) : "ไม่ระบุ" },
-          { label: "ปิดคาด", value: d.expectedClose ? thaiDate(d.expectedClose) : "ไม่ระบุ" },
+          closedAt
+            ? { label: d.stage === "won" ? "ปิดได้เมื่อ" : "ปิดเมื่อ", value: thaiDate(closedAt) }
+            : { label: "ปิดคาด", value: d.expectedClose ? thaiDate(d.expectedClose) : "ไม่ระบุ" },
           { label: "เจ้าของ", value: d.owner ?? "—" },
           { label: "แคมเปญ", value: d.campaignId ? <Link href={`/app/sales/${d.campaignId}`} className="text-[var(--c-accent)] hover:underline">{d.campaign}</Link> : "—" },
           { label: "อัปเดต", value: thaiDate(d.updatedAt) },
@@ -69,6 +73,7 @@ export default async function DealPage({ params, searchParams }: { params: Promi
                 ) : (
                   <ActionForm action={moveDealAction} fields={{ dealId: d.id, stage: s }} size="sm"
                     label={<>{state === "done" ? "✓ " : ""}{DEAL_STAGE_TH[s]}</>} pendingLabel="กำลังย้าย…"
+                    confirm={s === "won" ? "กดอีกครั้ง — ปิดดีลนี้ว่าได้" : closed ? "กดอีกครั้ง — เปิดดีลนี้ใหม่" : undefined}
                     variant="ghost" full buttonClassName={state === "done" ? "text-[var(--c-good)]" : ""} />
                 )}
               </li>

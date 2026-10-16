@@ -114,6 +114,8 @@ export async function recordOutcomeAction(_p: ActionState, fd: FormData): Promis
   }, v.actor, v.isStaff);
   if (!res.ok) return { error: res.reasons?.length ? `${res.error}: ${res.reasons.join(" · ")}` : res.error };
   revalidatePath(`/app/sales/${str(fd, "campaignId")}`);
+  revalidatePath("/app/tasks");
+  revalidatePath("/app/today");
   return { ok: "บันทึกผลแล้ว — ลงไทม์ไลน์ของบริษัทด้วย" };
 }
 

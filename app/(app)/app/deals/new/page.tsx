@@ -5,6 +5,7 @@ import { listAccounts } from "@/lib/engine/accounts";
 import { DEAL_STAGE_TH, OPEN_STAGES } from "@/lib/shared/deals";
 import { ActionForm } from "@/components/console/action-form";
 import { PageHead, Panel } from "@/components/console/ui";
+import { OrgPicker } from "@/components/console/org-picker";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,8 @@ export default async function NewDealPage({ searchParams }: { searchParams: Prom
   const v = await viewer();
   const { rows } = await listAccounts(v.tenantId, { sort: "name", limit: 1000, viewer: { id: v.actor, clearance: v.clearance } });
 
+  const pre = rows.find((r) => r.id === org);
+
   return (
     <>
       <Link href="/app/deals" className="c-thai text-[0.8rem] text-[var(--c-text-3)] hover:text-[var(--c-accent)]">← ดีลทั้งหมด</Link>
@@ -24,10 +27,8 @@ export default async function NewDealPage({ searchParams }: { searchParams: Prom
       <Panel className="max-w-2xl p-5 md:p-6">
         <ActionForm action={createDealAction} label="สร้างดีล" pendingLabel="กำลังสร้าง…" variant="primary" className="grid gap-4 sm:grid-cols-2">
           <label className={`${LABEL} sm:col-span-2`}>บริษัท *
-            <select name="orgId" className="c-select" defaultValue={org ?? ""} required>
-              <option value="" disabled>เลือกบริษัท</option>
-              {rows.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-            </select>
+            <OrgPicker id="deal-org" name="orgName" names={rows.map((r) => r.name)} defaultValue={pre?.name} required />
+            {pre && <><input type="hidden" name="prefillOrgId" value={pre.id} /><input type="hidden" name="prefillOrgName" value={pre.name} /></>}
           </label>
           <label className={`${LABEL} sm:col-span-2`}>ชื่อดีล *
             <input name="name" className="c-input" maxLength={160} placeholder="เช่น สปอนเซอร์ Gold งาน 2027" required />

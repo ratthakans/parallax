@@ -2,6 +2,7 @@ import { all } from "@/lib/engine/sql";
 import { searchCustomers } from "@/lib/engine/customers";
 import { listAccounts, MASKED_PERSON, type Viewer } from "@/lib/engine/accounts";
 import { canSee } from "@/lib/shared/accounts";
+import { listDeals } from "@/lib/engine/deals";
 import type { Classification } from "@/lib/shared/vault";
 
 /* ── ค้นหารวมจากแถบบน (docs/ux-plan.md U1) ─────────────────────────────
@@ -10,12 +11,14 @@ import type { Classification } from "@/lib/shared/vault";
      บริษัท   ชื่อ/ชื่ออังกฤษ/โดเมน บางส่วน (listAccounts — กรองระดับความลับแล้ว ไม่เผยบริษัทที่เกินสิทธิ์)
      ผู้ติดต่อ  ชื่อบางส่วน · อีเมล/เบอร์ต้องครบ (searchCustomers — หาด้วย HMAC ไม่ถอดรหัสใคร)
               คนที่ระดับเกินสิทธิ์ขึ้นเป็นชื่อปิดบังและไม่มีลิงก์ (แบบเดียวกับหน้า "วันนี้")
+     ดีล      ชื่อดีลหรือชื่อบริษัทบางส่วน (listDeals — ดีลของบริษัทที่เกินสิทธิ์ไม่ขึ้น)
      แคมเปญ   ชื่อบางส่วน
    ไม่บันทึกคำค้น — อาจเป็นเบอร์หรือชื่อคน */
 
 export type SearchResults = {
   orgs: { id: string; name: string; domain: string | null; people: number }[];
   people: { id: string; name: string; visible: boolean; org: string | null; title: string | null }[];
+  deals: { id: string; name: string; org: string; stage: string; value: number | null }[];
   campaigns: { id: string; name: string; status: string }[];
 };
 
@@ -23,10 +26,11 @@ const LIMIT = 10;
 
 export async function searchEverything(tenantId: string, q: string, viewer: Viewer): Promise<SearchResults> {
   const term = q.trim().slice(0, 120);
-  if (term.length < 2) return { orgs: [], people: [], campaigns: [] };
-  const [orgs, people, campaigns] = await Promise.all([
+  if (term.length < 2) return { orgs: [], people: [], deals: [], campaigns: [] };
+  const [orgs, people, deals, campaigns] = await Promise.all([
     listAccounts(tenantId, { q: term, limit: LIMIT, viewer }),
     searchCustomers(tenantId, { q: term, sort: "name" }),
+    listDeals(tenantId, { view: "all", q: term }, viewer),
     all<{ id: string; name: string; status: string }>(
       "SELECT id, name, status FROM sales_campaigns WHERE tenant_id = ? AND name LIKE ? ORDER BY updated_at DESC LIMIT ?",
       tenantId, `%${term}%`, LIMIT),
@@ -57,6 +61,7 @@ export async function searchEverything(tenantId: string, q: string, viewer: View
       const j = visible ? job.get(p.id) : undefined;
       return { id: p.id, name: visible ? p.name : MASKED_PERSON, visible, org: j?.org ?? null, title: j?.title ?? null };
     }),
+    deals: deals.slice(0, LIMIT).map((d) => ({ id: d.id, name: d.name, org: d.org, stage: d.stage, value: d.value })),
     campaigns,
   };
 }

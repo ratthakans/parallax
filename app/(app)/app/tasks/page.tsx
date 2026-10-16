@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { viewer } from "@/app/(app)/viewer";
 import { completeTaskAction } from "@/app/(app)/task-actions";
+import { recordOutcomeAction } from "@/app/(app)/sales-actions";
+import { OUTCOMES, TARGET_STATUS_TH } from "@/lib/shared/policy";
 import { TASK_VIEWS, listTasks, type TaskView } from "@/lib/engine/tasks";
 import { bangkokDay, thaiDate } from "@/lib/shared/format";
 import { ActionForm } from "@/components/console/action-form";
@@ -9,7 +11,10 @@ import { ListViews, type ListState } from "@/components/console/list-view";
 
 export const dynamic = "force-dynamic";
 
-/* ── งาน (docs/ux-plan.md U5) ── ทุกงานในที่เดียว · งานของแคมเปญปิดที่หน้าแคมเปญ (บันทึกผล = ตรวจนโยบายซ้ำ) */
+/* ── งาน (docs/ux-plan.md U5) ── ทุกงานในที่เดียว
+   งานของแคมเปญบันทึกผลได้ที่นี่เลย (docs/crm-plan.md C0 ข้อ 5) — ใช้ action เดียวกับหน้าแคมเปญ จึงตรวจนโยบายซ้ำเหมือนกัน */
+
+const LABEL = "c-thai flex min-w-0 flex-col gap-1 text-[0.8rem] text-[var(--c-text-3)]";
 
 const BASE = "/app/tasks";
 const VIEWS: { key: TaskView; label: string }[] = [
@@ -54,10 +59,27 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
                   </div>
                   <div className="flex flex-wrap items-center gap-2 md:justify-end">
                     {t.due && <span className={`c-pill ${late ? "c-pill-bad" : ""}`}>{late ? "เลยกำหนด " : "ครบ "}{thaiDate(t.due)}</span>}
-                    {t.status === "open" && (t.targetId
-                      ? <Link href={`/app/sales/${t.campaignId}`} className="c-btn c-btn-ghost c-btn-sm">บันทึกผลที่แคมเปญ</Link>
-                      : <ActionForm action={completeTaskAction} fields={{ taskId: t.id }} label="เสร็จแล้ว" pendingLabel="กำลังบันทึก…" size="sm" />)}
+                    {t.status === "open" && !t.targetId && (
+                      <ActionForm action={completeTaskAction} fields={{ taskId: t.id }} label="เสร็จแล้ว" pendingLabel="กำลังบันทึก…" size="sm" />
+                    )}
                   </div>
+                  {t.status === "open" && t.targetId && t.campaignId && (
+                    <details className="md:col-span-2">
+                      <summary className="c-btn c-btn-primary c-btn-sm inline-flex cursor-pointer list-none">บันทึกผล</summary>
+                      <ActionForm action={recordOutcomeAction} fields={{ campaignId: t.campaignId, targetId: t.targetId }} label="บันทึกผล"
+                        pendingLabel="กำลังตรวจนโยบาย…" size="sm" className="mt-3 grid max-w-2xl gap-2 sm:grid-cols-2">
+                        <label className={LABEL}>ผล
+                          <select name="outcome" className="c-select" defaultValue="contacted">
+                            {OUTCOMES.map((o) => <option key={o} value={o}>{TARGET_STATUS_TH[o]}</option>)}
+                          </select>
+                        </label>
+                        <label className={LABEL}>มูลค่า (ถ้าปิดได้ · บาท)<input name="value" inputMode="numeric" className="c-input" /></label>
+                        <label className={`${LABEL} sm:col-span-2`}>เกิดอะไรขึ้น<input name="note" className="c-input" required /></label>
+                        <label className={LABEL}>ขั้นตอนถัดไป (ไม่บังคับ)<input name="nextStep" className="c-input" placeholder="เช่น ส่งข้อเสนอฉบับแก้" /></label>
+                        <label className={LABEL}>ครบกำหนดขั้นถัดไป<input type="date" name="nextDue" className="c-input" /></label>
+                      </ActionForm>
+                    </details>
+                  )}
                 </li>
               );
             })}

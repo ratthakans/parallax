@@ -28,10 +28,10 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
   const dir = sp.dir === "asc" || sp.dir === "desc" ? sp.dir : undefined;
   const mode = sp.mode === "list" ? "list" : "board";
   const deals = await listDeals(v.tenantId, { view, sort, dir, q: sp.q }, { id: v.actor, clearance: v.clearance });
-  const state: ListState = { q: sp.q, view, sort, dir, defaultView: "open", mode: mode === "list" ? "list" : undefined };
+  const state: ListState = { q: sp.q, view, sort, dir, defaultView: "open", mode: sp.mode === "list" || sp.mode === "board" ? sp.mode : undefined };
   const total = deals.reduce((t, d) => t + (d.value ?? 0), 0);
   const stages = view === "won" || view === "lost" ? [view] : view === "all" ? [...DEAL_STAGES] : OPEN_STAGES;
-  const modeHref = (m: string) => listHref(BASE, state, { mode: m === "list" ? "list" : undefined });
+  const modeHref = (m: string) => listHref(BASE, state, { mode: m });
 
   return (
     <>
@@ -55,7 +55,26 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
           </p>
         </Panel>
       ) : mode === "board" ? (
-        <DealBoard key={deals.map((d) => `${d.id}:${d.stage}`).join("|")} stages={stages} deals={deals.map((d) => ({ id: d.id, name: d.name, org: d.org, stage: d.stage, value: d.value, expectedClose: d.expectedClose, owner: d.owner }))} />
+        <>
+          {/* ไม่ได้เลือกรูปแบบเอง + จอแคบ = รายการการ์ด (บอร์ดหลายคอลัมน์บนมือถือเห็นทีละคอลัมน์ · docs/crm-plan.md C0 ข้อ 9) */}
+          {!state.mode && (
+            <ul className="grid gap-2 md:hidden">
+              {deals.map((d) => (
+                <li key={d.id} className="c-panel p-3">
+                  <Link href={`/app/deals/${d.id}`} className="c-thai block text-[0.92rem] font-medium text-[var(--c-accent)]">{d.name}</Link>
+                  <p className="c-thai mt-0.5 truncate text-[0.8rem] text-[var(--c-text-3)]">{d.org}</p>
+                  <p className="mt-1.5 flex items-center justify-between gap-2">
+                    <span className={`c-pill ${d.stage === "won" ? "c-pill-good" : d.stage === "lost" ? "" : "c-pill-reach"}`}>{stageTh(d.stage)}</span>
+                    <span className="c-mono text-[0.82rem]">{d.value != null ? baht(d.value) : "—"}</span>
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className={state.mode ? "" : "hidden md:block"}>
+            <DealBoard key={deals.map((d) => `${d.id}:${d.stage}`).join("|")} stages={stages} deals={deals.map((d) => ({ id: d.id, name: d.name, org: d.org, stage: d.stage, value: d.value, expectedClose: d.expectedClose, owner: d.owner }))} />
+          </div>
+        </>
       ) : (
         <Panel className="p-0">
           <div className="c-scroll px-5 py-2" tabIndex={0} role="region" aria-label="ตารางดีล">

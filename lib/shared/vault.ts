@@ -18,7 +18,7 @@ export const LIFECYCLE_STATES = [
 ] as const;
 export type LifecycleState = (typeof LIFECYCLE_STATES)[number];
 export const LIFECYCLE_TH: Record<LifecycleState, string> = {
-  received: "รับเข้า",
+  received: "ยังไม่ตรวจ",
   pending_review: "รอตรวจ",
   confirmed: "ยืนยันแล้ว",
   needs_review: "ต้องทบทวน",
