@@ -44,13 +44,13 @@
     "verify:pg": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/pg-rls.mts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.115.0",
-    "@supabase/ssr": "^0.12.4",
+    "@anthropic-ai/sdk": "^0.133.0",
+    "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.112.0",
     "next": "16.4.0",
     "postgres": "^3.4.9",
-    "react": "19.2.4",
-    "react-dom": "19.2.4",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
