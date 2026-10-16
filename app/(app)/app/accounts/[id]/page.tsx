@@ -176,6 +176,8 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
             confirm={o.accountOwner && !mineAccount ? `ยืนยันรับแทน ${o.accountOwner}` : undefined} />
           <ActionForm action={verifyOrgAction} fields={{ orgId: o.id }} label="ยืนยันว่าข้อมูลถูกต้อง" pendingLabel="กำลังบันทึก…" size="sm" />
           <Link href={`/app/deals/new?org=${o.id}`} className="c-btn c-btn-primary c-btn-sm">+ ดีล</Link>
+          {/* มือถือ: ช่องบันทึกกิจกรรมอยู่ท้ายหน้า — ปุ่มนี้พาไปทันที (docs/ux-plan.md U7) */}
+          <a href="#activity" className="c-btn c-btn-ghost c-btn-sm xl:hidden">บันทึกกิจกรรม</a>
         </>}
       />
 
@@ -486,7 +488,7 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
         </div>
 
         {/* ── กิจกรรม: จดโน้ต · บันทึกแบบฟอร์ม · ไทม์ไลน์ (ช่องบันทึกด้านขวาแบบ Salesforce) ── */}
-        <aside className="grid min-w-0 content-start gap-5">
+        <aside id="activity" className="grid min-w-0 scroll-mt-28 content-start gap-5">
           {/* ── ไทม์ไลน์ ── */}
           <Panel className="p-4 md:p-5">
             <h2 className="c-h2 text-[var(--c-text)]">กิจกรรม</h2>
