@@ -3,6 +3,7 @@ import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/shared/supabase";
+import type { MfaLevel } from "@/lib/shared/roles";
 
 /* ── ใครเป็นเจ้าของคำขอนี้ ─────────────────────────────────────
 
@@ -17,7 +18,9 @@ import { supabaseServer } from "@/lib/shared/supabase";
    หน้าคอนโซลหนึ่งหน้าถามว่า "ใครล็อกอินอยู่" หลายที่
    ───────────────────────────────────────────────────────────── */
 
-export type Session = { userId: string; email: string };
+/** mfa: "verified" = ยืนยันสองชั้นในรอบนี้แล้ว (aal2) · "pending" = มีแอปยืนยันแต่ยังไม่ได้ใส่รหัส (aal1 → ต้องไปหน้ารหัส)
+    "none" = ยังไม่ได้เปิดใช้ยืนยันสองชั้น */
+export type Session = { userId: string; email: string; mfa: MfaLevel };
 
 /** คนที่ล็อกอินอยู่ หรือ null ถ้ายังไม่ได้ล็อกอิน */
 export const currentUser = cache(async (): Promise<Session | null> => {
@@ -38,6 +41,10 @@ export const currentUser = cache(async (): Promise<Session | null> => {
      ต่างจาก getSession() ที่อ่านจากคุกกี้เฉย ๆ ซึ่งปลอมได้ */
   const { data, error } = await sb.auth.getUser();
   if (error || !data.user) return null;
-  return { userId: data.user.id, email: data.user.email ?? "" };
+  /* ระดับยืนยันตัวตนอ่านจาก JWT ที่ getUser() เพิ่งตรวจ — อ่านไม่ได้ = ถือว่ายังไม่ได้เปิดใช้ (ไม่ทำให้ล็อกอินพัง)
+     แต่การกระทำที่ต้องยืนยันสองชั้นจะยังถูกปฏิเสธ เพราะไม่ใช่ "verified" */
+  const { data: aal } = await sb.auth.mfa.getAuthenticatorAssuranceLevel();
+  const mfa = aal?.currentLevel === "aal2" ? "verified" : aal?.nextLevel === "aal2" ? "pending" : "none";
+  return { userId: data.user.id, email: data.user.email ?? "", mfa };
 });
 

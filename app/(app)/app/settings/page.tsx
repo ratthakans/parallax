@@ -17,6 +17,12 @@ import {
   updateLimitsAction,
 } from "../../actions";
 import { ActionForm } from "@/components/console/action-form";
+import { MfaSetup } from "@/components/console/mfa-setup";
+import { removeMfaAction } from "../../mfa-actions";
+import { currentUser } from "@/lib/shared/session";
+import { supabaseServer } from "@/lib/shared/supabase";
+import { membershipEnforced } from "@/lib/engine/access";
+import { thaiDate } from "@/lib/shared/format";
 import { demoToolsEnabled } from "@/lib/shared/demo-tools";
 
 export const dynamic = "force-dynamic";
@@ -76,6 +82,8 @@ export default async function SettingsPage() {
         title="เพดาน · AI · เครื่องมือเดโม"
         lead="ทุกเพดานถูกบังคับที่ชั้นส่งจริง ไม่ได้อยู่แค่บนหน้าจอ เมื่อแก้แล้วจะมีผลตั้งแต่รอบคำนวณถัดไป"
       />
+
+      <MfaPanel />
 
       {/* ── โปรไฟล์บัญชี ── */}
       <Panel className="mb-6 p-5 md:p-6">
@@ -418,5 +426,37 @@ export default async function SettingsPage() {
         </ActionForm>
       </Panel>
     </>
+  );
+}
+
+/* ── ยืนยันตัวตนสองชั้น (B6) ── ของผู้ใช้คนนี้ ไม่ใช่ของบัญชี · ต้องเปิดก่อนส่งออก ทำคำขอสิทธิ หรือลบคน (lib/shared/roles.ts MFA_REQUIRED) */
+async function MfaPanel() {
+  const user = membershipEnforced() ? await currentUser() : null;
+  const factors = user ? ((await (await supabaseServer()).auth.mfa.listFactors()).data?.totp ?? []) : [];
+  return (
+    <Panel className="mb-6 p-5 md:p-6">
+      <h2 className="c-h2 text-[var(--c-text)]">ยืนยันตัวตนสองชั้น</h2>
+      <p className="c-thai mt-1 text-[0.82rem] text-[var(--c-text-3)]">
+        รหัส 6 หลักจากแอปในโทรศัพท์ นอกจากรหัสผ่าน — ต้องเปิดก่อนส่งออกรายชื่อ ทำคำขอสิทธิ หรือลบคน เพื่อให้รหัสผ่านที่รั่วอย่างเดียวดึงข้อมูลออกไม่ได้
+      </p>
+      {!user ? (
+        <p className="c-thai mt-3 text-[0.84rem] text-[var(--c-text-4)]">โหมดเดโมไม่มีการเข้าสู่ระบบ — ใช้ได้เมื่อเชื่อม Supabase</p>
+      ) : factors.length ? (
+        <ul className="mt-3 flex flex-col divide-y divide-[var(--c-line)]">
+          {factors.map((f) => (
+            <li key={f.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
+              <span className="c-thai text-[0.86rem] text-[var(--c-text-2)]">
+                <span className="c-pill c-pill-good mr-2">เปิดอยู่</span>{f.friendly_name ?? "แอปยืนยันตัวตน"} · เพิ่มเมื่อ {thaiDate(f.created_at)}
+                {user.mfa !== "verified" && " · รอบนี้ยังไม่ได้ใส่รหัส"}
+              </span>
+              <ActionForm action={removeMfaAction} fields={{ factorId: f.id }} label="ปิด" size="sm" variant="danger"
+                confirm="กดอีกครั้งเพื่อปิดยืนยันสองชั้น" pendingLabel="กำลังปิด…" />
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <MfaSetup />
+      )}
+    </Panel>
   );
 }

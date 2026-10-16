@@ -3,7 +3,7 @@ import { viewer } from "@/app/(app)/viewer";
 import { approveExportAction, cancelExportAction, requestExportAction } from "@/app/(app)/export-actions";
 import { listExports, scopeFrom, type ExportRequest } from "@/lib/engine/exports";
 import { thaiDateTime } from "@/lib/shared/format";
-import { can, deniedTh } from "@/lib/shared/roles";
+import { MFA_NEEDED_TH, can, deniedTh } from "@/lib/shared/roles";
 import { ActionForm } from "@/components/console/action-form";
 import { PageHead, Panel, num } from "@/components/console/ui";
 
@@ -43,6 +43,9 @@ export default async function ExportsPage({ searchParams }: { searchParams: Prom
         lead="ไฟล์ส่งออกมีเบอร์และอีเมลแบบอ่านได้ ออกไปแล้วตามคืนไม่ได้ — จึงต้องขอพร้อมเหตุผลและได้รับอนุมัติก่อน · ผู้อนุมัติอีกคน (เจ้าของหรือผู้ดูแลข้อมูลส่วนบุคคล) อนุมัติ = ดาวน์โหลดได้ทันที · บัญชีที่มีผู้อนุมัติคนเดียวอนุมัติตัวเองได้ แต่ต้องรอ 1 ชั่วโมง · ผู้ขอดาวน์โหลดได้ครั้งเดียวภายใน 24 ชั่วโมง"
       />
 
+      {(mayRequest || mayApprove) && v.mfa !== "verified" && (
+        <p role="status" className="c-msg c-msg-err mb-6">{MFA_NEEDED_TH} · <Link href="/app/settings" className="underline underline-offset-4">ไปหน้าตั้งค่า</Link></p>
+      )}
       {!mayRequest ? (
         <Panel flat className="mb-6 p-5"><p className="c-thai text-[0.86rem] text-[var(--c-text-3)]">{deniedTh("export_request")}</p></Panel>
       ) : (

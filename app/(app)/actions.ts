@@ -1,5 +1,6 @@
 "use server";
 
+import { denied, viewer } from "@/app/(app)/viewer";
 import { activeTenantId } from "@/app/(app)/tenant";
 import { currentUser } from "@/lib/shared/session";
 import { membershipEnforced, tenantsForUser } from "@/lib/engine/access";
@@ -443,17 +444,11 @@ export async function wipeCustomerDataAction(
     return { error: `พิมพ์ชื่อร้าน "${tenant.name}" ให้ตรงก่อน — ยังไม่มีอะไรถูกลบ` };
   }
 
-  if (membershipEnforced()) {
-    const user = await currentUser();
-    const role = user
-      ? (await get<{ role: string }>(
-          "SELECT role FROM tenant_users WHERE user_id = ? AND tenant_id = ?",
-          user.userId,
-          tenantId,
-        ))?.role
-      : undefined;
-    if (role !== "owner") return { error: "เฉพาะเจ้าของบัญชีเท่านั้นที่ล้างข้อมูลได้" };
-  }
+  /* เจ้าของบัญชีเท่านั้น และต้องยืนยันสองชั้นในรอบนี้ (ล้างแล้วย้อนไม่ได้) — viewer() อ่านบัญชีจากฝั่งเซิร์ฟเวอร์ */
+  const v = await viewer();
+  if (v.tenantId !== tenantId) return { error: "หน้านี้เปิดอยู่กับบัญชีอื่น — โหลดหน้าใหม่ก่อน" };
+  const no = denied(v, "account_admin");
+  if (no) return { error: no };
 
   await tx((q) => wipeCustomerData(q, tenantId));
   await logActivity(tenantId, ACTOR, "wipe_customer_data", tenant.name);
