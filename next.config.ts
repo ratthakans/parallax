@@ -12,8 +12,9 @@ import type { NextConfig } from "next";
      X-Frame        กัน clickjacking — คอนโซลมีปุ่มที่กดแล้วส่งข้อความจริง
      Permissions    ปิดกล้อง ไมค์ ตำแหน่ง ที่เว็บนี้ไม่เคยใช้
 
-   ยังไม่ใส่ CSP เต็ม เพราะต้องไล่ inline style ของ Next กับฟอนต์ให้ครบ
-   ก่อน ไม่งั้นจะได้ CSP ที่ปิดหน้าเว็บตัวเอง — เป็นงานแยกที่ต้องวัดจริง */
+   CSP เต็ม (nonce) อยู่ที่ proxy.ts สำหรับคอนโซลและหน้าเข้าสู่ระบบ ซึ่ง render ตอนขอ
+   เว็บการตลาดเป็นหน้าคงที่ ใส่ nonce ไม่ได้ จึงได้ชุดพื้นฐานที่ไม่ต้องรู้จักสคริปต์:
+   ห้ามฝัง plugin · ห้ามเปลี่ยน <base> · ฟอร์มส่งได้แค่โดเมนตัวเอง · ห้ามถูกฝังใน iframe ของคนอื่น */
 const SECURITY_HEADERS = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
@@ -23,6 +24,9 @@ const SECURITY_HEADERS = [
     value: "camera=(), microphone=(), geolocation=(), interest-cohort=()",
   },
 ];
+
+/* หน้าคอนโซลได้ CSP เต็มจาก proxy.ts แทน — ไม่ส่งชุดนี้ซ้อนไป (สอง CSP = เบราว์เซอร์บังคับทั้งคู่) */
+const SITE_CSP = { key: "Content-Security-Policy", value: "object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'" };
 
 const nextConfig: NextConfig = {
   experimental: {
@@ -42,7 +46,10 @@ const nextConfig: NextConfig = {
   },
 
   async headers() {
-    return [{ source: "/:path*", headers: SECURITY_HEADERS }];
+    return [
+      { source: "/:path*", headers: SECURITY_HEADERS },
+      { source: "/((?!app|login).*)", headers: [SITE_CSP] },
+    ];
   },
 };
 
