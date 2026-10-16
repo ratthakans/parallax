@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { emailInfo, orgInfo } from "@/lib/shared/identity";
+import { normaliseTaxId } from "@/lib/shared/tax-id";
 import { normaliseContact } from "@/lib/engine/pii";
 import { orgIdFor } from "@/lib/engine/vault/resolve";
 import { get, tx, type Sql } from "@/lib/engine/sql";
@@ -44,8 +45,12 @@ export async function updateOrgField(
   if (!org) return { ok: false, error: "ไม่พบบริษัทนี้" };
   let next: string | null = clean(value, 200) || null;
   if (field === "tax_id" && next) {
-    next = next.replace(/\D/g, "");
-    if (next.length !== 13) return { ok: false, error: "เลขประจำตัวผู้เสียภาษีมี 13 หลัก" };
+    const tax = normaliseTaxId(next);
+    if (!tax) return { ok: false, error: "เลขนิติบุคคลไม่ถูกต้อง — 13 หลัก ขึ้นต้นด้วย 0 และหลักสุดท้ายต้องตรงกับเลขตรวจสอบ" };
+    /* เลขเดียวกัน = นิติบุคคลเดียวกัน — บอกให้รวมบริษัท แทนที่จะมีสองแฟ้มที่เลขเดียวกัน */
+    const twin = await get<{ id: string; name: string }>("SELECT id, name FROM orgs WHERE tenant_id = ? AND tax_id = ? AND id <> ?", tenantId, tax, orgId);
+    if (twin) return { ok: false, error: `เลขนี้เป็นของ "${twin.name}" อยู่แล้ว — เป็นบริษัทเดียวกัน ให้รวมสองแฟ้มที่คิวตรวจข้อมูลซ้ำแทน` };
+    next = tax;
   }
   if (field === "primary_domain" && next) {
     next = next.toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/.*$/, "");

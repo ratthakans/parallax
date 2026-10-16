@@ -11,6 +11,13 @@ import { orgInfo } from "@/lib/shared/identity";
 import { createDeal, dealCandidates, dealsOfPerson, getDeal, removeDealPerson, setDealPerson } from "@/lib/engine/deals";
 import { logInteraction } from "@/lib/engine/accounts/edit";
 import { personB2B } from "@/lib/engine/accounts/person";
+import { setParent, updateOrgField } from "@/lib/engine/accounts/edit";
+import { orgGroup } from "@/lib/engine/accounts/group";
+import { registerSource } from "@/lib/engine/vault/sources";
+import { commitUpload } from "@/lib/engine/vault/intake";
+import { resolveTenant } from "@/lib/engine/vault/resolve";
+import { normaliseTaxId, taxIdChecksum } from "@/lib/shared/tax-id";
+import { createHash } from "node:crypto";
 import { searchEverything } from "@/lib/engine/search";
 import { teamMembers } from "@/lib/engine/team";
 
@@ -99,5 +106,59 @@ ok(dd2 !== null && dd2 !== "masked" && dd2.interactions.some((i) => i.summary ==
 ok((await personB2B(T, p1, ME)).interactions.some((i) => i.summary === "นำเสนอบูธ (สมมุติ)"), "กิจกรรมขึ้นที่หน้าผู้ติดต่อ");
 const otherOrg = r4.ok ? r4.orgId : "";
 ok(!(await logInteraction(T, otherOrg, { kind: "call", occurredAt: day, opportunityId: dealId, summary: "x" }, ME.id)).ok, "ผูกกิจกรรมกับดีลของบริษัทอื่นไม่ได้");
+
+// ── C2 · เลขนิติบุคคล ──
+const tax = (first12: string) => first12 + String(taxIdChecksum(first12));
+const TAX_A = tax("010555012345"), TAX_B = tax("010555099999");
+ok(normaliseTaxId(TAX_A) === TAX_A && normaliseTaxId(`${TAX_A.slice(0, 1)}-${TAX_A.slice(1, 5)}-${TAX_A.slice(5)}`) === TAX_A, "เลขนิติบุคคลที่ถูกต้องผ่าน (มีขีดก็อ่านได้)");
+const wrong = TAX_A.slice(0, 12) + String((Number(TAX_A[12]) + 1) % 10);
+ok(normaliseTaxId(wrong) === null && normaliseTaxId("1101700203451") === null && normaliseTaxId("12345") === null, "เลขที่ checksum ผิด · เลขบุคคลธรรมดา · เลขสั้น = ไม่รับ");
+
+// นำเข้าไฟล์: ชื่อสามแบบ เลขเดียวกัน = บริษัทเดียว · เลขต่าง = คนละบริษัท
+const src = await registerSource(T, {
+  name: "ไฟล์ทดสอบเลขนิติบุคคล (สมมุติ)", kind: "file", newPurpose: "ทดสอบ C2",
+  acquisitionNote: "ข้อมูลสมมุติ", fields: ["customer_name", "company", "tax_id", "email"],
+}, ME.id);
+const importCsv = async (name: string, lines: string[]) => {
+  const bytes = new TextEncoder().encode(["ชื่อ,บริษัท,เลขนิติบุคคล,อีเมล", ...lines].join("\n"));
+  const done = src.ok ? await commitUpload(T, src.id, bytes, name, { 0: "customer_name", 1: "company", 2: "tax_id", 3: "email" },
+    createHash("sha256").update(bytes).digest("hex"), ME.id) : null;
+  await resolveTenant(T, ME.id);
+  return done?.ok ?? false;
+};
+ok(await importCsv("tax1.csv", [
+  `อนันต์ ทดสอบ,บริษัท ฟ้าใส พลังงาน จำกัด,${TAX_A},anan@fahsai.example`,
+  `บุญมี ทดสอบ,"Fahsai Energy Co.,Ltd.",${TAX_A},boonmee@fahsai-energy.example`,
+  `ชูใจ ทดสอบ,ฟ้าใส เอนเนอร์ยี่,${TAX_A},chujai@fahsai.example`,
+  `มานะ ทดสอบ,บริษัท ฟ้าใส พลังงาน จำกัด,${TAX_B},mana@other.example`,
+]), "นำเข้าไฟล์ที่มีคอลัมน์เลขนิติบุคคลได้");
+const taxOrgs = await all<{ id: string; tax_id: string | null }>("SELECT id, tax_id FROM orgs WHERE tenant_id = ? AND tax_id IN (?, ?)", T, TAX_A, TAX_B);
+ok(taxOrgs.filter((o) => o.tax_id === TAX_A).length === 1, "ชื่อเขียนสามแบบแต่เลขเดียวกัน = บริษัทเดียว");
+const orgA = taxOrgs.find((o) => o.tax_id === TAX_A)?.id ?? "";
+const atA = await all<{ name: string }>("SELECT c.name FROM affiliations a JOIN customers c ON c.id = a.customer_id AND c.tenant_id = a.tenant_id WHERE a.tenant_id = ? AND a.org_id = ?", T, orgA);
+ok(["อนันต์ ทดสอบ", "บุญมี ทดสอบ", "ชูใจ ทดสอบ"].every((n) => atA.some((x) => x.name === n)) && !atA.some((x) => x.name === "มานะ ทดสอบ"), "ทั้งสามคนสังกัดบริษัทเดียวกัน · คนที่เลขต่างไม่ปน");
+ok(await importCsv("tax2.csv", [`ปิติ ทดสอบ,FAHSAI GROUP,${TAX_A},piti@fahsai.example`]), "นำเข้าไฟล์ที่สอง");
+const piti = await get<{ org_id: string }>("SELECT a.org_id FROM affiliations a JOIN customers c ON c.id = a.customer_id AND c.tenant_id = a.tenant_id WHERE a.tenant_id = ? AND c.name = ?", T, "ปิติ ทดสอบ");
+ok(piti?.org_id === orgA, "ไฟล์ทีหลังที่เลขตรงกับบริษัทเดิม = เข้าบริษัทเดิม แม้ชื่อต่าง");
+
+// แก้เลขด้วยมือ
+const r5 = await affiliateManual(T, await person("วีระ ทดสอบ (สมมุติ)"), { company: "บริษัท ทดสอบเลขซ้ำ จำกัด" }, ME.id);
+const orgX = r5.ok ? r5.orgId : "";
+ok(!(await updateOrgField(T, orgX, "tax_id", wrong, "จากหนังสือรับรอง", ME.id)).ok, "แก้เลขที่ checksum ผิด = ไม่บันทึก");
+const twin = await updateOrgField(T, orgX, "tax_id", TAX_A, "จากหนังสือรับรอง", ME.id);
+ok(!twin.ok && twin.error.includes("รวม"), "เลขที่เป็นของบริษัทอื่นแล้ว = ไม่บันทึก และบอกให้รวมแฟ้ม");
+const t3 = tax("010555077777");
+ok((await updateOrgField(T, orgX, "tax_id", `${t3.slice(0, 1)} ${t3.slice(1)}`, "จากหนังสือรับรอง", ME.id)).ok
+  && (await get<{ tax_id: string }>("SELECT tax_id FROM orgs WHERE tenant_id = ? AND id = ?", T, orgX))?.tax_id === t3, "เลขที่ถูกต้องบันทึกแบบตัวเลขล้วน");
+
+// ── C2 · กลุ่มบริษัทในเครือ ──
+const parent = r1.ok ? r1.orgId : "";
+await setParent(T, orgA, parent, "บริษัทลูกตามรายงานประจำปี (สมมุติ)", ME.id);
+await setParent(T, orgX, orgA, "บริษัทหลานตามรายงานประจำปี (สมมุติ)", ME.id);
+const g = await orgGroup(T, orgX, ME);
+ok(g !== null && g.rootId === parent && g.members.length === 3 && g.members.find((m) => m.id === orgX)?.depth === 2, "กลุ่มรวมจากบนสุดลงล่าง (แม่ · ลูก · หลาน) ไม่ว่าจะเปิดจากบริษัทไหน");
+ok(g !== null && g.totals.current >= 5 && g.totals.openDeals >= 2, "ยอดรวมทั้งกลุ่ม: คนปัจจุบันและดีลเปิด");
+ok(!(await setParent(T, parent, orgX, "ทดสอบวง", ME.id)).ok, "ตั้งบริษัทแม่จนเป็นวงไม่ได้");
+ok((await orgGroup("mst-golf", orgX, ME)) === null, "ดูกลุ่มข้ามบัญชีไม่ได้");
 
 for (const line of out) console.log(line);

@@ -342,6 +342,8 @@ const RULES: Rule[] = [
      (เดิมตกไปที่ customer_name เพราะ /name/ — verify:synthetic จับได้) */
   { field: "company", re: /(company|organi[sz]ation|business.?name|account.?name|^\s*account\s*$|บริษัท|องค์กร|หน่วยงาน)/i, score: 10 },
   { field: "job_title", re: /(job.?title|job.?role|position|^\s*title\s*$|ตำแหน่ง)/i, score: 10 },
+  /* เลขนิติบุคคล (C2) — 12 ชนะ customer_ref แบบกว้าง ("ID" · "เลขที่") */
+  { field: "tax_id", re: /(tax.?(id|no|number)|เลข(ประจำตัว)?ผู้เสียภาษี|เลข(ทะเบียน)?นิติบุคคล|juristic|company.?reg(istration)?)/i, score: 12 },
 
   /* ── ช่องทางติดต่อ ──
      เบอร์ (9) ชนะ customer_ref แบบกว้าง (6) คอลัมน์เบอร์จึงถูกเก็บเป็นช่องทาง

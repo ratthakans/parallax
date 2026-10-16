@@ -20,6 +20,7 @@ import { NoteCapture } from "@/components/console/note-capture";
 import { Panel, num } from "@/components/console/ui";
 import { RecordHeader, RecordTabs, pickTab } from "@/components/console/record";
 import { stageTh } from "@/lib/shared/deals";
+import { orgGroup } from "@/lib/engine/accounts/group";
 
 const baht = (n: number) => `฿${n.toLocaleString("th-TH", { maximumFractionDigits: 0 })}`;
 
@@ -104,8 +105,9 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
     );
   }
 
-  const [brief, others, graph, suggested] = await Promise.all([
+  const [brief, others, graph, suggested, group] = await Promise.all([
     currentBrief(v.tenantId, id, who), orgOptions(v.tenantId, id), loadPathGraph(v.tenantId, v.clearance), suggestKnows(v.tenantId, who, id),
+    orgGroup(v.tenantId, id, who),
   ]);
   const paths = pathsToOrg(graph, id);
   const knownByMe = new Set(paths.filter((p) => p.hops === 1 && p.member === v.actor).map((p) => p.person.id));
@@ -152,7 +154,8 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
     })),
   ].filter((e) => e.at).sort((a, b) => (sortKey(a) < sortKey(b) ? 1 : -1));
 
-  const TABS = ["overview", "details", "people", "deals", "relationships"] as const;
+  const inGroup = Boolean(group && group.members.length + group.hidden > 1);
+  const TABS = ["overview", "details", "people", "deals", "group", "relationships"] as const;
   const tab = pickTab(TABS, (await searchParams).tab);
   const base = `/app/accounts/${o.id}`;
   const lastTouch = d.interactions.map((i) => i.occurredAt).sort().at(-1);
@@ -195,6 +198,7 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
             { key: "details", label: "รายละเอียด" },
             { key: "people", label: "คน", count: d.people.length },
             { key: "deals", label: "ดีล", count: d.opportunities.length },
+            ...(inGroup ? [{ key: "group", label: "บริษัทในเครือ", count: group!.members.length }] : []),
             { key: "relationships", label: "ความสัมพันธ์", count: d.relationships.length },
           ]} />
           <div className="grid min-w-0 content-start gap-5">
@@ -455,6 +459,49 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
                 ) : <p className="c-thai px-5 py-5 text-[0.88rem] text-[var(--c-text-3)]">ยังไม่มีดีลกับบริษัทนี้</p>}
               </Panel>
             )}
+
+            {tab === "group" && (inGroup && group ? <>
+              <Panel flat className="grid grid-cols-2 gap-x-6 gap-y-5 p-5 md:grid-cols-4">
+                <div><p className="c-thai text-[0.75rem] text-[var(--c-text-4)]">บริษัทในกลุ่ม</p><p className="c-mono text-[1.2rem]">{num(group.totals.orgs)}{group.hidden ? <span className="c-thai text-[0.75rem] text-[var(--c-text-4)]"> +{group.hidden} จำกัดสิทธิ์</span> : null}</p></div>
+                <div><p className="c-thai text-[0.75rem] text-[var(--c-text-4)]">คนปัจจุบันทั้งกลุ่ม</p><p className="c-mono text-[1.2rem]">{num(group.totals.current)}</p></div>
+                <div><p className="c-thai text-[0.75rem] text-[var(--c-text-4)]">ดีลเปิดทั้งกลุ่ม</p><p className="c-mono text-[1.2rem]">{num(group.totals.openDeals)} · {baht(group.totals.openValue)}</p></div>
+                <div><p className="c-thai text-[0.75rem] text-[var(--c-text-4)]">ติดต่อล่าสุดในกลุ่ม</p><p className="c-thai text-[1rem]">{group.totals.lastAt ? thaiDate(group.totals.lastAt) : "ยังไม่เคย"}</p></div>
+              </Panel>
+              <Panel className="p-0">
+                <div className="c-scroll px-5 pb-2" tabIndex={0} role="region" aria-label="บริษัทในเครือ">
+                  <table className="c-table min-w-[40rem]">
+                    <thead><tr><th>บริษัท</th><th className="text-right">คนปัจจุบัน</th><th className="text-right">ดีลเปิด</th><th className="text-right">มูลค่าเปิด</th><th>ติดต่อล่าสุด</th></tr></thead>
+                    <tbody>
+                      {group.members.map((m) => (
+                        <tr key={m.id}>
+                          <td style={{ paddingLeft: `${m.depth * 1.25}rem` }}>
+                            {m.depth > 0 && <span aria-hidden className="text-[var(--c-text-4)]">└ </span>}
+                            {m.self ? <span className="c-thai font-semibold">{m.name} (บริษัทนี้)</span>
+                              : <Link href={`/app/accounts/${m.id}?tab=group`} className="c-thai text-[var(--c-accent)] hover:underline">{m.name}</Link>}
+                          </td>
+                          <td className="c-mono text-right">{num(m.current)}</td>
+                          <td className="c-mono text-right">{num(m.openDeals)}</td>
+                          <td className="c-mono text-right">{m.openValue ? baht(m.openValue) : "—"}</td>
+                          <td className="c-thai text-[0.84rem]">{m.lastAt ? thaiDate(m.lastAt) : "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Panel>
+              <Panel className="p-5 md:p-6">
+                <h2 className="c-h2 text-[var(--c-text)]">ใครในทีมรู้จักใครในเครือ</h2>
+                {group.knows.length ? (
+                  <ul className="c-thai mt-3 grid gap-1.5 text-[0.88rem] text-[var(--c-text-2)]">
+                    {group.knows.map((k, i) => (
+                      <li key={i}>{k.member} รู้จัก <Link href={`/app/customers/${k.personId}`} className="text-[var(--c-accent)] hover:underline">{k.person}</Link> · <Link href={`/app/accounts/${k.orgId}`} className="hover:text-[var(--c-accent)]">{k.org}</Link></li>
+                    ))}
+                  </ul>
+                ) : <p className="c-thai mt-3 text-[0.88rem] text-[var(--c-text-3)]">ยังไม่มีใครในทีมบันทึกว่ารู้จักคนในเครือนี้</p>}
+              </Panel>
+            </> : (
+              <Panel className="p-5"><p className="c-thai text-[0.88rem] text-[var(--c-text-3)]">บริษัทนี้ยังไม่อยู่ในกลุ่ม — ตั้งบริษัทแม่ได้ในแท็บรายละเอียด</p></Panel>
+            ))}
 
             {tab === "relationships" && <>
           {/* ── ความสัมพันธ์ที่ยืนยัน ── */}

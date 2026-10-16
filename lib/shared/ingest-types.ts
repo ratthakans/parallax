@@ -15,6 +15,7 @@ export const IMPORT_FIELDS = [
   "gender",
   "birthday",
   "company",
+  "tax_id",
   "job_title",
   // ── ช่องทางติดต่อ — เก็บแบบเข้ารหัส ──
   "phone",
@@ -64,7 +65,7 @@ export const IMPORT_FIELD_GROUPS: { label: string; fields: ImportField[] }[] = [
   {
     label: "ข้อมูลของคน",
     fields: ["customer_ref", "customer_name", "first_name", "last_name", "nickname",
-      "gender", "birthday", "company", "job_title", "note", "consent"],
+      "gender", "birthday", "company", "tax_id", "job_title", "note", "consent"],
   },
   {
     label: "ช่องทางติดต่อ",
@@ -88,6 +89,7 @@ export const FIELD_LABEL: Record<ImportField, string> = {
   gender: "เพศ",
   birthday: "วันเกิด",
   company: "บริษัท / หน่วยงาน",
+  tax_id: "เลขนิติบุคคล (ผู้เสียภาษี 13 หลัก)",
   job_title: "ตำแหน่ง",
   phone: "เบอร์มือถือ",
   phone_alt: "เบอร์โทรอื่น (บ้าน · ที่ทำงาน)",
