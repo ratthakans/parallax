@@ -9,6 +9,7 @@ import { MAX_UPLOAD_BYTES } from "@/lib/engine/vault/scan";
 import { resolveTenant, type ResolveStats } from "@/lib/engine/vault/resolve";
 import { decideReview, unmerge } from "@/lib/engine/vault/merge";
 import { recordSample, type SampleVerdict } from "@/lib/engine/vault/sample";
+import { aiAssist, confirmBatch, dismissBatch, recordBatchSample, undoBatch } from "@/lib/engine/vault/review-batches";
 import { messageOf, type ActionState } from "@/lib/shared/action-state";
 import type { SourceKind } from "@/lib/shared/vault";
 import type { Capability } from "@/lib/shared/roles";
@@ -130,4 +131,67 @@ export async function recordSampleAction(_prev: ActionState, fd: FormData): Prom
   if (!res.ok) return { error: res.error };
   revalidatePath("/app/vault/review");
   return { ok: "บันทึกผลตรวจแล้ว" };
+}
+
+/* ── ยืนยันการรวมเป็นชุด (docs/solo-plan.md S5) ── ทุกปุ่มต้องมีสิทธิ์ตรวจตัวตน เหมือนการตัดสินทีละคู่ */
+
+export async function confirmBatchAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  const { tenantId, actor, no } = await scope("review");
+  if (no) return { error: no };
+  let itemIds: string[] = [];
+  try {
+    itemIds = (JSON.parse(String(fd.get("items") ?? "[]")) as unknown[]).map(String);
+  } catch {
+    return { error: "รายการในชุดอ่านไม่ได้ — โหลดหน้าใหม่" };
+  }
+  const res = await confirmBatch(tenantId, { key: String(fd.get("key") ?? ""), itemIds, exclude: fd.getAll("exclude").map(String) }, actor);
+  if (!res.ok) return { error: res.error };
+  revalidatePath("/app/vault/review");
+  return {
+    ok: `รวมแล้ว ${res.merged.toLocaleString()} คู่ในครั้งเดียว${res.excluded ? ` · เอาออก ${res.excluded.toLocaleString()} คู่ไว้ตรวจทีละคู่` : ""}`
+      + `${res.dropped ? ` · ${res.dropped.toLocaleString()} คู่หลุดจากชุดระหว่างนั้นจึงไม่ถูกรวม` : ""}`
+      + `${res.sampled ? ` · สุ่ม ${res.sampled} คู่ไว้ตรวจซ้ำในอีก 7 วัน` : ""} — ย้อนได้ทั้งชุดจากประวัติชุด`,
+  };
+}
+
+export async function undoBatchAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  const { tenantId, actor, no } = await scope("review");
+  if (no) return { error: no };
+  const res = await undoBatch(tenantId, String(fd.get("batchId") ?? ""), actor);
+  if (!res.ok) return { error: res.error };
+  revalidatePath("/app/vault/review");
+  return { ok: `ย้อนทั้งชุดแล้ว — ${res.restored.toLocaleString()} คู่กลับเข้าคิวให้ตรวจทีละคู่` };
+}
+
+export async function aiAssistAction(_prev: ActionState): Promise<ActionState> {
+  const { tenantId, actor, no } = await scope("review");
+  if (no) return { error: no };
+  try {
+    const res = await aiAssist(tenantId, actor);
+    if (!res.ok) return { error: res.error };
+    revalidatePath("/app/vault/review");
+    return { ok: `AI ดูแล้ว ${res.asked} คู่ — เสนอเป็นชุด ${res.same} · ไม่ใช่คนเดียวกัน ${res.different} · ไม่แน่ใจ ${res.unsure} (ที่ไม่ได้เสนอยังอยู่ในคิวทีละคู่)` };
+  } catch (err) {
+    return { error: messageOf(err) };
+  }
+}
+
+export async function dismissBatchAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  const { tenantId, actor, no } = await scope("review");
+  if (no) return { error: no };
+  const res = await dismissBatch(tenantId, String(fd.get("batchId") ?? ""), actor);
+  if (!res.ok) return { error: res.error };
+  revalidatePath("/app/vault/review");
+  return { ok: "ไม่ใช้ข้อเสนอนี้ — คู่เหล่านี้อยู่ในคิวให้ตรวจทีละคู่" };
+}
+
+export async function recordBatchSampleAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  const { tenantId, actor, no } = await scope("review");
+  if (no) return { error: no };
+  const verdict = String(fd.get("verdict") ?? "");
+  if (verdict !== "merge_ok" && verdict !== "merge_wrong") return { error: "ผลตรวจไม่ถูกต้อง" };
+  const res = await recordBatchSample(tenantId, String(fd.get("sampleId") ?? ""), verdict, actor);
+  if (!res.ok) return { error: res.error };
+  revalidatePath("/app/vault/review");
+  return { ok: res.returned ? "บันทึกว่าผิด — ชุดนี้ถูกย้อนทั้งชุดและส่งกลับไปตรวจทีละคู่" : "บันทึกผลตรวจแล้ว" };
 }

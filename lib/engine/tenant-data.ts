@@ -56,7 +56,7 @@ export const B2B_DATA_TABLES = [
   "import_rows", "import_batches", "affiliations", "relationship_assertions", "interactions",
   "participations", "opportunity_people", "tasks", "opportunities", "org_domains", "orgs",
   "preferences", "evidence", "record_versions", "merge_log",
-  "review_items", "resolution_overrides", "sample_checks", "account_briefs",
+  "review_items", "review_batches", "resolution_overrides", "sample_checks", "account_briefs",
   "campaign_targets", "sales_campaigns", "work_log", "queue_marks",
 ] as const;
 
@@ -110,7 +110,7 @@ export async function deletePersonData(q: Sql, tenantId: string, customerId: str
 
 /* ── ลบประวัติในตารางเพิ่มอย่างเดียวของคนที่ถูกลบแล้ว ──
    เรียกหลังลบแถว customers ในธุรกรรมเดียวกัน · ids = ผลของ deletePersonData
-   บน Postgres ผ่าน app.erase_person_history (0011) ซึ่งปฏิเสธถ้าคนยังอยู่ในทะเบียน —
+   บน Postgres ผ่าน app.erase_person_history (0011 · 0021 เพิ่มหลักฐานของโน้ต/ความสัมพันธ์) ซึ่งปฏิเสธถ้าคนยังอยู่ในทะเบียน —
    ลบ "คัดค้าน" ทิ้งแล้วติดต่อต่อไม่ได้ */
 export async function erasePersonHistory(q: Sql, tenantId: string, ids: string[]): Promise<void> {
   if (usingPostgres()) {
@@ -125,6 +125,13 @@ export async function erasePersonHistory(q: Sql, tenantId: string, ids: string[]
     await q.run("DELETE FROM preferences WHERE tenant_id = ? AND customer_id = ?", tenantId, id);
     await q.run("DELETE FROM record_versions WHERE tenant_id = ? AND record_kind = 'person' AND record_id = ?", tenantId, id);
   }
+  /* หลักฐานของโน้ต (S6) และความสัมพันธ์ที่ปฏิสัมพันธ์/ความสัมพันธ์ถูกลบไปแล้ว — ตรงกับ 0021 */
+  await q.run(
+    "DELETE FROM evidence WHERE tenant_id = ? AND ref LIKE 'interaction:%' AND NOT EXISTS (SELECT 1 FROM interactions i WHERE i.tenant_id = evidence.tenant_id AND i.id = substr(evidence.ref, 13))",
+    tenantId);
+  await q.run(
+    "DELETE FROM evidence WHERE tenant_id = ? AND ref LIKE 'relationship:%' AND NOT EXISTS (SELECT 1 FROM relationship_assertions r WHERE r.tenant_id = evidence.tenant_id AND r.id = substr(evidence.ref, 14))",
+    tenantId);
 }
 
 async function deleteOneId(q: Sql, tenantId: string, customerId: string): Promise<void> {

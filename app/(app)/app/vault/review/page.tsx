@@ -1,7 +1,14 @@
 import Link from "next/link";
 import { activeTenantId } from "@/app/(app)/tenant";
-import { decideReviewAction, recordSampleAction, resolveNowAction, unmergeAction } from "@/app/(app)/vault-actions";
-import { drawSample, sampleStats, type Sample } from "@/lib/engine/vault/sample";
+import {
+  aiAssistAction, confirmBatchAction, decideReviewAction, dismissBatchAction, recordBatchSampleAction, recordSampleAction, resolveNowAction,
+  undoBatchAction, unmergeAction,
+} from "@/app/(app)/vault-actions";
+import { drawSample, sampleStats, type Sample, type SampleRow } from "@/lib/engine/vault/sample";
+import {
+  BATCH_RULE_TH, BATCH_STATUS_TH, SAMPLE_FROM, batchHistory, batchOverview, dueBatchSamples, examplesOf,
+  type BatchRecord, type BatchSample, type ContactRel, type PairFacts, type ProposedBatch,
+} from "@/lib/engine/vault/review-batches";
 import { listOpenReviews, mergeHistory, reviewCounts, SIGNAL_TH, type OrgSide, type PersonSide, type ReviewItem } from "@/lib/engine/vault/review";
 import { vaultOverview } from "@/lib/engine/vault";
 import { LIFECYCLE_TH, type LifecycleState } from "@/lib/shared/vault";
@@ -107,6 +114,179 @@ function Impact({ item }: { item: ReviewItem }) {
 
 const TH_CELL = "font-sans normal-case tracking-normal text-[0.75rem]";
 
+function SourceRows({ rows, label }: { rows: SampleRow[]; label: string }) {
+  return (
+    <div className="c-scroll mt-4" tabIndex={0} role="region" aria-label={label}>
+      <table className="c-table min-w-[48rem]">
+        <thead>
+          <tr>{["ไฟล์ · บรรทัด", "ชื่อตามไฟล์", "บริษัท", "ตำแหน่ง", "อีเมล", "เบอร์"].map((h) => <th key={h} className={TH_CELL}>{h}</th>)}</tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={`${r.file}#${r.line}`}>
+              <td className="c-mono text-[0.78rem] text-[var(--c-text-3)]">{r.file} · {num(r.line)}</td>
+              <td className="c-thai text-[0.84rem]">{r.name || "—"}</td>
+              <td className="c-thai text-[0.84rem]">{r.company || "—"}</td>
+              <td className="c-thai text-[0.84rem]">{r.title || "—"}</td>
+              <td className="c-mono text-[0.8rem]">{r.email || "—"}</td>
+              <td className="c-mono text-[0.8rem]">{r.phone || "—"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/* ── ชุดที่ระบบเสนอ (docs/solo-plan.md S5) ─────────────────────
+   เหตุผลของชุด · ขนาด · ตัวอย่างสุ่ม 5 คู่ (สุ่มใหม่ได้) · ดูทุกคู่และเอาบางคู่ออกได้ก่อนยืนยัน
+   ช่องทางแสดงเป็น "ตรงกัน/ไม่ตรง/ไม่มี" — หน้านี้ไม่ต้องเห็นค่าเพื่อยืนยันทั้งชุด (ค่าปิดบางอยู่ในคิวทีละคู่ด้านล่าง) */
+const REL_TH: Record<ContactRel, string> = { match: "ตรงกัน", conflict: "ไม่ตรง", none: "ไม่มี" };
+const AI_TH = { same: "AI: คนเดียวกัน", different: "AI: คนละคน", unsure: "AI: ไม่แน่ใจ" } as const;
+
+function Side({ name, title, org }: { name: string; title: string | null; org: string | null }) {
+  return (
+    <td className="c-thai text-[0.84rem]">
+      {name}
+      <span className="block text-[0.75rem] text-[var(--c-text-4)]">{[title, org].filter(Boolean).join(" · ") || "—"}</span>
+    </td>
+  );
+}
+
+function PairRows({ pairs, selectable }: { pairs: PairFacts[]; selectable: boolean }) {
+  return (
+    <div className="c-scroll mt-4" tabIndex={0} role="region" aria-label="คู่ในชุด">
+      <table className="c-table min-w-[44rem]">
+        <thead>
+          <tr>
+            {selectable && <th className={TH_CELL}>เอาออก</th>}
+            {["ฝั่งหนึ่ง", "อีกฝั่ง", "ช่องทาง"].map((h) => <th key={h} className={TH_CELL}>{h}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {pairs.map((f) => (
+            <tr key={f.itemId}>
+              {selectable && (
+                <td>
+                  <input type="checkbox" name="exclude" value={f.itemId} aria-label={`เอาคู่ ${f.a.name} – ${f.b.name} ออกจากชุด`} />
+                </td>
+              )}
+              <Side name={f.a.name} title={f.titleA} org={f.orgA} />
+              <Side name={f.b.name} title={f.titleB} org={f.orgB} />
+              <td className="c-thai text-[0.78rem] text-[var(--c-text-3)]">
+                อีเมล {REL_TH[f.email]} · เบอร์ {REL_TH[f.phone]}
+                {f.ai && <span className="block">{AI_TH[f.ai.v]}{f.ai.r ? ` — ${f.ai.r}` : ""}</span>}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function BatchPanel({ b, full }: { b: ProposedBatch; full: boolean }) {
+  const n = b.pairs.length;
+  const shown = full ? b.pairs : examplesOf(b.pairs, 5);
+  return (
+    <Panel className="p-5 md:p-6">
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <p className="c-thai text-[0.9rem] text-[var(--c-text)]">{BATCH_RULE_TH[b.rule]}</p>
+        <p className="c-thai text-[0.8rem] text-[var(--c-text-3)]">
+          <span className="c-mono">{num(n)}</span> คู่{b.aiAssisted && " · AI ช่วยตัดสินชื่อ — คุณยืนยันเอง"}
+        </p>
+      </div>
+      <p className="c-thai mt-2 text-[0.78rem] text-[var(--c-text-4)]">
+        {full ? "ทุกคู่ในชุด — ติ๊กคู่ที่อยากตรวจทีละคู่ แล้วยืนยันส่วนที่เหลือ" : `ตัวอย่างสุ่ม ${num(shown.length)} คู่จาก ${num(n)} — ทุกคู่ในชุดมีเหตุผลครบทุกข้อด้านบน`}
+        {n >= SAMPLE_FROM && ` · ชุดตั้งแต่ ${SAMPLE_FROM} คู่ ระบบสุ่ม 3 คู่ให้ตรวจซ้ำหลัง 7 วัน ถ้าพบผิด ชุดทั้งชุดถูกส่งกลับไปตรวจทีละคู่`}
+      </p>
+      <ActionForm
+        action={confirmBatchAction}
+        fields={{ key: b.key, items: JSON.stringify(b.pairs.map((p) => p.itemId)) }}
+        label={full ? "ยืนยันคู่ที่ไม่ได้ติ๊กออก — รวมในครั้งเดียว" : `ยืนยันทั้งชุด — รวม ${num(n)} คู่`}
+        confirm={full ? "ยืนยัน — รวมคู่ที่เหลือ (ย้อนได้ทั้งชุด)" : `ยืนยันรวม ${num(n)} คู่ (ย้อนได้ทั้งชุด)`}
+        pendingLabel="กำลังรวม…"
+        variant="primary"
+        buttonClassName="mt-4"
+      >
+        <PairRows pairs={shown} selectable={full} />
+      </ActionForm>
+      <div className="c-thai mt-3 flex flex-wrap gap-2 text-[0.86rem]">
+        {full ? (
+          <Link href="/app/vault/review" className="c-btn c-btn-ghost">กลับไปดูทุกชุด</Link>
+        ) : (
+          <>
+            <Link href={`/app/vault/review?batch=${encodeURIComponent(b.key)}`} className="c-btn c-btn-ghost">ดูทุกคู่ / เอาบางคู่ออก</Link>
+            <Link href={`/app/vault/review?r=${Date.now()}`} className="c-btn c-btn-ghost">สุ่มตัวอย่างใหม่</Link>
+          </>
+        )}
+        {b.batchId && <ActionForm action={dismissBatchAction} fields={{ batchId: b.batchId }} label="ไม่ใช้ข้อเสนอของ AI" pendingLabel="กำลังบันทึก…" />}
+      </div>
+    </Panel>
+  );
+}
+
+function BatchSamplePanel({ samples }: { samples: BatchSample[] }) {
+  return (
+    <Panel className="p-5 md:p-6">
+      <h2 className="c-h2 text-[var(--c-text)]">สุ่มตรวจหลังรวมเป็นชุด</h2>
+      <p className="c-thai mt-2 text-[0.82rem] text-[var(--c-text-3)]">
+        ระบบสุ่มไว้ตอนยืนยันชุดตั้งแต่ {SAMPLE_FROM} คู่ และครบ 7 วันแล้ว — ทุกแถวเป็นคนเดียวกันจริงไหม · ถ้าพบผิดแม้คนเดียว ชุดทั้งชุดถูกย้อนและส่งกลับไปตรวจทีละคู่
+      </p>
+      {samples.map((s) => (
+        <div key={s.id} className="mt-5 border-t border-[var(--c-line)] pt-4">
+          <p className="c-thai text-[1rem] text-[var(--c-text)]">{s.name}</p>
+          <p className="c-thai text-[0.75rem] text-[var(--c-text-4)]">จากชุด: {BATCH_RULE_TH[s.rule]}</p>
+          <SourceRows rows={s.rows} label={`แถวต้นทางของ ${s.name}`} />
+          <div className="mt-3 flex flex-wrap gap-2">
+            <ActionForm action={recordBatchSampleAction} fields={{ sampleId: s.id, verdict: "merge_ok" }} label="ถูก — ทุกแถวเป็นคนนี้" pendingLabel="กำลังบันทึก…" variant="primary" />
+            <ActionForm action={recordBatchSampleAction} fields={{ sampleId: s.id, verdict: "merge_wrong" }} label="ผิด — มีแถวของคนอื่นปน" confirm="ยืนยัน — ย้อนทั้งชุด" pendingLabel="กำลังส่งชุดกลับ…" />
+          </div>
+        </div>
+      ))}
+    </Panel>
+  );
+}
+
+function BatchHistory({ rows }: { rows: BatchRecord[] }) {
+  return (
+    <Panel className="mt-8 p-5 md:p-6">
+      <h2 className="c-h2 text-[var(--c-text)]">ประวัติชุด</h2>
+      <p className="c-thai mt-2 text-[0.82rem] text-[var(--c-text-3)]">
+        ย้อนทั้งชุดได้ในกดเดียว: ทุกคู่ในชุดถูกแยกคืน (ช่องทาง · consents · ข้อจำกัด · แถวต้นทาง) แล้วกลับเข้าคิวให้ตรวจทีละคู่
+      </p>
+      <div className="c-scroll mt-4" tabIndex={0} role="region" aria-label="ตารางประวัติชุด">
+        <table className="c-table min-w-[48rem]">
+          <thead>
+            <tr>{["เหตุผล", "คู่", "สถานะ", "ตัดสินโดย", "เมื่อ", "สุ่มตรวจ", ""].map((h, i) => <th key={i} className={TH_CELL}>{h}</th>)}</tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.id}>
+                <td className="c-thai text-[0.8rem]">{BATCH_RULE_TH[r.rule] ?? r.rule}</td>
+                <td className="c-mono text-[0.84rem]">{num(r.size)}</td>
+                <td className="c-thai text-[0.8rem]">{BATCH_STATUS_TH[r.status] ?? r.status}</td>
+                <td className="c-thai text-[0.8rem]">{r.decidedBy ?? "—"}</td>
+                <td className="c-thai text-[0.8rem]">{r.decidedAt ? thaiDateTime(r.decidedAt) : "—"}</td>
+                <td className="c-thai text-[0.78rem] text-[var(--c-text-3)]">
+                  {r.samplesPending + r.samplesOk + r.samplesWrong ? `ถูก ${r.samplesOk} · ผิด ${r.samplesWrong} · รอ ${r.samplesPending}` : "—"}
+                </td>
+                <td>
+                  {r.status === "confirmed" ? (
+                    <ActionForm action={undoBatchAction} fields={{ batchId: r.id }} label="ย้อนทั้งชุด" confirm={`ยืนยันแยกคืน ${num(r.size)} คู่`} pendingLabel="กำลังย้อน…" size="sm" />
+                  ) : r.undoneAt ? (
+                    <span className="c-thai text-[0.78rem] text-[var(--c-text-4)]">{thaiDateTime(r.undoneAt)}</span>
+                  ) : null}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Panel>
+  );
+}
+
 function SamplePanel({ sample, mode }: { sample: Sample | null; mode: "merge" | "missed" }) {
   if (!sample) {
     return (
@@ -127,25 +307,7 @@ function SamplePanel({ sample, mode }: { sample: Sample | null; mode: "merge" | 
           ? `ระบบรวม ${num(sample.rows.length)} แถวนี้เป็นคนเดียวกัน — ทุกแถวเป็นคนนี้จริงไหม`
           : "คนด้านล่างที่ชื่อคล้ายกัน มีใครเป็นคนนี้ซึ่งระบบไม่ได้รวมและไม่ได้ส่งเข้าคิวไหม"}
       </p>
-      <div className="c-scroll mt-4" tabIndex={0} role="region" aria-label="แถวต้นทางของคนที่สุ่มได้">
-        <table className="c-table min-w-[48rem]">
-          <thead>
-            <tr>{["ไฟล์ · บรรทัด", "ชื่อตามไฟล์", "บริษัท", "ตำแหน่ง", "อีเมล", "เบอร์"].map((h) => <th key={h} className={TH_CELL}>{h}</th>)}</tr>
-          </thead>
-          <tbody>
-            {sample.rows.map((r) => (
-              <tr key={`${r.file}#${r.line}`}>
-                <td className="c-mono text-[0.78rem] text-[var(--c-text-3)]">{r.file} · {num(r.line)}</td>
-                <td className="c-thai text-[0.84rem]">{r.name || "—"}</td>
-                <td className="c-thai text-[0.84rem]">{r.company || "—"}</td>
-                <td className="c-thai text-[0.84rem]">{r.title || "—"}</td>
-                <td className="c-mono text-[0.8rem]">{r.email || "—"}</td>
-                <td className="c-mono text-[0.8rem]">{r.phone || "—"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <SourceRows rows={sample.rows} label="แถวต้นทางของคนที่สุ่มได้" />
       {mode === "missed" && (
         <div className="mt-5">
           <h3 className="c-thai text-[0.86rem] text-[var(--c-text-3)]">ชื่อคล้ายกันในฐาน</h3>
@@ -176,21 +338,27 @@ function SamplePanel({ sample, mode }: { sample: Sample | null; mode: "merge" | 
   );
 }
 
-export default async function ReviewPage({ searchParams }: { searchParams: Promise<{ kind?: string; page?: string; mode?: string }> }) {
+export default async function ReviewPage({ searchParams }: { searchParams: Promise<{ kind?: string; page?: string; mode?: string; batch?: string }> }) {
   const sp = await searchParams;
   const sampling = sp.kind === "sample";
   const mode = sp.mode === "missed" ? "missed" : "merge";
   const kind = sp.kind === "org" ? "org_group" : "person_pair";
   const page = Math.max(1, Number(sp.page) || 1);
   const tenantId = await activeTenantId();
-  const [counts, items, history, overview, stats, sample] = await Promise.all([
+  /* ชุดแสดงเฉพาะแท็บคู่คน หน้าแรก — หน้าถัดไปของคิวทีละคู่ไม่ต้องคำนวณชุดซ้ำ */
+  const showBatches = !sampling && kind === "person_pair" && page === 1;
+  const [counts, items, history, overview, stats, sample, batchInfo, dueSamples, batches] = await Promise.all([
     reviewCounts(tenantId),
     sampling ? Promise.resolve([]) : listOpenReviews(tenantId, kind, PAGE, (page - 1) * PAGE),
     mergeHistory(tenantId),
     vaultOverview(tenantId),
     sampleStats(tenantId),
     sampling ? drawSample(tenantId, mode) : Promise.resolve(null),
+    showBatches ? batchOverview(tenantId) : Promise.resolve(null),
+    showBatches ? dueBatchSamples(tenantId) : Promise.resolve([]),
+    batchHistory(tenantId),
   ]);
+  const focus = sp.batch ? batchInfo?.batches.find((b) => b.key === sp.batch) : undefined;
   const open = kind === "person_pair" ? counts.personOpen : counts.orgOpen;
   const pages = Math.max(1, Math.ceil(open / PAGE));
   const tab = (k: "person" | "org" | "sample", label: string, n: number | null) => {
@@ -249,7 +417,45 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
           </nav>
           <SamplePanel sample={sample} mode={mode} />
         </>
-      ) : items.length ? (
+      ) : null}
+
+      {batchInfo && (dueSamples.length > 0 || batchInfo.batches.length > 0 || batchInfo.aiCandidates > 0) && (
+        <section className="mb-8 grid gap-5 [&>*]:min-w-0" aria-label="ชุดที่ระบบเสนอ">
+          {dueSamples.length > 0 && <BatchSamplePanel samples={dueSamples} />}
+          {batchInfo.batches.length > 0 && (
+            <div>
+              <h2 className="c-h2 text-[var(--c-text)]">ยืนยันเป็นชุด</h2>
+              <p className="c-thai mt-1 text-[0.82rem] text-[var(--c-text-3)]">
+                คู่ที่มีเหตุผลเดียวกันครบทุกข้อ จัดเป็นชุดให้ยืนยันทีเดียว · ชื่อเหมือน + โดเมนเดียวกันอย่างเดียวไม่ถูกจัดเป็นชุด ต้องตรวจทีละคู่ด้านล่าง
+              </p>
+            </div>
+          )}
+          {focus ? <BatchPanel b={focus} full /> : batchInfo.batches.map((b) => <BatchPanel key={b.key} b={b} full={false} />)}
+          {batchInfo.aiCandidates > 0 && (
+            <Panel flat className="p-5 md:p-6">
+              {batchInfo.ai.allowed ? (
+                <ActionForm
+                  action={aiAssistAction}
+                  label={`ให้ AI ช่วยดู ${num(batchInfo.aiCandidates)} คู่ที่ชื่อสะกดต่างหรือตำแหน่งเขียนต่าง`}
+                  pendingLabel="AI กำลังดู…"
+                  note={
+                    <p className="c-thai text-[0.78rem] text-[var(--c-text-4)]">
+                      ส่งให้ AI เฉพาะชื่อ ตำแหน่ง ชื่อบริษัท และ “ตรงกัน/ไม่ตรง/ไม่มี” ของอีเมลและเบอร์ — ไม่ส่งอีเมลหรือเบอร์จริง · AI เสนอเป็นชุดได้อย่างเดียว คุณยืนยันเอง
+                    </p>
+                  }
+                />
+              ) : (
+                <p className="c-thai text-[0.86rem] text-[var(--c-text-3)]">
+                  {batchInfo.ai.reason} — {num(batchInfo.aiCandidates)} คู่ที่ชื่อสะกดต่างต้องตรวจทีละคู่ด้านล่าง
+                </p>
+              )}
+            </Panel>
+          )}
+          <h2 className="c-h2 text-[var(--c-text)]">ตรวจทีละคู่</h2>
+        </section>
+      )}
+
+      {sampling ? null : items.length ? (
         <div className="grid gap-5">
           {items.map((it) => {
             const shared = new Set(it.shared);
@@ -334,6 +540,8 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
           <p className="c-thai mt-4 text-[0.86rem] text-[var(--c-text-3)]">ยังไม่มีการรวม</p>
         )}
       </Panel>
+
+      {batches.length > 0 && <BatchHistory rows={batches} />}
     </>
   );
 }

@@ -892,6 +892,23 @@ export async function ensureSchema(): Promise<void> {
       PRIMARY KEY (tenant_id, user_id)
     );
     CREATE INDEX IF NOT EXISTS ix_digest_prefs_due ON digest_prefs (weekday, enabled);
+    /* ══ ยืนยันการรวมเป็นชุด (docs/solo-plan.md S5) — สเปกเดียวกับ supabase/migrations/0018_review_batches.sql ══ */
+    -- ไม่มีรหัสคน ชื่อ หรือค่าติดต่อ · merge_group_id = merge_log.rule ของทุกการรวมในชุด (ย้อนทั้งชุด)
+    CREATE TABLE IF NOT EXISTS review_batches (
+      id TEXT NOT NULL PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      rule TEXT NOT NULL,
+      ai_assisted INTEGER NOT NULL DEFAULT 0,
+      size INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'proposed',
+      decided_by TEXT,
+      decided_at TEXT,
+      merge_group_id TEXT,
+      undone_by TEXT,
+      undone_at TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS ix_review_batches_tenant ON review_batches (tenant_id, status, created_at);
   `);
 
   /* บัญชีเดโมสังเคราะห์ได้สถานะ demo — เฉพาะบัญชีในทะเบียนเดโม ไม่ใช่ทุกแถวใน tenants
@@ -986,6 +1003,18 @@ export async function ensureSchema(): Promise<void> {
     if (!have.has("employer_scoped")) await exec("ALTER TABLE processing_records ADD COLUMN employer_scoped INTEGER NOT NULL DEFAULT 0");
     if (!have.has("allowed_channels")) await exec("ALTER TABLE processing_records ADD COLUMN allowed_channels TEXT");
     if (!have.has("allowed_message_kinds")) await exec("ALTER TABLE processing_records ADD COLUMN allowed_message_kinds TEXT");
+  }
+  /* ยืนยันการรวมเป็นชุด (docs/solo-plan.md S5 · 0018) — ดัชนีสร้างหลังเพิ่มคอลัมน์ */
+  {
+    const have = await columnsOf("review_items");
+    if (!have.has("batch_id")) await exec("ALTER TABLE review_items ADD COLUMN batch_id TEXT");
+    if (!have.has("ai_verdict")) await exec("ALTER TABLE review_items ADD COLUMN ai_verdict TEXT");
+    await exec("CREATE INDEX IF NOT EXISTS ix_review_batch ON review_items (tenant_id, batch_id)");
+  }
+  {
+    const have = await columnsOf("sample_checks");
+    if (!have.has("batch_id")) await exec("ALTER TABLE sample_checks ADD COLUMN batch_id TEXT");
+    if (!have.has("due_at")) await exec("ALTER TABLE sample_checks ADD COLUMN due_at TEXT");
   }
 }
 

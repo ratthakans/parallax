@@ -15,10 +15,12 @@
    10. ทะเบียนการลบเขียนได้ระหว่างลบตามคำขอ และผู้ใช้ลบแถวทะเบียนไม่ได้ (0014)
    11. คำขอสิทธิ: เปิด · ยืนยัน · รายงาน · ปิดด้วยการลบ ในนามผู้ใช้ · อีกบัญชีมองไม่เห็น · ลบแถวคำขอไม่ได้ (0015)
    12. ส่งออกแบบขออนุมัติ: มีเจ้าของสองคน = อนุมัติคำขอของตัวเองไม่ได้ · อีกคนอนุมัติแล้วผู้ขอดาวน์โหลดได้ครั้งเดียว (0016)
+   15. ลบคนตามคำขอในนามผู้ใช้ = หลักฐานโน้ตของปฏิสัมพันธ์ถูกลบด้วย (0021)
    13. บทบาทหกแบบ: BD และผู้ดูแลข้อมูลส่วนบุคคลเขียนผ่าน RLS ได้ · viewer เขียนไม่ได้ · ค่าบทบาทที่ไม่รู้จักบันทึกไม่ได้ (0017)
    14. สมัครเอง (0019): app.create_signup_tenant สร้างบัญชีให้ auth.uid() ครั้งเดียว (แม้กดพร้อมกัน) · เรียกโดยไม่มีตัวตนไม่ได้
        · เข้าบัญชีคนอื่นไม่ได้ · ผู้ใช้เปลี่ยนสถานะการชำระหรือ signup_source เองไม่ได้ · ขั้นตั้งต้นรันในนามผู้ใช้ได้
    16. สรุปรายสัปดาห์: ตั้งได้เฉพาะแถวของตัวเอง · เพื่อนร่วมบัญชีมองไม่เห็น/แก้ไม่ได้ · cron อ่าน auth.users และนับในนามผู้ใช้ (0020)
+   17. ยืนยันการรวมเป็นชุดและย้อนทั้งชุดในนามผู้ใช้ · อีกบัญชีมองไม่เห็นชุด (0018 · solo S5)
 
    ต้องมี DATABASE_URL ของฐานทดสอบที่ใช้ migration แล้ว (npm run pg:test-db) — ไม่มีก็ข้าม
    ⚠ ห้ามชี้ไปที่ production: ชุดนี้สร้างบัญชีและผู้ใช้ทดสอบ */
@@ -310,6 +312,54 @@ ok(!wiped && await countFor("deletion_registry", "tenant_id = ?", T) === regRows
   ok(r.failed === 0 && got.includes(`${op}@pg.example`), `cron อ่านอีเมลจาก auth.users และนับคิวในนามผู้ใช้บน Postgres (ส่ง ${r.sent} · ล้ม ${r.failed})`);
   await run("DELETE FROM tenant_users WHERE tenant_id = ? AND user_id = ?", T, peer);
   await run("DELETE FROM auth.users WHERE id = ?", peer);
+}
+
+// ── 17 · ยืนยันการรวมเป็นชุดและย้อนทั้งชุด (S5 · 0018) ในนามผู้ใช้ ── review_batches ผ่าน RLS · ธุรกรรมเดียวบน Postgres
+{
+  const { proposeBatches, confirmBatch, undoBatch } = await import("@/lib/engine/vault/review-batches");
+  const org = randomUUID();
+  await run("INSERT INTO orgs (id, tenant_id, name, name_norm, created_at) VALUES (?,?,?,?,?)", org, T, "บริษัทชุดทดสอบ (สมมุติ)", "บริษัทชุดทดสอบ", now);
+  const people: string[] = [];
+  for (const [i, nm] of ["ชุดหนึ่ง ทดสอบ", "ชุดสอง ทดสอบ"].entries()) {
+    const ids: string[] = [];
+    for (const k of [0, 1]) {
+      const c = await as(() => createCustomer(T, { name: nm, contacts: [{ kind: "email", value: `batch${i}${k}@pg${k}.example` }], profile: {}, consent: false }, "verify"));
+      if (!c.ok) throw new Error(c.error);
+      ids.push(c.id);
+      await run("INSERT INTO affiliations (id, tenant_id, customer_id, org_id, title, valid_from, confirmed_by, recorded_at) VALUES (?,?,?,?,?,?,?,?)",
+        randomUUID(), T, c.id, org, "วิศวกร", ago(30), "verify", now);
+    }
+    ids.sort();
+    people.push(...ids);
+    await run("INSERT INTO review_items (id, tenant_id, kind, subject_ids, signals, confidence, status, created_at) VALUES (?,?,?,?,?,?,?,?)",
+      randomUUID(), T, "person_pair", JSON.stringify(ids), '["same_name_same_org"]', 0.8, "open", now);
+  }
+  const b = (await as(() => proposeBatches(T))).find((x) => x.rule === "same_name_org_title");
+  ok(b?.pairs.length === 2, "คำนวณชุดที่เสนอในนามผู้ใช้บน Postgres ได้");
+  const cf = b ? await as(() => confirmBatch(T, { key: b.key, itemIds: b.pairs.map((p) => p.itemId) }, viewerPg.id)) : null;
+  const inPeople = `tenant_id = ? AND id IN (${people.map(() => "?").join(",")})`;
+  ok(Boolean(cf?.ok && cf.merged === 2) && await countFor("customers", inPeople, T, ...people) === 2,
+    `ยืนยันทั้งชุดเป็นธุรกรรมเดียวในนามผู้ใช้ (review_batches · merge_log ผ่าน RLS)${cf && !cf.ok ? ` (${cf.error})` : ""}`);
+  const peekB = await withIdentity(stranger, () => all<{ id: string }>("SELECT id FROM review_batches WHERE tenant_id = ?", T));
+  ok(peekB.length === 0, "ผู้ใช้นอกบัญชีมองไม่เห็นชุด");
+  const ud = cf?.ok ? await as(() => undoBatch(T, cf.batchId, viewerPg.id)) : null;
+  ok(Boolean(ud?.ok && ud.restored === 2) && await countFor("customers", inPeople, T, ...people) === 4
+    && await countFor("review_items", "tenant_id = ? AND kind = 'person_pair' AND status = 'open' AND batch_id IS NOT NULL", T) === 2,
+    `ย้อนทั้งชุดในนามผู้ใช้ได้ — ทั้งสี่คนกลับมา และคู่กลับเข้าคิว${ud && !ud.ok ? ` (${ud.error})` : ""}`);
+}
+
+// ── 15 · หลักฐานโน้ตตามการลบ (0021) ── evidence ลบตรงไม่ได้ ต้องผ่าน app.erase_person_history
+{
+  const p = await as(() => createCustomer(T, { name: "โน้ต ทดสอบ", contacts: [{ kind: "email", value: "note-erase@pg.example" }], profile: {}, consent: false }, "verify"));
+  if (!p.ok) throw new Error(p.error);
+  const intId = randomUUID();
+  await as(async () => {
+    await run("INSERT INTO interactions (id, tenant_id, kind, occurred_at, customer_id, summary, recorded_at) VALUES (?,?,?,?,?,?,?)", intId, T, "meeting", now, p.id, "โน้ต (สมมุติ)", now);
+    await run("INSERT INTO evidence (id, tenant_id, kind, ref, note, captured_by, captured_at) VALUES (?,?,?,?,?,?,?)", randomUUID(), T, "note", `interaction:${intId}`, "คุยกัน (สมมุติ)", "verify", now);
+  });
+  const gone = await as(() => deleteCustomer(T, p.id, "verify", { reason: "request" }));
+  ok(gone.ok && await countFor("evidence", "tenant_id = ? AND ref = ?", T, `interaction:${intId}`) === 0,
+    "ลบคนในนามผู้ใช้บน Postgres = หลักฐานโน้ตของปฏิสัมพันธ์หายด้วย");
 }
 
 // เก็บกวาด — บัญชีทดสอบหายพร้อมทุกแถว (on delete cascade)
