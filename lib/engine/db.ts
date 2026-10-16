@@ -838,6 +838,26 @@ export async function ensureSchema(): Promise<void> {
     );
     CREATE UNIQUE INDEX IF NOT EXISTS ux_dsar_requests_ref ON dsar_requests (tenant_id, ref);
     CREATE INDEX IF NOT EXISTS ix_dsar_requests_open ON dsar_requests (tenant_id, status, due_at);
+
+    /* ══ ส่งออกแบบขออนุมัติ (B6) — สเปกเดียวกับ supabase/migrations/0016_export_requests.sql ══ */
+    CREATE TABLE IF NOT EXISTS export_requests (
+      id TEXT NOT NULL PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      scope TEXT NOT NULL,
+      reason TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      requested_by TEXT NOT NULL,
+      requested_at TEXT NOT NULL,
+      approved_by TEXT,
+      approved_at TEXT,
+      ready_at TEXT,
+      expires_at TEXT,
+      downloaded_at TEXT,
+      row_count INTEGER,
+      cancelled_by TEXT,
+      cancelled_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS ix_export_requests_tenant ON export_requests (tenant_id, requested_at);
   `);
 
   /* บัญชีเดโมสังเคราะห์ได้สถานะ demo — เฉพาะบัญชีในทะเบียนเดโม ไม่ใช่ทุกแถวใน tenants

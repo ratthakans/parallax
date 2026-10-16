@@ -78,7 +78,9 @@ export function ActionForm({
 
       <button
         type={needsConfirm ? "button" : "submit"}
-        onClick={needsConfirm ? () => setArmed(true) : undefined}
+        /* preventDefault จำเป็น: React เปลี่ยน type เป็น submit ก่อนที่เบราว์เซอร์จะตัดสินว่าคลิกนี้ส่งฟอร์มไหม
+           ไม่กันไว้ = กดครั้งแรกก็ส่งเลย ขั้นยืนยันหายไปเงียบ ๆ (เจอตอนทดสอบปุ่มอนุมัติส่งออก B6) */
+        onClick={needsConfirm ? (e) => { e.preventDefault(); setArmed(true); } : undefined}
         onBlur={confirm ? () => setArmed(false) : undefined}
         disabled={pending || disabled}
         aria-busy={pending || undefined}

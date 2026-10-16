@@ -135,14 +135,13 @@ export default async function CustomersPage({
             <Link href="/app/import" className="c-btn c-btn-ghost">
               นำเข้าไฟล์
             </Link>
-            {/* <a> ไม่ใช่ <Link> — เป็นการดาวน์โหลดไฟล์ ไม่ใช่การเปลี่ยนหน้า */}
-            <a
-              href={hrefFor(state, { page: undefined }).replace("/app/customers", "/app/customers/export")}
+            {/* ส่งออกต้องขออนุมัติก่อน (B6) — ส่งตัวกรองปัจจุบันไปเป็นขอบเขตของคำขอ */}
+            <Link
+              href={hrefFor(state, { page: undefined }).replace("/app/customers", "/app/exports")}
               className="c-btn c-btn-ghost"
-              download
             >
               ส่งออก CSV
-            </a>
+            </Link>
           </>
         }
       />

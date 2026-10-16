@@ -14,6 +14,7 @@
    9. ตั้งกฎอายุข้อมูลและคำนวณวันครบอายุในนามผู้ใช้ (B6)
    10. ทะเบียนการลบเขียนได้ระหว่างลบตามคำขอ และผู้ใช้ลบแถวทะเบียนไม่ได้ (0014)
    11. คำขอสิทธิ: เปิด · ยืนยัน · รายงาน · ปิดด้วยการลบ ในนามผู้ใช้ · อีกบัญชีมองไม่เห็น · ลบแถวคำขอไม่ได้ (0015)
+   12. ส่งออกแบบขออนุมัติ: มีเจ้าของสองคน = อนุมัติคำขอของตัวเองไม่ได้ · อีกคนอนุมัติแล้วผู้ขอดาวน์โหลดได้ครั้งเดียว (0016)
 
    ต้องมี DATABASE_URL ของฐานทดสอบที่ใช้ migration แล้ว (npm run pg:test-db) — ไม่มีก็ข้าม
    ⚠ ห้ามชี้ไปที่ production: ชุดนี้สร้างบัญชีและผู้ใช้ทดสอบ */
@@ -183,6 +184,29 @@ ok(!wiped && await countFor("deletion_registry", "tenant_id = ?", T) === regRows
   const nReq = await countFor("dsar_requests", "tenant_id = ?", T);
   const gone = await as(async () => { try { await run("DELETE FROM dsar_requests WHERE tenant_id = ?", T); return true; } catch { return false; } });
   ok(!gone && await countFor("dsar_requests", "tenant_id = ?", T) === nReq, "ผู้ใช้ลบแถวคำขอสิทธิไม่ได้ (หลักฐานว่าทำตามคำขอ)");
+}
+
+// ── 12 · ส่งออกแบบขออนุมัติ (0016) ── สองเจ้าของ: คนขออนุมัติตัวเองไม่ได้ (นับเจ้าของผ่าน RLS) · อีกคนอนุมัติ = พร้อมทันที
+{
+  const { requestExport, approveExport, downloadExport, scopeFrom } = await import("@/lib/engine/exports");
+  const [o1, o2] = [randomUUID(), randomUUID()];
+  for (const u of [o1, o2]) {
+    await run("INSERT INTO auth.users (id, email) VALUES (?, ?)", u, `${u}@pg.example`);
+    await run("INSERT INTO tenant_users (user_id, tenant_id, role) VALUES (?, ?, 'owner')", u, T);
+  }
+  const e1 = `${o1}@pg.example`, e2 = `${o2}@pg.example`;
+  const req = await withIdentity(o1, () => requestExport(T, scopeFrom({}), "ส่งรายชื่อให้ทีมหน้างาน (สมมุติ)", e1));
+  const selfAp = req.ok ? await withIdentity(o1, () => approveExport(T, req.id, e1)) : null;
+  ok(Boolean(req.ok && selfAp && !selfAp.ok), "มีเจ้าของสองคน: อนุมัติคำขอส่งออกของตัวเองไม่ได้");
+  const otherAp = req.ok ? await withIdentity(o2, () => approveExport(T, req.id, e2)) : null;
+  const dl = req.ok ? await withIdentity(o1, () => downloadExport(T, req.id, e1)) : null;
+  const again = req.ok ? await withIdentity(o1, () => downloadExport(T, req.id, e1)) : null;
+  ok(Boolean(otherAp?.ok && !otherAp.self && dl?.ok && again && !again.ok),
+    `เจ้าของอีกคนอนุมัติแล้วผู้ขอดาวน์โหลดได้ครั้งเดียวบน Postgres${dl && !dl.ok ? ` (${dl.error})` : ""}`);
+  const gone = await withIdentity(o1, async () => { try { await run("DELETE FROM export_requests WHERE tenant_id = ?", T); return true; } catch { return false; } });
+  ok(!gone, "ผู้ใช้ลบแถวคำขอส่งออกไม่ได้");
+  await run("DELETE FROM tenant_users WHERE tenant_id = ? AND user_id IN (?, ?)", T, o1, o2);
+  await run("DELETE FROM auth.users WHERE id IN (?, ?)", o1, o2);
 }
 
 // เก็บกวาด — บัญชีทดสอบหายพร้อมทุกแถว (on delete cascade)
