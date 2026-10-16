@@ -1,20 +1,20 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { viewer } from "@/app/(app)/viewer";
+import { denied, viewer } from "@/app/(app)/viewer";
 import { approveExport, cancelExport, requestExport, scopeFrom } from "@/lib/engine/exports";
 import { thaiDateTime } from "@/lib/shared/format";
 import type { ActionState } from "@/lib/shared/action-state";
 
-/* ── ส่งออกแบบขออนุมัติ (B6) ── ขอ · อนุมัติ · ยกเลิก = เจ้าของบัญชี (เหมือนสิทธิ์ส่งออกเดิม)
+/* ── ส่งออกแบบขออนุมัติ (B6) ── ขอ/ยกเลิก = export_request · อนุมัติ = export_approve (lib/shared/roles.ts)
    บัญชีและผู้กระทำมาจากฝั่งเซิร์ฟเวอร์เสมอ · กติกาคนเดียว/สองคนอยู่ใน engine */
 
 const str = (fd: FormData, k: string) => String(fd.get(k) ?? "");
-const OWNER_ONLY = "เฉพาะเจ้าของบัญชีเท่านั้นที่ส่งออกรายชื่อได้";
 
 export async function requestExportAction(_p: ActionState, fd: FormData): Promise<ActionState> {
   const v = await viewer();
-  if (v.role !== "owner") return { error: OWNER_ONLY };
+  const no = denied(v, "export_request");
+  if (no) return { error: no };
   const res = await requestExport(v.tenantId, scopeFrom({ q: str(fd, "q"), filter: str(fd, "filter"), sort: str(fd, "sort") }), str(fd, "reason"), v.actor);
   if (!res.ok) return { error: res.error };
   revalidatePath("/app/exports");
@@ -23,7 +23,8 @@ export async function requestExportAction(_p: ActionState, fd: FormData): Promis
 
 export async function approveExportAction(_p: ActionState, fd: FormData): Promise<ActionState> {
   const v = await viewer();
-  if (v.role !== "owner") return { error: OWNER_ONLY };
+  const no = denied(v, "export_approve");
+  if (no) return { error: no };
   const res = await approveExport(v.tenantId, str(fd, "requestId"), v.actor);
   if (!res.ok) return { error: res.error };
   revalidatePath("/app/exports");
@@ -32,7 +33,8 @@ export async function approveExportAction(_p: ActionState, fd: FormData): Promis
 
 export async function cancelExportAction(_p: ActionState, fd: FormData): Promise<ActionState> {
   const v = await viewer();
-  if (v.role !== "owner") return { error: OWNER_ONLY };
+  const no = denied(v, "export_request") && denied(v, "export_approve");
+  if (no) return { error: no };
   const res = await cancelExport(v.tenantId, str(fd, "requestId"), v.actor);
   if (!res.ok) return { error: res.error };
   revalidatePath("/app/exports");

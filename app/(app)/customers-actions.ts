@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { activeTenantId } from "@/app/(app)/tenant";
+import { denied, viewer } from "@/app/(app)/viewer";
 import { currentUser } from "@/lib/shared/session";
 import { membershipEnforced } from "@/lib/engine/access";
 import { get } from "@/lib/engine/sql";
@@ -117,17 +118,8 @@ export async function setConsentAction(_prev: ActionState, fd: FormData): Promis
 
 export async function deleteCustomerAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
   const { tenantId, actor } = await scope(fd);
-  if (membershipEnforced()) {
-    const user = await currentUser();
-    const role = user
-      ? (await get<{ role: string }>(
-          "SELECT role FROM tenant_users WHERE user_id = ? AND tenant_id = ?",
-          user.userId,
-          tenantId,
-        ))?.role
-      : undefined;
-    if (role !== "owner") return { error: "เฉพาะเจ้าของบัญชีเท่านั้นที่ลบลูกค้าได้" };
-  }
+  const no = denied(await viewer(), "privacy");
+  if (no) return { error: no };
   const id = field(fd, "customerId");
   const reason = (["request", "retention", "manual"] as const).find((r) => r === field(fd, "reason")) ?? "manual";
   const res = await deleteCustomer(tenantId, id, actor, { reason, requestRef: field(fd, "requestRef") || null });

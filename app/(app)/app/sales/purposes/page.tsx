@@ -6,6 +6,7 @@ import { listBases, RULES_VERSION } from "@/lib/engine/policy";
 import { listTemplates } from "@/lib/engine/policy/templates";
 import { CHANNEL_TH, LAWFUL_BASES, LAWFUL_BASIS_TH, type LawfulBasis } from "@/lib/shared/policy";
 import { thaiDateTime } from "@/lib/shared/format";
+import { can, deniedTh } from "@/lib/shared/roles";
 import { ActionForm } from "@/components/console/action-form";
 import { PageHead, Panel } from "@/components/console/ui";
 
@@ -63,7 +64,7 @@ export default async function PurposesPage() {
                 ช่องทาง {t.channels.map((c) => CHANNEL_TH[c]).join(" · ")} · {t.messageKinds.map((k) => KIND_TH[k] ?? k).join(" · ")} · เก็บ {t.retention.note}
                 {t.employerScoped ? " · ผูกกับบริษัท: ย้ายบริษัทแล้วต้องมีหลักฐานใหม่" : ""}
               </p>
-              {!t.adopted && v.role === "owner" && (
+              {!t.adopted && can(v.role, "policy") && (
                 <details className="mt-2">
                   <summary className="c-btn c-btn-ghost c-btn-sm inline-flex cursor-pointer">ใช้แม่แบบนี้</summary>
                   <ActionForm action={adoptTemplateAction} fields={{ code: t.code }} label="สร้างวัตถุประสงค์" pendingLabel="กำลังสร้าง…" size="sm" className="mt-3 grid gap-3">
@@ -77,7 +78,7 @@ export default async function PurposesPage() {
             </li>
           ))}
         </ul>
-        {v.role !== "owner" && <p className="c-thai mt-3 text-[0.78rem] text-[var(--c-text-4)]">เฉพาะเจ้าของบัญชีที่เลือกแม่แบบได้</p>}
+        {!can(v.role, "policy") && <p className="c-thai mt-3 text-[0.78rem] text-[var(--c-text-4)]">{deniedTh("policy")}</p>}
       </Panel>
 
       <p className="c-thai mb-4 text-[0.78rem] text-[var(--c-text-4)]">กติกานโยบายรุ่น <span className="c-mono">{RULES_VERSION}</span> · วัตถุประสงค์ใหม่สร้างได้ตอนลงทะเบียนแหล่งข้อมูล</p>
@@ -115,7 +116,7 @@ export default async function PurposesPage() {
                         ? <>อายุข้อมูล: เก็บ {r.days} วัน นับจาก{TRIGGER_TH[r.trigger] ?? r.trigger}{r.legalHold ? <span className="text-[var(--c-warn)]"> · legal hold ({r.note})</span> : ""}</>
                         : <span className="text-[var(--c-warn)]">ยังไม่มีกฎอายุข้อมูล — ข้อมูลของวัตถุประสงค์นี้ไม่มีวันครบอายุจนกว่าจะตั้ง</span>}
                     </p>
-                    {v.role === "owner" && (
+                    {can(v.role, "policy") && (
                       <details className="mt-2">
                         <summary className="c-btn c-btn-ghost c-btn-sm inline-flex cursor-pointer">{r ? "แก้กฎอายุ" : "ตั้งกฎอายุ"}</summary>
                         <ActionForm action={setRetentionRuleAction} fields={{ purposeId: b.purpose_id }} label="บันทึกกฎอายุ" pendingLabel="กำลังบันทึก…" size="sm" className="mt-3 grid gap-3 md:grid-cols-3">

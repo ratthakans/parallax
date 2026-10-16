@@ -2,8 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { activeTenantId } from "@/app/(app)/tenant";
-import { currentUser } from "@/lib/shared/session";
+import { denied, viewer } from "@/app/(app)/viewer";
 import { registerSource } from "@/lib/engine/vault/sources";
 import { analyseUpload, commitUpload, type AnalyseResult, type CommitResult } from "@/lib/engine/vault/intake";
 import { MAX_UPLOAD_BYTES } from "@/lib/engine/vault/scan";
@@ -12,20 +11,22 @@ import { decideReview, unmerge } from "@/lib/engine/vault/merge";
 import { recordSample, type SampleVerdict } from "@/lib/engine/vault/sample";
 import { messageOf, type ActionState } from "@/lib/shared/action-state";
 import type { SourceKind } from "@/lib/shared/vault";
+import type { Capability } from "@/lib/shared/roles";
 
 /* ── Data Vault (docs/plan.md B2) ─────────────────────────────────
 
    บัญชีมาจากฝั่งเซิร์ฟเวอร์เสมอ · ไฟล์ส่งมาเป็นไบต์ดิบ ไม่ถอดรหัสที่เบราว์เซอร์
    (เดาอักษร Windows-874 และอ่าน xlsx ที่เซิร์ฟเวอร์ ซึ่งตรวจไฟล์ก่อนแตะเนื้อในได้) */
 
-async function scope(): Promise<{ tenantId: string; actor: string }> {
-  const tenantId = await activeTenantId();
-  const user = await currentUser();
-  return { tenantId, actor: user?.email || "owner" };
+/* นำเข้า = ลงทะเบียนแหล่ง/นำเข้า/ตรวจตัวตนรอบใหม่ · ตรวจ = ตัดสินคิว/แยกคืน/สุ่มตรวจ (lib/shared/roles.ts) */
+async function scope(cap: Capability): Promise<{ tenantId: string; actor: string; no: string | null }> {
+  const v = await viewer();
+  return { tenantId: v.tenantId, actor: v.actor, no: denied(v, cap) };
 }
 
 export async function registerSourceAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
-  const { tenantId, actor } = await scope();
+  const { tenantId, actor, no } = await scope("import");
+  if (no) return { error: no };
   const res = await registerSource(
     tenantId,
     {
@@ -52,7 +53,8 @@ async function fileOf(fd: FormData): Promise<{ bytes: Uint8Array; name: string }
 }
 
 export async function analyseUploadAction(fd: FormData): Promise<AnalyseResult> {
-  const { tenantId, actor } = await scope();
+  const { tenantId, actor, no } = await scope("import");
+  if (no) return { ok: false, error: no };
   const file = await fileOf(fd);
   if (typeof file === "string") return { ok: false, error: file };
   return analyseUpload(tenantId, String(fd.get("sourceId") ?? ""), file.bytes, file.name, actor);
@@ -61,7 +63,8 @@ export async function analyseUploadAction(fd: FormData): Promise<AnalyseResult> 
 export type CommitWithResolve = CommitResult & { resolved?: ResolveStats | null; resolveError?: string };
 
 export async function commitUploadAction(fd: FormData): Promise<CommitWithResolve> {
-  const { tenantId, actor } = await scope();
+  const { tenantId, actor, no } = await scope("import");
+  if (no) return { ok: false, error: no };
   const file = await fileOf(fd);
   if (typeof file === "string") return { ok: false, error: file };
   let override: Record<number, string> = {};
@@ -86,7 +89,8 @@ export async function commitUploadAction(fd: FormData): Promise<CommitWithResolv
 }
 
 export async function resolveNowAction(_prev: ActionState): Promise<ActionState> {
-  const { tenantId, actor } = await scope();
+  const { tenantId, actor, no } = await scope("import");
+  if (no) return { error: no };
   try {
     const s = await resolveTenant(tenantId, actor);
     revalidatePath("/app/vault");
@@ -97,7 +101,8 @@ export async function resolveNowAction(_prev: ActionState): Promise<ActionState>
 }
 
 export async function decideReviewAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
-  const { tenantId, actor } = await scope();
+  const { tenantId, actor, no } = await scope("review");
+  if (no) return { error: no };
   const verdict = String(fd.get("verdict") ?? "");
   if (verdict !== "same" && verdict !== "different") return { error: "คำตัดสินไม่ถูกต้อง" };
   const res = await decideReview(tenantId, String(fd.get("reviewId") ?? ""), verdict, actor, String(fd.get("note") ?? "") || undefined);
@@ -107,7 +112,8 @@ export async function decideReviewAction(_prev: ActionState, fd: FormData): Prom
 }
 
 export async function unmergeAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
-  const { tenantId, actor } = await scope();
+  const { tenantId, actor, no } = await scope("review");
+  if (no) return { error: no };
   const res = await unmerge(tenantId, String(fd.get("mergeId") ?? ""), actor);
   if (!res.ok) return { error: res.error };
   revalidatePath("/app/vault/review");
@@ -115,7 +121,8 @@ export async function unmergeAction(_prev: ActionState, fd: FormData): Promise<A
 }
 
 export async function recordSampleAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
-  const { tenantId, actor } = await scope();
+  const { tenantId, actor, no } = await scope("review");
+  if (no) return { error: no };
   const res = await recordSample(
     tenantId, String(fd.get("customerId") ?? ""), String(fd.get("verdict") ?? "") as SampleVerdict, actor,
     String(fd.get("note") ?? "") || undefined,

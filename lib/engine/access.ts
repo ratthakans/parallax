@@ -5,6 +5,7 @@ import {
   isKnownTenant,
   CONSOLE_PROFILES,
 } from "@/lib/shared/tenants";
+import { roleFrom, type Role } from "@/lib/shared/roles";
 
 /* ── ใครแตะบัญชีไหนได้ ─────────────────────────────────────────
 
@@ -49,15 +50,14 @@ export const tenantsForUser = cache(async function tenantsForUser(
    WHERE tenant_id = ? ของตัวเอง — RLS เป็นชั้นที่สอง ไม่ใช่ชั้นเดียว */
 export const membershipEnforced = () => usingPostgres();
 
-/* ── บทบาทในบัญชี ── owner · operator · viewer (tenant_users.role)
+/* ── บทบาทในบัญชี ── หกบทบาท (lib/shared/roles.ts) จาก tenant_users.role
    โหมดเดโมไม่มีสมาชิก จึงถือเป็น owner เหมือนที่เปิดได้ทุกอย่างอยู่แล้ว
-   ไม่พบแถว = viewer (สิทธิ์น้อยสุด) ไม่ใช่ owner */
-export type TenantRole = "owner" | "operator" | "viewer";
+   ไม่พบแถว = viewer (สิทธิ์น้อยสุด) ไม่ใช่ owner · operator เดิม = หัวหน้าทีม */
+export type TenantRole = Role;
 export async function tenantRole(tenantId: string, userId: string | null | undefined): Promise<TenantRole> {
   if (!membershipEnforced()) return "owner";
   if (!userId) return "viewer";
-  const r = (await get<{ role: string }>("SELECT role FROM tenant_users WHERE tenant_id = ? AND user_id = ?", tenantId, userId))?.role;
-  return r === "owner" || r === "operator" ? r : "viewer";
+  return roleFrom((await get<{ role: string }>("SELECT role FROM tenant_users WHERE tenant_id = ? AND user_id = ?", tenantId, userId))?.role);
 }
 
 /**

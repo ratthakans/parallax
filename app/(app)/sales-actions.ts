@@ -34,7 +34,7 @@ function criteriaOf(fd: FormData): Criteria {
 
 export async function createCampaignAction(_p: ActionState, fd: FormData): Promise<ActionState> {
   const v = await viewer();
-  const no = denied(v, "write");
+  const no = denied(v, "campaign");
   if (no) return { error: no };
   const res = await createCampaign(v.tenantId, {
     name: str(fd, "name"), offer: str(fd, "offer"), purposeId: str(fd, "purposeId"), channel: str(fd, "channel"),
@@ -48,7 +48,7 @@ export async function createCampaignAction(_p: ActionState, fd: FormData): Promi
 
 export async function updateCriteriaAction(_p: ActionState, fd: FormData): Promise<ActionState> {
   const v = await viewer();
-  const no = denied(v, "write");
+  const no = denied(v, "campaign");
   if (no) return { error: no };
   const id = str(fd, "campaignId");
   const res = await updateCriteria(v.tenantId, id, criteriaOf(fd), v.actor);
@@ -59,7 +59,7 @@ export async function updateCriteriaAction(_p: ActionState, fd: FormData): Promi
 
 export async function buildTargetsAction(_p: ActionState, fd: FormData): Promise<ActionState> {
   const v = await viewer();
-  const no = denied(v, "write");
+  const no = denied(v, "campaign");
   if (no) return { error: no };
   const id = str(fd, "campaignId");
   const res = await buildTargets(v.tenantId, id, v.actor);
@@ -73,7 +73,7 @@ export async function buildTargetsAction(_p: ActionState, fd: FormData): Promise
 
 export async function assignTargetAction(_p: ActionState, fd: FormData): Promise<ActionState> {
   const v = await viewer();
-  const no = denied(v, "write");
+  const no = denied(v, "campaign");
   if (no) return { error: no };
   const res = await assignTarget(v.tenantId, str(fd, "targetId"), str(fd, "assignee") || v.actor, str(fd, "dueOn"), v.actor, v.isStaff);
   if (!res.ok) return { error: res.reasons?.length ? `${res.error}: ${res.reasons.join(" · ")}` : res.error };

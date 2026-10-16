@@ -98,7 +98,7 @@ export async function ensureSchema(): Promise<void> {
     CREATE TABLE IF NOT EXISTS tenant_users (
       tenant_id TEXT NOT NULL,
       user_id TEXT NOT NULL,
-      role TEXT NOT NULL DEFAULT 'member',
+      role TEXT NOT NULL DEFAULT 'bd',
       created_at TEXT NOT NULL,
       PRIMARY KEY (tenant_id, user_id)
     );

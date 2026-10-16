@@ -3,6 +3,7 @@ import { viewer } from "@/app/(app)/viewer";
 import { approveExportAction, cancelExportAction, requestExportAction } from "@/app/(app)/export-actions";
 import { listExports, scopeFrom, type ExportRequest } from "@/lib/engine/exports";
 import { thaiDateTime } from "@/lib/shared/format";
+import { can, deniedTh } from "@/lib/shared/roles";
 import { ActionForm } from "@/components/console/action-form";
 import { PageHead, Panel, num } from "@/components/console/ui";
 
@@ -31,7 +32,7 @@ export default async function ExportsPage({ searchParams }: { searchParams: Prom
   const v = await viewer();
   const scope = scopeFrom(await searchParams);
   const requests = await listExports(v.tenantId);
-  const owner = v.role === "owner";
+  const mayRequest = can(v.role, "export_request"), mayApprove = can(v.role, "export_approve");
 
   return (
     <>
@@ -39,11 +40,11 @@ export default async function ExportsPage({ searchParams }: { searchParams: Prom
       <PageHead
         label="Data Vault"
         title="ส่งออกรายชื่อ"
-        lead="ไฟล์ส่งออกมีเบอร์และอีเมลแบบอ่านได้ ออกไปแล้วตามคืนไม่ได้ — จึงต้องขอพร้อมเหตุผลและได้รับอนุมัติก่อน · เจ้าของอีกคนอนุมัติ = ดาวน์โหลดได้ทันที · บัญชีที่มีเจ้าของคนเดียวอนุมัติตัวเองได้ แต่ต้องรอ 1 ชั่วโมง · ผู้ขอดาวน์โหลดได้ครั้งเดียวภายใน 24 ชั่วโมง"
+        lead="ไฟล์ส่งออกมีเบอร์และอีเมลแบบอ่านได้ ออกไปแล้วตามคืนไม่ได้ — จึงต้องขอพร้อมเหตุผลและได้รับอนุมัติก่อน · ผู้อนุมัติอีกคน (เจ้าของหรือผู้ดูแลข้อมูลส่วนบุคคล) อนุมัติ = ดาวน์โหลดได้ทันที · บัญชีที่มีผู้อนุมัติคนเดียวอนุมัติตัวเองได้ แต่ต้องรอ 1 ชั่วโมง · ผู้ขอดาวน์โหลดได้ครั้งเดียวภายใน 24 ชั่วโมง"
       />
 
-      {!owner ? (
-        <Panel flat className="mb-6 p-5"><p className="c-thai text-[0.86rem] text-[var(--c-text-3)]">เฉพาะเจ้าของบัญชีเท่านั้นที่ส่งออกรายชื่อได้</p></Panel>
+      {!mayRequest ? (
+        <Panel flat className="mb-6 p-5"><p className="c-thai text-[0.86rem] text-[var(--c-text-3)]">{deniedTh("export_request")}</p></Panel>
       ) : (
         <Panel className="mb-6 p-5 md:p-6">
           <h2 className="c-h2 text-[var(--c-text)]">ขอส่งออก</h2>
@@ -85,9 +86,9 @@ export default async function ExportsPage({ searchParams }: { searchParams: Prom
                     {r.cancelledBy && ` · ยกเลิกโดย ${r.cancelledBy}`}
                   </p>
                 </div>
-                {owner && (
+                {(mayRequest || mayApprove) && (
                   <div className="flex flex-wrap gap-2">
-                    {r.stage === "awaiting_approval" && (
+                    {r.stage === "awaiting_approval" && mayApprove && (
                       <ActionForm action={approveExportAction} fields={{ requestId: r.id }} size="sm"
                         label={r.requestedBy === v.actor ? "อนุมัติตัวเอง (รอ 1 ชม.)" : "อนุมัติ"}
                         confirm={r.requestedBy === v.actor ? "กดอีกครั้ง — ดาวน์โหลดได้หลังรอ 1 ชั่วโมง" : undefined} pendingLabel="กำลังอนุมัติ…" />

@@ -4,6 +4,7 @@ import { viewer } from "@/app/(app)/viewer";
 import { closeRequestAction, verifyIdentityAction } from "@/app/(app)/dsar-actions";
 import { getRequest } from "@/lib/engine/dsar";
 import { listBases } from "@/lib/engine/policy";
+import { can } from "@/lib/shared/roles";
 import { DSAR_CHANNEL_TH, DSAR_KIND_DONE_TH, DSAR_KIND_TH } from "@/lib/shared/dsar";
 import { thaiDate, thaiDateTime } from "@/lib/shared/format";
 import { ActionForm } from "@/components/console/action-form";
@@ -21,7 +22,7 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
   const v = await viewer();
   const r = await getRequest(v.tenantId, id);
   if (!r) notFound();
-  const owner = v.role === "owner";
+  const owner = can(v.role, "privacy");
   const needsReport = r.kind === "access" || r.kind === "portability";
   const needsPurpose = r.kind === "withdraw" || r.kind === "object" || r.kind === "restrict";
   const purposes = needsPurpose ? await listBases(v.tenantId) : [];
@@ -84,7 +85,7 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
               {!r.verifiedAt ? (
                 <p className="c-thai mt-3 text-[0.84rem] text-[var(--c-warn)]">ยืนยันตัวตนก่อน — รายงานมีข้อมูลเต็ม</p>
               ) : !owner ? (
-                <p className="c-thai mt-3 text-[0.84rem] text-[var(--c-text-3)]">เจ้าของบัญชีเป็นผู้สร้างรายงาน</p>
+                <p className="c-thai mt-3 text-[0.84rem] text-[var(--c-text-3)]">ผู้ดูแลข้อมูลส่วนบุคคลหรือเจ้าของบัญชีเป็นผู้สร้างรายงาน</p>
               ) : (
                 <a href={`/app/requests/${r.id}/report`} className="c-btn c-btn-ghost c-btn-sm mt-3 inline-flex">ดาวน์โหลดรายงาน ({r.ref}.json)</a>
               )}
@@ -99,7 +100,7 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
               {" · "}ปฏิเสธได้เมื่อมีเหตุตามกฎหมาย (เช่น ยืนยันตัวตนไม่ได้ · ต้องเก็บตามหน้าที่ทางกฎหมาย) และต้องแจ้งเหตุผลแก่ผู้ขอ
             </p>
             {!owner ? (
-              <p className="c-thai mt-3 text-[0.84rem] text-[var(--c-text-3)]">เจ้าของบัญชีเป็นผู้ปิดคำขอ</p>
+              <p className="c-thai mt-3 text-[0.84rem] text-[var(--c-text-3)]">ผู้ดูแลข้อมูลส่วนบุคคลหรือเจ้าของบัญชีเป็นผู้ปิดคำขอ</p>
             ) : (
               <ActionForm
                 action={closeRequestAction}

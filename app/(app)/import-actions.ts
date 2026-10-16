@@ -1,6 +1,7 @@
 "use server";
 
 import { activeTenantId } from "@/app/(app)/tenant";
+import { denied, viewer } from "@/app/(app)/viewer";
 
 import { revalidatePath } from "next/cache";
 import { mapColumns, type AiSource } from "@/lib/engine/ai";
@@ -83,6 +84,8 @@ export async function commitCsv(
   mapping: ColumnMapping,
   opts: { consentAll?: boolean } = {},
 ): Promise<CommitOutcome> {
+  const no = denied(await viewer(), "import");
+  if (no) return { ok: false, error: no };
   try {
     const parsed = parseCsv(csvText);
     const result = await commitImport(await activeTenantId(), parsed, mapping, {

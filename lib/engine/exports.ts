@@ -2,14 +2,15 @@ import { randomUUID } from "node:crypto";
 import { all, get, run } from "@/lib/engine/sql";
 import { logActivity } from "@/lib/engine/db";
 import { membershipEnforced } from "@/lib/engine/access";
+import { rolesWith } from "@/lib/shared/roles";
 import { CUSTOMER_FILTERS, CUSTOMER_SORTS, exportCustomersCsv, type CustomerFilter, type CustomerSort } from "@/lib/engine/customers";
 
 /* ── ส่งออกแบบขออนุมัติ (docs/plan.md B6 · docs/solo-plan.md หัวข้อ 6.1) ─────────
 
    ไฟล์ส่งออกมีเบอร์และอีเมลแบบอ่านได้ — ออกไปแล้วตามคืนไม่ได้ จึงไม่ใช่ปุ่มกดแล้วได้ไฟล์ทันที
    ขอ (พร้อมเหตุผล) → อนุมัติ → ผู้ขอดาวน์โหลดได้ครั้งเดียว ภายใน 24 ชั่วโมงนับจากพร้อม
-   - มีเจ้าของบัญชีคนอื่น: ต้องให้คนอื่นอนุมัติ · อนุมัติแล้วพร้อมทันที
-   - เจ้าของคนเดียว (โหมดคนเดียว): อนุมัติตัวเองได้ แต่พร้อมหลังรอ 1 ชั่วโมง — เวลาทำหน้าที่แทนคนที่สอง
+   - มีผู้อนุมัติคนอื่น (เจ้าของ · ผู้ดูแลข้อมูลส่วนบุคคล): ต้องให้คนอื่นอนุมัติ · อนุมัติแล้วพร้อมทันที
+   - ผู้อนุมัติคนเดียว (โหมดคนเดียว): อนุมัติตัวเองได้ แต่พร้อมหลังรอ 1 ชั่วโมง — เวลาทำหน้าที่แทนคนที่สอง
      (กันกดผิด และกันบัญชีที่ถูกยึดดึงข้อมูลออกทันที) · ยกเลิกได้ระหว่างรอ
    - ทุกขั้นอยู่ใน audit · ไม่บันทึกค่าใดในไฟล์ */
 
@@ -46,10 +47,12 @@ function toRequest(r: Row, now: Date): ExportRequest {
   };
 }
 
-/** จำนวนเจ้าของบัญชี — โหมดเดโม (ไม่มีการล็อกอิน) นับเป็นเจ้าของคนเดียว */
-async function ownerCount(tenantId: string): Promise<number> {
+/** จำนวนคนที่อนุมัติการส่งออกได้ (เจ้าของ · ผู้ดูแลข้อมูลส่วนบุคคล) — โหมดเดโม (ไม่มีการล็อกอิน) นับเป็นคนเดียว */
+async function approverCount(tenantId: string): Promise<number> {
   if (!membershipEnforced()) return 1;
-  return Number((await get<{ n: number | string }>("SELECT COUNT(*) AS n FROM tenant_users WHERE tenant_id = ? AND role = 'owner'", tenantId))?.n ?? 0);
+  const roles = rolesWith("export_approve");
+  return Number((await get<{ n: number | string }>(
+    `SELECT COUNT(*) AS n FROM tenant_users WHERE tenant_id = ? AND role IN (${roles.map(() => "?").join(",")})`, tenantId, ...roles))?.n ?? 0);
 }
 
 export function scopeFrom(input: { q?: string | null; filter?: string | null; sort?: string | null }): ExportScope {
@@ -85,7 +88,7 @@ export async function approveExport(tenantId: string, id: string, actor: string,
   if (!r) return { ok: false, error: "ไม่พบคำขอนี้" };
   if (r.status !== "pending") return { ok: false, error: "คำขอนี้ไม่ได้รออนุมัติแล้ว" };
   const self = r.requestedBy === actor;
-  if (self && (await ownerCount(tenantId)) > 1) return { ok: false, error: "ให้เจ้าของบัญชีอีกคนอนุมัติ — อนุมัติคำขอของตัวเองได้เฉพาะบัญชีที่มีเจ้าของคนเดียว" };
+  if (self && (await approverCount(tenantId)) > 1) return { ok: false, error: "ให้ผู้อนุมัติอีกคนอนุมัติ — อนุมัติคำขอของตัวเองได้เฉพาะบัญชีที่มีผู้อนุมัติคนเดียว" };
   const ready = new Date(+now + (self ? SELF_APPROVAL_WAIT_MS : 0));
   const res = await run(
     "UPDATE export_requests SET status = 'approved', approved_by = ?, approved_at = ?, ready_at = ?, expires_at = ? WHERE tenant_id = ? AND id = ? AND status = 'pending'",
