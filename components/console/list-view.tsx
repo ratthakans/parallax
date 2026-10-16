@@ -7,22 +7,24 @@ import Link from "next/link";
    SortTh      หัวคอลัมน์กดเรียง · กดซ้ำสลับทิศ · มีลูกศรบอกทิศ
    Pager       ก่อนหน้า/ถัดไป */
 
-export type ListState = { q?: string; view?: string; sort?: string; dir?: string; page?: number };
+export type ListState = { q?: string; view?: string; sort?: string; dir?: string; page?: number; mode?: string; defaultView?: string };
 
+/** ลิงก์ของสถานะรายการ — มุมมองเริ่มต้น (state.defaultView · ปกติ "all") ไม่ใส่ใน URL */
 export function listHref(base: string, state: ListState, patch: ListState): string {
   const next = { ...state, ...patch };
   const qs = new URLSearchParams();
   if (next.q) qs.set("q", next.q);
-  if (next.view && next.view !== "all") qs.set("view", next.view);
+  if (next.view && next.view !== (next.defaultView ?? "all")) qs.set("view", next.view);
   if (next.sort) qs.set("sort", next.sort);
   if (next.dir) qs.set("dir", next.dir);
   if (next.page && next.page > 1) qs.set("page", String(next.page));
+  if (next.mode) qs.set("mode", next.mode);
   const s = qs.toString();
   return s ? `${base}?${s}` : base;
 }
 
 export function ListViews({ base, state, views }: { base: string; state: ListState; views: { key: string; label: string }[] }) {
-  const active = state.view ?? "all";
+  const active = state.view ?? state.defaultView ?? "all";
   return (
     <nav className="flex flex-wrap gap-1.5" aria-label="มุมมองของรายการ">
       {views.map((v) => (

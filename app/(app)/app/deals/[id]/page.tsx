@@ -1,0 +1,142 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { viewer } from "@/app/(app)/viewer";
+import { moveDealAction, updateDealAction } from "@/app/(app)/deal-actions";
+import { getDeal } from "@/lib/engine/deals";
+import { DEAL_STAGE_TH, OPEN_STAGES, isDealStage, stageTh } from "@/lib/shared/deals";
+import { INTERACTION_TH, type InteractionKind } from "@/lib/shared/accounts";
+import { thaiDate, thaiDateTime } from "@/lib/shared/format";
+import { ActionForm } from "@/components/console/action-form";
+import { Panel, baht } from "@/components/console/ui";
+import { RecordHeader, RecordTabs, pickTab } from "@/components/console/record";
+
+export const dynamic = "force-dynamic";
+
+/* ── หน้าดีล (docs/ux-plan.md U4) ── หัวสรุป + Path (กดขั้นเพื่อย้าย) + แท็บ ภาพรวม/ประวัติ */
+
+const FIELD_TH: Record<string, string> = { stage: "ขั้น", value: "มูลค่า", expected_close: "ปิดคาด", name: "ชื่อ" };
+
+function Edit({ dealId, field, label, value, type = "text" }: { dealId: string; field: string; label: string; value: string; type?: string }) {
+  return (
+    <details className="mt-1">
+      <summary className="inline-block cursor-pointer text-[0.76rem] text-[var(--c-text-4)] hover:text-[var(--c-accent)]">แก้{label}</summary>
+      <ActionForm action={updateDealAction} fields={{ dealId, field }} label="บันทึก" pendingLabel="กำลังบันทึก…" size="sm" className="mt-1 flex flex-wrap items-end gap-2">
+        <input name="value_raw" type={type} defaultValue={value} className="c-input max-w-[14rem]" aria-label={label} />
+      </ActionForm>
+    </details>
+  );
+}
+
+export default async function DealPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string }> }) {
+  const { id } = await params;
+  const v = await viewer();
+  const d = await getDeal(v.tenantId, id, { id: v.actor, clearance: v.clearance });
+  if (!d) notFound();
+  if (d === "masked") {
+    return <Panel className="p-5"><p className="c-thai text-[0.9rem] text-[var(--c-text-2)]">ดีลนี้อยู่ในบริษัทที่ระดับความลับสูงกว่าสิทธิ์ของคุณ</p></Panel>;
+  }
+  const tab = pickTab(["overview", "history"] as const, (await searchParams).tab);
+  const closed = d.stage === "won" || d.stage === "lost";
+  const pathStages = [...OPEN_STAGES, closed ? (d.stage as "won" | "lost") : "won"];
+  const at = isDealStage(d.stage) ? pathStages.indexOf(d.stage) : -1;
+
+  return (
+    <>
+      <RecordHeader
+        back={{ href: "/app/deals", label: "ดีลทั้งหมด" }}
+        kind="ดีล"
+        title={d.name}
+        badges={<span className={`c-pill ${d.stage === "won" ? "c-pill-good" : d.stage === "lost" ? "c-pill-bad" : "c-pill-reach"}`}>{stageTh(d.stage)}</span>}
+        highlights={[
+          { label: "บริษัท", value: <Link href={`/app/accounts/${d.orgId}`} className="text-[var(--c-accent)] hover:underline">{d.org}</Link> },
+          { label: "มูลค่า", value: d.value != null ? baht(d.value) : "ไม่ระบุ" },
+          { label: "ปิดคาด", value: d.expectedClose ? thaiDate(d.expectedClose) : "ไม่ระบุ" },
+          { label: "เจ้าของ", value: d.owner ?? "—" },
+          { label: "แคมเปญ", value: d.campaignId ? <Link href={`/app/sales/${d.campaignId}`} className="text-[var(--c-accent)] hover:underline">{d.campaign}</Link> : "—" },
+          { label: "อัปเดต", value: thaiDate(d.updatedAt) },
+        ]}
+      />
+
+      {/* ── Path: ขั้นของดีล กดเพื่อย้าย ── */}
+      <Panel className="mb-5 p-3">
+        <ol className="flex flex-wrap gap-1" aria-label="ขั้นของดีล">
+          {pathStages.map((s, i) => {
+            const state = i < at ? "done" : i === at ? "current" : "todo";
+            return (
+              <li key={s} className="min-w-[7rem] flex-1">
+                {state === "current" ? (
+                  <span aria-current="step" className={`c-btn c-btn-sm w-full ${s === "lost" ? "c-btn-danger" : "c-btn-primary"}`}>{DEAL_STAGE_TH[s]}</span>
+                ) : (
+                  <ActionForm action={moveDealAction} fields={{ dealId: d.id, stage: s }} size="sm"
+                    label={<>{state === "done" ? "✓ " : ""}{DEAL_STAGE_TH[s]}</>} pendingLabel="กำลังย้าย…"
+                    variant="ghost" full buttonClassName={state === "done" ? "text-[var(--c-good)]" : ""} />
+                )}
+              </li>
+            );
+          })}
+          {!closed && (
+            <li className="min-w-[7rem] flex-1">
+              <ActionForm action={moveDealAction} fields={{ dealId: d.id, stage: "lost" }} size="sm" label="ไม่ได้" pendingLabel="กำลังย้าย…" full
+                confirm="กดอีกครั้ง — ปิดดีลนี้ว่าไม่ได้" />
+            </li>
+          )}
+        </ol>
+      </Panel>
+
+      <RecordTabs base={`/app/deals/${d.id}`} active={tab} tabs={[{ key: "overview", label: "ภาพรวม" }, { key: "history", label: "ประวัติ", count: d.history.length }]} />
+
+      {tab === "overview" ? (
+        <div className="grid gap-5 lg:grid-cols-2">
+          <Panel className="p-5">
+            <h2 className="c-h2 text-[var(--c-text)]">รายละเอียด</h2>
+            <dl className="c-thai mt-3 grid gap-3 text-[0.9rem]">
+              <div><dt className="text-[0.75rem] text-[var(--c-text-4)]">ชื่อ</dt><dd>{d.name}</dd><Edit dealId={d.id} field="name" label="ชื่อ" value={d.name} /></div>
+              <div><dt className="text-[0.75rem] text-[var(--c-text-4)]">มูลค่า</dt><dd>{d.value != null ? baht(d.value) : "ไม่ระบุ"}</dd><Edit dealId={d.id} field="value" label="มูลค่า" value={d.value != null ? String(d.value) : ""} /></div>
+              <div><dt className="text-[0.75rem] text-[var(--c-text-4)]">ปิดคาด</dt><dd>{d.expectedClose ? thaiDate(d.expectedClose) : "ไม่ระบุ"}</dd><Edit dealId={d.id} field="expected_close" label="วันปิดคาด" value={d.expectedClose ?? ""} type="date" /></div>
+              <div><dt className="text-[0.75rem] text-[var(--c-text-4)]">สร้างเมื่อ</dt><dd>{thaiDate(d.createdAt)}</dd></div>
+            </dl>
+          </Panel>
+          <Panel className="p-5">
+            <h2 className="c-h2 text-[var(--c-text)]">คนในดีล</h2>
+            {d.people.length ? (
+              <ul className="mt-3 divide-y divide-[var(--c-line)]">
+                {d.people.map((p) => (
+                  <li key={p.id} className="flex justify-between gap-2 py-2">
+                    <Link href={`/app/customers/${p.id}`} className="c-thai text-[var(--c-accent)] hover:underline">{p.name}</Link>
+                    <span className="c-thai text-[0.8rem] text-[var(--c-text-3)]">{p.role ?? ""}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="c-thai mt-3 text-[0.88rem] text-[var(--c-text-3)]">ยังไม่ได้ระบุคน</p>}
+            <h2 className="c-h2 mt-6 text-[var(--c-text)]">กิจกรรมของดีล</h2>
+            {d.interactions.length ? (
+              <ul className="mt-3 divide-y divide-[var(--c-line)]">
+                {d.interactions.map((i) => (
+                  <li key={i.id} className="c-thai py-2 text-[0.86rem]">
+                    <span className="text-[var(--c-text-3)]">{thaiDate(i.at)}</span> · {INTERACTION_TH[i.kind as InteractionKind] ?? i.kind}
+                    {i.summary ? <span className="block text-[var(--c-text-2)]">{i.summary}</span> : <span className="block text-[var(--c-text-4)]">บันทึกระดับสูง</span>}
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="c-thai mt-3 text-[0.88rem] text-[var(--c-text-3)]">บันทึกกิจกรรมที่หน้าบริษัท <Link href={`/app/accounts/${d.orgId}`} className="underline">{d.org}</Link></p>}
+          </Panel>
+        </div>
+      ) : (
+        <Panel className="p-5">
+          <ol className="divide-y divide-[var(--c-line)]">
+            {d.history.map((h, i) => (
+              <li key={i} className="c-thai grid grid-cols-[9rem_minmax(0,1fr)] gap-3 py-2.5 text-[0.86rem]">
+                <span className="text-[var(--c-text-3)]">{thaiDateTime(h.at)}</span>
+                <span>
+                  {FIELD_TH[h.field] ?? h.field}: {h.field === "stage" ? `${h.oldValue ? stageTh(h.oldValue) : "—"} → ${h.newValue ? stageTh(h.newValue) : "—"}` : `${h.oldValue ?? "—"} → ${h.newValue ?? "—"}`}
+                  <span className="text-[var(--c-text-4)]"> · {h.by} · {h.reason}</span>
+                </span>
+              </li>
+            ))}
+            {!d.history.length && <li className="c-thai py-2 text-[var(--c-text-3)]">ยังไม่มีประวัติ</li>}
+          </ol>
+        </Panel>
+      )}
+    </>
+  );
+}

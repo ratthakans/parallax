@@ -16,6 +16,7 @@
    11. คำขอสิทธิ: เปิด · ยืนยัน · รายงาน · ปิดด้วยการลบ ในนามผู้ใช้ · อีกบัญชีมองไม่เห็น · ลบแถวคำขอไม่ได้ (0015)
    12. ส่งออกแบบขออนุมัติ: มีเจ้าของสองคน = อนุมัติคำขอของตัวเองไม่ได้ · อีกคนอนุมัติแล้วผู้ขอดาวน์โหลดได้ครั้งเดียว (0016)
    15. ลบคนตามคำขอในนามผู้ใช้ = หลักฐานโน้ตของปฏิสัมพันธ์ถูกลบด้วย (0021)
+   18. ดีล: สร้างและย้ายขั้นในนามผู้ใช้ พร้อมประวัติ (U4)
    13. บทบาทหกแบบ: BD และผู้ดูแลข้อมูลส่วนบุคคลเขียนผ่าน RLS ได้ · viewer เขียนไม่ได้ · ค่าบทบาทที่ไม่รู้จักบันทึกไม่ได้ (0017)
    14. สมัครเอง (0019): app.create_signup_tenant สร้างบัญชีให้ auth.uid() ครั้งเดียว (แม้กดพร้อมกัน) · เรียกโดยไม่มีตัวตนไม่ได้
        · เข้าบัญชีคนอื่นไม่ได้ · ผู้ใช้เปลี่ยนสถานะการชำระหรือ signup_source เองไม่ได้ · ขั้นตั้งต้นรันในนามผู้ใช้ได้
@@ -360,6 +361,19 @@ ok(!wiped && await countFor("deletion_registry", "tenant_id = ?", T) === regRows
   const gone = await as(() => deleteCustomer(T, p.id, "verify", { reason: "request" }));
   ok(gone.ok && await countFor("evidence", "tenant_id = ? AND ref = ?", T, `interaction:${intId}`) === 0,
     "ลบคนในนามผู้ใช้บน Postgres = หลักฐานโน้ตของปฏิสัมพันธ์หายด้วย");
+}
+
+// ── 18 · ดีล (U4) ── สร้าง · ย้ายขั้น (เขียน record_versions) ในนามผู้ใช้ผ่าน RLS
+{
+  const { createDeal, moveDeal, getDeal } = await import("@/lib/engine/deals");
+  const orgId = `o-${randomUUID().slice(0, 8)}`;
+  await run("INSERT INTO orgs (id, tenant_id, name, name_norm, classification, lifecycle_state, recorded_at, created_at) VALUES (?,?,?,?,?,?,?,?)",
+    orgId, T, "บริษัท ดีล PG (สมมุติ)", "บริษัท ดีล pg", "confidential", "confirmed", now, now);
+  const made = await as(() => createDeal(T, { orgId, name: "ดีลทดสอบ PG", value: "1000" }, viewerPg));
+  const moved = made.ok ? await as(() => moveDeal(T, made.id, "proposal", viewerPg)) : null;
+  const got = made.ok ? await as(() => getDeal(T, made.id, viewerPg)) : null;
+  ok(Boolean(made.ok && moved?.ok && got && got !== "masked" && got.stage === "proposal" && got.history.length === 2),
+    `สร้างและย้ายขั้นดีลในนามผู้ใช้บน Postgres พร้อมประวัติ${made.ok ? "" : ` (${made.error})`}`);
 }
 
 // เก็บกวาด — บัญชีทดสอบหายพร้อมทุกแถว (on delete cascade)

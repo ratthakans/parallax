@@ -33,6 +33,7 @@ const TABS = [
   { href: "/app/today", label: "หน้าแรก" },
   { href: "/app/accounts", label: "บริษัท" },
   { href: "/app/customers", label: "ผู้ติดต่อ" },
+  { href: "/app/deals", label: "ดีล" },
   { href: "/app/sales", label: "แคมเปญ" },
   { href: "/app/sales/weekly", label: "รายงาน" },
 ];
@@ -42,6 +43,7 @@ const SETUP_PATHS = ["/app/sales/purposes"];
 
 const NEW_ITEMS = [
   { href: "/app/customers/new", label: "ผู้ติดต่อ" },
+  { href: "/app/deals/new", label: "ดีล" },
   { href: "/app/sales#new", label: "แคมเปญ" },
   { href: "/app/vault/cards", label: "นามบัตร" },
   { href: "/app/requests", label: "คำขอสิทธิ" },
