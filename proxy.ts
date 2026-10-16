@@ -47,7 +47,9 @@ function consoleCsp(nonce: string): string {
 
 export default async function proxy(req: NextRequest) {
   const path = req.nextUrl.pathname;
-  const isConsole = path === "/app" || path.startsWith("/app/") || path === "/login" || path.startsWith("/login/");
+  const under = (p: string) => path === p || path.startsWith(`${p}/`);
+  /* /signup · /onboarding · /upgrade (S9) เป็นประตูหน้าคอนโซล render ตอนขอ — ได้ CSP เดียวกับคอนโซล */
+  const isConsole = under("/app") || under("/login") || under("/signup") || under("/onboarding") || under("/upgrade");
   const csp = isConsole ? consoleCsp(Buffer.from(crypto.randomUUID()).toString("base64")) : null;
   /* header ของคำขอที่ส่งต่อให้ Next — สร้างใหม่ทุกครั้งที่คุกกี้เปลี่ยน (ต่ออายุ session) ไม่ให้ CSP หาย */
   const forward = () => {
@@ -84,7 +86,7 @@ export default async function proxy(req: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const needsAuth = path === "/app" || path.startsWith("/app/");
+  const needsAuth = under("/app") || under("/onboarding") || under("/upgrade");
 
   /* ── เด้งไปล็อกอินเฉพาะคนที่ไม่มี session เลย ──
 
@@ -103,7 +105,7 @@ export default async function proxy(req: NextRequest) {
     return NextResponse.redirect(to);
   }
 
-  if (path === "/login" && user) {
+  if ((path === "/login" || path === "/signup") && user) {
     return NextResponse.redirect(new URL("/app", req.nextUrl));
   }
 

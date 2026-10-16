@@ -12,7 +12,8 @@ import { get } from "@/lib/engine/sql";
    ไม่มีแถว = ไม่อนุญาต (fail closed ตาม Blueprint บท 5) บัญชีเดโมสังเคราะห์มีแถว
    state 'demo' และ is_customer = 0 จึงเปิดได้ เพราะไม่มีข้อมูลของใครจริง */
 
-export type BillingState = "demo" | "trial_audit" | "awaiting_payment" | "paid" | "suspended";
+/** trial = ทดลองใช้ 14 วันของบัญชีสมัครเอง (S9 · 0019) — AI ปิดตลอดช่วงทดลอง */
+export type BillingState = "demo" | "trial" | "trial_audit" | "awaiting_payment" | "paid" | "suspended";
 
 export type AiPolicy = { allowed: true } | { allowed: false; reason: string };
 
@@ -30,5 +31,6 @@ export async function aiPolicy(tenantId: string): Promise<AiPolicy> {
   if (!row) return { allowed: false, reason: "บัญชีนี้ยังไม่มีสถานะการชำระ — AI ปิดอยู่" };
   if (row.state === "paid") return { allowed: true };
   if (!Number(row.is_customer) && row.state === "demo") return { allowed: true };
+  if (row.state === "trial") return { allowed: false, reason: "ช่วงทดลองใช้ AI ปิดอยู่ — เปิดได้หลังชำระเงิน ตอนนี้ใช้สูตรสำเร็จแทน" };
   return { allowed: false, reason: "AI เปิดได้หลังบัญชีชำระเงินแล้ว — ตอนนี้ใช้สูตรสำเร็จแทน" };
 }

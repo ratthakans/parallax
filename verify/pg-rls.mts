@@ -16,6 +16,8 @@
    11. คำขอสิทธิ: เปิด · ยืนยัน · รายงาน · ปิดด้วยการลบ ในนามผู้ใช้ · อีกบัญชีมองไม่เห็น · ลบแถวคำขอไม่ได้ (0015)
    12. ส่งออกแบบขออนุมัติ: มีเจ้าของสองคน = อนุมัติคำขอของตัวเองไม่ได้ · อีกคนอนุมัติแล้วผู้ขอดาวน์โหลดได้ครั้งเดียว (0016)
    13. บทบาทหกแบบ: BD และผู้ดูแลข้อมูลส่วนบุคคลเขียนผ่าน RLS ได้ · viewer เขียนไม่ได้ · ค่าบทบาทที่ไม่รู้จักบันทึกไม่ได้ (0017)
+   14. สมัครเอง (0019): app.create_signup_tenant สร้างบัญชีให้ auth.uid() ครั้งเดียว (แม้กดพร้อมกัน) · เรียกโดยไม่มีตัวตนไม่ได้
+       · เข้าบัญชีคนอื่นไม่ได้ · ผู้ใช้เปลี่ยนสถานะการชำระหรือ signup_source เองไม่ได้ · ขั้นตั้งต้นรันในนามผู้ใช้ได้
 
    ต้องมี DATABASE_URL ของฐานทดสอบที่ใช้ migration แล้ว (npm run pg:test-db) — ไม่มีก็ข้าม
    ⚠ ห้ามชี้ไปที่ production: ชุดนี้สร้างบัญชีและผู้ใช้ทดสอบ */
@@ -231,6 +233,60 @@ ok(!wiped && await countFor("deletion_registry", "tenant_id = ?", T) === regRows
   ok(!bad, "ค่าบทบาทที่ไม่รู้จักบันทึกไม่ได้ (check constraint)");
   await run(`DELETE FROM tenant_users WHERE tenant_id = ? AND user_id IN (?, ?, ?)`, T, users.bd, users.privacy, users.viewer);
   await run(`DELETE FROM auth.users WHERE id IN (?, ?, ?)`, users.bd, users.privacy, users.viewer);
+}
+
+// ── 14 · สมัครเอง (0019) ── บัญชีของผู้ใช้ใหม่สร้างผ่านฟังก์ชัน security definer เท่านั้น
+{
+  const { createSignupTenant, acceptDpa, chooseTemplates, loadSignupDemo } = await import("@/lib/engine/signup");
+  const { importBlockedReason, signupInfo } = await import("@/lib/engine/signup/gate");
+  process.env.SIGNUP_ENABLED = "1";
+  const u = randomUUID(), racer = randomUUID(), other = randomUUID();
+  for (const id of [u, racer, other]) await run("INSERT INTO auth.users (id, email) VALUES (?, ?)", id, `${id}@pg.example`);
+  const made = await withIdentity(u, () => createSignupTenant(u, "บัญชีสมัครเอง (สมมุติ)", `${u}@pg.example`));
+  ok(made.ok, `สร้างบัญชีสมัครเองในนามผู้ใช้ผ่าน app.create_signup_tenant${made.ok ? "" : ` (${made.error})`}`);
+  const S = made.ok ? made.tenantId : "";
+  const row = await get<{ role: string; state: string; trial_ends_at: string; mode: string; signup_source: string }>(
+    `SELECT tu.role, b.state, b.trial_ends_at, s.mode, s.signup_source FROM tenant_users tu
+       JOIN tenant_billing b ON b.tenant_id = tu.tenant_id JOIN tenant_settings s ON s.tenant_id = tu.tenant_id
+      WHERE tu.user_id = ? AND tu.tenant_id = ?`, u, S);
+  const days = row ? (Date.parse(row.trial_ends_at) - Date.now()) / 864e5 : 0;
+  ok(row?.role === "owner" && row.state === "trial" && row.mode === "solo" && row.signup_source === "self" && days > 13.9 && days <= 14,
+    "ฟังก์ชันสร้างครบสี่แถวในธุรกรรมเดียว: เจ้าของ · ทดลอง 14 วัน · โหมดคนเดียว · ที่มา = สมัครเอง");
+  const second = await withIdentity(u, () => createSignupTenant(u, "บัญชีที่สอง (สมมุติ)", "verify"));
+  ok(!second.ok && await countFor("tenant_users", "user_id = ?", u) === 1, "ผู้ใช้ที่มีบัญชีแล้วสร้างบัญชีที่สองไม่ได้ (ฐานข้อมูลปฏิเสธ)");
+  const race = await Promise.all([1, 2, 3].map((i) => withIdentity(racer, () => createSignupTenant(racer, `กดพร้อมกัน ${i} (สมมุติ)`, "verify"))));
+  ok(race.filter((r) => r.ok).length === 1 && await countFor("tenant_users", "user_id = ?", racer) === 1, "กดสร้างพร้อมกันสามครั้ง = ได้บัญชีเดียว (advisory lock)");
+  let anon = true;
+  try { await run("SELECT app.create_signup_tenant(?, ?)", "s-0123456789ab", "ไม่มีตัวตน"); } catch { anon = false; }
+  ok(!anon && await countFor("tenants", "id = ?", "s-0123456789ab") === 0, "เรียกฟังก์ชันโดยไม่มีตัวตน (auth.uid() ว่าง) ไม่ได้");
+  let joined = true;
+  try { await withIdentity(other, () => run("SELECT app.create_signup_tenant(?, ?)", S, "ยึดบัญชีคนอื่น")); } catch { joined = false; }
+  ok(!joined && await countFor("tenant_users", "user_id = ?", other) === 0, "ส่งรหัสบัญชีของคนอื่นเข้าฟังก์ชัน = ไม่ได้เป็นสมาชิกบัญชีนั้น");
+  let selfInvite = true;
+  try { await withIdentity(other, () => run("INSERT INTO tenant_users (user_id, tenant_id, role) VALUES (?, ?, 'owner')", other, S)); } catch { selfInvite = false; }
+  ok(!selfInvite && await countFor("tenant_users", "user_id = ? AND tenant_id = ?", other, S) === 0, "ใส่ตัวเองเข้าบัญชีคนอื่นตรง ๆ ไม่ได้ (RLS ของ tenant_users)");
+  const peek = await withIdentity(other, () => all("SELECT tenant_id FROM tenant_settings WHERE tenant_id = ?", S));
+  ok(peek.length === 0, "คนนอกอ่านค่าตั้งของบัญชีนี้ไม่ได้");
+  let paidSelf = true;
+  try { await withIdentity(u, () => run("UPDATE tenant_billing SET state = 'paid' WHERE tenant_id = ?", S)); } catch { paidSelf = false; }
+  ok(!paidSelf && (await get<{ state: string }>("SELECT state FROM tenant_billing WHERE tenant_id = ?", S))?.state === "trial", "เจ้าของเปลี่ยนสถานะการชำระเป็น paid เองไม่ได้");
+  let unblock = true;
+  try { await withIdentity(u, () => run("UPDATE tenant_settings SET signup_source = 'invite' WHERE tenant_id = ?", S)); } catch { unblock = false; }
+  ok(!unblock && (await get<{ s: string }>("SELECT signup_source AS s FROM tenant_settings WHERE tenant_id = ?", S))?.s === "self", "เจ้าของแก้ signup_source เพื่อปลดด่านไฟล์จริงไม่ได้ (สิทธิ์ระดับคอลัมน์)");
+  let modeOk = false;
+  try { modeOk = (await withIdentity(u, () => run("UPDATE tenant_settings SET mode = 'solo', today_quiet_days = 21 WHERE tenant_id = ?", S))).changes === 1; } catch { modeOk = false; }
+  ok(modeOk, "เจ้าของแก้โหมดและวันนับบัญชีเงียบได้");
+  const asU = <R,>(fn: () => Promise<R>) => withIdentity(u, fn);
+  const dpa = await asU(() => acceptDpa(S, true, "verify", "none"));
+  const tpl = await asU(() => chooseTemplates(S, [{ code: "b2b_event_namecard", confirmation: "ยืนยันข้อเท็จจริง (สมมุติ)" }], "verify", "verified"));
+  const demo = await asU(() => loadSignupDemo(S, "verify", "verified"));
+  ok(dpa.ok && tpl.ok && demo.ok, `ขั้นตั้งต้นครบในนามผู้ใช้: DPA · แม่แบบ · ข้อมูลสมมุติผ่านด่านไฟล์${demo.ok ? ` (${demo.rows} แถว)` : ` (${!dpa.ok ? dpa.error : !tpl.ok ? tpl.error : demo.error})`}`);
+  ok((await asU(() => signupInfo(S, "verified"))).step === "done" && await asU(() => importBlockedReason(S, "0".repeat(64))) !== null,
+    "ตั้งค่าครบแล้วไฟล์ที่ไม่ใช่ไฟล์สมมุติยังถูกกั้นบน Postgres");
+  for (const id of [u, racer]) {
+    for (const t of await all<{ tenant_id: string }>("SELECT tenant_id FROM tenant_users WHERE user_id = ?", id)) await run("DELETE FROM tenants WHERE id = ?", t.tenant_id);
+  }
+  await run("DELETE FROM auth.users WHERE id IN (?, ?, ?)", u, racer, other);
 }
 
 // เก็บกวาด — บัญชีทดสอบหายพร้อมทุกแถว (on delete cascade)

@@ -48,7 +48,7 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       { source: "/:path*", headers: SECURITY_HEADERS },
-      { source: "/((?!app|login).*)", headers: [SITE_CSP] },
+      { source: "/((?!app|login|signup|onboarding|upgrade).*)", headers: [SITE_CSP] },
     ];
   },
 };

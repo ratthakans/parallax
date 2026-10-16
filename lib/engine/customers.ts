@@ -1,5 +1,6 @@
 import { all, get, insertMany, tx, type Param, type Sql } from "@/lib/engine/sql";
 import { logActivity } from "@/lib/engine/db";
+import { importBlockedReason } from "@/lib/engine/signup/gate";
 import { PERSON_LINKED, deletePersonData, erasePersonHistory } from "@/lib/engine/tenant-data";
 import { RETAIL, mergePersons } from "@/lib/engine/vault/merge";
 import { recordErasure, type ErasureReason } from "@/lib/engine/vault/erasure";
@@ -377,6 +378,9 @@ export async function createCustomer(
   if (!contactStorageReady()) {
     return { ok: false, error: "ยังเก็บข้อมูลติดต่อไม่ได้ — ระบบยังไม่ได้ตั้งกุญแจเข้ารหัส" };
   }
+  /* บัญชีสมัครเองใช้ข้อมูลสมมุติเท่านั้น (S9) — เพิ่มคนเองด้วยมือคือข้อมูลจริงอีกทางหนึ่ง */
+  const blocked = await importBlockedReason(tenantId);
+  if (blocked) return { ok: false, error: blocked };
 
   const contacts: { kind: ContactKind; value: string }[] = [];
   for (const c of input.contacts) {

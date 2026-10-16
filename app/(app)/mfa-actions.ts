@@ -6,6 +6,7 @@ import { currentUser } from "@/lib/shared/session";
 import { supabaseServer } from "@/lib/shared/supabase";
 import { logActivity } from "@/lib/engine/db";
 import type { ActionState } from "@/lib/shared/action-state";
+import { isSelfSignup } from "@/lib/engine/signup/gate";
 
 /* ── เปิด/ปิดยืนยันตัวตนสองชั้น (TOTP · B6) ─────────────────────
    เป็นเรื่องของผู้ใช้แต่ละคน ไม่ใช่ของบัญชี — ทุกบทบาททำได้ · Supabase ถือความลับ ระบบเราไม่เก็บ
@@ -29,6 +30,8 @@ export async function removeMfaAction(_p: ActionState, fd: FormData): Promise<Ac
   const user = await currentUser();
   if (!user) return { error: "เข้าสู่ระบบก่อน" };
   if (user.mfa !== "verified") return { error: "ปิดยืนยันสองชั้นได้เฉพาะรอบที่เข้าสู่ระบบด้วยรหัสจากแอปแล้ว" };
+  /* บัญชีสมัครเองบังคับยืนยันสองชั้นตั้งแต่วันแรก (S9) — ปิดแล้วคอนโซลจะพากลับไปขั้นตั้งค่าอยู่ดี จึงไม่ให้ปิด */
+  if (await isSelfSignup(await activeTenantId())) return { error: "บัญชีที่สมัครเองต้องเปิดยืนยันสองชั้นไว้เสมอ — เพิ่มแอปใหม่ก่อนถ้าจะเปลี่ยนเครื่อง" };
   const sb = await supabaseServer();
   const { error } = await sb.auth.mfa.unenroll({ factorId: String(fd.get("factorId") ?? "") });
   if (error) return { error: "ปิดไม่สำเร็จ — ลองอีกครั้ง" };

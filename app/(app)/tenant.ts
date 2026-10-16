@@ -4,7 +4,7 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import { TENANT_COOKIE } from "@/lib/shared/active-tenant";
 import { currentUser } from "@/lib/shared/session";
-import { membershipEnforced, resolveTenant, switchableTenants } from "@/lib/engine/access";
+import { membershipEnforced, resolveTenant, switchableTenants, tenantsForUser } from "@/lib/engine/access";
 import { redirect } from "next/navigation";
 import { enterIdentity } from "@/lib/engine/sql";
 
@@ -42,6 +42,10 @@ export const activeTenantId = cache(async (): Promise<string> => {
      proxy.ts ปล่อยคำขอที่มีคุกกี้ session ผ่านมาแม้ตรวจไม่ผ่าน (กันการเด้งตอนต่ออายุ token)
      ที่นี่จึงเป็นด่านที่ตัดสินจริง และ resolveTenant จะไม่ต้องโยน "ต้องล็อกอินก่อน" */
   if (!user && membershipEnforced()) redirect("/login");
+
+  /* ล็อกอินแล้วแต่ยังไม่มีบัญชี = ผู้ที่เพิ่งสมัคร (S9) — ไปสร้างบัญชีและตั้งค่าที่ /onboarding
+     (ถ้าการสมัครเองปิดอยู่ หน้านั้นบอกให้ติดต่อทีม) แทนหน้า error "ยังไม่ถูกผูกกับร้านใดเลย" */
+  if (user && membershipEnforced() && !(await tenantsForUser(user.userId)).length) redirect("/onboarding");
 
   return resolveTenant(user?.userId ?? null, wanted);
 });

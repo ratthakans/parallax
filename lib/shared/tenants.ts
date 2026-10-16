@@ -423,10 +423,36 @@ export const CONSOLE_PROFILES: TenantProfile[] = [...TENANT_PROFILES, ...B2B_DEM
 /** บัญชีตั้งต้นเมื่อยังไม่ได้เลือก */
 export const DEFAULT_TENANT_ID = MST_GOLF.id;
 
-export function profileFor(tenantId: string): TenantProfile {
-  return CONSOLE_PROFILES.find((t) => t.id === tenantId) ?? MST_GOLF;
+/* ── บัญชีสมัครเอง (docs/solo-plan.md S9) ──────────────────────────────
+   ไม่อยู่ในทะเบียนนิ่งข้างบน เพราะเกิดขึ้นตอนรันจากแถวในฐาน (app.create_signup_tenant · 0019)
+   จำได้จากรูปแบบรหัส s-<hex 12> — รูปแบบไม่ใช่สิทธิ์: ใครแตะบัญชีไหนได้ยังมาจาก tenant_users เสมอ
+   โปรไฟล์ใช้คำเรียกแบบ B2B ของบัญชีเดโม (ผู้ติดต่อ · แพ็กเกจ) · ชื่อจริงของบัญชีอ่านจากแถว tenants */
+export const SIGNUP_TENANT_RE = /^s-[0-9a-f]{12}$/;
+export const isSignupTenantId = (tenantId: string): boolean => SIGNUP_TENANT_RE.test(tenantId);
+
+const SIGNUP_PROFILE: TenantProfile = {
+  ...SUNLINE_DEMO,
+  id: "signup",
+  name: "บัญชีทดลอง",
+  industry: "บัญชีสมัครเอง · ทดลองใช้",
+  source: "ข้อมูลสมมุติจากตัวสร้าง B2B — บัญชีสมัครเองยังไม่รับข้อมูลจริงจนกว่าการทดสอบเจาะระบบจะผ่าน",
+  tier: "growth",
+  seedKey: 0,
+};
+
+/** บัญชีในทะเบียนนิ่ง (เดโมสังเคราะห์) — ไม่รวมบัญชีสมัครเอง */
+export function isStaticTenant(tenantId: string): boolean {
+  return CONSOLE_PROFILES.some((t) => t.id === tenantId);
 }
 
+export function profileFor(tenantId: string): TenantProfile {
+  const fixed = CONSOLE_PROFILES.find((t) => t.id === tenantId);
+  if (fixed) return fixed;
+  if (isSignupTenantId(tenantId)) return { ...SIGNUP_PROFILE, id: tenantId };
+  return MST_GOLF;
+}
+
+/** รหัสที่คอนโซลรู้จัก: ทะเบียนนิ่ง + รูปแบบบัญชีสมัครเอง */
 export function isKnownTenant(tenantId: string): boolean {
-  return CONSOLE_PROFILES.some((t) => t.id === tenantId);
+  return isStaticTenant(tenantId) || isSignupTenantId(tenantId);
 }

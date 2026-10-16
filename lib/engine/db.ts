@@ -348,7 +348,9 @@ export async function ensureSchema(): Promise<void> {
       state TEXT NOT NULL DEFAULT 'demo',
       is_customer INTEGER NOT NULL DEFAULT 0,
       updated_at TEXT NOT NULL,
-      updated_by TEXT NOT NULL
+      updated_by TEXT NOT NULL,
+      -- ทดลองใช้ของบัญชีสมัครเอง (S9 · 0019) — state = 'trial' ถึงวันนี้
+      trial_ends_at TEXT
     );
 
     /* ── บันทึกการเรียก AI ทุกครั้ง (lib/engine/ai/ledger.ts) — ไม่เก็บ prompt หรือคำตอบ ── */
@@ -858,6 +860,25 @@ export async function ensureSchema(): Promise<void> {
       cancelled_at TEXT
     );
     CREATE INDEX IF NOT EXISTS ix_export_requests_tenant ON export_requests (tenant_id, requested_at);
+
+    /* ══ ค่าตั้งของบัญชี + สมัครเอง (S9) — สเปกเดียวกับ supabase/migrations/0019_tenant_settings.sql ══ */
+    -- ไม่มีแถว = ค่าตั้งต้น (team · invite) · signup_source = 'self' คือบัญชีสมัครเอง ซึ่งรับได้แค่ข้อมูลสมมุติ
+    CREATE TABLE IF NOT EXISTS tenant_settings (
+      tenant_id TEXT NOT NULL PRIMARY KEY,
+      mode TEXT NOT NULL DEFAULT 'team',
+      today_quiet_days INTEGER NOT NULL DEFAULT 30,
+      weekly_digest_day INTEGER,
+      signup_source TEXT NOT NULL DEFAULT 'invite',
+      dpa_version TEXT,
+      dpa_accepted_at TEXT,
+      dpa_accepted_by TEXT,
+      mfa_confirmed_at TEXT,
+      templates_chosen_at TEXT,
+      demo_loaded_at TEXT,
+      onboarded_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
   `);
 
   /* บัญชีเดโมสังเคราะห์ได้สถานะ demo — เฉพาะบัญชีในทะเบียนเดโม ไม่ใช่ทุกแถวใน tenants
@@ -886,6 +907,9 @@ export async function ensureSchema(): Promise<void> {
     await exec(
       "ALTER TABLE attributions ADD COLUMN matured INTEGER NOT NULL DEFAULT 0",
     );
+  }
+  if (!(await columnsOf("tenant_billing")).has("trial_ends_at")) {
+    await exec("ALTER TABLE tenant_billing ADD COLUMN trial_ends_at TEXT");
   }
   if (!(await columnsOf("tenants")).has("billing_day")) {
     await exec(
