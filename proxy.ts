@@ -22,22 +22,58 @@ import { createServerClient } from "@supabase/ssr";
    ที่นี่คือการตรวจแบบมองโลกในแง่ดี ไม่ใช่ประตูที่ล็อกได้จริง
    ───────────────────────────────────────────────────────────── */
 
+/* ── CSP ของคอนโซล (threat model G5) ──
+   nonce ใหม่ทุกคำขอ — Next ใส่ให้สคริปต์และสไตล์ของตัวเองเอง (อ่านจาก header ของคำขอ) · ใช้ได้เฉพาะหน้าที่ render ตอนขอ
+   คอนโซลและหน้าเข้าสู่ระบบ render ตอนขออยู่แล้ว · เว็บการตลาดเป็นหน้าคงที่ ใช้ nonce ไม่ได้ (ได้ CSP พื้นฐานจาก next.config.ts)
+   style-src-attr 'unsafe-inline': React ใช้ style={{}} เป็น attribute ซึ่ง nonce คุมไม่ได้ — attribute ไม่รันสคริปต์
+   img-src data: — QR ของยืนยันสองชั้นเป็น SVG data URL จาก Supabase */
+function consoleCsp(nonce: string): string {
+  const dev = process.env.NODE_ENV !== "production";
+  return [
+    "default-src 'self'",
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${dev ? " 'unsafe-eval'" : ""}`,
+    `style-src 'self' 'nonce-${nonce}'`,
+    "style-src-attr 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "font-src 'self'",
+    `connect-src 'self'${dev ? " ws:" : ""}`,
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "object-src 'none'",
+    ...(dev ? [] : ["upgrade-insecure-requests"]),
+  ].join("; ");
+}
+
 export default async function proxy(req: NextRequest) {
-  let res = NextResponse.next({ request: req });
+  const path = req.nextUrl.pathname;
+  const isConsole = path === "/app" || path.startsWith("/app/") || path === "/login" || path.startsWith("/login/");
+  const csp = isConsole ? consoleCsp(Buffer.from(crypto.randomUUID()).toString("base64")) : null;
+  /* header ของคำขอที่ส่งต่อให้ Next — สร้างใหม่ทุกครั้งที่คุกกี้เปลี่ยน (ต่ออายุ session) ไม่ให้ CSP หาย */
+  const forward = () => {
+    const h = new Headers(req.headers);
+    if (csp) h.set("content-security-policy", csp);
+    return NextResponse.next({ request: { headers: h } });
+  };
+  const withCsp = (r: NextResponse) => {
+    if (csp) r.headers.set("Content-Security-Policy", csp);
+    return r;
+  };
+  let res = forward();
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
   /* ยังไม่ตั้งค่า Supabase — ปล่อยผ่านทั้งหมด ไม่ใช่ล็อกทุกคนออก
      เครื่องพัฒนาที่ยังไม่มีคีย์ต้องเปิดคอนโซลได้ตามเดิม */
-  if (!url || !key) return res;
+  if (!url || !key) return withCsp(res);
 
   const supabase = createServerClient(url, key, {
     cookies: {
       getAll: () => req.cookies.getAll(),
       setAll(list) {
         for (const c of list) req.cookies.set(c.name, c.value);
-        res = NextResponse.next({ request: req });
+        res = forward();
         for (const c of list) res.cookies.set(c.name, c.value, c.options);
       },
     },
@@ -48,7 +84,6 @@ export default async function proxy(req: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const path = req.nextUrl.pathname;
   const needsAuth = path === "/app" || path.startsWith("/app/");
 
   /* ── เด้งไปล็อกอินเฉพาะคนที่ไม่มี session เลย ──
@@ -72,7 +107,7 @@ export default async function proxy(req: NextRequest) {
     return NextResponse.redirect(new URL("/app", req.nextUrl));
   }
 
-  return res;
+  return withCsp(res);
 }
 
 export const config = {
