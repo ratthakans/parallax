@@ -10,6 +10,7 @@ import {
   compareNames, emailInfo, nameInfo, nameKey, orgInfo, type EmailInfo, type NameInfo,
 } from "@/lib/shared/identity";
 import type { VaultField } from "@/lib/shared/vault";
+import { normaliseTaxId } from "@/lib/shared/tax-id";
 
 /* ── ตรวจตัวตน: แถวที่รอตรวจ → คน · องค์กร · สังกัด (docs/plan.md B3 · Blueprint 2.0 บท 3) ─────
 
@@ -33,7 +34,7 @@ import type { VaultField } from "@/lib/shared/vault";
 type Row = {
   batchId: string; line: number; uploadedAt: string; sourceId: string;
   v: Partial<Record<VaultField, string>>;
-  name: NameInfo; emails: EmailInfo[]; phones: string[]; orgKey: string; orgDisplay: string; when: string | null;
+  name: NameInfo; emails: EmailInfo[]; phones: string[]; orgKey: string; orgDisplay: string; taxId: string | null; when: string | null;
 };
 
 export type ResolveStats = {
@@ -97,6 +98,7 @@ async function loadPending(tenantId: string): Promise<Row[]> {
     return {
       batchId: r.batch_id, line: Number(r.line), uploadedAt: r.uploaded_at, sourceId: r.source_id, v,
       name: nameInfo(personName(v)), emails, phones: phones.slice(0, 1), orgKey: org.key, orgDisplay: org.display,
+      taxId: org.key ? normaliseTaxId(v.tax_id) : null,
       when: v.occurred_at ? normaliseDate(v.occurred_at, orderByBatch.get(r.batch_id)) : null,
     };
   });
@@ -144,6 +146,50 @@ export async function resolveTenant(tenantId: string, actor: string): Promise<Re
   const apart = new Set(overrides.filter((o) => o.kind === "person" && o.verdict === "different").map((o) => [o.a_id, o.b_id].sort().join("|")));
   const orgAlias = new Map(overrides.filter((o) => o.kind === "org_alias").map((o) => [o.a_id, o.b_id]));
   const orgApart = new Set(overrides.filter((o) => o.kind === "org" && o.verdict === "different").map((o) => [o.a_id, o.b_id].sort().join("|")));
+
+  /* ── เลขนิติบุคคล = บริษัทเดียวกันแน่นอน (docs/crm-plan.md C2) ──
+     ชื่อเขียนต่างกันแต่เลขเดียวกัน → ชี้ไปบริษัทเดียว: บริษัทเดิมที่มีเลขนี้ก่อน ไม่มีก็ใช้ชื่อแรกที่เห็นของเลขนั้น
+     คำตัดสินของคน (org_alias ที่มีอยู่) ชนะเสมอ · เลขที่ checksum ไม่ผ่านไม่ถูกใช้ (normaliseTaxId) */
+  const taxOrgs = new Map<string, string>();
+  {
+    const taxRows = rows.filter((r) => r.taxId && r.orgKey && !orgAlias.has(r.orgKey));
+    const taxes = [...new Set(taxRows.map((r) => r.taxId!))];
+    const defaults = [...new Set(taxRows.map((r) => orgIdFor(tenantId, r.orgKey)))];
+    /* บริษัทที่มีเลขอยู่แล้ว: ตามเลข (เลข → บริษัท) และตาม id ที่ชื่อจะได้ (id → เลขของมัน) */
+    const claimed = new Map<string, string>();
+    for (let i = 0; i < taxes.length; i += 500) {
+      const chunk = taxes.slice(i, i + 500);
+      for (const o of await all<{ id: string; tax_id: string }>(
+        `SELECT id, tax_id FROM orgs WHERE tenant_id = ? AND tax_id IN (${chunk.map(() => "?").join(",")}) ORDER BY created_at, id`, tenantId, ...chunk,
+      )) if (!taxOrgs.has(o.tax_id)) taxOrgs.set(o.tax_id, o.id);
+    }
+    for (let i = 0; i < defaults.length; i += 500) {
+      const chunk = defaults.slice(i, i + 500);
+      for (const o of await all<{ id: string; tax_id: string }>(
+        `SELECT id, tax_id FROM orgs WHERE tenant_id = ? AND tax_id IS NOT NULL AND id IN (${chunk.map(() => "?").join(",")})`, tenantId, ...chunk,
+      )) claimed.set(o.id, o.tax_id);
+    }
+    /* ทุกแถวของเลขหนึ่งได้กุญแจเดียวกัน (กุญแจของชื่อแรกที่เห็น) — ชื่อเดียวกันแต่เลขต่าง = นิติบุคคลคนละราย
+       จึงได้กุญแจแยก "<ชื่อ>|tax:<เลข>" ไม่ไปปนกับบริษัทที่ถือชื่อนั้นอยู่ */
+    const keyOfTax = new Map<string, string>();
+    for (const r of taxRows) {
+      const t = r.taxId!;
+      let k = keyOfTax.get(t);
+      if (!k) {
+        k = r.orgKey;
+        const owner = claimed.get(orgIdFor(tenantId, k));
+        if (owner && owner !== t) k = `${k}|tax:${t}`;
+        keyOfTax.set(t, k);
+        const existing = taxOrgs.get(t);
+        const id = existing ?? orgIdFor(tenantId, k);
+        if (existing && existing !== orgIdFor(tenantId, k)) orgAlias.set(k, existing);
+        taxOrgs.set(t, id);
+        claimed.set(id, t);
+        claimed.set(orgIdFor(tenantId, k), t);
+      }
+      r.orgKey = k;
+    }
+  }
 
   // ── กราฟ: แถวหนึ่งแถว = หนึ่งโหนด · คนที่มีอยู่แล้ว = หนึ่งโหนด ──
   const uf = new UnionFind();
@@ -456,6 +502,10 @@ export async function resolveTenant(tenantId: string, actor: string): Promise<Re
       onConflict: "ON CONFLICT(id) DO UPDATE SET primary_domain = COALESCE(orgs.primary_domain, excluded.primary_domain), recorded_at = excluded.recorded_at",
     });
     await insertMany(q, "org_domains", ["tenant_id", "org_id", "domain"], domainRows, { onConflict: "ON CONFLICT DO NOTHING" });
+    /* เลขนิติบุคคลจากไฟล์ เติมให้บริษัทที่ยังไม่มีเลข — ไม่ทับเลขที่มีอยู่ (คนแก้เองหรือไฟล์ก่อนหน้า) */
+    for (const [tax, id] of taxOrgs) {
+      await q.run("UPDATE orgs SET tax_id = ? WHERE tenant_id = ? AND id = ? AND tax_id IS NULL", tax, tenantId, id);
+    }
     await insertMany(q, "customers",
       ["id", "tenant_id", "name", "created_at", "lifecycle_state", "source_id", "recorded_at"],
       people.map(([id, p]) => [id, tenantId, p.name ?? "ไม่ระบุชื่อ", p.firstAt, inReview.has(id) ? "pending_review" : "received", p.source, now]),

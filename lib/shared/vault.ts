@@ -63,7 +63,7 @@ export type RecordKind = "person" | "org";
    แหล่งข้อมูลแต่ละแหล่งเลือกได้เฉพาะฟิลด์ที่จำเป็น (Blueprint บท 4 ขั้น 1) และตอนนำเข้า
    คอลัมน์ที่จับคู่กับฟิลด์นอกที่เลือกไว้จะไม่ถูกเก็บ */
 export const VAULT_FIELDS = [
-  "customer_name", "first_name", "last_name", "company", "job_title",
+  "customer_name", "first_name", "last_name", "company", "tax_id", "job_title",
   "email", "phone", "phone_alt", "line_id", "website",
   "province", "occurred_at", "consent", "note",
   "program", "edition", "participant_role",
@@ -113,6 +113,7 @@ export const VAULT_FIELD_TH: Record<VaultField, string> = {
   first_name: "ชื่อ",
   last_name: "นามสกุล",
   company: "บริษัท / หน่วยงาน",
+  tax_id: "เลขนิติบุคคล (ผู้เสียภาษี 13 หลัก)",
   job_title: "ตำแหน่ง",
   email: "อีเมล",
   phone: "เบอร์มือถือ",

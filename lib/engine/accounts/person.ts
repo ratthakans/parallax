@@ -33,7 +33,7 @@ export async function personB2B(tenantId: string, customerId: string, viewer: Vi
     all<{ id: string; kind: string; occurred_at: string; org_id: string | null; org: string | null; summary: string | null; outcome: string | null; owner_id: string | null; classification: string | null }>(
       `SELECT i.id, i.kind, i.occurred_at, i.org_id, o.name AS org, i.summary, i.outcome, i.owner_id, i.classification
        FROM interactions i LEFT JOIN orgs o ON o.id = i.org_id AND o.tenant_id = i.tenant_id
-       WHERE i.tenant_id = ? AND i.customer_id IN (${IN}) ORDER BY i.occurred_at DESC LIMIT 50`, tenantId, ...ids),
+       WHERE i.tenant_id = ? AND i.customer_id IN (${IN}) ORDER BY i.occurred_at DESC, i.recorded_at DESC LIMIT 50`, tenantId, ...ids),
     all<{ id: string; name: string; eligibility: string; status: string; assigned_to: string | null }>(
       `SELECT c.id, c.name, t.eligibility, t.status, t.assigned_to FROM campaign_targets t
        JOIN sales_campaigns c ON c.id = t.campaign_id AND c.tenant_id = t.tenant_id

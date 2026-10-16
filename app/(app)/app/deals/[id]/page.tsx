@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { viewer } from "@/app/(app)/viewer";
-import { moveDealAction, updateDealAction } from "@/app/(app)/deal-actions";
-import { getDeal } from "@/lib/engine/deals";
-import { DEAL_STAGE_TH, OPEN_STAGES, isDealStage, stageTh } from "@/lib/shared/deals";
-import { INTERACTION_TH, type InteractionKind } from "@/lib/shared/accounts";
+import { logDealActivityAction, moveDealAction, removeDealPersonAction, setDealPersonAction, updateDealAction } from "@/app/(app)/deal-actions";
+import { dealCandidates, getDeal } from "@/lib/engine/deals";
+import { DEAL_ROLES, DEAL_ROLE_TH, DEAL_STAGE_TH, OPEN_STAGES, dealRoleTh, isDealStage, stageTh } from "@/lib/shared/deals";
+import { INTERACTION_KINDS, INTERACTION_TH, type InteractionKind } from "@/lib/shared/accounts";
+import { bangkokDay } from "@/lib/shared/format";
 import { thaiDate, thaiDateTime } from "@/lib/shared/format";
 import { ActionForm } from "@/components/console/action-form";
 import { Panel, baht } from "@/components/console/ui";
@@ -14,7 +15,8 @@ export const dynamic = "force-dynamic";
 
 /* ── หน้าดีล (docs/ux-plan.md U4) ── หัวสรุป + Path (กดขั้นเพื่อย้าย) + แท็บ ภาพรวม/ประวัติ */
 
-const FIELD_TH: Record<string, string> = { stage: "ขั้น", value: "มูลค่า", expected_close: "ปิดคาด", name: "ชื่อ" };
+const FIELD_TH: Record<string, string> = { stage: "ขั้น", value: "มูลค่า", expected_close: "ปิดคาด", name: "ชื่อ", person: "คนในดีล" };
+const LABEL = "c-thai flex min-w-0 flex-col gap-1 text-[0.8rem] text-[var(--c-text-3)]";
 
 function Edit({ dealId, field, label, value, type = "text" }: { dealId: string; field: string; label: string; value: string; type?: string }) {
   return (
@@ -36,6 +38,14 @@ export default async function DealPage({ params, searchParams }: { params: Promi
     return <Panel className="p-5"><p className="c-thai text-[0.9rem] text-[var(--c-text-2)]">ดีลนี้อยู่ในบริษัทที่ระดับความลับสูงกว่าสิทธิ์ของคุณ</p></Panel>;
   }
   const tab = pickTab(["overview", "history"] as const, (await searchParams).tab);
+  const candidates = await dealCandidates(v.tenantId, d.id, { id: v.actor, clearance: v.clearance });
+  const nameOf = new Map(candidates.map((c) => [c.id, c.name]));
+  /* ประวัติ field = person เก็บเป็น "<id>:<บทบาท>" — แสดงเป็นชื่อและบทบาท */
+  const personVal = (raw: string | null) => {
+    if (!raw) return "—";
+    const [pid, role] = raw.split(":");
+    return `${nameOf.get(pid) ?? "บุคคล"}${role ? ` (${dealRoleTh(role)})` : ""}`;
+  };
   const closed = d.stage === "won" || d.stage === "lost";
   const pathStages = [...OPEN_STAGES, closed ? (d.stage as "won" | "lost") : "won"];
   const at = isDealStage(d.stage) ? pathStages.indexOf(d.stage) : -1;
@@ -106,24 +116,68 @@ export default async function DealPage({ params, searchParams }: { params: Promi
             {d.people.length ? (
               <ul className="mt-3 divide-y divide-[var(--c-line)]">
                 {d.people.map((p) => (
-                  <li key={p.id} className="flex justify-between gap-2 py-2">
-                    <Link href={`/app/customers/${p.id}`} className="c-thai text-[var(--c-accent)] hover:underline">{p.name}</Link>
-                    <span className="c-thai text-[0.8rem] text-[var(--c-text-3)]">{p.role ?? ""}</span>
+                  <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                    <span className="min-w-0">
+                      <Link href={`/app/customers/${p.id}`} className="c-thai text-[var(--c-accent)] hover:underline">{p.name}</Link>
+                      {p.role && <span className="c-pill ml-2">{dealRoleTh(p.role)}</span>}
+                    </span>
+                    <ActionForm action={removeDealPersonAction} fields={{ dealId: d.id, personId: p.id }} label="เอาออก" pendingLabel="…" size="sm" variant="ghost"
+                      confirm={`กดอีกครั้ง — เอา ${p.name} ออกจากดีล`} />
                   </li>
                 ))}
               </ul>
-            ) : <p className="c-thai mt-3 text-[0.88rem] text-[var(--c-text-3)]">ยังไม่ได้ระบุคน</p>}
-            <h2 className="c-h2 mt-6 text-[var(--c-text)]">กิจกรรมของดีล</h2>
+            ) : <p className="c-thai mt-3 text-[0.88rem] text-[var(--c-text-3)]">ยังไม่ได้ระบุคน — ใครตัดสินใจ ใครอนุมัติงบ ใส่ไว้ที่นี่</p>}
+            {candidates.length > 0 ? (
+              <ActionForm action={setDealPersonAction} fields={{ dealId: d.id }} label="เพิ่ม / เปลี่ยนบทบาท" pendingLabel="กำลังบันทึก…" size="sm"
+                className="mt-3 grid gap-2 sm:grid-cols-2">
+                <label className={LABEL}>คน
+                  <select name="personId" className="c-select" required defaultValue="">
+                    <option value="" disabled>เลือกคนในบริษัทนี้</option>
+                    {candidates.map((c) => <option key={c.id} value={c.id}>{c.name}{c.title ? ` · ${c.title}` : ""}{c.current ? "" : " (ออกแล้ว)"}</option>)}
+                  </select>
+                </label>
+                <label className={LABEL}>บทบาท
+                  <select name="role" className="c-select" defaultValue="decision_maker">
+                    {DEAL_ROLES.map((r) => <option key={r} value={r}>{DEAL_ROLE_TH[r]}</option>)}
+                  </select>
+                </label>
+              </ActionForm>
+            ) : (
+              <p className="c-thai mt-3 text-[0.8rem] text-[var(--c-text-4)]">บริษัทนี้ยังไม่มีคนในระบบ — <Link href={`/app/customers/new?org=${d.orgId}`} className="underline">เพิ่มผู้ติดต่อ</Link></p>
+            )}
+          </Panel>
+          <Panel className="p-5 lg:col-span-2">
+            <h2 className="c-h2 text-[var(--c-text)]">กิจกรรมของดีล</h2>
+            <details className="mt-3" open={!d.interactions.length}>
+              <summary className="c-btn c-btn-primary c-btn-sm inline-flex cursor-pointer list-none">บันทึกกิจกรรม</summary>
+              <ActionForm action={logDealActivityAction} fields={{ dealId: d.id }} label="บันทึก" pendingLabel="กำลังบันทึก…" size="sm"
+                className="mt-3 grid max-w-3xl gap-2 sm:grid-cols-3">
+                <label className={LABEL}>ชนิด
+                  <select name="kind" className="c-select" defaultValue="meeting">
+                    {INTERACTION_KINDS.map((k) => <option key={k} value={k}>{INTERACTION_TH[k]}</option>)}
+                  </select>
+                </label>
+                <label className={LABEL}>วันที่<input type="date" name="occurredAt" defaultValue={bangkokDay()} className="c-input" required /></label>
+                <label className={LABEL}>กับใคร
+                  <select name="personId" className="c-select" defaultValue="">
+                    <option value="">ไม่ระบุคน</option>
+                    {candidates.filter((c) => c.current).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </label>
+                <label className={`${LABEL} sm:col-span-3`}>คุยอะไร<textarea name="summary" rows={2} className="c-input" required /></label>
+                <label className={`${LABEL} sm:col-span-3`}>ผลและขั้นตอนถัดไป<input name="outcome" className="c-input" /></label>
+              </ActionForm>
+            </details>
             {d.interactions.length ? (
               <ul className="mt-3 divide-y divide-[var(--c-line)]">
                 {d.interactions.map((i) => (
                   <li key={i.id} className="c-thai py-2 text-[0.86rem]">
-                    <span className="text-[var(--c-text-3)]">{thaiDate(i.at)}</span> · {INTERACTION_TH[i.kind as InteractionKind] ?? i.kind}
+                    <span className="text-[var(--c-text-3)]">{thaiDate(i.at)}</span> · {INTERACTION_TH[i.kind as InteractionKind] ?? i.kind}{i.owner ? <span className="text-[var(--c-text-4)]"> · {i.owner}</span> : null}
                     {i.summary ? <span className="block text-[var(--c-text-2)]">{i.summary}</span> : <span className="block text-[var(--c-text-4)]">บันทึกระดับสูง</span>}
                   </li>
                 ))}
               </ul>
-            ) : <p className="c-thai mt-3 text-[0.88rem] text-[var(--c-text-3)]">บันทึกกิจกรรมที่หน้าบริษัท <Link href={`/app/accounts/${d.orgId}`} className="underline">{d.org}</Link></p>}
+            ) : <p className="c-thai mt-3 text-[0.88rem] text-[var(--c-text-3)]">ยังไม่มีกิจกรรมของดีลนี้ — บันทึกที่นี่แล้วจะขึ้นที่หน้าบริษัทและหน้าผู้ติดต่อด้วย</p>}
           </Panel>
         </div>
       ) : (
@@ -133,7 +187,8 @@ export default async function DealPage({ params, searchParams }: { params: Promi
               <li key={i} className="c-thai grid grid-cols-[9rem_minmax(0,1fr)] gap-3 py-2.5 text-[0.86rem]">
                 <span className="text-[var(--c-text-3)]">{thaiDateTime(h.at)}</span>
                 <span>
-                  {FIELD_TH[h.field] ?? h.field}: {h.field === "stage" ? `${h.oldValue ? stageTh(h.oldValue) : "—"} → ${h.newValue ? stageTh(h.newValue) : "—"}` : `${h.oldValue ?? "—"} → ${h.newValue ?? "—"}`}
+                  {FIELD_TH[h.field] ?? h.field}: {h.field === "stage" ? `${h.oldValue ? stageTh(h.oldValue) : "—"} → ${h.newValue ? stageTh(h.newValue) : "—"}`
+                    : h.field === "person" ? `${personVal(h.oldValue)} → ${personVal(h.newValue)}` : `${h.oldValue ?? "—"} → ${h.newValue ?? "—"}`}
                   <span className="text-[var(--c-text-4)]"> · {h.by} · {h.reason}</span>
                 </span>
               </li>

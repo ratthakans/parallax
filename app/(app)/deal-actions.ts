@@ -3,8 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { denied, viewer } from "@/app/(app)/viewer";
-import { createDeal, moveDeal, updateDeal } from "@/lib/engine/deals";
-import { orgByName } from "@/lib/engine/accounts/edit";
+import { createDeal, moveDeal, removeDealPerson, setDealPerson, updateDeal } from "@/lib/engine/deals";
+import { logInteraction, orgByName } from "@/lib/engine/accounts/edit";
+import { get } from "@/lib/engine/sql";
+import { orgAccess } from "@/lib/engine/accounts";
 import type { ActionState } from "@/lib/shared/action-state";
 
 /* ── ดีล (docs/ux-plan.md U4) ── สร้าง · ย้ายขั้น · แก้ทีละช่อง = งานประจำของคนขาย (write)
@@ -58,4 +60,48 @@ export async function updateDealAction(_p: ActionState, fd: FormData): Promise<A
   if (!res.ok) return { error: res.error };
   refresh(id);
   return { ok: "บันทึกแล้ว" };
+}
+
+/* ── คนในดีลพร้อมบทบาท · กิจกรรมของดีล (docs/crm-plan.md C1) ── */
+export async function setDealPersonAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  const v = await viewer();
+  const no = denied(v, "write");
+  if (no) return { error: no };
+  const id = str(fd, "dealId");
+  const res = await setDealPerson(v.tenantId, id, str(fd, "personId"), str(fd, "role"), { id: v.actor, clearance: v.clearance });
+  if (!res.ok) return { error: res.error };
+  refresh(id);
+  return { ok: "บันทึกแล้ว" };
+}
+
+export async function removeDealPersonAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  const v = await viewer();
+  const no = denied(v, "write");
+  if (no) return { error: no };
+  const id = str(fd, "dealId");
+  const res = await removeDealPerson(v.tenantId, id, str(fd, "personId"), { id: v.actor, clearance: v.clearance });
+  if (!res.ok) return { error: res.error };
+  refresh(id);
+  return { ok: "เอาออกแล้ว" };
+}
+
+export async function logDealActivityAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  const v = await viewer();
+  const no = denied(v, "write");
+  if (no) return { error: no };
+  const id = str(fd, "dealId");
+  /* บริษัทมาจากดีลในฐาน ไม่ใช่จากฟอร์ม · ตรวจสิทธิ์บริษัทเหมือนการแก้ดีล */
+  const d = await get<{ org_id: string }>("SELECT org_id FROM opportunities WHERE tenant_id = ? AND id = ?", v.tenantId, id);
+  if (!d) return { error: "ไม่พบดีลนี้" };
+  const access = await orgAccess(v.tenantId, d.org_id, { id: v.actor, clearance: v.clearance });
+  if (!access.ok) return { error: access.error };
+  const res = await logInteraction(v.tenantId, d.org_id, {
+    kind: str(fd, "kind"), occurredAt: str(fd, "occurredAt"), personId: str(fd, "personId") || undefined, opportunityId: id,
+    summary: str(fd, "summary"), outcome: str(fd, "outcome"), classification: str(fd, "classification") || undefined,
+  }, v.actor);
+  if (!res.ok) return { error: res.error };
+  refresh(id, d.org_id);
+  const person = str(fd, "personId");
+  if (person) revalidatePath(`/app/customers/${person}`);
+  return { ok: "บันทึกแล้ว — ขึ้นทั้งหน้าดีล หน้าบริษัท และหน้าผู้ติดต่อ" };
 }

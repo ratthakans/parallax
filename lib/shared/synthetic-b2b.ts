@@ -1,3 +1,4 @@
+import { taxIdChecksum } from "@/lib/shared/tax-id";
 /* ── ข้อมูลสมมุติแบบ B2B พร้อมเฉลย (docs/plan.md B1 · ตัดสินใจ T8) ─────────
 
    ใช้ทดสอบ Data Vault และวัดความแม่นของการรวมตัวตน (B3) ก่อนมีข้อมูลจริง —
@@ -89,11 +90,7 @@ const PREFIX_TH = ["คุณ", "นาย", "นางสาว", "นาง", 
 const PREFIX_EN = ["Mr.", "Ms.", "Mrs.", "Dr.", "", ""];
 
 /* ── เลขผู้เสียภาษีนิติบุคคล 13 หลัก (ขึ้นต้น 0) ที่ checksum ถูก ── */
-export function taxIdChecksum(first12: string): number {
-  let sum = 0;
-  for (let i = 0; i < 12; i++) sum += Number(first12[i]) * (13 - i);
-  return (11 - (sum % 11)) % 10;
-}
+export { taxIdChecksum };
 function makeTaxId(r: R): string {
   let s = "0105";
   while (s.length < 12) s += String(r.int(10));

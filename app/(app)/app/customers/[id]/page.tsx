@@ -16,6 +16,9 @@ import { RecordHeader, RecordTabs, pickTab } from "@/components/console/record";
 import { NoteCapture } from "@/components/console/note-capture";
 import { viewer } from "@/app/(app)/viewer";
 import { personB2B } from "@/lib/engine/accounts/person";
+import { dealsOfPerson } from "@/lib/engine/deals";
+import { personIdsOf } from "@/lib/engine/vault/merge";
+import { dealRoleTh, stageTh } from "@/lib/shared/deals";
 import { isB2BTenant } from "@/lib/shared/tenants";
 import { INTERACTION_TH, type InteractionKind } from "@/lib/shared/accounts";
 import { ELIGIBILITY_TH, PREFERENCE_TH, type Eligibility } from "@/lib/shared/vault";
@@ -158,6 +161,7 @@ export default async function CustomerPage({
   /* บัญชี B2B ได้หน้าระเบียนแบบผู้ติดต่อ (สังกัด · แคมเปญ · กิจกรรม) — บัญชีค้าปลีกเดิมได้ตัวเลขการซื้อตามเดิม */
   const me = await viewer();
   const b2b = isB2BTenant(tenantId) ? await personB2B(tenantId, cid, { id: me.actor, clearance: me.clearance }) : null;
+  const deals = b2b ? await dealsOfPerson(tenantId, await personIdsOf(tenantId, cid), { id: me.actor, clearance: me.clearance }) : [];
   const currentJob = b2b?.jobs.find((j) => j.current) ?? null;
 
   const s = c.stats;
@@ -254,6 +258,25 @@ export default async function CustomerPage({
                 ))}
               </ul>
             ) : <p className="c-thai mt-3 text-[0.88rem] text-[var(--c-text-3)]">ไม่ทราบ — ยังไม่มีสังกัดในฐาน</p>}
+          </Panel>
+          <Panel className="p-5 md:p-6">
+            <h2 className="c-h2 text-[var(--c-text)]">ดีล</h2>
+            {deals.length ? (
+              <ul className="mt-3 divide-y divide-[var(--c-line)]">
+                {deals.map((x) => (
+                  <li key={x.id} className="c-thai flex flex-wrap items-baseline justify-between gap-2 py-2 text-[0.88rem]">
+                    <span className="min-w-0">
+                      <Link href={`/app/deals/${x.id}`} className="text-[var(--c-accent)] hover:underline">{x.name}</Link>
+                      <span className="text-[var(--c-text-3)]"> · {x.org}</span>
+                    </span>
+                    <span className="flex gap-1.5">
+                      {x.role && <span className="c-pill">{dealRoleTh(x.role)}</span>}
+                      <span className="c-pill">{stageTh(x.stage)}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="c-thai mt-3 text-[0.88rem] text-[var(--c-text-3)]">ยังไม่อยู่ในดีลใด — เพิ่มได้จากหน้าดีล (คนในดีล)</p>}
           </Panel>
           <Panel className="p-5 md:p-6">
             <h2 className="c-h2 text-[var(--c-text)]">แคมเปญ</h2>

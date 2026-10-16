@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { emailInfo, orgInfo } from "@/lib/shared/identity";
+import { normaliseTaxId } from "@/lib/shared/tax-id";
 import { normaliseContact } from "@/lib/engine/pii";
 import { orgIdFor } from "@/lib/engine/vault/resolve";
 import { get, tx, type Sql } from "@/lib/engine/sql";
@@ -44,8 +45,12 @@ export async function updateOrgField(
   if (!org) return { ok: false, error: "ไม่พบบริษัทนี้" };
   let next: string | null = clean(value, 200) || null;
   if (field === "tax_id" && next) {
-    next = next.replace(/\D/g, "");
-    if (next.length !== 13) return { ok: false, error: "เลขประจำตัวผู้เสียภาษีมี 13 หลัก" };
+    const tax = normaliseTaxId(next);
+    if (!tax) return { ok: false, error: "เลขนิติบุคคลไม่ถูกต้อง — 13 หลัก ขึ้นต้นด้วย 0 และหลักสุดท้ายต้องตรงกับเลขตรวจสอบ" };
+    /* เลขเดียวกัน = นิติบุคคลเดียวกัน — บอกให้รวมบริษัท แทนที่จะมีสองแฟ้มที่เลขเดียวกัน */
+    const twin = await get<{ id: string; name: string }>("SELECT id, name FROM orgs WHERE tenant_id = ? AND tax_id = ? AND id <> ?", tenantId, tax, orgId);
+    if (twin) return { ok: false, error: `เลขนี้เป็นของ "${twin.name}" อยู่แล้ว — เป็นบริษัทเดียวกัน ให้รวมสองแฟ้มที่คิวตรวจข้อมูลซ้ำแทน` };
+    next = tax;
   }
   if (field === "primary_domain" && next) {
     next = next.toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/.*$/, "");
@@ -261,7 +266,7 @@ async function clearBriefsFor(q: Sql, tenantId: string, ...ends: [string, string
 
 export async function logInteraction(
   tenantId: string, orgId: string,
-  input: { kind: string; occurredAt: string; personId?: string; summary: string; outcome?: string; classification?: string },
+  input: { kind: string; occurredAt: string; personId?: string; opportunityId?: string; summary: string; outcome?: string; classification?: string },
   actor: string,
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   if (!(INTERACTION_KINDS as readonly string[]).includes(input.kind)) return { ok: false, error: "เลือกชนิดของการติดต่อ" };
@@ -277,14 +282,20 @@ export async function logInteraction(
   if (person && !(await get("SELECT 1 AS x FROM affiliations WHERE tenant_id = ? AND org_id = ? AND customer_id = ?", tenantId, orgId, person))) {
     return { ok: false, error: "คนที่เลือกไม่ได้สังกัดบริษัทนี้" };
   }
+  /* ผูกกับดีลได้ (docs/crm-plan.md C1) — ดีลต้องเป็นของบริษัทเดียวกัน · บันทึกเดียวขึ้นทั้งหน้าบริษัท หน้าคน และหน้าดีล */
+  const deal = input.opportunityId || null;
+  if (deal && !(await get("SELECT 1 AS x FROM opportunities WHERE tenant_id = ? AND id = ? AND org_id = ?", tenantId, deal, orgId))) {
+    return { ok: false, error: "ดีลนี้ไม่ใช่ของบริษัทนี้" };
+  }
   const id = randomUUID();
   await tx(async (q) => {
     await q.run(
       `INSERT INTO interactions (id, tenant_id, kind, occurred_at, org_id, customer_id, opportunity_id, summary, outcome, owner_id, source_id, classification, recorded_at)
        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      id, tenantId, input.kind as InteractionKind, day, orgId, person, null, summary, clean(input.outcome, 500) || null, actor, null, level, now(),
+      id, tenantId, input.kind as InteractionKind, day, orgId, person, deal, summary, clean(input.outcome, 500) || null, actor, null, level, now(),
     );
     await q.run("DELETE FROM account_briefs WHERE tenant_id = ? AND org_id = ?", tenantId, orgId);
+    if (deal) await q.run("UPDATE opportunities SET updated_at = ? WHERE tenant_id = ? AND id = ?", now(), tenantId, deal);
   });
   await logActivity(tenantId, actor, "interaction_log", `${orgId} · ${input.kind}`);
   return { ok: true, id };

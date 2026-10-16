@@ -129,7 +129,7 @@ export type Dossier = {
   }[];
   interactions: {
     id: string; kind: InteractionKind; occurredAt: string; personId: string | null; personName: string | null; personMasked: boolean;
-    summary: string | null; outcome: string | null; owner: string | null; classification: Classification; masked: boolean; recordedAt: string;
+    summary: string | null; outcome: string | null; owner: string | null; classification: Classification; masked: boolean; recordedAt: string; dealId: string | null;
     /** โน้ตต้นฉบับ (หลักฐาน kind 'note') ถ้าบันทึกจากโน้ตหลังพบลูกค้า (S6) — ปิดตามปฏิสัมพันธ์ */
     note: string | null;
   }[];
@@ -279,7 +279,7 @@ export async function getDossier(tenantId: string, orgId: string, viewer: Viewer
         id: i.id!, kind: i.kind as InteractionKind, occurredAt: i.occurred_at!, personId: i.customer_id,
         personName: personHidden ? MASKED_PERSON : i.person_name, personMasked: personHidden,
         summary: hidden ? null : i.summary, outcome: hidden ? null : i.outcome, owner: i.owner_id, classification: c, masked: hidden,
-        recordedAt: i.recorded_at!, note: hidden ? null : notes.get(i.id!) ?? null,
+        recordedAt: i.recorded_at!, note: hidden ? null : notes.get(i.id!) ?? null, dealId: i.opportunity_id ?? null,
       };
     }),
     participations: parts.map((p) => {
