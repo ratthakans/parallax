@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { viewer } from "@/app/(app)/viewer";
 import {
-  assignTargetAction, buildTargetsAction, draftMessageAction, markDraftSentAction, recordOutcomeAction, recordPreferenceAction, updateCriteriaAction,
+  assignTargetAction, bulkAssignAction, buildTargetsAction, draftMessageAction, markDraftSentAction, recordOutcomeAction, recordPreferenceAction, updateCriteriaAction,
 } from "@/app/(app)/sales-actions";
 import { getCampaign, type TargetView } from "@/lib/engine/campaigns";
 import { draftableTargets } from "@/lib/engine/campaigns/draft";
@@ -15,7 +15,8 @@ import { thaiDate, thaiDateTime } from "@/lib/shared/format";
 import { ActionForm } from "@/components/console/action-form";
 import { EligibilityPill } from "@/components/console/eligibility";
 import { DraftPanel } from "@/components/console/draft-panel";
-import { Metric, Panel, num } from "@/components/console/ui";
+import { Panel, num } from "@/components/console/ui";
+import { RecordHeader, RecordTabs, pickTab } from "@/components/console/record";
 import { CriteriaFields } from "../criteria-fields";
 
 export const dynamic = "force-dynamic";
@@ -34,6 +35,11 @@ function Target({ t, campaignId, me, purposes, draftable }: { t: TargetView; cam
   return (
     <li className="border-t border-[var(--c-line)] py-4 first:border-t-0">
       <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 gap-3">
+          {/* เลือกได้เฉพาะคนที่ยังไม่จบและนโยบายผ่าน — ผูกกับฟอร์ม "มอบหมายที่เลือก" ด้านบนรายชื่อ */}
+          {open && t.eligibility === "eligible"
+            ? <input type="checkbox" form="bulk" name="targetIds" value={t.id} aria-label={`เลือก ${t.name}`} className="mt-1 h-5 w-5 shrink-0" />
+            : <span className="w-5 shrink-0" aria-hidden />}
         <div className="min-w-0">
           <p className="c-thai text-[0.94rem] text-[var(--c-text)]">
             <Link href={`/app/customers/${t.customerId}`} className="hover:text-[var(--c-accent)]">{t.name}</Link>
@@ -42,6 +48,7 @@ function Target({ t, campaignId, me, purposes, draftable }: { t: TargetView; cam
           <ul className="c-thai mt-1 grid gap-0.5 text-[0.8rem] text-[var(--c-text-3)]">
             {t.reasons.map((r, i) => <li key={i}>· {r}</li>)}
           </ul>
+        </div>
         </div>
         <div className="c-thai text-right text-[0.8rem] text-[var(--c-text-3)]">
           <EligibilityPill status={t.eligibility} />
@@ -107,7 +114,7 @@ function Target({ t, campaignId, me, purposes, draftable }: { t: TargetView; cam
   );
 }
 
-export default async function CampaignPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ show?: string }> }) {
+export default async function CampaignPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ show?: string; tab?: string }> }) {
   const { id } = await params;
   const sp = await searchParams;
   const v = await viewer();
@@ -119,56 +126,55 @@ export default async function CampaignPage({ params, searchParams }: { params: P
   const purposes = bases.map((b) => ({ id: b.purpose_id, name: b.name }));
   const basis = bases.find((b) => b.purpose_id === c.purposeId);
   const draftable = await draftableTargets(v.tenantId, c.id, shown);
+  const tab = pickTab(["members", "criteria"] as const, sp.tab);
 
   return (
     <>
-      <Link href="/app/sales" className="c-thai inline-block py-2 text-[0.85rem] text-[var(--c-text-3)] hover:text-[var(--c-text)]">← แคมเปญขาย</Link>
-      <header className="mt-4 mb-6">
-        <p className="c-label-th">แคมเปญ</p>
-        <h1 className="c-h1 mt-3 break-words text-[var(--c-text)]">{c.name}</h1>
-        <p className="c-thai mt-2 text-[0.86rem] text-[var(--c-text-3)]">
-          {c.offer ? `${c.offer} · ` : ""}วัตถุประสงค์: {c.purpose}
-          {basis?.lawful_basis ? ` (ฐานรุ่น ${basis.version})` : " (ยังไม่มีฐาน)"} · {CHANNEL_TH[c.channel]} · {MESSAGE_KIND_TH[c.messageKind].split(" (")[0]}
-          {c.disclosure ? ` · ส่งรายชื่อให้บุคคลอื่น (ต้องมีความยินยอม “${c.disclosure}”)` : ""}
-          {c.endsAt ? ` · ถึง ${thaiDate(c.endsAt)}` : ""}
-        </p>
-      </header>
+      <RecordHeader
+        back={{ href: "/app/sales", label: "แคมเปญทั้งหมด" }}
+        kind="แคมเปญ"
+        title={c.name}
+        badges={<>
+          <span className="c-pill">{CHANNEL_TH[c.channel]}</span>
+          <span className="c-pill">{MESSAGE_KIND_TH[c.messageKind].split(" (")[0]}</span>
+          {basis?.lawful_basis ? <span className="c-pill c-pill-good">มีฐานรุ่น {basis.version}</span> : <span className="c-pill c-pill-warn">ยังไม่มีฐานการประมวลผล</span>}
+          {c.disclosure && <span className="c-pill c-pill-warn">ส่งรายชื่อให้บุคคลอื่น</span>}
+        </>}
+        highlights={[
+          { label: "วัตถุประสงค์", value: c.purpose },
+          { label: "เป้าหมาย", value: num(c.targets.length) },
+          { label: ELIGIBILITY_TH.eligible, value: num(count("eligible")) },
+          { label: ELIGIBILITY_TH.review_required, value: num(count("review_required")) },
+          { label: ELIGIBILITY_TH.suppressed, value: num(count("suppressed")) },
+          { label: "ปิดได้", value: num(c.targets.filter((t) => t.status === "won").length) },
+        ]}
+        actions={<ActionForm action={buildTargetsAction} fields={{ campaignId: c.id }} label={c.targets.length ? "สร้างรายชื่อใหม่ตามเกณฑ์" : "สร้างรายชื่อ"} pendingLabel="กำลังคัดและตรวจนโยบาย…" variant="primary" size="sm" />}
+      />
+      {c.offer && <p className="c-thai -mt-2 mb-4 text-[0.86rem] text-[var(--c-text-3)]">ข้อเสนอ: {c.offer}{c.endsAt ? ` · ถึง ${thaiDate(c.endsAt)}` : ""}</p>}
+      <RecordTabs base={`/app/sales/${c.id}`} active={tab} tabs={[{ key: "members", label: "สมาชิก", count: c.targets.length }, { key: "criteria", label: "เกณฑ์" }]} />
 
-      <Panel flat className="mb-6 grid grid-cols-2 gap-x-6 gap-y-7 p-5 md:grid-cols-5 md:p-6">
-        <Metric label="เป้าหมาย" value={num(c.targets.length)} />
-        <Metric label={ELIGIBILITY_TH.eligible} value={num(count("eligible"))} tone={count("eligible") ? "good" : "muted"} />
-        <Metric label={ELIGIBILITY_TH.review_required} value={num(count("review_required"))} tone={count("review_required") ? "plain" : "muted"} />
-        <Metric label={ELIGIBILITY_TH.suppressed} value={num(count("suppressed"))} tone="muted" />
-        <Metric label="ปิดได้" value={num(c.targets.filter((t) => t.status === "won").length)} tone="muted" />
-      </Panel>
-
-      <Panel className="mb-6 p-5 md:p-6">
-        <h2 className="c-h2 text-[var(--c-text)]">เกณฑ์เป้าหมาย</h2>
-        <ul className="c-thai mt-3 grid gap-1 text-[0.88rem] text-[var(--c-text-2)]">{c.criteriaText.map((t) => <li key={t}>· {t}</li>)}</ul>
-        <div className="mt-4 flex flex-wrap items-start gap-3">
-          <ActionForm action={buildTargetsAction} fields={{ campaignId: c.id }} label={c.targets.length ? "สร้างรายชื่อใหม่ตามเกณฑ์" : "สร้างรายชื่อ"} pendingLabel="กำลังคัดและตรวจนโยบาย…" variant="primary" />
-        </div>
-        <details className="mt-4">
-          <summary className="c-btn c-btn-ghost inline-flex cursor-pointer">แก้เกณฑ์</summary>
-          <ActionForm action={updateCriteriaAction} fields={{ campaignId: c.id }} label="บันทึกเกณฑ์" pendingLabel="กำลังบันทึก…" className="mt-4 grid gap-3">
-            <CriteriaFields c={c.criteria} />
-          </ActionForm>
-        </details>
-        <p className="c-thai mt-3 text-[0.76rem] text-[var(--c-text-4)]">ไม่เกิน 100 บริษัทต่อแคมเปญ (ขอบเขต pilot) · เป้าหมายที่มอบหมายแล้วไม่ถูกลบเมื่อเกณฑ์เปลี่ยน</p>
-      </Panel>
-
+      {tab === "members" ? (
+        <>
       <Panel className="p-5 md:p-6">
         <div className="flex flex-wrap items-baseline justify-between gap-3">
           <h2 className="c-h2 text-[var(--c-text)]">รายชื่อเป้าหมาย</h2>
           <nav className="c-thai flex flex-wrap gap-2 text-[0.8rem]" aria-label="กรองตามสถานะนโยบาย">
             {FILTERS.map((f) => (
-              <Link key={f} href={`/app/sales/${c.id}${f === "all" ? "" : `?show=${f}`}`} aria-current={show === f ? "page" : undefined}
+              <Link key={f} href={`/app/sales/${c.id}${f === "all" ? "" : `?show=${f}`}`} scroll={false} aria-current={show === f ? "page" : undefined}
                 className={`c-btn c-btn-sm ${show === f ? "c-btn-primary" : "c-btn-ghost"}`}>
                 {f === "all" ? "ทั้งหมด" : ELIGIBILITY_TH[f]} {num(f === "all" ? c.targets.length : count(f))}
               </Link>
             ))}
           </nav>
         </div>
+        {shown.some((t) => !FINAL.includes(t.status) && t.eligibility === "eligible") && (
+          <ActionForm id="bulk" action={bulkAssignAction} fields={{ campaignId: c.id }} label="มอบหมายที่เลือก" pendingLabel="กำลังตรวจนโยบายทีละคน…" size="sm"
+            className="mt-4 flex flex-wrap items-end gap-2 rounded-[var(--c-radius)] border border-[var(--c-line)] bg-[var(--c-panel-2)] p-3">
+            <span className="c-thai self-center text-[0.8rem] text-[var(--c-text-3)]">ติ๊กคนที่ “ใช้ได้ตามนโยบาย” แล้วมอบหมายทีเดียว ·</span>
+            <label className={LABEL}>ให้<input name="assignee" defaultValue={v.actor} className="c-input min-h-9 py-1" /></label>
+            <label className={LABEL}>ครบกำหนด<input type="date" name="dueOn" defaultValue={inDays(7)} className="c-input min-h-9 py-1" required /></label>
+          </ActionForm>
+        )}
         {shown.length ? (
           <ul className="mt-4 grid">
             {shown.map((t) => <Target key={t.id} t={t} campaignId={c.id} me={v.actor} purposes={purposes} draftable={draftable.has(t.id)} />)}
@@ -179,6 +185,23 @@ export default async function CampaignPage({ params, searchParams }: { params: P
           </p>
         )}
       </Panel>
+        </>
+      ) : (
+        <>
+      <Panel className="mb-6 p-5 md:p-6">
+        <h2 className="c-h2 text-[var(--c-text)]">เกณฑ์เป้าหมาย</h2>
+        <ul className="c-thai mt-3 grid gap-1 text-[0.88rem] text-[var(--c-text-2)]">{c.criteriaText.map((t) => <li key={t}>· {t}</li>)}</ul>
+        <details className="mt-4">
+          <summary className="c-btn c-btn-ghost inline-flex cursor-pointer">แก้เกณฑ์</summary>
+          <ActionForm action={updateCriteriaAction} fields={{ campaignId: c.id }} label="บันทึกเกณฑ์" pendingLabel="กำลังบันทึก…" className="mt-4 grid gap-3">
+            <CriteriaFields c={c.criteria} />
+          </ActionForm>
+        </details>
+        <p className="c-thai mt-3 text-[0.76rem] text-[var(--c-text-4)]">ไม่เกิน 100 บริษัทต่อแคมเปญ (ขอบเขต pilot) · เป้าหมายที่มอบหมายแล้วไม่ถูกลบเมื่อเกณฑ์เปลี่ยน</p>
+      </Panel>
+
+        </>
+      )}
     </>
   );
 }
