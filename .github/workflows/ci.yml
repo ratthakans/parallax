@@ -178,6 +178,10 @@ jobs:
       - name: Roles
         run: npm run verify:roles
 
+      # ขนาด pilot บน sqlite — จับ query ที่โตแบบกำลังสองตั้งแต่ PR (Postgres วัดซ้ำใน job ด้านล่าง)
+      - name: Load at pilot size
+        run: npm run verify:load
+
       # ── สคีมาสองฝั่งตรงกันไหม ──
       # ต้องมี DATABASE_URL ถึงจะเทียบได้ ไม่มีก็ข้ามโดยไม่ล้มเหลว เพราะ PR
       # จากคนนอกไม่ควรต้องมีรหัสฐานข้อมูล แต่บน push เข้า main ที่ตั้ง secret
@@ -224,3 +228,7 @@ jobs:
 
       - name: Postgres-only invariants
         run: npm run verify:pg
+
+      # ขนาด pilot (10,000 แถวต้นทาง) บน Postgres ในนามผู้ใช้ — ค้นทั่วไปต้องได้ p95 ≤ 2 วินาที (plan หัวข้อ 1 · B7)
+      - name: Load at pilot size
+        run: npm run verify:load

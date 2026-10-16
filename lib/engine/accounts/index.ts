@@ -25,11 +25,16 @@ export type AccountRow = {
   owner: string | null; lastInteraction: string | null; classification: Classification;
 };
 
+/* ยอดต่อบริษัทรวมครั้งเดียวทั้งบัญชี (GROUP BY) แล้ว join — เดิมเป็น subquery ต่อแถว ซึ่งการเรียงตามจำนวนคน
+   บังคับให้คำนวณทุกบริษัทที่ตรงคำค้น: ค้น "บริษัท" ที่ข้อมูล 100,000 แถวใช้ 18–79 วินาที (verify:load) · พารามิเตอร์: tenant × 3 */
 const LIST_SQL = `SELECT o.id, o.name, o.primary_domain, o.lifecycle_state, o.account_owner_id, o.classification,
-    (SELECT COUNT(DISTINCT a.customer_id) FROM affiliations a WHERE a.tenant_id = o.tenant_id AND a.org_id = o.id) AS people,
-    (SELECT COUNT(DISTINCT a.customer_id) FROM affiliations a WHERE a.tenant_id = o.tenant_id AND a.org_id = o.id AND a.valid_to IS NULL) AS cur,
-    (SELECT MAX(i.occurred_at) FROM interactions i WHERE i.tenant_id = o.tenant_id AND i.org_id = o.id) AS last_at
-  FROM orgs o WHERE o.tenant_id = ?`;
+    COALESCE(a.people, 0) AS people, COALESCE(a.cur, 0) AS cur, i.last_at
+  FROM orgs o
+  LEFT JOIN (SELECT org_id, COUNT(DISTINCT customer_id) AS people,
+      COUNT(DISTINCT CASE WHEN valid_to IS NULL THEN customer_id END) AS cur
+    FROM affiliations WHERE tenant_id = ? GROUP BY org_id) a ON a.org_id = o.id
+  LEFT JOIN (SELECT org_id, MAX(occurred_at) AS last_at FROM interactions WHERE tenant_id = ? AND org_id IS NOT NULL GROUP BY org_id) i ON i.org_id = o.id
+  WHERE o.tenant_id = ?`;
 
 /* ชื่อแทนคนที่ระดับความลับเกินสิทธิ์ผู้อ่าน — ไม่แสดงชื่อ ตำแหน่ง หรือแถวต้นทาง และไม่ส่งให้ AI */
 export const MASKED_PERSON = "บุคคลที่จำกัดการเข้าถึง";
@@ -60,7 +65,7 @@ export async function listAccounts(
   const rows = await all<{
     id: string; name: string; primary_domain: string | null; lifecycle_state: string; account_owner_id: string | null;
     classification: Classification; people: number | string; cur: number | string; last_at: string | null;
-  }>(`${LIST_SQL}${extra} ORDER BY cur DESC, o.name LIMIT ? OFFSET ?`, ...params, opts.limit ?? 50, opts.offset ?? 0);
+  }>(`${LIST_SQL}${extra} ORDER BY cur DESC, o.name LIMIT ? OFFSET ?`, tenantId, tenantId, ...params, opts.limit ?? 50, opts.offset ?? 0);
   return {
     total: Number(total?.n ?? 0),
     rows: rows.map((r) => ({
