@@ -14,6 +14,7 @@ import { hasSyntheticData } from "@/lib/engine/synthetic";
 import { switchTenantAction } from "./actions";
 import { signOutAction } from "@/app/login/actions";
 import { myTenants } from "./tenant";
+import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/shared/session";
 
 export const metadata: Metadata = {
@@ -33,6 +34,8 @@ export default async function ConsoleLayout({
   const synthetic = await hasSyntheticData(tenantId);
   const allowed = await myTenants();
   const user = await currentUser();
+  /* รหัสผ่านถูกแต่ยังไม่ได้ใส่รหัสจากแอป — ยังล็อกอินไม่ครบ */
+  if (user?.mfa === "pending") redirect("/login/mfa");
 
   return (
     <div className="console">

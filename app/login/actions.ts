@@ -34,7 +34,31 @@ export async function signInAction(
   }
 
   revalidatePath("/app", "layout");
+  const dest = next.startsWith("/app") ? next : "/app";
+  /* เปิดยืนยันสองชั้นไว้ = รหัสผ่านอย่างเดียวยังไม่พอ ไปหน้ารหัสจากแอปก่อน */
+  const { data: aal } = await sb.auth.mfa.getAuthenticatorAssuranceLevel();
+  if (aal?.nextLevel === "aal2" && aal.currentLevel !== "aal2") redirect(`/login/mfa?next=${encodeURIComponent(dest)}`);
   /* redirect ทำงานด้วยการ throw จึงต้องอยู่นอกบล็อกที่จับ error */
+  redirect(dest);
+}
+
+/* ── รหัสจากแอปยืนยันตัวตน (TOTP) ── ใช้ตอนเข้าสู่ระบบ และตอนยืนยันแอปที่เพิ่งเพิ่ม (factorId มาจากฟอร์มเปิดใช้)
+   ไม่บอกว่ารหัสผิดเพราะอะไร · Supabase จำกัดจำนวนครั้งที่ลองเอง */
+export async function verifyMfaAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const code = String(formData.get("code") ?? "").replace(/\s/g, "");
+  const next = String(formData.get("next") ?? "") || "/app";
+  if (!/^\d{6}$/.test(code)) return { error: "ใส่รหัส 6 หลักจากแอป" };
+  const sb = await supabaseServer();
+  let factorId = String(formData.get("factorId") ?? "");
+  if (!factorId) {
+    const { data } = await sb.auth.mfa.listFactors();
+    factorId = data?.totp?.[0]?.id ?? "";
+  }
+  if (!factorId) return { error: "บัญชีนี้ยังไม่ได้เปิดยืนยันสองชั้น" };
+  const { error } = await sb.auth.mfa.challengeAndVerify({ factorId, code });
+  if (error) return { error: "รหัสไม่ถูกต้องหรือหมดเวลา — ลองรหัสใหม่จากแอป" };
+  revalidatePath("/app", "layout");
+  if (formData.get("factorId")) return { ok: "เปิดยืนยันตัวตนสองชั้นแล้ว — ครั้งหน้าเข้าสู่ระบบต้องใช้รหัสจากแอปด้วย" };
   redirect(next.startsWith("/app") ? next : "/app");
 }
 

@@ -4,7 +4,7 @@ import { viewer } from "@/app/(app)/viewer";
 import { closeRequestAction, verifyIdentityAction } from "@/app/(app)/dsar-actions";
 import { getRequest } from "@/lib/engine/dsar";
 import { listBases } from "@/lib/engine/policy";
-import { can } from "@/lib/shared/roles";
+import { MFA_NEEDED_TH, can } from "@/lib/shared/roles";
 import { DSAR_CHANNEL_TH, DSAR_KIND_DONE_TH, DSAR_KIND_TH } from "@/lib/shared/dsar";
 import { thaiDate, thaiDateTime } from "@/lib/shared/format";
 import { ActionForm } from "@/components/console/action-form";
@@ -55,6 +55,9 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
         </dl>
       </Panel>
 
+      {r.status === "open" && owner && v.mfa !== "verified" && (
+        <p role="status" className="c-msg c-msg-err mb-6">{MFA_NEEDED_TH} · <Link href="/app/settings" className="underline underline-offset-4">ไปหน้าตั้งค่า</Link></p>
+      )}
       {r.status === "open" && (
         <div className="grid gap-6">
           {/* ── 1 · ยืนยันตัวตน ── */}

@@ -41,6 +41,22 @@ const MATRIX: Record<Capability, readonly Role[]> = {
 };
 
 export const can = (role: Role, cap: Capability): boolean => MATRIX[cap].includes(role);
+
+/** การกระทำที่ต้องยืนยันตัวตนสองชั้นในรอบล็อกอินนี้ — ข้อมูลออกจากระบบ (ส่งออก · รายงานคำขอสิทธิ) หรือหายถาวร (ลบคน · ล้างบัญชี)
+    รหัสผ่านที่รั่วอย่างเดียวต้องทำสิ่งเหล่านี้ไม่ได้ · งานประจำ (บันทึก · นำเข้า · แคมเปญ) ไม่บังคับ */
+export const MFA_REQUIRED: readonly Capability[] = ["privacy", "export_request", "export_approve", "account_admin"];
+export const MFA_NEEDED_TH = "การกระทำนี้ต้องยืนยันตัวตนสองชั้น — เปิดใช้ที่หน้าตั้งค่า แล้วเข้าสู่ระบบใหม่พร้อมรหัสจากแอป";
+
+export type MfaLevel = "verified" | "pending" | "none";
+
+/** ด่านเดียวของทุก Server Action: บทบาททำได้ไหม · ล็อกอินครบไหม · การกระทำเสี่ยงยืนยันสองชั้นแล้วไหม — null = ผ่าน */
+export function gate(role: Role, mfa: MfaLevel, cap: Capability): string | null {
+  if (!can(role, cap)) return deniedTh(cap);
+  /* มีแอปยืนยันแต่ยังไม่ได้ใส่รหัส = ยังล็อกอินไม่ครบ ทำอะไรไม่ได้ */
+  if (mfa === "pending") return "ใส่รหัสจากแอปยืนยันตัวตนก่อน — เข้าสู่ระบบใหม่";
+  if (MFA_REQUIRED.includes(cap) && mfa !== "verified") return MFA_NEEDED_TH;
+  return null;
+}
 export const rolesWith = (cap: Capability): readonly Role[] => MATRIX[cap];
 
 const DENIED_TH: Record<Capability, string> = {
