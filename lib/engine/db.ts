@@ -879,6 +879,42 @@ export async function ensureSchema(): Promise<void> {
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
+    /* ══ ฟิลด์กำหนดเอง · แพ็กเกจในดีล (docs/crm-plan.md C4) — สเปกเดียวกับ supabase/migrations/0022_custom_fields.sql ══ */
+    CREATE TABLE IF NOT EXISTS custom_fields (
+      id TEXT NOT NULL PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      entity TEXT NOT NULL CHECK (entity IN ('org', 'deal')),
+      label TEXT NOT NULL,
+      kind TEXT NOT NULL CHECK (kind IN ('text', 'number', 'choice', 'date')),
+      options TEXT,
+      position INTEGER NOT NULL DEFAULT 0,
+      archived_at TEXT,
+      created_by TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS ix_custom_fields_tenant ON custom_fields (tenant_id, entity);
+    CREATE TABLE IF NOT EXISTS custom_values (
+      id TEXT NOT NULL PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      field_id TEXT NOT NULL,
+      entity TEXT NOT NULL CHECK (entity IN ('org', 'deal')),
+      record_id TEXT NOT NULL,
+      value TEXT,
+      recorded_by TEXT NOT NULL,
+      recorded_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS ix_custom_values_record ON custom_values (tenant_id, entity, record_id, field_id, recorded_at);
+    CREATE TABLE IF NOT EXISTS deal_items (
+      id TEXT NOT NULL PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      opportunity_id TEXT NOT NULL,
+      package TEXT NOT NULL,
+      qty REAL NOT NULL DEFAULT 1,
+      unit_price REAL,
+      created_by TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS ix_deal_items_deal ON deal_items (tenant_id, opportunity_id);
     /* ══ สรุปรายสัปดาห์ถึงตัวเอง (S8) — สเปกเดียวกับ supabase/migrations/0020_digest_prefs.sql ══ */
     -- ต่อ (บัญชี, ผู้ใช้) · weekday 1 = จันทร์ … 7 = อาทิตย์ · last_sent_day กันส่งซ้ำในวันเดียวกัน · ไม่เก็บอีเมล
     CREATE TABLE IF NOT EXISTS digest_prefs (

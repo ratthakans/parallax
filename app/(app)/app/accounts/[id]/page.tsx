@@ -21,6 +21,9 @@ import { Panel, num } from "@/components/console/ui";
 import { RecordHeader, RecordTabs, pickTab } from "@/components/console/record";
 import { stageTh } from "@/lib/shared/deals";
 import { orgGroup } from "@/lib/engine/accounts/group";
+import { listFields, valuesFor } from "@/lib/engine/custom-fields";
+import { orgEditions } from "@/lib/engine/editions";
+import { CustomFieldsPanel } from "@/components/console/custom-fields";
 
 const baht = (n: number) => `฿${n.toLocaleString("th-TH", { maximumFractionDigits: 0 })}`;
 
@@ -155,7 +158,8 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
   ].filter((e) => e.at).sort((a, b) => (sortKey(a) < sortKey(b) ? 1 : -1));
 
   const inGroup = Boolean(group && group.members.length + group.hidden > 1);
-  const TABS = ["overview", "details", "people", "deals", "group", "relationships"] as const;
+  const [cFields, cValues, editions] = await Promise.all([listFields(v.tenantId, "org"), valuesFor(v.tenantId, "org", [id]), orgEditions(v.tenantId, id)]);
+  const TABS = ["overview", "details", "people", "deals", "events", "group", "relationships"] as const;
   const sp = await searchParams;
   const tab = pickTab(TABS, sp.tab);
   /* ณ วันที่ (C3): ใครสังกัดบริษัทนี้ในวันนั้น — ช่วงเวลาจากสังกัดตามเวลา */
@@ -202,6 +206,7 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
             { key: "details", label: "รายละเอียด" },
             { key: "people", label: "คน", count: d.people.length },
             { key: "deals", label: "ดีล", count: d.opportunities.length },
+            ...(editions.length ? [{ key: "events", label: "งานที่ร่วม", count: editions.reduce((t, p) => t + p.editions.length, 0) }] : []),
             ...(inGroup ? [{ key: "group", label: "บริษัทในเครือ", count: group!.members.length }] : []),
             { key: "relationships", label: "ความสัมพันธ์", count: d.relationships.length },
           ]} />
@@ -326,6 +331,13 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
 
             </>}
             {tab === "details" && <>
+          <Panel className="p-5 md:p-6">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 className="c-h2 text-[var(--c-text)]">ฟิลด์ของบัญชี</h2>
+              <Link href="/app/settings/fields" className="c-thai text-[0.8rem] text-[var(--c-accent)] hover:underline">จัดการฟิลด์</Link>
+            </div>
+            <div className="mt-3"><CustomFieldsPanel entity="org" recordId={o.id} fields={cFields} values={cValues.get(o.id)} /></div>
+          </Panel>
           <Panel className="p-5 md:p-6">
             <h2 className="c-h2 text-[var(--c-text)]">ข้อมูลบริษัท</h2>
             <div className="mt-3">
@@ -469,6 +481,30 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
                     </table>
                   </div>
                 ) : <p className="c-thai px-5 py-5 text-[0.88rem] text-[var(--c-text-3)]">ยังไม่มีดีลกับบริษัทนี้</p>}
+              </Panel>
+            )}
+
+            {tab === "events" && (
+              <Panel className="p-5 md:p-6">
+                <h2 className="c-h2 text-[var(--c-text)]">งานที่ร่วม</h2>
+                <p className="c-thai mt-1 text-[0.82rem] text-[var(--c-text-3)]">จากไฟล์ที่นำเข้า (ชื่องาน · ครั้ง/ปี · บทบาท) — เห็นว่ามาปีไหน ในบทบาทอะไร และหลุดไปตั้งแต่เมื่อไร</p>
+                {editions.length ? (
+                  <div className="mt-4 grid gap-5">
+                    {editions.map((p) => (
+                      <div key={p.program}>
+                        <h3 className="c-thai text-[0.92rem] font-semibold text-[var(--c-text)]">{p.program}</h3>
+                        <ol className="mt-2 flex flex-wrap gap-2">
+                          {p.editions.map((e) => (
+                            <li key={e.edition} className="c-panel px-3 py-2 text-[0.82rem]">
+                              <p className="c-mono font-semibold">{e.edition}</p>
+                              <p className="c-thai text-[var(--c-text-3)]">{e.roles.join(" · ")} · {num(e.people)} คน</p>
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                    ))}
+                  </div>
+                ) : <p className="c-thai mt-3 text-[0.88rem] text-[var(--c-text-3)]">ยังไม่มีข้อมูลการร่วมงาน</p>}
               </Panel>
             )}
 

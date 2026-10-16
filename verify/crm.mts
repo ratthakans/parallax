@@ -19,6 +19,12 @@ import { resolveTenant } from "@/lib/engine/vault/resolve";
 import { normaliseTaxId, taxIdChecksum } from "@/lib/shared/tax-id";
 import { createHash } from "node:crypto";
 import { pipelineAsOf, stageTimelines, velocity } from "@/lib/engine/velocity";
+import { archiveField, createField, listFields, setValue, valueHistory, valuesFor } from "@/lib/engine/custom-fields";
+import { addItem, listItems, packageReport, removeItem } from "@/lib/engine/deal-items";
+import { editionRetention, orgEditions } from "@/lib/engine/editions";
+import { mergeOrgs } from "@/lib/engine/vault/merge";
+import { wipeCustomerData } from "@/lib/engine/tenant-data";
+import { tx } from "@/lib/engine/sql";
 import { searchEverything } from "@/lib/engine/search";
 import { teamMembers } from "@/lib/engine/team";
 
@@ -201,4 +207,75 @@ await run("INSERT INTO record_versions (tenant_id, record_kind, record_id, field
   V, "opportunity", dA, "value", "80000", "100000", "ทดสอบ", ME.id, null, at("2026-01-20"));
 ok((await pipelineAsOf(V, ME, "2026-01-15")).find((x) => x.stage === "proposal")?.value === 280000, "มูลค่า ณ วันนั้นใช้ค่าก่อนแก้ (80,000 ไม่ใช่ 100,000)");
 
+// ── C4 · ฟิลด์กำหนดเอง ──
+ok(!(await createField(T, { entity: "person", label: "ศาสนา", kind: "text" }, ME.id)).ok, "ฟิลด์บนตัวคนสร้างไม่ได้ (ข้อมูลส่วนบุคคลต้องผ่านวัตถุประสงค์)");
+ok(!(await createField(T, { entity: "org", label: "Tier", kind: "choice", options: "Gold" }, ME.id)).ok, "ตัวเลือกน้อยกว่า 2 ข้อ = ไม่สร้าง");
+const fTier = await createField(T, { entity: "org", label: "Tier สปอนเซอร์", kind: "choice", options: "Platinum, Gold, Silver" }, ME.id);
+const fBooth = await createField(T, { entity: "org", label: "ขนาดบูธ (ตร.ม.)", kind: "number" }, ME.id);
+const fDue = await createField(T, { entity: "deal", label: "วันส่งสัญญา", kind: "date" }, ME.id);
+ok(fTier.ok && fBooth.ok && fDue.ok, "สร้างฟิลด์ตัวเลือก · ตัวเลข · วันที่ได้");
+ok(!(await createField(T, { entity: "org", label: "Tier สปอนเซอร์", kind: "text" }, ME.id)).ok, "ชื่อฟิลด์ซ้ำบนที่เดียวกัน = ไม่สร้าง");
+const tierId = fTier.ok ? fTier.id : "", boothId = fBooth.ok ? fBooth.id : "", dueId = fDue.ok ? fDue.id : "";
+ok(!(await setValue(T, "org", orgA, tierId, "Bronze", ME)).ok, "ค่าที่ไม่อยู่ในตัวเลือก = ไม่บันทึก");
+ok(!(await setValue(T, "org", orgA, boothId, "ใหญ่มาก", ME)).ok, "ตัวเลขที่ไม่ใช่ตัวเลข = ไม่บันทึก");
+await setValue(T, "org", orgA, tierId, "Silver", ME);
+await setValue(T, "org", orgA, tierId, "Gold", ME);
+await setValue(T, "org", orgA, tierId, "Gold", ME);
+await setValue(T, "org", orgA, boothId, "36", ME);
+ok((await valuesFor(T, "org", [orgA])).get(orgA)?.get(tierId) === "Gold", "ค่าปัจจุบัน = ค่าล่าสุด");
+ok((await valueHistory(T, "org", orgA)).filter((h) => h.fieldId === tierId).length === 2, "ทุกการเปลี่ยนเก็บประวัติ · ค่าเดิมซ้ำไม่เพิ่มแถว");
+await setValue(T, "org", orgA, boothId, "", ME);
+ok(!(await valuesFor(T, "org", [orgA])).get(orgA)?.has(boothId), "ลบค่า (เว้นว่าง) ได้ และยังมีประวัติ");
+ok((await setValue(T, "deal", dealId, dueId, "2027-01-15", ME)).ok && !(await setValue(T, "deal", dealId, dueId, "15/1/2027", ME)).ok, "ฟิลด์วันที่รับเฉพาะวันที่");
+ok(!(await setValue(T, "org", orgA, dueId, "2027-01-15", ME)).ok, "ใช้ฟิลด์ของดีลบนบริษัทไม่ได้");
+ok(!(await setValue("mst-golf", "org", orgA, tierId, "Gold", ME)).ok, "กรอกค่าข้ามบัญชีไม่ได้");
+await archiveField(T, boothId, true, ME.id);
+ok(!(await listFields(T, "org")).some((f) => f.id === boothId) && (await listFields(T, "org", true)).some((f) => f.id === boothId), "ซ่อนฟิลด์แล้วไม่ขึ้นในหน้าระเบียน แต่ยังอยู่ในหน้าตั้งค่า");
+ok(!(await setValue(T, "org", orgA, boothId, "18", ME)).ok, "ฟิลด์ที่ซ่อนกรอกค่าไม่ได้");
+// รวมบริษัท: ค่าย้ายตาม
+const dupOrg = await affiliateManual(T, await person("ทดสอบรวม (สมมุติ)"), { company: "บริษัท ฟ้าใสสำรอง จำกัด" }, ME.id);
+const dupId = dupOrg.ok ? dupOrg.orgId : "";
+await setValue(T, "org", dupId, tierId, "Platinum", ME);
+const mg = await mergeOrgs(T, dupId, orgX, ME.id);
+ok(mg.ok && (await valuesFor(T, "org", [dupId])).get(dupId)?.get(tierId) === "Platinum", "รวมบริษัทแล้วค่าฟิลด์ยังอยู่กับบริษัทที่คงอยู่");
+
+// ── C4 · แพ็กเกจในดีล ──
+ok(!(await addItem(T, dealId, { package: "G", qty: "1" }, ME)).ok && !(await addItem(T, dealId, { package: "Gold", qty: "0" }, ME)).ok, "ชื่อสั้นเกิน · จำนวน 0 = ไม่เพิ่ม");
+await addItem(T, dealId, { package: "Gold", qty: "1", unitPrice: "350,000" }, ME);
+await addItem(T, dealId, { package: "บูธ 18 ตร.ม.", qty: "2", unitPrice: "45000" }, ME);
+const items = await listItems(T, dealId);
+ok(items.length === 2 && items.reduce((t, i) => t + (i.total ?? 0), 0) === 440000, "ยอดรวมแพ็กเกจ = จำนวน × ราคา");
+ok(!(await addItem("mst-golf", dealId, { package: "Gold" }, ME)).ok, "เพิ่มแพ็กเกจข้ามบัญชีไม่ได้");
+const rep0 = await packageReport(T, ME);
+ok(rep0.find((p) => p.package === "Gold")?.openValue === 350000 && rep0.find((p) => p.package === "Gold")?.wonDeals === 0, "รายงานแพ็กเกจ: ดีลเปิดนับเป็นยอดเปิด");
+const { moveDeal } = await import("@/lib/engine/deals");
+await moveDeal(T, dealId, "won", ME);
+ok((await packageReport(T, ME)).find((p) => p.package === "Gold")?.wonValue === 350000, "ปิดได้แล้วนับเป็นยอดที่ปิดได้");
+ok((await removeItem(T, dealId, items[1].id, ME)).ok && (await listItems(T, dealId)).length === 1, "เอาแพ็กเกจออกได้");
+
+// ── C4 · งาน/ปี ──
+const part = (org: string, ed: string, role = "สปอนเซอร์") => run(
+  "INSERT INTO participations (id, tenant_id, customer_id, org_id, program, edition, role, occurred_at, source_id, recorded_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+  `pt-${randomUUID().slice(0, 12)}`, T, p1, org, "งานทดสอบ C4 (สมมุติ)", ed, role, null, null, now);
+const o1 = parent, o2 = orgA, o3 = dupId;
+await part(o1, "2024"); await part(o2, "2024");
+await part(o1, "2025"); await part(o3, "2025");
+await part(o3, "2026"); await part(o2, "2026", "ผู้ออกบูธ");
+const ret = (await editionRetention(T, ME)).find((p) => p.program === "งานทดสอบ C4 (สมมุติ)")!;
+const e = (x: string) => ret.rows.find((r) => r.edition === x)!;
+ok(e("2024").orgs === 2 && e("2025").returning === 1 && e("2025").fresh === 1 && e("2025").lapsed === 1, "2025: กลับมา 1 · ใหม่ 1 · หลุด 1");
+ok(e("2026").returning === 1 && e("2026").fresh === 1 && e("2026").lapsed === 1, "2026: บริษัทที่หลุดปีก่อนแล้วกลับมา = นับเป็นใหม่เทียบกับปีก่อน");
+const sp = (await editionRetention(T, ME, "สปอนเซอร์")).find((p) => p.program === "งานทดสอบ C4 (สมมุติ)")!;
+ok(sp.rows.find((r) => r.edition === "2026")?.orgs === 1, "กรองตามบทบาท (สปอนเซอร์) ได้");
+ok((await orgEditions(T, o2)).find((p) => p.program === "งานทดสอบ C4 (สมมุติ)")?.editions.map((x) => x.edition).join(",") === "2024,2026", "หน้าบริษัทเห็นว่ามาปีไหนบ้าง");
+
+// ── C4 · ล้างบัญชีล้างฟิลด์และแพ็กเกจ แต่คงนิยามฟิลด์ ──
+await tx((q) => wipeCustomerData(q, T));
+const leftV = await get<{ n: number | string }>("SELECT COUNT(*) AS n FROM custom_values WHERE tenant_id = ?", T);
+const leftI = await get<{ n: number | string }>("SELECT COUNT(*) AS n FROM deal_items WHERE tenant_id = ?", T);
+ok(Number(leftV?.n) === 0 && Number(leftI?.n) === 0 && (await listFields(T, undefined, true)).length === 3, "ล้างข้อมูลลูกค้า = ล้างค่าฟิลด์และแพ็กเกจ · นิยามฟิลด์ (การตั้งค่า) อยู่ต่อ");
+
 for (const line of out) console.log(line);
+const failed = out.filter((l) => l.startsWith("FAIL"));
+if (failed.length) { console.log(`\n=== FAIL ${failed.length} ข้อ ===`); process.exit(1); }
+console.log(`\n=== ผ่านทั้งหมด ${out.length} ข้อ ===`);

@@ -6,6 +6,7 @@ import { denied, viewer } from "@/app/(app)/viewer";
 import { createDeal, moveDeal, removeDealPerson, setDealPerson, updateDeal } from "@/lib/engine/deals";
 import { logInteraction, orgByName } from "@/lib/engine/accounts/edit";
 import { get } from "@/lib/engine/sql";
+import { addItem, listItems, removeItem } from "@/lib/engine/deal-items";
 import { orgAccess } from "@/lib/engine/accounts";
 import type { ActionState } from "@/lib/shared/action-state";
 
@@ -104,4 +105,42 @@ export async function logDealActivityAction(_p: ActionState, fd: FormData): Prom
   const person = str(fd, "personId");
   if (person) revalidatePath(`/app/customers/${person}`);
   return { ok: "บันทึกแล้ว — ขึ้นทั้งหน้าดีล หน้าบริษัท และหน้าผู้ติดต่อ" };
+}
+
+/* ── แพ็กเกจในดีล (docs/crm-plan.md C4) ── */
+export async function addDealItemAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  const v = await viewer();
+  const no = denied(v, "write");
+  if (no) return { error: no };
+  const id = str(fd, "dealId");
+  const res = await addItem(v.tenantId, id, { package: str(fd, "package"), qty: str(fd, "qty"), unitPrice: str(fd, "unitPrice") }, { id: v.actor, clearance: v.clearance });
+  if (!res.ok) return { error: res.error };
+  refresh(id);
+  return { ok: "เพิ่มแพ็กเกจแล้ว" };
+}
+
+export async function removeDealItemAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  const v = await viewer();
+  const no = denied(v, "write");
+  if (no) return { error: no };
+  const id = str(fd, "dealId");
+  const res = await removeItem(v.tenantId, id, str(fd, "itemId"), { id: v.actor, clearance: v.clearance });
+  if (!res.ok) return { error: res.error };
+  refresh(id);
+  return { ok: "เอาออกแล้ว" };
+}
+
+/** ใช้ยอดรวมของแพ็กเกจเป็นมูลค่าดีล — ผ่าน updateDeal จึงมีรุ่นในประวัติเหมือนแก้เอง */
+export async function syncDealValueAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  const v = await viewer();
+  const no = denied(v, "write");
+  if (no) return { error: no };
+  const id = str(fd, "dealId");
+  const items = await listItems(v.tenantId, id);
+  if (!items.length) return { error: "ยังไม่มีแพ็กเกจ" };
+  const total = items.reduce((t, i) => t + (i.total ?? 0), 0);
+  const res = await updateDeal(v.tenantId, id, "value", String(total), { id: v.actor, clearance: v.clearance });
+  if (!res.ok) return { error: res.error };
+  refresh(id);
+  return { ok: "ตั้งมูลค่าดีลตามยอดรวมแพ็กเกจแล้ว" };
 }
