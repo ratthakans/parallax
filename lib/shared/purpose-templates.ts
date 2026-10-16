@@ -82,3 +82,16 @@ export const PURPOSE_TEMPLATES: PurposeTemplate[] = [
 ];
 
 export const templateOf = (code: string | null | undefined) => PURPOSE_TEMPLATES.find((t) => t.code === code) ?? null;
+
+/* ── วิธียกเลิกรับในข้อความการตลาด (docs/solo-plan.md S7) ──
+   ร่างข้อความที่ message_kind = 'marketing' ต่อท้ายบรรทัดนี้เสมอ — ระบบใส่เอง ไม่ให้โมเดลเขียน
+   ⚠ ร่าง รอนักกฎหมาย/DPO (plan O3) · แก้ข้อความ = เพิ่ม version */
+export const OPT_OUT_TEXT = {
+  version: 1,
+  draft: true,
+  /** ช่องทางที่ตอบกลับได้ (อีเมล · ข้อความ) */
+  reply: "หากไม่ต้องการรับข้อเสนอจากเราอีก ตอบกลับข้อความนี้ว่า \"ยกเลิก\" ได้ทุกเมื่อ แล้วเราจะหยุดติดต่อเรื่องข้อเสนอทันที",
+  /** โทร/พบตัว — บอกด้วยวาจาในการคุย */
+  spoken: "(บอกผู้รับ) หากไม่ต้องการรับข้อเสนออีก แจ้งได้เลยตอนนี้หรือเมื่อไรก็ได้ แล้วเราจะหยุดติดต่อเรื่องข้อเสนอ",
+} as const;
+export const optOutLine = (channel: Channel) => (channel === "email" ? OPT_OUT_TEXT.reply : OPT_OUT_TEXT.spoken);

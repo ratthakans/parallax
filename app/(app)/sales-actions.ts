@@ -9,7 +9,8 @@ import { adoptTemplate } from "@/lib/engine/policy/templates";
 import { setRetentionRule } from "@/lib/engine/retention";
 import { recordPreference } from "@/lib/engine/policy/preferences";
 import type { ActionState } from "@/lib/shared/action-state";
-import type { Criteria } from "@/lib/shared/policy";
+import { draftForTarget, markDraftSent } from "@/lib/engine/campaigns/draft";
+import type { Criteria, DraftState } from "@/lib/shared/policy";
 
 /* ── Campaign Workspace (docs/plan.md B5) ─────────────────────────
    บัญชี ผู้กระทำ และธงทีม PARALLAX มาจากฝั่งเซิร์ฟเวอร์เสมอ (viewer.ts) */
@@ -93,6 +94,30 @@ export async function recordOutcomeAction(_p: ActionState, fd: FormData): Promis
   if (!res.ok) return { error: res.reasons?.length ? `${res.error}: ${res.reasons.join(" · ")}` : res.error };
   revalidatePath(`/app/sales/${str(fd, "campaignId")}`);
   return { ok: "บันทึกผลแล้ว — ลงไทม์ไลน์ของบริษัทด้วย" };
+}
+
+/* ── ร่างข้อความหลังผ่านนโยบาย (docs/solo-plan.md S7) ──
+   ร่างไม่ถูกเก็บและไม่ส่งจากระบบ · ทั้งตอนร่างและตอนกด "ส่งแล้ว" ตรวจนโยบายซ้ำในเครื่องยนต์ (draft.ts) */
+export async function draftMessageAction(_p: DraftState, fd: FormData): Promise<DraftState> {
+  const v = await viewer();
+  const no = denied(v, "write");
+  if (no) return { error: no };
+  const res = await draftForTarget(v.tenantId, str(fd, "targetId"), { id: v.actor, clearance: v.clearance });
+  if (!res.ok) return { error: res.reasons?.length ? `${res.error}: ${res.reasons.join(" · ")}` : res.error };
+  return {
+    ok: res.draft.generatedBy === "ai" ? "ร่างด้วย AI จากหลักฐานที่คุณเห็นได้ — อ่านและแก้ก่อนส่ง" : "ร่างจากแม่แบบ — อ่านและแก้ก่อนส่ง",
+    draft: res.draft,
+  };
+}
+
+export async function markDraftSentAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  const v = await viewer();
+  const no = denied(v, "write");
+  if (no) return { error: no };
+  const res = await markDraftSent(v.tenantId, str(fd, "targetId"), v.actor, v.isStaff);
+  if (!res.ok) return { error: res.reasons?.length ? `${res.error}: ${res.reasons.join(" · ")}` : res.error };
+  revalidatePath(`/app/sales/${str(fd, "campaignId")}`);
+  return { ok: "บันทึกว่าส่งแล้ว — นโยบายตรวจซ้ำแล้ว ณ ตอนนี้ และลงไทม์ไลน์ของบริษัท" };
 }
 
 export async function recordPreferenceAction(_p: ActionState, fd: FormData): Promise<ActionState> {

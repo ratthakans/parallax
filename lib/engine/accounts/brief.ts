@@ -17,7 +17,7 @@ import type { Classification } from "@/lib/shared/vault";
 
 /* ระดับสูงสุดที่ส่งให้โมเดลได้ — "จำกัดสูง" ไม่ออกจากระบบ */
 const AI_CEILING: Classification = "confidential";
-const scopeOf = (viewer: Viewer): Classification =>
+export const scopeOf = (viewer: Viewer): Classification =>
   CLEARANCE_RANK[viewer.clearance] < CLEARANCE_RANK[AI_CEILING] ? viewer.clearance : AI_CEILING;
 
 const thaiDay = (iso: string | null) => (iso ? iso.slice(0, 10) : "ไม่ทราบวัน");
