@@ -38,7 +38,7 @@ ok(CAPABILITIES.every((c) => gate("owner", "pending", c) !== null), "ใส่�
 ok(gate("bd", "verified", "privacy") !== null, "ยืนยันสองชั้นแล้วก็ไม่ได้สิทธิ์เกินบทบาท");
 
 // ── 3 · ทุก action มีด่าน ──
-const FILES = ["sales-actions", "vault-actions", "account-actions", "today-actions", "dsar-actions", "export-actions"];
+const FILES = ["sales-actions", "vault-actions", "account-actions", "today-actions", "dsar-actions", "export-actions", "capture-actions"];
 const missing: string[] = [];
 for (const f of FILES) {
   const src = readFileSync(`app/(app)/${f}.ts`, "utf8");

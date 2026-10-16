@@ -30,7 +30,7 @@ const ACTOR = "verify";
 const noSrc = await analyseUpload(A, "ไม่มีแหล่งนี้", enc("ชื่อ,อีเมล\nก,a@b.example\n"), "x.csv", ACTOR);
 ok(!noSrc.ok, "ไม่มีแหล่งที่ลงทะเบียน = อัปโหลดไม่ได้");
 const card = await registerSource(A, { name: "นามบัตร", kind: "namecard", newPurpose: "ขาย", acquisitionNote: "สแกนจากงานแสดงสินค้า", fields: ["email"] }, ACTOR);
-ok(!card.ok, "นามบัตรยังไม่เปิดจนตกลงขอบเขต OCR");
+ok(!card.ok, "ลงทะเบียนแหล่งนามบัตรเองจากฟอร์มไม่ได้ — ต้องผ่านหน้ากรอกนามบัตรที่ผูกวัตถุประสงค์นามบัตร (verify:capture)");
 const noWhy = await registerSource(A, { name: "ไฟล์", kind: "file", newPurpose: "ขาย", acquisitionNote: "", fields: ["email"] }, ACTOR);
 ok(!noWhy.ok, "ไม่บอกที่มาของข้อมูล = ลงทะเบียนไม่ได้");
 
