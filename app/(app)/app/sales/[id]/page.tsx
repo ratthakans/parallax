@@ -2,9 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { viewer } from "@/app/(app)/viewer";
 import {
-  assignTargetAction, buildTargetsAction, recordOutcomeAction, recordPreferenceAction, updateCriteriaAction,
+  assignTargetAction, buildTargetsAction, draftMessageAction, markDraftSentAction, recordOutcomeAction, recordPreferenceAction, updateCriteriaAction,
 } from "@/app/(app)/sales-actions";
 import { getCampaign, type TargetView } from "@/lib/engine/campaigns";
+import { draftableTargets } from "@/lib/engine/campaigns/draft";
 import { listBases } from "@/lib/engine/policy";
 import {
   CHANNELS, CHANNEL_TH, MESSAGE_KIND_TH, OUTCOMES, TARGET_STATUS_TH, type TargetStatus,
@@ -13,6 +14,7 @@ import { ELIGIBILITY_TH, PREFERENCE_KINDS, PREFERENCE_TH, type Eligibility } fro
 import { thaiDate, thaiDateTime } from "@/lib/shared/format";
 import { ActionForm } from "@/components/console/action-form";
 import { EligibilityPill } from "@/components/console/eligibility";
+import { DraftPanel } from "@/components/console/draft-panel";
 import { Metric, Panel, num } from "@/components/console/ui";
 import { CriteriaFields } from "../criteria-fields";
 
@@ -27,7 +29,7 @@ const FILTERS: (Eligibility | "all")[] = ["all", "eligible", "review_required", 
 const FINAL: TargetStatus[] = ["won", "lost", "not_interested", "cancelled"];
 const inDays = (n: number) => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
 
-function Target({ t, campaignId, me, purposes }: { t: TargetView; campaignId: string; me: string; purposes: { id: string; name: string }[] }) {
+function Target({ t, campaignId, me, purposes, draftable }: { t: TargetView; campaignId: string; me: string; purposes: { id: string; name: string }[]; draftable: boolean }) {
   const open = !FINAL.includes(t.status);
   return (
     <li className="border-t border-[var(--c-line)] py-4 first:border-t-0">
@@ -46,6 +48,12 @@ function Target({ t, campaignId, me, purposes }: { t: TargetView; campaignId: st
           <p className="mt-1">{TARGET_STATUS_TH[t.status]}{t.assignedTo ? ` · ${t.assignedTo}` : ""}{t.due ? ` · ครบ ${thaiDate(t.due)}` : ""}</p>
         </div>
       </div>
+      {/* S7: ปุ่มร่างมีเฉพาะเมื่อ decide() ให้ Eligible ณ ตอนแสดงนี้ (ไม่ใช่ผลที่เก็บไว้) · ตรวจซ้ำอีกครั้งตอนกด */}
+      {draftable && (
+        <div className="c-thai mt-2 text-[0.8rem] text-[var(--c-text-3)]">
+          <DraftPanel draftAction={draftMessageAction} sentAction={markDraftSentAction} campaignId={campaignId} targetId={t.id} />
+        </div>
+      )}
       <details className="c-thai mt-2 text-[0.78rem] text-[var(--c-text-3)]">
         <summary className="inline-block cursor-pointer py-1 text-[var(--c-text-4)] hover:text-[var(--c-text-2)]">เหตุผลของนโยบาย · {open ? "มอบหมาย / บันทึกผล" : "ผล"}</summary>
         <div className="mt-2 grid gap-3 border-l border-[var(--c-line)] pl-3">
@@ -110,6 +118,7 @@ export default async function CampaignPage({ params, searchParams }: { params: P
   const shown = show === "all" ? c.targets : c.targets.filter((t) => t.eligibility === show);
   const purposes = bases.map((b) => ({ id: b.purpose_id, name: b.name }));
   const basis = bases.find((b) => b.purpose_id === c.purposeId);
+  const draftable = await draftableTargets(v.tenantId, c.id, shown);
 
   return (
     <>
@@ -162,7 +171,7 @@ export default async function CampaignPage({ params, searchParams }: { params: P
         </div>
         {shown.length ? (
           <ul className="mt-4 grid">
-            {shown.map((t) => <Target key={t.id} t={t} campaignId={c.id} me={v.actor} purposes={purposes} />)}
+            {shown.map((t) => <Target key={t.id} t={t} campaignId={c.id} me={v.actor} purposes={purposes} draftable={draftable.has(t.id)} />)}
           </ul>
         ) : (
           <p className="c-thai mt-4 text-[0.88rem] text-[var(--c-text-3)]">

@@ -79,3 +79,21 @@ export function describeCriteria(c: Criteria): string[] {
   out.push(`ไม่เกิน ${c.maxPerOrg ?? 2} คนต่อบริษัท`);
   return out;
 }
+
+/* ── ร่างข้อความหลังผ่านนโยบาย (docs/solo-plan.md S7) ── ร่างไม่ถูกเก็บ · ไม่ส่งจากระบบ */
+export type OutreachDraftView = {
+  subject: string;
+  body: string;
+  channel: Channel;
+  messageKind: MessageKind;
+  generatedBy: "ai" | "fallback";
+  note?: string;
+  /** ชื่อผู้แนะนำ — มีเฉพาะเมื่อมีความสัมพันธ์ "ได้รับการแนะนำโดย" ที่ยืนยันแล้ว */
+  introducedBy: string | null;
+  optOut: boolean;
+  /** หลักฐานที่ใช้ร่าง (ที่ผู้ใช้เห็นได้อยู่แล้ว) */
+  evidence: { id: string; text: string }[];
+  policyVersion: string;
+};
+/** ผลของปุ่ม "ร่างข้อความ" — ActionState ที่มีร่างแนบมา */
+export type DraftState = { ok?: string; error?: string; draft?: OutreachDraftView } | null;

@@ -104,6 +104,8 @@ export type Dossier = {
   interactions: {
     id: string; kind: InteractionKind; occurredAt: string; personId: string | null; personName: string | null; personMasked: boolean;
     summary: string | null; outcome: string | null; owner: string | null; classification: Classification; masked: boolean; recordedAt: string;
+    /** โน้ตต้นฉบับ (หลักฐาน kind 'note') ถ้าบันทึกจากโน้ตหลังพบลูกค้า (S6) — ปิดตามปฏิสัมพันธ์ */
+    note: string | null;
   }[];
   participations: { id: string; personName: string | null; program: string; edition: string | null; role: string; occurredAt: string | null; masked: boolean }[];
   opportunities: { id: string; name: string; stage: string; owner: string | null; expectedClose: string | null }[];
@@ -175,6 +177,16 @@ export async function getDossier(tenantId: string, orgId: string, viewer: Viewer
     all<{ a_id: string }>("SELECT a_id FROM resolution_overrides WHERE tenant_id = ? AND kind = 'org_alias' AND b_id = ?", tenantId, orgId),
   ]);
 
+  /* โน้ตต้นฉบับของปฏิสัมพันธ์ (S6) — หลักฐานอ้างกลับด้วย ref "interaction:<id>" */
+  const notes = new Map<string, string>();
+  const refs = inter.map((i) => `interaction:${i.id}`);
+  for (let k = 0; k < refs.length; k += 200) {
+    const chunk = refs.slice(k, k + 200);
+    for (const e of await all<{ ref: string; note: string | null }>(
+      `SELECT ref, note FROM evidence WHERE tenant_id = ? AND kind = 'note' AND ref IN (${chunk.map(() => "?").join(",")})`, tenantId, ...chunk,
+    )) if (e.note) notes.set(e.ref.slice("interaction:".length), e.note);
+  }
+
   // ── หลักฐานจากแถวต้นทาง ──
   const personIds = [...new Set(affs.map((a) => a.customer_id))];
   const keys = new Set([o.name_norm!, ...aliases.map((a) => a.a_id)]);
@@ -241,7 +253,7 @@ export async function getDossier(tenantId: string, orgId: string, viewer: Viewer
         id: i.id!, kind: i.kind as InteractionKind, occurredAt: i.occurred_at!, personId: i.customer_id,
         personName: personHidden ? MASKED_PERSON : i.person_name, personMasked: personHidden,
         summary: hidden ? null : i.summary, outcome: hidden ? null : i.outcome, owner: i.owner_id, classification: c, masked: hidden,
-        recordedAt: i.recorded_at!,
+        recordedAt: i.recorded_at!, note: hidden ? null : notes.get(i.id!) ?? null,
       };
     }),
     participations: parts.map((p) => {

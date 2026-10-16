@@ -112,7 +112,7 @@ export function judgeRow(cells: string[], columns: ColumnPlan[], issue: string |
 }
 
 /* แถวที่อีเมลหรือเบอร์ตรงกับคนที่ถูกลบ (ทะเบียนการลบ · erasure.ts) → พักไว้ ไม่เข้าสู่การตรวจตัวตน */
-function withErasure(
+export function withErasure(
   tenantId: string, j: ReturnType<typeof judgeRow>, erased: Awaited<ReturnType<typeof erasedKeys>>,
 ): ReturnType<typeof judgeRow> & { erased?: boolean } {
   if (j.status === "rejected" || !erased.size) return j;
