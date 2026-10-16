@@ -31,6 +31,7 @@ export function ActionForm({
   className = "",
   buttonClassName = "",
   children,
+  id,
 }: {
   action: (prev: ActionState, formData: FormData) => Promise<ActionState>;
   label: ReactNode;
@@ -48,6 +49,8 @@ export function ActionForm({
   note?: ReactNode;
   className?: string;
   buttonClassName?: string;
+  /* ให้ช่องที่อยู่นอกฟอร์มผูกเข้ามาได้ด้วย form="<id>" — เช่น ช่องติ๊กเลือกหลายแถว (U5) */
+  id?: string;
   children?: ReactNode;
 }) {
   const [state, formAction, pending] = useActionState(action, null);
@@ -69,7 +72,7 @@ export function ActionForm({
     .join(" ");
 
   return (
-    <form action={formAction} className={className}>
+    <form id={id} action={formAction} className={className}>
       {fields &&
         Object.entries(fields).map(([k, v]) => (
           <input key={k} type="hidden" name={k} value={String(v)} />

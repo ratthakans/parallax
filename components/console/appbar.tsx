@@ -34,6 +34,7 @@ const TABS = [
   { href: "/app/accounts", label: "บริษัท" },
   { href: "/app/customers", label: "ผู้ติดต่อ" },
   { href: "/app/deals", label: "ดีล" },
+  { href: "/app/tasks", label: "งาน" },
   { href: "/app/sales", label: "แคมเปญ" },
   { href: "/app/sales/weekly", label: "รายงาน" },
 ];

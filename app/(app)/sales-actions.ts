@@ -82,6 +82,27 @@ export async function assignTargetAction(_p: ActionState, fd: FormData): Promise
   return { ok: "มอบหมายแล้ว — นโยบายตรวจซ้ำแล้ว ณ ตอนนี้" };
 }
 
+/* ── มอบหมายหลายคนทีเดียว (docs/ux-plan.md U5) ── ทีละคนผ่าน assignTarget เดิม (ตรวจนโยบายซ้ำทุกคน)
+   คนที่นโยบายไม่ผ่านแล้วถูกข้ามพร้อมบอกจำนวน — ไม่ล้มทั้งชุด */
+export async function bulkAssignAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  const v = await viewer();
+  const no = denied(v, "campaign");
+  if (no) return { error: no };
+  const ids = [...new Set(fd.getAll("targetIds").map(String))].slice(0, 200);
+  if (!ids.length) return { error: "เลือกเป้าหมายอย่างน้อยหนึ่งคน" };
+  const assignee = str(fd, "assignee").trim() || v.actor;
+  let done = 0;
+  const refused: string[] = [];
+  for (const id of ids) {
+    const res = await assignTarget(v.tenantId, id, assignee, str(fd, "dueOn"), v.actor, v.isStaff);
+    if (res.ok) done++;
+    else refused.push(res.error);
+  }
+  revalidatePath(`/app/sales/${str(fd, "campaignId")}`);
+  if (!done) return { error: `มอบหมายไม่ได้: ${refused[0] ?? "ไม่ทราบสาเหตุ"}` };
+  return { ok: `มอบหมายให้ ${assignee} แล้ว ${done} คน${refused.length ? ` · ข้าม ${refused.length} คน (นโยบายไม่ผ่านหรือปิดไปแล้ว)` : ""}` };
+}
+
 export async function recordOutcomeAction(_p: ActionState, fd: FormData): Promise<ActionState> {
   const v = await viewer();
   const no = denied(v, "write");
