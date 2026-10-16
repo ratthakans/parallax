@@ -18,7 +18,7 @@ export const ROLE_TH: Record<Role, { name: string; does: string }> = {
 };
 
 /** การกระทำที่แยกสิทธิ์ */
-export const CAPABILITIES = ["write", "import", "review", "campaign", "policy", "privacy", "export_request", "export_approve", "account_admin"] as const;
+export const CAPABILITIES = ["write", "import", "review", "campaign", "fields", "policy", "privacy", "export_request", "export_approve", "account_admin"] as const;
 export type Capability = (typeof CAPABILITIES)[number];
 
 const MATRIX: Record<Capability, readonly Role[]> = {
@@ -30,6 +30,8 @@ const MATRIX: Record<Capability, readonly Role[]> = {
   review: ["owner", "steward", "lead"],
   /** สร้างแคมเปญ · เกณฑ์ · สร้างรายชื่อ · มอบหมาย */
   campaign: ["owner", "lead"],
+  /** นิยามฟิลด์กำหนดเองของบัญชี (docs/crm-plan.md C4) — กรอกค่าใช้สิทธิ์ write */
+  fields: ["owner", "steward", "lead"],
   /** ฐานการประมวลผล · แม่แบบวัตถุประสงค์ · กฎอายุข้อมูล */
   policy: ["owner", "privacy"],
   /** ปิดคำขอสิทธิ · รายงานข้อมูลของผู้ขอ · ลบคน */
@@ -64,6 +66,7 @@ const DENIED_TH: Record<Capability, string> = {
   import: "นำเข้าและลงทะเบียนแหล่งได้เฉพาะ Data steward หัวหน้าทีม หรือเจ้าของบัญชี",
   review: "ตรวจและรวมตัวตนได้เฉพาะ Data steward หัวหน้าทีม หรือเจ้าของบัญชี",
   campaign: "สร้างแคมเปญและมอบหมายงานได้เฉพาะหัวหน้าทีมหรือเจ้าของบัญชี",
+  fields: "ตั้งฟิลด์ของบัญชีได้เฉพาะ Data steward หัวหน้าทีม หรือเจ้าของบัญชี",
   policy: "ตั้งฐานการประมวลผลและอายุข้อมูลได้เฉพาะผู้ดูแลข้อมูลส่วนบุคคลหรือเจ้าของบัญชี",
   privacy: "คำขอสิทธิและการลบคนเป็นของผู้ดูแลข้อมูลส่วนบุคคลหรือเจ้าของบัญชี",
   export_request: "ขอส่งออกได้เฉพาะหัวหน้าทีม ผู้ดูแลข้อมูลส่วนบุคคล หรือเจ้าของบัญชี",

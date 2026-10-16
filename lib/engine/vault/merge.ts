@@ -291,6 +291,8 @@ const ORG_MOVES: { table: string; key: string[]; column: string; where?: string 
   { table: "orgs", key: ["id"], column: "parent_id" },
   { table: "relationship_assertions", key: ["id"], column: "from_id", where: "from_kind = 'org'" },
   { table: "relationship_assertions", key: ["id"], column: "to_id", where: "to_kind = 'org'" },
+  /* ฟิลด์กำหนดเอง (C4) — ค่าเพิ่มอย่างเดียว ย้ายตามได้ไม่ชน · ค่าปัจจุบัน = แถวล่าสุดของทั้งสองฝั่ง */
+  { table: "custom_values", key: ["id"], column: "record_id", where: "entity = 'org'" },
 ];
 
 export async function mergeOrgs(tenantId: string, keepId: string, dropId: string, actor: string): Promise<MergeResult> {

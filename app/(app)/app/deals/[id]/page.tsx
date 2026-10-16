@@ -1,7 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { viewer } from "@/app/(app)/viewer";
-import { logDealActivityAction, moveDealAction, removeDealPersonAction, setDealPersonAction, updateDealAction } from "@/app/(app)/deal-actions";
+import {
+  addDealItemAction, logDealActivityAction, moveDealAction, removeDealItemAction, removeDealPersonAction, setDealPersonAction, syncDealValueAction, updateDealAction,
+} from "@/app/(app)/deal-actions";
+import { listFields, valuesFor } from "@/lib/engine/custom-fields";
+import { listItems, packageNames } from "@/lib/engine/deal-items";
+import { CustomFieldsPanel } from "@/components/console/custom-fields";
 import { dealCandidates, getDeal } from "@/lib/engine/deals";
 import { DEAL_ROLES, DEAL_ROLE_TH, DEAL_STAGE_TH, OPEN_STAGES, dealRoleTh, isDealStage, stageTh } from "@/lib/shared/deals";
 import { INTERACTION_KINDS, INTERACTION_TH, type InteractionKind } from "@/lib/shared/accounts";
@@ -38,7 +43,11 @@ export default async function DealPage({ params, searchParams }: { params: Promi
     return <Panel className="p-5"><p className="c-thai text-[0.9rem] text-[var(--c-text-2)]">ดีลนี้อยู่ในบริษัทที่ระดับความลับสูงกว่าสิทธิ์ของคุณ</p></Panel>;
   }
   const tab = pickTab(["overview", "history"] as const, (await searchParams).tab);
-  const candidates = await dealCandidates(v.tenantId, d.id, { id: v.actor, clearance: v.clearance });
+  const [candidates, cFields, cValues, items, pkgNames] = await Promise.all([
+    dealCandidates(v.tenantId, d.id, { id: v.actor, clearance: v.clearance }),
+    listFields(v.tenantId, "deal"), valuesFor(v.tenantId, "deal", [d.id]), listItems(v.tenantId, d.id), packageNames(v.tenantId),
+  ]);
+  const itemsTotal = items.reduce((t, i) => t + (i.total ?? 0), 0);
   const nameOf = new Map(candidates.map((c) => [c.id, c.name]));
   /* ประวัติ field = person เก็บเป็น "<id>:<บทบาท>" — แสดงเป็นชื่อและบทบาท */
   const personVal = (raw: string | null) => {
@@ -50,6 +59,9 @@ export default async function DealPage({ params, searchParams }: { params: Promi
   const pathStages = [...OPEN_STAGES, closed ? (d.stage as "won" | "lost") : "won"];
   const at = isDealStage(d.stage) ? pathStages.indexOf(d.stage) : -1;
   /* วันปิดจริง = ครั้งล่าสุดที่ย้ายเข้าขั้นปัจจุบัน (ประวัติเรียงใหม่ก่อน) — ไม่ต้องเก็บคอลัมน์ซ้ำ */
+  /* อยู่ขั้นนี้มากี่วัน (C3) — จากการย้ายเข้าขั้นปัจจุบันครั้งล่าสุด */
+  const enteredAt = d.history.find((h) => h.field === "stage" && h.newValue === d.stage)?.at ?? d.createdAt;
+  const daysHere = Math.max(0, Math.floor((Date.now() - Date.parse(enteredAt)) / 864e5));
   const closedAt = closed ? d.history.find((h) => h.field === "stage" && h.newValue === d.stage)?.at ?? d.updatedAt : null;
 
   return (
@@ -58,7 +70,10 @@ export default async function DealPage({ params, searchParams }: { params: Promi
         back={{ href: "/app/deals", label: "ดีลทั้งหมด" }}
         kind="ดีล"
         title={d.name}
-        badges={<span className={`c-pill ${d.stage === "won" ? "c-pill-good" : d.stage === "lost" ? "c-pill-bad" : "c-pill-reach"}`}>{stageTh(d.stage)}</span>}
+        badges={<>
+          <span className={`c-pill ${d.stage === "won" ? "c-pill-good" : d.stage === "lost" ? "c-pill-bad" : "c-pill-reach"}`}>{stageTh(d.stage)}</span>
+          {!closed && <span className={`c-pill ${daysHere > 30 ? "c-pill-warn" : ""}`}>อยู่ขั้นนี้ {daysHere} วัน</span>}
+        </>}
         highlights={[
           { label: "บริษัท", value: <Link href={`/app/accounts/${d.orgId}`} className="text-[var(--c-accent)] hover:underline">{d.org}</Link> },
           { label: "มูลค่า", value: d.value != null ? baht(d.value) : "ไม่ระบุ" },
@@ -110,6 +125,39 @@ export default async function DealPage({ params, searchParams }: { params: Promi
               <div><dt className="text-[0.75rem] text-[var(--c-text-4)]">ปิดคาด</dt><dd>{d.expectedClose ? thaiDate(d.expectedClose) : "ไม่ระบุ"}</dd><Edit dealId={d.id} field="expected_close" label="วันปิดคาด" value={d.expectedClose ?? ""} type="date" /></div>
               <div><dt className="text-[0.75rem] text-[var(--c-text-4)]">สร้างเมื่อ</dt><dd>{thaiDate(d.createdAt)}</dd></div>
             </dl>
+          </Panel>
+          <Panel className="p-5">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 className="c-h2 text-[var(--c-text)]">แพ็กเกจ</h2>
+              {items.length > 0 && <span className="c-mono text-[0.86rem]">รวม {baht(itemsTotal)}</span>}
+            </div>
+            {items.length ? (
+              <ul className="mt-3 divide-y divide-[var(--c-line)]">
+                {items.map((it) => (
+                  <li key={it.id} className="c-thai flex flex-wrap items-center justify-between gap-2 py-2 text-[0.88rem]">
+                    <span>{it.package} <span className="text-[var(--c-text-3)]">× {it.qty.toLocaleString("th-TH")}{it.unitPrice != null ? ` · ${baht(it.unitPrice)}` : ""}</span></span>
+                    <span className="flex items-center gap-2">
+                      <span className="c-mono">{it.total != null ? baht(it.total) : "—"}</span>
+                      <ActionForm action={removeDealItemAction} fields={{ dealId: d.id, itemId: it.id }} label="เอาออก" pendingLabel="…" size="sm" variant="ghost" />
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="c-thai mt-3 text-[0.86rem] text-[var(--c-text-3)]">ยังไม่ได้ใส่แพ็กเกจ — ใส่แล้วรายงานจะบอกได้ว่าแพ็กเกจไหนขายดี</p>}
+            <datalist id="pkg-list">{pkgNames.map((n) => <option key={n} value={n} />)}</datalist>
+            <ActionForm action={addDealItemAction} fields={{ dealId: d.id }} label="เพิ่มแพ็กเกจ" pendingLabel="กำลังบันทึก…" size="sm" className="mt-3 grid gap-2 sm:grid-cols-3">
+              <label className={LABEL}>แพ็กเกจ<input name="package" list="pkg-list" className="c-input" required autoComplete="off" placeholder="เช่น Gold" /></label>
+              <label className={LABEL}>จำนวน<input name="qty" inputMode="decimal" defaultValue="1" className="c-input" /></label>
+              <label className={LABEL}>ราคาต่อหน่วย (บาท)<input name="unitPrice" inputMode="decimal" className="c-input" /></label>
+            </ActionForm>
+            {items.length > 0 && itemsTotal !== (d.value ?? 0) && (
+              <ActionForm action={syncDealValueAction} fields={{ dealId: d.id }} label={`ใช้ยอดรวม ${baht(itemsTotal)} เป็นมูลค่าดีล`} pendingLabel="กำลังบันทึก…" size="sm" variant="ghost" className="mt-2" />
+            )}
+            <div className="mt-6 flex flex-wrap items-baseline justify-between gap-2">
+              <h2 className="c-h2 text-[var(--c-text)]">ฟิลด์ของบัญชี</h2>
+              <Link href="/app/settings/fields" className="c-thai text-[0.8rem] text-[var(--c-accent)] hover:underline">จัดการฟิลด์</Link>
+            </div>
+            <div className="mt-3"><CustomFieldsPanel entity="deal" recordId={d.id} fields={cFields} values={cValues.get(d.id)} /></div>
           </Panel>
           <Panel className="p-5">
             <h2 className="c-h2 text-[var(--c-text)]">คนในดีล</h2>

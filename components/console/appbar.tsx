@@ -72,6 +72,7 @@ const SETUP_GROUPS: { title: string; links: { href: string; label: string }[] }[
     title: "ระบบ",
     links: [
       { href: "/app/settings", label: "ตั้งค่าและความปลอดภัย" },
+      { href: "/app/settings/fields", label: "ฟิลด์ของบัญชี" },
       { href: "/app/admin", label: "ผู้ดูแลระบบ" },
     ],
   },

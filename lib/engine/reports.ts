@@ -4,6 +4,7 @@ import { retentionSummary } from "@/lib/engine/retention";
 import type { Viewer } from "@/lib/engine/accounts";
 import { OPEN_STAGES, type DealStage } from "@/lib/shared/deals";
 import { bangkokDay } from "@/lib/shared/format";
+import { closedAt, stageTimelines } from "@/lib/engine/velocity";
 
 /* ── รายงาน 4 กราฟตายตัว (docs/ux-plan.md U6) ─────────────────────────────
 
@@ -29,7 +30,9 @@ export async function reports(tenantId: string, viewer: Viewer, now = new Date()
     return { stage, count: xs.length, value: xs.reduce((t, d) => t + (d.value ?? 0), 0) };
   });
   const q = new Date(now); q.setUTCMonth(Math.floor(q.getUTCMonth() / 3) * 3, 1); q.setUTCHours(0, 0, 0, 0);
-  const wonQ = won.filter((d) => d.updatedAt >= q.toISOString());
+  /* ปิดได้ไตรมาสนี้ = วันที่เข้าขั้น "ปิดได้" จริง (ประวัติขั้น) ไม่ใช่วันที่แก้ดีลล่าสุด */
+  const wonTl = await stageTimelines(tenantId, won);
+  const wonQ = won.filter((d) => (closedAt(wonTl.get(d.id) ?? []) ?? d.updatedAt) >= q.toISOString());
 
   /* สัปดาห์เริ่มวันจันทร์ (เวลาไทย) · 12 สัปดาห์ล่าสุดรวมสัปดาห์นี้ */
   const today = new Date(`${bangkokDay(now)}T00:00:00Z`);

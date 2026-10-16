@@ -54,7 +54,7 @@ const APPEND_ONLY = new Set(["preferences", "evidence", "record_versions"]);
    และ audit_log (บันทึกตรวจสอบต้องอยู่ต่อ — การล้างบัญชีเองก็ถูกบันทึกไว้) */
 export const B2B_DATA_TABLES = [
   "import_rows", "import_batches", "affiliations", "relationship_assertions", "interactions",
-  "participations", "opportunity_people", "tasks", "opportunities", "org_domains", "orgs",
+  "participations", "opportunity_people", "deal_items", "custom_values", "tasks", "opportunities", "org_domains", "orgs",
   "preferences", "evidence", "record_versions", "merge_log",
   "review_items", "review_batches", "resolution_overrides", "sample_checks", "account_briefs",
   "campaign_targets", "sales_campaigns", "work_log", "queue_marks",
