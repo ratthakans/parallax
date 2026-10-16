@@ -2,6 +2,7 @@ import Link from "next/link";
 import { viewer } from "@/app/(app)/viewer";
 import { searchEverything } from "@/lib/engine/search";
 import { PageHead, Panel } from "@/components/console/ui";
+import { stageTh } from "@/lib/shared/deals";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +14,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
   const v = await viewer();
   const q = ((await searchParams).q ?? "").trim();
   const r = await searchEverything(v.tenantId, q, { id: v.actor, clearance: v.clearance });
-  const total = r.orgs.length + r.people.length + r.campaigns.length;
+  const total = r.orgs.length + r.people.length + r.deals.length + r.campaigns.length;
 
   return (
     <>
@@ -49,6 +50,19 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
                       ? <Link href={`/app/customers/${p.id}`} className="text-[var(--c-accent)] hover:underline">{p.name}</Link>
                       : <span className="text-[var(--c-text-3)]">{p.name}</span>}
                     <span className="c-thai text-[0.8rem] text-[var(--c-text-4)]">{[p.title, p.org].filter(Boolean).join(" · ")}</span>
+                  </li>
+                ))}
+              </ul>
+            </Panel>
+          )}
+          {r.deals.length > 0 && (
+            <Panel className="p-5">
+              <h2 className="c-h2 text-[var(--c-text)]">ดีล <span className="text-[var(--c-text-4)]">({r.deals.length})</span></h2>
+              <ul className="mt-2 divide-y divide-[var(--c-line)]">
+                {r.deals.map((d) => (
+                  <li key={d.id} className="flex items-baseline justify-between gap-3 py-2.5">
+                    <Link href={`/app/deals/${d.id}`} className="text-[var(--c-accent)] hover:underline">{d.name}</Link>
+                    <span className="c-thai text-[0.8rem] text-[var(--c-text-4)]">{d.org} · {stageTh(d.stage)}{d.value != null ? ` · ฿${d.value.toLocaleString("th-TH")}` : ""}</span>
                   </li>
                 ))}
               </ul>

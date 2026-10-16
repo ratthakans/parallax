@@ -201,6 +201,10 @@ jobs:
       - name: Deals
         run: npm run verify:deals
 
+      # CRM C0: ผู้ติดต่อที่เพิ่มเองผูกบริษัท (กุญแจเดียวกับการนำเข้า) · หาบริษัทจากชื่อ · ค้นหารวมเจอดีล
+      - name: CRM
+        run: npm run verify:crm
+
       # งาน (U5): มุมมองถูก · งานแคมเปญปิดที่แคมเปญเท่านั้น · บริษัทเกินสิทธิ์ไม่โผล่
       - name: Tasks
         run: npm run verify:tasks

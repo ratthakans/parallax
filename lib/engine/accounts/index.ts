@@ -134,7 +134,7 @@ export type Dossier = {
     note: string | null;
   }[];
   participations: { id: string; personName: string | null; program: string; edition: string | null; role: string; occurredAt: string | null; masked: boolean }[];
-  opportunities: { id: string; name: string; stage: string; owner: string | null; expectedClose: string | null }[];
+  opportunities: { id: string; name: string; stage: string; owner: string | null; expectedClose: string | null; value: number | null; updatedAt: string | null }[];
   versions: Record<string, Version[]>;
 };
 
@@ -196,7 +196,7 @@ export async function getDossier(tenantId: string, orgId: string, viewer: Viewer
        LEFT JOIN customers c ON c.id = p.customer_id AND c.tenant_id = p.tenant_id
        WHERE p.tenant_id = ? AND p.org_id = ? ORDER BY p.occurred_at DESC`, tenantId, orgId),
     all<Record<string, string | null>>(
-      "SELECT id, name, stage, owner_id, expected_close FROM opportunities WHERE tenant_id = ? AND org_id = ? ORDER BY updated_at DESC", tenantId, orgId),
+      "SELECT id, name, stage, owner_id, expected_close, value, updated_at FROM opportunities WHERE tenant_id = ? AND org_id = ? ORDER BY updated_at DESC", tenantId, orgId),
     all<{ field: string; old_value: string | null; new_value: string | null; reason: string; changed_by: string; recorded_at: string }>(
       `SELECT field, old_value, new_value, reason, changed_by, recorded_at FROM record_versions
        WHERE tenant_id = ? AND record_kind = 'org' AND record_id = ? ORDER BY recorded_at DESC, id DESC`, tenantId, orgId),
@@ -286,7 +286,10 @@ export async function getDossier(tenantId: string, orgId: string, viewer: Viewer
       const hidden = hiddenPerson(p.person_class);
       return { id: p.id!, personName: hidden ? MASKED_PERSON : p.person_name, program: p.program!, edition: p.edition, role: p.role!, occurredAt: p.occurred_at, masked: hidden };
     }),
-    opportunities: opps.map((p) => ({ id: p.id!, name: p.name!, stage: p.stage!, owner: p.owner_id, expectedClose: p.expected_close })),
+    opportunities: opps.map((p) => ({
+      id: p.id!, name: p.name!, stage: p.stage!, owner: p.owner_id, expectedClose: p.expected_close,
+      value: p.value == null ? null : Number(p.value), updatedAt: p.updated_at ?? null,
+    })),
     versions: groupedVersions,
   };
 }

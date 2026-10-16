@@ -6,6 +6,10 @@ import { FIELD_LABEL } from "@/lib/shared/ingest-types";
 import { Panel } from "@/components/console/ui";
 import { ActionForm } from "@/components/console/action-form";
 import { createCustomerAction } from "../../../customers-actions";
+import { OrgPicker } from "@/components/console/org-picker";
+import { isB2BTenant } from "@/lib/shared/tenants";
+import { viewer } from "@/app/(app)/viewer";
+import { listAccounts } from "@/lib/engine/accounts";
 
 export const dynamic = "force-dynamic";
 
@@ -32,8 +36,9 @@ const PROFILE: { name: keyof typeof FIELD_LABEL; type?: string }[] = [
   { name: "subdistrict" }, { name: "district" }, { name: "province" }, { name: "postcode" },
 ];
 
-export default async function NewCustomerPage() {
+export default async function NewCustomerPage({ searchParams }: { searchParams: Promise<{ org?: string }> }) {
   const tenantId = await activeTenantId();
+  if (isB2BTenant(tenantId)) return <NewContactB2B org={(await searchParams).org} />;
   const v = profileFor(tenantId).vocab.th;
 
   return (
@@ -120,6 +125,64 @@ export default async function NewCustomerPage() {
                 {FIELD_LABEL.note}
                 <textarea name="note" rows={3} className="c-input" />
               </label>
+            </div>
+          </details>
+        </ActionForm>
+      </Panel>
+    </>
+  );
+}
+
+/* ── ผู้ติดต่อ B2B (docs/crm-plan.md C0 ข้อ 3) ──
+   คนขายกรอก: ชื่อ · บริษัท · ตำแหน่ง · อีเมล · เบอร์ — บริษัทกลายเป็นสังกัดจริง (affiliateManual)
+   ไม่มีช่องยินยอมรับข่าวสาร: บัญชี B2B ตัดสินว่าติดต่อได้ไหมจากวัตถุประสงค์และฐานการประมวลผล (บริการนโยบาย) */
+async function NewContactB2B({ org }: { org?: string }) {
+  const v = await viewer();
+  const { rows } = await listAccounts(v.tenantId, { sort: "name", limit: 1000, viewer: { id: v.actor, clearance: v.clearance } });
+  const pre = rows.find((r) => r.id === org);
+  return (
+    <>
+      <Link href={pre ? `/app/accounts/${pre.id}` : "/app/customers"} className="c-thai text-[0.85rem] text-[var(--c-text-3)] hover:text-[var(--c-text)]">
+        ← {pre ? pre.name : "ผู้ติดต่อทั้งหมด"}
+      </Link>
+      <header className="mt-4 mb-6">
+        <h1 className="c-h1 text-[var(--c-text)]">เพิ่มผู้ติดต่อ</h1>
+        <p className="c-thai mt-2 max-w-2xl text-[0.9rem] text-[var(--c-text-3)]">
+          ชื่อ บริษัท และอีเมลหรือเบอร์อย่างน้อยหนึ่งช่อง — บริษัทที่ยังไม่มีในระบบจะถูกสร้างให้
+        </p>
+      </header>
+      <Panel className="max-w-3xl p-5 md:p-6">
+        <ActionForm
+          action={createCustomerAction}
+          fields={{ tenantId: v.tenantId, ...(pre ? { prefillOrgId: pre.id, prefillOrgName: pre.name } : {}) }}
+          label="เพิ่มผู้ติดต่อ"
+          pendingLabel="กำลังบันทึก…"
+          variant="primary"
+          className="grid gap-4 sm:grid-cols-2"
+        >
+          <label className={`${LABEL} sm:col-span-2`}>ชื่อ-นามสกุล *
+            <input name="name" className="c-input" required autoFocus />
+          </label>
+          <label className={LABEL}>บริษัท
+            <OrgPicker id="contact-org" name="company" names={rows.map((r) => r.name)} defaultValue={pre?.name} placeholder="พิมพ์ชื่อบริษัท — ไม่มีในรายการ = สร้างใหม่" />
+          </label>
+          <label className={LABEL}>ตำแหน่ง
+            <input name="job_title" className="c-input" placeholder="เช่น ผู้จัดการฝ่ายการตลาด" />
+          </label>
+          <label className={LABEL}>{CONTACT_KIND_LABEL.email}
+            <input name="contact_email" type="email" className="c-input" placeholder="name@company.co.th" autoComplete="off" />
+          </label>
+          <label className={LABEL}>{CONTACT_KIND_LABEL.phone}
+            <input name="contact_phone" type="tel" className="c-input" placeholder="081 234 5678" autoComplete="off" />
+          </label>
+          <details className="sm:col-span-2">
+            <summary className="c-thai cursor-pointer text-[0.86rem] text-[var(--c-accent)]">ข้อมูลเพิ่มเติม (ไม่บังคับ)</summary>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <label className={LABEL}>{CONTACT_KIND_LABEL.line}<input name="contact_line" className="c-input" autoComplete="off" /></label>
+              <label className={LABEL}>{CONTACT_KIND_LABEL.website}<input name="contact_website" className="c-input" autoComplete="off" /></label>
+              <label className={LABEL}>{FIELD_LABEL.first_name}<input name="first_name" className="c-input" /></label>
+              <label className={LABEL}>{FIELD_LABEL.last_name}<input name="last_name" className="c-input" /></label>
+              <label className={`${LABEL} sm:col-span-2`}>{FIELD_LABEL.note}<textarea name="note" rows={3} className="c-input" /></label>
             </div>
           </details>
         </ActionForm>

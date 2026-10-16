@@ -1,3 +1,4 @@
+import { stageTh } from "@/lib/shared/deals";
 import { createHash, randomUUID } from "node:crypto";
 import { all, get, run, tx } from "@/lib/engine/sql";
 import { logActivity } from "@/lib/engine/db";
@@ -57,7 +58,7 @@ export function evidencePack(d: Dossier, scope: Classification): EvidenceItem[] 
   for (const p of d.participations.filter((x) => !x.masked).slice(0, 20)) {
     out.push({ kind: "participation", ref: p.id, text: `${p.personName ?? "ไม่ทราบชื่อ"} ร่วม ${p.program}${p.edition ? ` ${p.edition}` : ""} ในบทบาท ${p.role}` });
   }
-  for (const o of d.opportunities) out.push({ kind: "opportunity", ref: o.id, text: `โอกาสขาย: ${o.name} · ขั้น ${o.stage}` });
+  for (const o of d.opportunities) out.push({ kind: "opportunity", ref: o.id, text: `ดีล: ${o.name} · ขั้น ${stageTh(o.stage)}` });
   return out.map((e, i) => ({ ...e, id: `E${i + 1}` }));
 }
 
