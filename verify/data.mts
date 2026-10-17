@@ -18,6 +18,7 @@ import { listTrash, purgeTrash, restoreTrash, trashDeal, trashOrg } from "@/lib/
 import { addItem, listItems } from "@/lib/engine/deal-items";
 import { createDeal, createRenewal, closeDeal, setDealPerson } from "@/lib/engine/deals";
 import { createTask } from "@/lib/engine/tasks";
+import { similarOrgs, similarPeopleAt } from "@/lib/engine/duplicates";
 
 const out: string[] = [];
 const ok = (c: boolean, m: string) => out.push(`${c ? "PASS" : "FAIL"}  ${m}`);
@@ -225,6 +226,23 @@ await run("INSERT INTO trash (id, tenant_id, kind, record_id, name, payload, del
   JSON.stringify({ deal: { id: "d-evil", tenant_id: T, org_id: A, name: "x", stage: "open", created_at: "x", updated_at: "x", "name) VALUES ('a'); --": 1 } }), ME.id, new Date().toISOString());
 const ev = await restoreTrash(T, "tr-evil", ME);
 ok(ev.ok && Boolean(await get("SELECT 1 AS x FROM opportunities WHERE tenant_id = ? AND id = 'd-evil'", T)), "คีย์แปลกใน payload ถูกตัดทิ้ง ใช้เฉพาะคอลัมน์ในรายการคงที่");
+
+// ── กันซ้ำตั้งแต่ตอนกรอก ──
+const X1 = await org("บริษัท เมฆคราม เทรดดิ้ง จำกัด (สมมุติ)");
+const X2 = await org("MEKKRAM TRADING CO.,LTD (สมมุติ)");
+const X3 = await org("เมฆคราม เทรดดิ้ง");
+const X4 = await org("บริษัท ฟ้าคราม จำกัด (สมมุติ)");
+await run("INSERT INTO org_domains (tenant_id, org_id, domain) VALUES (?,?,?)", T, X2, "mekkram.example");
+const s1 = await similarOrgs(T, { name: "เมฆคราม เทรดดิ้ง จำกัด" }, ME);
+ok(s1.some((m) => m.id === X3 && m.why.includes("ชื่อเดียวกัน")) && s1.some((m) => m.id === X1) && !s1.some((m) => m.id === X4), "ชื่อเดียวกันเมื่อตัดคำนิติบุคคล · ชื่อที่มีคำนี้อยู่ · บริษัทชื่อต่างไม่ติดมา");
+ok((await similarOrgs(T, { name: "Totally New Co", email: "a@mekkram.example" }, ME)).some((m) => m.id === X2 && m.why.includes("โดเมน")), "โดเมนอีเมลตรงกับบริษัทเดิม");
+ok((await similarOrgs(T, { name: "บริษัท ลับสุดยอด จำกัด" }, ME)).every((m) => m.id !== S), "บริษัทเกินสิทธิ์ไม่ถูกเสนอ");
+ok(!(await similarOrgs(T, { orgId: X1 }, ME)).some((m) => m.id === X1) && (await similarOrgs(T, { orgId: X1 }, ME)).some((m) => m.id === X3), "จากหน้าบริษัท: ไม่เสนอตัวเอง");
+ok((await similarOrgs(T, { name: "AB" }, ME)).length === 0, "ชื่อสั้นเกิน (< 4) ไม่เดาว่าคล้าย");
+const px = await person("สมหญิง ใจดี");
+await aff(px, X1, "2026-09-01");
+ok((await similarPeopleAt(T, "สมหญิง  ใจดี", X1, ME)).some((p) => p.id === px) && (await similarPeopleAt(T, "สมหญิง ใจร้าย", X1, ME)).length === 0, "คนชื่อเดียวกันในบริษัทเดียวกัน (เว้นวรรคต่างไม่เป็นไร) · ชื่ออื่นไม่ติด");
+ok((await similarPeopleAt(T, "สมหญิง ใจดี", X4, ME)).length === 0, "ชื่อเดียวกันแต่คนละบริษัท = ไม่เตือน");
 
 for (const line of out) console.log(line);
 const failed = out.filter((l) => l.startsWith("FAIL"));

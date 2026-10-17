@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { activeTenantId } from "@/app/(app)/tenant";
 import { denied, viewer } from "@/app/(app)/viewer";
-import { affiliateManual } from "@/lib/engine/accounts/edit";
+import { affiliateManual, orgByName } from "@/lib/engine/accounts/edit";
+import { similarOrgs, similarPeopleAt } from "@/lib/engine/duplicates";
 import { isB2BTenant } from "@/lib/shared/tenants";
 import { currentUser } from "@/lib/shared/session";
 import { membershipEnforced } from "@/lib/engine/access";
@@ -58,6 +59,21 @@ export async function createCustomerAction(_prev: ActionState, fd: FormData): Pr
   const no = denied(await viewer(), "write");
   if (no) return { error: no };
   const contacts = CONTACT_KIND_ORDER.map((kind) => ({ kind, value: field(fd, `contact_${kind}`) }));
+  /* กันซ้ำตั้งแต่ตอนกรอก (บัญชี B2B) — เตือนก่อนสร้าง · ผู้ใช้ยืนยันว่าไม่ใช่รายเดิมได้ด้วยช่องติ๊ก */
+  if (isB2BTenant(tenantId) && fd.get("confirmDup") !== "1") {
+    const v = await viewer();
+    const who = { id: v.actor, clearance: v.clearance };
+    const company = field(fd, "company").trim();
+    const prefilled = field(fd, "prefillOrgId") && company === field(fd, "prefillOrgName") ? field(fd, "prefillOrgId") : "";
+    const orgId = prefilled || (company ? await orgByName(tenantId, company) : null);
+    if (orgId) {
+      const same = await similarPeopleAt(tenantId, field(fd, "name"), orgId, who);
+      if (same.length) return { error: `อาจเป็นคนเดิม: ${same.map((x) => x.name).join(", ")} อยู่ที่บริษัทนี้แล้ว — ถ้าเป็นคนละคน ติ๊ก "ตรวจแล้ว ไม่ใช่รายเดิม" แล้วกดอีกครั้ง` };
+    } else if (company) {
+      const like = await similarOrgs(tenantId, { name: company, email: field(fd, "contact_email") }, who);
+      if (like.length) return { error: `บริษัทนี้อาจมีอยู่แล้ว: ${like.slice(0, 3).map((x) => `${x.name} (${x.why})`).join(" · ")} — เลือกจากรายการ หรือติ๊ก "ตรวจแล้ว ไม่ใช่รายเดิม" ถ้าเป็นบริษัทใหม่จริง` };
+    }
+  }
   const res = await createCustomer(
     tenantId,
     { name: field(fd, "name"), contacts, profile: profileFrom(fd), consent: fd.get("consent") === "1" },

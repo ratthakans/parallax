@@ -10,6 +10,9 @@ import { generateBrief } from "@/lib/engine/accounts/brief";
 import { orgAccess } from "@/lib/engine/accounts";
 import { get } from "@/lib/engine/sql";
 import { createTask } from "@/lib/engine/tasks";
+import { mergeOrgs } from "@/lib/engine/vault/merge";
+import { orgByName } from "@/lib/engine/accounts/edit";
+import { redirect } from "next/navigation";
 import type { ActionState } from "@/lib/shared/action-state";
 import type { Classification } from "@/lib/shared/vault";
 
@@ -199,4 +202,24 @@ export async function leftCompanyAction(_p: ActionState, fd: FormData): Promise<
   revalidatePath("/app/data");
   revalidatePath(`/app/accounts/${a.org_id}`);
   return { ok: "บันทึกว่าออกแล้ว — ประวัติยังอยู่" };
+}
+
+/* ── รวมบริษัทซ้ำจากหน้าบริษัท ── ใช้การรวมเดียวกับคิวตรวจ (ย้อนได้ที่ประวัติการรวม) · สิทธิ์ review · ต้องเห็นทั้งสองฝั่ง */
+export async function mergeOrgHereAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  const v = await viewer();
+  const no = denied(v, "review");
+  if (no) return { error: no };
+  const keep = str(fd, "orgId");
+  const drop = str(fd, "dropId") || (str(fd, "dropName").trim() ? (await orgByName(v.tenantId, str(fd, "dropName"))) ?? "" : "");
+  if (!drop) return { error: "เลือกบริษัทที่จะรวมเข้ามา" };
+  if (drop === keep) return { error: "เป็นบริษัทเดียวกันอยู่แล้ว" };
+  for (const id of [keep, drop]) {
+    const gate = await orgAccess(v.tenantId, id, who(v));
+    if (!gate.ok) return { error: gate.error };
+  }
+  const r = await mergeOrgs(v.tenantId, keep, drop, v.actor);
+  if (!r.ok) return { error: r.error };
+  revalidatePath("/app/accounts");
+  revalidatePath("/app/data");
+  redirect(`/app/accounts/${keep}?tab=details&merged=1`);
 }

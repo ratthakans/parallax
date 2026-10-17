@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { viewer } from "@/app/(app)/viewer";
 import {
   addMemberLinkAction, addRelationshipAction, claimAccountAction, confirmAffiliationAction, endAffiliationAction, endRelationshipAction,
-  generateBriefAction, logInteractionAction, setClassificationAction, setParentAction, updateOrgFieldAction, verifyOrgAction,
+  generateBriefAction, logInteractionAction, mergeOrgHereAction, setClassificationAction, setParentAction, updateOrgFieldAction, verifyOrgAction,
 } from "@/app/(app)/account-actions";
 import { getDossier, orgOptions, unknownsOf, type Dossier, type RowRef, type Version } from "@/lib/engine/accounts";
 import { currentBrief } from "@/lib/engine/accounts/brief";
@@ -30,6 +30,8 @@ import { teamMembers } from "@/lib/engine/team";
 import { NewTaskForm, TaskList } from "@/components/console/tasks";
 import { trashOrgAction } from "@/app/(app)/bulk-actions";
 import { orgIsEmpty } from "@/lib/engine/trash";
+import { similarOrgs } from "@/lib/engine/duplicates";
+import { OrgPicker } from "@/components/console/org-picker";
 import { setOrgTeamAction } from "@/app/(app)/field-actions";
 import { get as getRow } from "@/lib/engine/sql";
 
@@ -171,8 +173,9 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
     getRow<{ team_id: string | null }>("SELECT team_id FROM orgs WHERE tenant_id = ? AND id = ?", v.tenantId, id),
   ]);
   const team = teams.find((t) => t.id === teamRow?.team_id) ?? null;
-  const [orgTasks, teamList, notEmpty] = await Promise.all([
+  const [orgTasks, teamList, notEmpty, dupes] = await Promise.all([
     listTasks(v.tenantId, "open", who, new Date(), { orgId: id }), teamMembers(v.tenantId, v.actor), orgIsEmpty(v.tenantId, id),
+    (await searchParams).tab === "details" ? similarOrgs(v.tenantId, { orgId: id }, who) : Promise.resolve([]),
   ]);
   const TABS = ["overview", "details", "people", "deals", "events", "group", "relationships"] as const;
   const sp = await searchParams;
@@ -363,6 +366,29 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
                 </ActionForm>
               </div>
             )}
+          </Panel>
+          {/* ── บริษัทที่อาจซ้ำ · รวมเข้าบริษัทนี้ ── */}
+          <Panel className="scroll-mt-28 p-5 md:p-6">
+            <h2 id="merge" className="c-h2 text-[var(--c-text)]">บริษัทที่อาจซ้ำกับบริษัทนี้</h2>
+            <p className="c-thai mt-1 text-[0.82rem] text-[var(--c-text-3)]">รวมแล้วคน ดีล กิจกรรม และงานของอีกแฟ้มย้ายมาที่นี่ · ย้อนได้ที่ ตรวจข้อมูลซ้ำ › ประวัติการรวม · เลขนิติบุคคลต่างกันรวมไม่ได้</p>
+            {dupes.length ? (
+              <ul className="mt-3 divide-y divide-[var(--c-line)]">
+                {dupes.map((x) => (
+                  <li key={x.id} className="c-thai flex flex-wrap items-center justify-between gap-2 py-2 text-[0.88rem]">
+                    <span><Link href={`/app/accounts/${x.id}`} className="text-[var(--c-accent)] hover:underline">{x.name}</Link> <span className="text-[0.76rem] text-[var(--c-text-3)]">· {x.why}</span></span>
+                    <ActionForm action={mergeOrgHereAction} fields={{ orgId: o.id, dropId: x.id }} label="รวมเข้าบริษัทนี้" pendingLabel="กำลังรวม…" size="sm" variant="ghost"
+                      confirm={`กดอีกครั้ง — รวม "${x.name}" เข้า "${o.name}"`} />
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="c-thai mt-3 text-[0.86rem] text-[var(--c-text-3)]">ไม่พบบริษัทที่น่าจะซ้ำ</p>}
+            <details className="mt-3">
+              <summary className="c-thai cursor-pointer text-[0.82rem] text-[var(--c-accent)]">รวมบริษัทอื่นที่ไม่อยู่ในรายการ</summary>
+              <ActionForm action={mergeOrgHereAction} fields={{ orgId: o.id }} label="รวมเข้าบริษัทนี้" pendingLabel="กำลังรวม…" size="sm" className="mt-2 grid max-w-md gap-2"
+                confirm="กดอีกครั้ง — รวมบริษัทที่เลือกเข้าบริษัทนี้">
+                <OrgPicker id="merge-org" name="dropName" names={others.map((x) => x.name)} placeholder="พิมพ์ชื่อบริษัทที่จะรวมเข้ามา" required />
+              </ActionForm>
+            </details>
           </Panel>
           {!notEmpty && (
             <Panel className="p-5 md:p-6">
