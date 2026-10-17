@@ -7,6 +7,9 @@ import {
 import { listFields, valuesFor } from "@/lib/engine/custom-fields";
 import { listItems, packageNames } from "@/lib/engine/deal-items";
 import { CustomFieldsPanel } from "@/components/console/custom-fields";
+import { NewTaskForm, TaskList } from "@/components/console/tasks";
+import { listTasks } from "@/lib/engine/tasks";
+import { teamMembers } from "@/lib/engine/team";
 import { dealCandidates, getDeal } from "@/lib/engine/deals";
 import { DEAL_ROLES, DEAL_ROLE_TH, DEAL_STAGE_TH, FORECAST_CATEGORIES, FORECAST_TH, OPEN_STAGES, dealRoleTh, effectiveForecast, isDealStage, stageTh } from "@/lib/shared/deals";
 import { get } from "@/lib/engine/sql";
@@ -47,6 +50,9 @@ export default async function DealPage({ params, searchParams }: { params: Promi
   const [candidates, cFields, cValues, items, pkgNames] = await Promise.all([
     dealCandidates(v.tenantId, d.id, { id: v.actor, clearance: v.clearance }),
     listFields(v.tenantId, "deal"), valuesFor(v.tenantId, "deal", [d.id]), listItems(v.tenantId, d.id), packageNames(v.tenantId),
+  ]);
+  const [dealTasks, team] = await Promise.all([
+    listTasks(v.tenantId, "open", { id: v.actor, clearance: v.clearance }, new Date(), { dealId: d.id }), teamMembers(v.tenantId, v.actor),
   ]);
   const itemsTotal = items.reduce((t, i) => t + (i.total ?? 0), 0);
   const fcSet = (await get<{ forecast_category: string | null }>("SELECT forecast_category FROM opportunities WHERE tenant_id = ? AND id = ?", v.tenantId, d.id))?.forecast_category ?? null;
@@ -210,6 +216,14 @@ export default async function DealPage({ params, searchParams }: { params: Promi
             )}
           </Panel>
           <Panel className="p-5 lg:col-span-2">
+            <h2 className="c-h2 text-[var(--c-text)]">งานของดีล <span className="text-[var(--c-text-4)]">({dealTasks.length})</span></h2>
+            <div className="mt-3"><TaskList tasks={dealTasks} link={{ dealId: d.id, orgId: d.orgId }} /></div>
+            <details className="mt-3">
+              <summary className="c-btn c-btn-ghost c-btn-sm inline-flex cursor-pointer list-none">+ งาน</summary>
+              <div className="mt-3 max-w-2xl"><NewTaskForm link={{ dealId: d.id, orgId: d.orgId }} team={team} people={candidates.filter((c) => c.current)} /></div>
+            </details>
+          </Panel>
+          <Panel className="p-5 lg:col-span-2">
             <h2 className="c-h2 text-[var(--c-text)]">กิจกรรมของดีล</h2>
             <details className="mt-3" open={!d.interactions.length}>
               <summary className="c-btn c-btn-primary c-btn-sm inline-flex cursor-pointer list-none">บันทึกกิจกรรม</summary>
@@ -228,7 +242,9 @@ export default async function DealPage({ params, searchParams }: { params: Promi
                   </select>
                 </label>
                 <label className={`${LABEL} sm:col-span-3`}>คุยอะไร<textarea name="summary" rows={2} className="c-input" required /></label>
-                <label className={`${LABEL} sm:col-span-3`}>ผลและขั้นตอนถัดไป<input name="outcome" className="c-input" /></label>
+                <label className={`${LABEL} sm:col-span-3`}>ผล<input name="outcome" className="c-input" /></label>
+                <label className={`${LABEL} sm:col-span-2`}>งานถัดไป (ไม่บังคับ — สร้างเป็นงานให้)<input name="nextTitle" className="c-input" placeholder="เช่น ส่งใบเสนอราคาฉบับแก้" /></label>
+                <label className={LABEL}>ครบกำหนด<input type="date" name="nextDue" className="c-input" /></label>
               </ActionForm>
             </details>
             {d.interactions.length ? (

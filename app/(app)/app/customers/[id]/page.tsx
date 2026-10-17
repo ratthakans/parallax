@@ -17,6 +17,9 @@ import { NoteCapture } from "@/components/console/note-capture";
 import { viewer } from "@/app/(app)/viewer";
 import { personB2B } from "@/lib/engine/accounts/person";
 import { dealsOfPerson } from "@/lib/engine/deals";
+import { listTasks } from "@/lib/engine/tasks";
+import { teamMembers } from "@/lib/engine/team";
+import { NewTaskForm, TaskList } from "@/components/console/tasks";
 import { personIdsOf } from "@/lib/engine/vault/merge";
 import { dealRoleTh, stageTh } from "@/lib/shared/deals";
 import { isB2BTenant } from "@/lib/shared/tenants";
@@ -162,6 +165,9 @@ export default async function CustomerPage({
   const me = await viewer();
   const b2b = isB2BTenant(tenantId) ? await personB2B(tenantId, cid, { id: me.actor, clearance: me.clearance }) : null;
   const deals = b2b ? await dealsOfPerson(tenantId, await personIdsOf(tenantId, cid), { id: me.actor, clearance: me.clearance }) : [];
+  const [personTasks, team] = b2b
+    ? await Promise.all([listTasks(tenantId, "open", { id: me.actor, clearance: me.clearance }, new Date(), { personId: cid }), teamMembers(tenantId, me.actor)])
+    : [[], []];
   const currentJob = b2b?.jobs.find((j) => j.current) ?? null;
 
   const s = c.stats;
@@ -583,6 +589,14 @@ export default async function CustomerPage({
         </div>
         {b2b && (
           <aside id="activity" className="grid min-w-0 scroll-mt-28 content-start gap-5">
+          <Panel className="p-4 md:p-5">
+            <h2 className="c-h2 text-[var(--c-text)]">งาน <span className="text-[var(--c-text-4)]">({personTasks.length})</span></h2>
+            <div className="mt-3"><TaskList tasks={personTasks} link={{ personId: c.id }} showRecord /></div>
+            <details className="mt-3">
+              <summary className="c-btn c-btn-ghost c-btn-sm inline-flex cursor-pointer list-none">+ งาน</summary>
+              <div className="mt-3"><NewTaskForm link={{ personId: c.id, orgId: currentJob?.visible ? currentJob.orgId : undefined }} team={team} compact /></div>
+            </details>
+          </Panel>
           <Panel className="p-4 md:p-5">
             <h2 className="c-h2 text-[var(--c-text)]">กิจกรรม</h2>
             {currentJob?.visible && (

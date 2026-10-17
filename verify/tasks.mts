@@ -4,7 +4,7 @@ import "./isolate.mts";
 import { randomUUID } from "node:crypto";
 import { ensureReady } from "@/lib/engine/bootstrap";
 import { run } from "@/lib/engine/sql";
-import { completeTask, listTasks } from "@/lib/engine/tasks";
+import { completeTask, createTask, listTasks, updateTask } from "@/lib/engine/tasks";
 import { bangkokDay } from "@/lib/shared/format";
 
 const out: string[] = [];
@@ -50,6 +50,36 @@ ok((await completeTask(T, tToday, "นัดได้แล้ว", ME)).ok, "�
 const done = await listTasks(T, "done", ME);
 ok(done.some((t) => t.id === tToday && t.outcome === "นัดได้แล้ว") && !ids(await listTasks(T, "mine", ME)).includes(tToday), "งานที่ปิดย้ายไปเสร็จแล้ว พร้อมผล");
 ok(!(await completeTask(T, tToday, "", ME)).ok, "ปิดซ้ำไม่ได้");
+
+// ── E1 · สร้างและแก้งาน (docs/crm-plan.md) ──
+const pid = `c-${randomUUID().slice(0, 12)}`;
+await run("INSERT INTO customers (id, tenant_id, name, created_at) VALUES (?,?,?,?)", pid, T, "คนในบริษัท A (สมมุติ)", now);
+await run("INSERT INTO affiliations (id, tenant_id, customer_id, org_id, title, valid_from, valid_to, last_seen_at, source_id, recorded_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+  `a-${randomUUID().slice(0, 12)}`, T, pid, A, null, day(-30), null, now, null, now);
+const dealId = randomUUID();
+await run("INSERT INTO opportunities (id, tenant_id, org_id, name, stage, owner_id, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)", dealId, T, A, "ดีลของ A (สมมุติ)", "open", ME.id, now, now);
+const B = await org("confidential");
+ok(!(await createTask(T, { title: "x" }, ME)).ok && !(await createTask(T, { title: "ส่งเอกสาร", due: "พรุ่งนี้" }, ME)).ok, "ชื่องานสั้นเกิน · วันที่ผิดรูป = ไม่สร้าง");
+const c1 = await createTask(T, { title: "ส่งใบเสนอราคา (สมมุติ)", due: day(3), dealId }, ME);
+const t1 = c1.ok ? (await listTasks(T, "open", ME, new Date(), { dealId })).find((t) => t.id === c1.id) : undefined;
+ok(Boolean(t1) && t1?.orgId === A && t1?.owner === ME.id && t1?.deal === "ดีลของ A (สมมุติ)", "งานจากดีล: บริษัทมาจากดีลเอง · ผู้รับเริ่มต้น = ผู้สร้าง");
+ok((await listTasks(T, "open", ME, new Date(), { orgId: A })).some((t) => c1.ok && t.id === c1.id), "งานของดีลขึ้นที่หน้าบริษัทด้วย");
+ok(!(await createTask(T, { title: "ผิดบริษัท (สมมุติ)", orgId: B, dealId }, ME)).ok, "ดีลกับบริษัทไม่ตรงกัน = ไม่สร้าง");
+ok(!(await createTask(T, { title: "คนนอกบริษัท (สมมุติ)", orgId: B, personId: pid }, ME)).ok, "คนที่ไม่ได้สังกัดบริษัทนั้น = ไม่สร้าง");
+const c2 = await createTask(T, { title: "โทรหา (สมมุติ)", personId: pid, owner: "other@verify" }, ME);
+const t2 = c2.ok ? (await listTasks(T, "open", ME, new Date(), { personId: pid })).find((t) => t.id === c2.id) : undefined;
+ok(t2?.orgId === A && t2?.owner === "other@verify", "งานจากคน: ใช้บริษัทปัจจุบันของเขา · มอบให้คนอื่นได้");
+ok(!(await createTask(T, { title: "งานบริษัทลับ (สมมุติ)", orgId: SECRET }, ME)).ok, "สร้างงานในบริษัทที่เกินสิทธิ์ไม่ได้");
+ok(!(await createTask("mst-golf", { title: "ข้ามบัญชี (สมมุติ)", dealId }, ME)).ok, "สร้างงานผูกดีลข้ามบัญชีไม่ได้");
+if (c1.ok) {
+  ok((await updateTask(T, c1.id, { due: day(10), owner: "other@verify" }, ME)).ok, "เลื่อนวันและเปลี่ยนผู้รับได้");
+  const u = (await listTasks(T, "open", ME, new Date(), { dealId })).find((t) => t.id === c1.id);
+  ok(u?.due === day(10) && u?.owner === "other@verify", "ค่าใหม่ถูกบันทึก");
+  ok(!(await updateTask(T, c1.id, { due: "13/13/2026" }, ME)).ok && !(await updateTask(T, c1.id, { owner: " " }, ME)).ok, "วันที่ผิดรูป · ผู้รับว่าง = ไม่บันทึก");
+  await completeTask(T, c1.id, "", ME);
+  ok(!(await updateTask(T, c1.id, { due: day(1) }, ME)).ok, "งานที่ปิดแล้วแก้ไม่ได้");
+}
+ok(!(await updateTask(T, tCamp, { due: day(5) }, ME)).ok, "งานแคมเปญเลื่อนที่นี่ไม่ได้ (มอบหมายใหม่ที่แคมเปญ)");
 
 for (const line of out) console.log(line);
 const failed = out.filter((l) => l.startsWith("FAIL"));

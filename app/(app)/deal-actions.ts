@@ -8,6 +8,7 @@ import { logInteraction, orgByName } from "@/lib/engine/accounts/edit";
 import { get } from "@/lib/engine/sql";
 import { addItem, listItems, removeItem } from "@/lib/engine/deal-items";
 import { setForecast } from "@/lib/engine/forecast";
+import { createTask } from "@/lib/engine/tasks";
 import { orgAccess } from "@/lib/engine/accounts";
 import type { ActionState } from "@/lib/shared/action-state";
 
@@ -102,10 +103,15 @@ export async function logDealActivityAction(_p: ActionState, fd: FormData): Prom
     summary: str(fd, "summary"), outcome: str(fd, "outcome"), classification: str(fd, "classification") || undefined,
   }, v.actor);
   if (!res.ok) return { error: res.error };
-  refresh(id, d.org_id);
   const person = str(fd, "personId");
+  /* งานถัดไป (E1) — สร้างหลังบันทึกกิจกรรมสำเร็จเท่านั้น */
+  const next = str(fd, "nextTitle").trim();
+  const task = next ? await createTask(v.tenantId, { title: next, due: str(fd, "nextDue"), dealId: id, personId: person || undefined }, { id: v.actor, clearance: v.clearance }) : null;
+  refresh(id, d.org_id);
+  revalidatePath("/app/tasks");
   if (person) revalidatePath(`/app/customers/${person}`);
-  return { ok: "บันทึกแล้ว — ขึ้นทั้งหน้าดีล หน้าบริษัท และหน้าผู้ติดต่อ" };
+  if (task && !task.ok) return { ok: `บันทึกกิจกรรมแล้ว แต่สร้างงานถัดไปไม่ได้: ${task.error}` };
+  return { ok: task ? "บันทึกกิจกรรมและงานถัดไปแล้ว" : "บันทึกแล้ว — ขึ้นทั้งหน้าดีล หน้าบริษัท และหน้าผู้ติดต่อ" };
 }
 
 /* ── แพ็กเกจในดีล (docs/crm-plan.md C4) ── */

@@ -25,6 +25,9 @@ import { listFields, valuesFor } from "@/lib/engine/custom-fields";
 import { orgEditions } from "@/lib/engine/editions";
 import { CustomFieldsPanel } from "@/components/console/custom-fields";
 import { listTeams } from "@/lib/engine/forecast";
+import { listTasks } from "@/lib/engine/tasks";
+import { teamMembers } from "@/lib/engine/team";
+import { NewTaskForm, TaskList } from "@/components/console/tasks";
 import { setOrgTeamAction } from "@/app/(app)/field-actions";
 import { get as getRow } from "@/lib/engine/sql";
 
@@ -166,6 +169,7 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
     getRow<{ team_id: string | null }>("SELECT team_id FROM orgs WHERE tenant_id = ? AND id = ?", v.tenantId, id),
   ]);
   const team = teams.find((t) => t.id === teamRow?.team_id) ?? null;
+  const [orgTasks, teamList] = await Promise.all([listTasks(v.tenantId, "open", who, new Date(), { orgId: id }), teamMembers(v.tenantId, v.actor)]);
   const TABS = ["overview", "details", "people", "deals", "events", "group", "relationships"] as const;
   const sp = await searchParams;
   const tab = pickTab(TABS, sp.tab);
@@ -639,6 +643,15 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
 
         {/* ── กิจกรรม: จดโน้ต · บันทึกแบบฟอร์ม · ไทม์ไลน์ (ช่องบันทึกด้านขวาแบบ Salesforce) ── */}
         <aside id="activity" className="grid min-w-0 scroll-mt-28 content-start gap-5">
+          {/* ── งานเปิดของบริษัทนี้ (E1) ── */}
+          <Panel className="p-4 md:p-5">
+            <h2 className="c-h2 text-[var(--c-text)]">งาน <span className="text-[var(--c-text-4)]">({orgTasks.length})</span></h2>
+            <div className="mt-3"><TaskList tasks={orgTasks} link={{ orgId: o.id }} showRecord /></div>
+            <details className="mt-3">
+              <summary className="c-btn c-btn-ghost c-btn-sm inline-flex cursor-pointer list-none">+ งาน</summary>
+              <div className="mt-3"><NewTaskForm link={{ orgId: o.id }} team={teamList} people={current.map((p) => ({ id: p.personId, name: p.name }))} compact /></div>
+            </details>
+          </Panel>
           {/* ── ไทม์ไลน์ ── */}
           <Panel className="p-4 md:p-5">
             <h2 className="c-h2 text-[var(--c-text)]">กิจกรรม</h2>
@@ -666,7 +679,9 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
                 <label className={`${LABEL}`}>คุยอะไร
                   <textarea name="summary" rows={3} className="c-input" required />
                 </label>
-                <label className={`${LABEL}`}>ผลและขั้นตอนถัดไป<input name="outcome" className="c-input" /></label>
+                <label className={`${LABEL}`}>ผล<input name="outcome" className="c-input" /></label>
+                <label className={`${LABEL}`}>งานถัดไป (ไม่บังคับ — สร้างเป็นงานให้)<input name="nextTitle" className="c-input" placeholder="เช่น โทรตามผลสัปดาห์หน้า" /></label>
+                <label className={`${LABEL}`}>ครบกำหนดงานถัดไป<input type="date" name="nextDue" className="c-input" /></label>
                 <label className={LABEL}>ระดับความลับ
                   <select name="classification" className="c-select" defaultValue="confidential">
                     {CLASSIFICATIONS.map((c) => <option key={c} value={c}>{CLASSIFICATION_TH[c]}{c === "restricted_high" ? " (เห็นเฉพาะคุณ · ไม่ส่งให้ AI)" : ""}</option>)}
