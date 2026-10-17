@@ -6,6 +6,10 @@ import { cleanQuery, listViews } from "@/lib/engine/saved-views";
 import { can } from "@/lib/shared/roles";
 import { SavedViews } from "@/components/console/saved-views";
 import { listTeams } from "@/lib/engine/forecast";
+import { bulkOrgsAction } from "@/app/(app)/bulk-actions";
+import { teamMembers } from "@/lib/engine/team";
+import { ActionForm } from "@/components/console/action-form";
+import { SelectAll } from "@/components/console/select-all";
 import { CLASSIFICATION_TH, LIFECYCLE_TH, type LifecycleState } from "@/lib/shared/vault";
 import { thaiDate } from "@/lib/shared/format";
 import { PageHead, Panel, num } from "@/components/console/ui";
@@ -59,6 +63,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
     limit: PAGE, offset: (page - 1) * PAGE, viewer: { id: v.actor, clearance: v.clearance },
   });
   const pages = Math.max(1, Math.ceil(total / PAGE));
+  const people = await teamMembers(v.tenantId, v.actor);
   const cvals = shownFields.length ? await valuesFor(v.tenantId, "org", rows.map((r) => r.id)) : new Map();
   const current = cleanQuery(new URLSearchParams(Object.entries({ view: view !== "all" ? view : "", sort: sort ?? "", dir: dir ?? "", ...extra }).filter((e) => e[1])).toString());
   return (
@@ -124,14 +129,39 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
       </details>
 
       <Panel className="p-0">
-        <p className="c-thai border-b border-[var(--c-line)] px-5 py-3 text-[0.84rem] text-[var(--c-text-3)]">
-          {num(total)} บริษัท{sp.q ? ` ที่ตรงกับ “${sp.q}”` : ""}
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--c-line)] px-5 py-3">
+          <p className="c-thai text-[0.84rem] text-[var(--c-text-3)]">{num(total)} บริษัท{sp.q ? ` ที่ตรงกับ “${sp.q}”` : ""}</p>
+          {/* ── ทำทีละหลายรายการ (E3) ── ติ๊กแถว แล้วเลือกว่าจะเปลี่ยนอะไร */}
+          {rows.length > 0 && (
+            <details className="relative">
+              <summary className="c-btn c-btn-ghost c-btn-sm inline-flex cursor-pointer list-none">เปลี่ยนรายการที่ติ๊ก…</summary>
+              <ActionForm id="bulk-orgs" action={bulkOrgsAction} label="เปลี่ยน" pendingLabel="กำลังเปลี่ยน…" size="sm"
+                className="c-panel absolute right-0 z-10 mt-1 grid w-80 gap-2 p-3">
+                <label className={LABEL}>เปลี่ยนอะไร
+                  <select name="op" className="c-select" defaultValue="owner">
+                    <option value="owner">เจ้าของบัญชี</option>
+                    {teams.length > 0 && <option value="team">ทีมที่ดูแล</option>}
+                    {fields.map((f) => <option key={f.id} value={`cf.${f.id}`}>{f.label}</option>)}
+                  </select>
+                </label>
+                <label className={LABEL}>เจ้าของใหม่ (ว่าง = ปล่อยบัญชี)<input name="owner" list="bulk-people" className="c-input" autoComplete="off" /></label>
+                {teams.length > 0 && (
+                  <label className={LABEL}>ทีม
+                    <select name="teamId" className="c-select" defaultValue=""><option value="">ไม่ระบุ</option>{teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
+                  </label>
+                )}
+                {fields.length > 0 && <label className={LABEL}>ค่าใหม่ของฟิลด์ (ว่าง = ล้างค่า)<input name="value" className="c-input" /></label>}
+                <datalist id="bulk-people">{people.map((p) => <option key={p} value={p} />)}</datalist>
+              </ActionForm>
+            </details>
+          )}
+        </div>
         {rows.length ? (
           <div className="c-scroll px-5 pb-2" tabIndex={0} role="region" aria-label="ตารางบริษัท">
             <table className="c-table min-w-[52rem]">
               <thead>
                 <tr>
+                  <th className="w-8"><SelectAll form="bulk-orgs" /></th>
                   <SortTh base={BASE} state={state} col="name" label="บริษัท" />
                   <SortTh base={BASE} state={state} col="people" label="ยังสังกัด" defaultDir="desc" align="right" />
                   <th className="text-right font-sans text-[0.75rem] normal-case tracking-normal">เคยสังกัด</th>
@@ -144,6 +174,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.id}>
+                    <td><input type="checkbox" form="bulk-orgs" name="ids" value={r.id} aria-label={`เลือก ${r.name}`} className="h-4 w-4" /></td>
                     <td>
                       <Link href={`/app/accounts/${r.id}`} className="c-thai inline-block py-1 text-[var(--c-accent)] hover:underline">{r.name}</Link>
                       <span className="c-mono block text-[0.75rem] text-[var(--c-text-4)]">{r.domain ?? "ไม่ทราบโดเมน"}</span>

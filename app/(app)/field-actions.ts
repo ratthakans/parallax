@@ -5,6 +5,7 @@ import { denied, viewer } from "@/app/(app)/viewer";
 import { archiveField, createField, setValue, type FieldEntity } from "@/lib/engine/custom-fields";
 import { deleteView, saveView } from "@/lib/engine/saved-views";
 import { createTeam, setOrgTeam, setQuota, setTeamMember } from "@/lib/engine/forecast";
+import { setStageRule } from "@/lib/engine/stage-rules";
 import { can } from "@/lib/shared/roles";
 import type { ActionState } from "@/lib/shared/action-state";
 
@@ -111,4 +112,16 @@ export async function setOrgTeamAction(_p: ActionState, fd: FormData): Promise<A
   if (!res.ok) return { error: res.error };
   revalidatePath(`/app/accounts/${org}`);
   return { ok: "บันทึกทีมที่ดูแลแล้ว" };
+}
+
+/* ── กฎขั้นของดีล (D4) ── ตั้งได้ด้วยสิทธิ์ fields (การตั้งค่าโครงข้อมูลของบัญชี) */
+export async function setStageRuleAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  const v = await viewer();
+  const no = denied(v, "fields");
+  if (no) return { error: no };
+  const on = str(fd, "on") === "1";
+  const res = await setStageRule(v.tenantId, str(fd, "stage"), str(fd, "requirement"), on, v.actor);
+  if (!res.ok) return { error: res.error };
+  revalidatePath("/app/settings/stages");
+  return { ok: on ? "เพิ่มกฎแล้ว" : "เอากฎออกแล้ว" };
 }

@@ -175,6 +175,10 @@ async function NewContactB2B({ org }: { org?: string }) {
           <label className={LABEL}>{CONTACT_KIND_LABEL.phone}
             <input name="contact_phone" type="tel" className="c-input" placeholder="081 234 5678" autoComplete="off" />
           </label>
+          <label className="c-thai flex items-start gap-2 text-[0.8rem] text-[var(--c-text-3)] sm:col-span-2">
+            <input type="checkbox" name="confirmDup" value="1" className="mt-0.5" />
+            <span>ตรวจแล้ว ไม่ใช่รายเดิม (ใช้เมื่อระบบเตือนว่าคนหรือบริษัทนี้อาจมีอยู่แล้ว)</span>
+          </label>
           <details className="sm:col-span-2">
             <summary className="c-thai cursor-pointer text-[0.86rem] text-[var(--c-accent)]">ข้อมูลเพิ่มเติม (ไม่บังคับ)</summary>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">

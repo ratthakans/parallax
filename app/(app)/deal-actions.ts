@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { denied, viewer } from "@/app/(app)/viewer";
-import { createDeal, moveDeal, removeDealPerson, setDealPerson, updateDeal } from "@/lib/engine/deals";
+import { closeDeal, createDeal, createRenewal, moveDeal, removeDealPerson, setDealPerson, updateDeal } from "@/lib/engine/deals";
 import { logInteraction, orgByName } from "@/lib/engine/accounts/edit";
 import { get } from "@/lib/engine/sql";
 import { addItem, listItems, removeItem } from "@/lib/engine/deal-items";
@@ -46,6 +46,8 @@ export async function moveDealAction(_p: ActionState, fd: FormData): Promise<Act
   const no = denied(v, "write");
   if (no) return { error: no };
   const id = str(fd, "dealId");
+  /* ปิดดีลต้องมีเหตุผล (E2) — ทางลากในไปป์ไลน์/ปุ่มขั้นปิดไม่ได้ ต้องใช้ฟอร์มปิดดีลที่หน้าดีล */
+  if (str(fd, "stage") === "won" || str(fd, "stage") === "lost") return { error: "ปิดดีลที่หน้าดีล — เลือกเหตุผลที่ได้หรือไม่ได้ก่อน" };
   const res = await moveDeal(v.tenantId, id, str(fd, "stage"), { id: v.actor, clearance: v.clearance });
   if (!res.ok) return { error: res.error };
   refresh(id);
@@ -162,4 +164,32 @@ export async function setForecastAction(_p: ActionState, fd: FormData): Promise<
   if (!res.ok) return { error: res.error };
   refresh(id);
   return { ok: "บันทึกแล้ว" };
+}
+
+/** ปิดดีลพร้อมเหตุผล (E2) */
+export async function closeDealAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  const v = await viewer();
+  const no = denied(v, "write");
+  if (no) return { error: no };
+  const id = str(fd, "dealId");
+  const stage = str(fd, "stage") === "won" ? "won" : "lost";
+  const res = await closeDeal(v.tenantId, id, stage, str(fd, "reason"), str(fd, "note"), { id: v.actor, clearance: v.clearance });
+  if (!res.ok) return { error: res.error };
+  /* ต่อสัญญา (E4) — ติ๊กไว้ตั้งแต่แรก: ลูกค้าที่ซื้อแล้วคือรอบถัดไปที่ปิดง่ายที่สุด */
+  const renewal = stage === "won" && str(fd, "renew") === "1" ? await createRenewal(v.tenantId, id, { id: v.actor, clearance: v.clearance }) : null;
+  refresh(id);
+  revalidatePath("/app/reports");
+  if (renewal && !renewal.ok) return { ok: `ปิดได้แล้ว แต่สร้างดีลต่อสัญญาไม่ได้: ${renewal.error}` };
+  return { ok: stage === "won" ? (renewal ? "ปิดได้แล้ว 🎉 · สร้างดีลต่อสัญญารอบถัดไปให้แล้ว" : "ปิดได้แล้ว 🎉") : "ปิดดีลแล้ว — เหตุผลจะรวมในรายงาน" };
+}
+
+export async function createRenewalAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  const v = await viewer();
+  const no = denied(v, "write");
+  if (no) return { error: no };
+  const id = str(fd, "dealId");
+  const r = await createRenewal(v.tenantId, id, { id: v.actor, clearance: v.clearance });
+  if (!r.ok) return { error: r.error };
+  refresh(id);
+  redirect(`/app/deals/${r.id}`);
 }

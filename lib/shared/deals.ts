@@ -56,3 +56,13 @@ export const quarterRange = (period: string): { from: string; to: string } => {
   const end = new Date(Date.UTC(y, m + 3, 0));
   return { from: `${y}-${pad(m + 1)}-01`, to: `${y}-${pad(m + 3)}-${pad(end.getUTCDate())}` };
 };
+
+/* ── เหตุผลที่ได้/ไม่ได้ (docs/crm-plan.md E2) ── รายการคงที่ เพื่อรวมเป็นรายงานได้ · รายละเอียดเพิ่มใส่ในหมายเหตุ */
+export const WIN_REASONS = ["price", "relationship", "fit", "timing", "audience", "other"] as const;
+export const LOSS_REASONS = ["price", "budget", "competitor", "timing", "no_decision", "fit", "no_response", "other"] as const;
+export const CLOSE_REASON_TH: Record<string, string> = {
+  price: "ราคา", relationship: "ความสัมพันธ์/ความเชื่อใจ", fit: "แพ็กเกจตรง/ไม่ตรงความต้องการ", timing: "จังหวะเวลา",
+  audience: "กลุ่มผู้เข้างานตรงเป้าหมาย", budget: "ไม่มีงบ/งบถูกตัด", competitor: "เลือกคู่แข่ง", no_decision: "ไม่ตัดสินใจ/ชะลอ",
+  no_response: "ติดต่อไม่ได้", other: "อื่น ๆ",
+};
+export const reasonsFor = (stage: "won" | "lost") => (stage === "won" ? WIN_REASONS : LOSS_REASONS) as readonly string[];

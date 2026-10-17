@@ -5,7 +5,13 @@ import "./isolate.mts";
 import { randomUUID } from "node:crypto";
 import { ensureReady } from "@/lib/engine/bootstrap";
 import { all, run } from "@/lib/engine/sql";
-import { createDeal, getDeal, listDeals, moveDeal, updateDeal } from "@/lib/engine/deals";
+import { closeDeal, createDeal, createRenewal, getDeal, listDeals, moveDeal, renewalName, updateDeal } from "@/lib/engine/deals";
+import { addItem, listItems } from "@/lib/engine/deal-items";
+import { setStageRule, stageBlockers } from "@/lib/engine/stage-rules";
+import { bulkDeals } from "@/lib/engine/bulk";
+import { createTask } from "@/lib/engine/tasks";
+import { closeReasons } from "@/lib/engine/velocity";
+import { get } from "@/lib/engine/sql";
 
 const out: string[] = [];
 const ok = (c: boolean, m: string) => out.push(`${c ? "PASS" : "FAIL"}  ${m}`);
@@ -50,12 +56,77 @@ ok(!(await listDeals(T, { view: "open" }, ME)).some((x) => x.id === id) && (awai
 // บริษัทเกินสิทธิ์
 ok(!(await createDeal(T, { orgId: SECRET, name: "ดีลลับ (สมมุติ)" }, ME)).ok, "สร้างดีลในบริษัทที่เกินสิทธิ์ไม่ได้");
 const sid = randomUUID();
+const SECRET_DEAL = () => sid;
 await run("INSERT INTO opportunities (id, tenant_id, org_id, name, stage, owner_id, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)", sid, T, SECRET, "ดีลลับ (สมมุติ)", "open", "boss@verify", now, now);
 ok(!(await listDeals(T, { view: "all" }, ME)).some((x) => x.id === sid), "ดีลของบริษัทเกินสิทธิ์ไม่โผล่ในรายการ");
 ok((await getDeal(T, sid, ME)) === "masked" && !(await moveDeal(T, sid, "won", ME)).ok, "เปิดหรือย้ายขั้นดีลของบริษัทเกินสิทธิ์ไม่ได้");
 ok((await listDeals(T, { view: "all" }, { id: "boss@verify", clearance: "confidential" })).some((x) => x.id === sid), "เจ้าของบัญชีของบริษัทนั้นยังเห็นดีลตัวเอง");
 const leaked = await all<{ n: number }>("SELECT COUNT(*) AS n FROM record_versions WHERE tenant_id = ? AND record_kind = 'opportunity' AND record_id = ?", T, sid);
 ok(Number(leaked[0].n) === 0, "การย้ายที่ถูกปฏิเสธไม่ทิ้งประวัติ");
+
+// ── E2 · ปิดดีลพร้อมเหตุผล ──
+const mkd = async (name: string, value: string) => { const r = await createDeal(T, { orgId: A, name, value }, ME); return r.ok ? r.id : ""; };
+const L1 = await mkd("แพ้ราคา (สมมุติ)", "100000"), L2 = await mkd("แพ้คู่แข่ง (สมมุติ)", "200000"), W1 = await mkd("ได้เพราะสัมพันธ์ (สมมุติ)", "300000");
+ok(!(await closeDeal(T, L1, "lost", "", "", ME)).ok && !(await closeDeal(T, L1, "lost", "audience", "", ME)).ok, "ไม่เลือกเหตุผล · เหตุผลของฝั่งได้ใช้กับไม่ได้ = ไม่ปิด");
+ok(!(await closeDeal(T, L1, "lost", "other", "", ME)).ok, "เหตุผล 'อื่น ๆ' ต้องเขียนหมายเหตุ");
+ok((await closeDeal(T, L1, "lost", "price", "แพงกว่าเจ้าอื่น 20%", ME)).ok, "ปิดว่าไม่ได้พร้อมเหตุผล");
+const l1 = await get<{ stage: string; close_reason: string; close_note: string }>("SELECT stage, close_reason, close_note FROM opportunities WHERE tenant_id = ? AND id = ?", T, L1);
+ok(l1?.stage === "lost" && l1.close_reason === "price" && l1.close_note === "แพงกว่าเจ้าอื่น 20%", "ขั้น เหตุผล และหมายเหตุถูกบันทึก");
+const h1 = await getDeal(T, L1, ME);
+ok(h1 !== null && h1 !== "masked" && h1.history.some((h) => h.field === "stage" && h.newValue === "lost"), "การปิดยังมีประวัติขั้นเหมือนการย้ายปกติ");
+await closeDeal(T, L2, "lost", "competitor", "", ME);
+await closeDeal(T, W1, "won", "relationship", "", ME);
+ok(!(await closeDeal(T, SECRET_DEAL(), "won", "price", "", ME)).ok, "ปิดดีลของบริษัทเกินสิทธิ์ไม่ได้");
+const rs = await closeReasons(T, ME, new Date(Date.now() - 864e5).toISOString());
+ok(rs.find((r) => r.stage === "lost" && r.reason === "price")?.value === 100000 && rs.find((r) => r.stage === "lost" && r.reason === "competitor")?.count === 1
+  && rs.find((r) => r.stage === "won" && r.reason === "relationship")?.value === 300000, "รายงานเหตุผลรวมตามฝั่งและเหตุผล");
+ok(rs.some((r) => r.reason === "unrecorded"), "ดีลที่ปิดโดยไม่มีเหตุผล (ทางเดิม) นับเป็น 'ไม่ได้บันทึก'");
+
+// ── E4 · ดีลต่อสัญญา ──
+ok(renewalName("สปอนเซอร์ Gold งาน 2026") === "สปอนเซอร์ Gold งาน 2027" && renewalName("บูธ ปี 2569") === "บูธ ปี 2570" && renewalName("แพ็กเกจพิเศษ") === "แพ็กเกจพิเศษ (ต่อสัญญา)", "ชื่อดีลเลื่อนปี (ค.ศ./พ.ศ.) · ไม่มีปี = ต่อท้าย");
+const R0 = (await createDeal(T, { orgId: A, name: "สปอนเซอร์ Gold งาน 2026 (สมมุติ)", value: "400000", expectedClose: "2026-03-15" }, ME));
+const r0 = R0.ok ? R0.id : "";
+await addItem(T, r0, { package: "Gold", qty: "1", unitPrice: "400000" }, ME);
+ok(!(await createRenewal(T, r0, ME)).ok, "ดีลที่ยังไม่ปิดได้ ต่อสัญญาไม่ได้");
+await closeDeal(T, r0, "won", "relationship", "", ME);
+const rn = await createRenewal(T, r0, ME);
+ok(rn.ok && !rn.existed, "สร้างดีลต่อสัญญาจากดีลที่ปิดได้");
+const nd = rn.ok ? await get<{ name: string; stage: string; value: number; expected_close: string; renewed_from: string; owner_id: string }>(
+  "SELECT name, stage, value, expected_close, renewed_from, owner_id FROM opportunities WHERE tenant_id = ? AND id = ?", T, rn.id) : undefined;
+ok(nd?.name === "สปอนเซอร์ Gold งาน 2027 (สมมุติ)" && nd.stage === "open" && Number(nd.value) === 400000 && nd.expected_close === "2027-03-15" && nd.renewed_from === r0 && nd.owner_id === ME.id,
+  "ดีลใหม่: ชื่อปีถัดไป · เริ่มคุย · มูลค่าเดิม · ปิดคาด +1 ปี · ผูกกับดีลเดิม · เจ้าของเดิม");
+ok(rn.ok && (await listItems(T, rn.id)).map((i) => `${i.package}:${i.total}`).join() === "Gold:400000", "แพ็กเกจเดิมติดไปด้วย");
+const again = await createRenewal(T, r0, ME);
+ok(again.ok && again.existed && rn.ok && again.id === rn.id, "ต่อสัญญาซ้ำ = คืนดีลเดิม ไม่สร้างซ้ำ");
+ok(!(await createRenewal("mst-golf", r0, ME)).ok, "ต่อสัญญาข้ามบัญชีไม่ได้");
+const leap = await createDeal(T, { orgId: A, name: "ดีลวันอธิกสุรทิน 2028 (สมมุติ)", expectedClose: "2028-02-29" }, ME);
+if (leap.ok) { await closeDeal(T, leap.id, "won", "timing", "", ME); const lr = await createRenewal(T, leap.id, ME);
+  ok(lr.ok && (await get<{ expected_close: string }>("SELECT expected_close FROM opportunities WHERE tenant_id = ? AND id = ?", T, lr.id))?.expected_close === "2029-02-28", "29 ก.พ. ต่อปีถัดไปเป็น 28 ก.พ."); }
+
+// ── D4 · กฎขั้นของดีล ──
+ok(!(await setStageRule(T, "open", "value", true, ME.id)).ok && !(await setStageRule(T, "proposal", "magic", true, ME.id)).ok, "ตั้งกฎกับขั้นเริ่มคุย · เงื่อนไขที่ไม่รู้จัก = ไม่ได้");
+await setStageRule(T, "proposal", "value", true, ME.id);
+await setStageRule(T, "proposal", "close_date", true, ME.id);
+await setStageRule(T, "negotiation", "decision_maker", true, ME.id);
+const g = await createDeal(T, { orgId: A, name: "ดีลทดสอบกฎ (สมมุติ)" }, ME);
+const gid = g.ok ? g.id : "";
+const m1 = await moveDeal(T, gid, "proposal", ME);
+ok(!m1.ok && m1.error.includes("มีมูลค่า") && m1.error.includes("มีวันปิดคาด"), "เข้าเสนอราคาไม่ได้ และบอกทุกข้อที่ขาดในครั้งเดียว");
+ok((await moveDeal(T, gid, "qualified", ME)).ok, "ขั้นที่ไม่มีกฎย้ายได้ตามปกติ");
+await updateDeal(T, gid, "value", "50000", ME);
+await updateDeal(T, gid, "expected_close", "2027-01-31", ME);
+const m2 = await moveDeal(T, gid, "negotiation", ME);
+ok(!m2.ok && m2.error.includes("ผู้ตัดสินใจ") && !m2.error.includes("มูลค่า"), "ข้ามขั้นต้องผ่านกฎของขั้นที่ข้ามด้วย · บอกเฉพาะที่ยังขาด");
+ok((await moveDeal(T, gid, "proposal", ME)).ok, "ครบแล้วเข้าเสนอราคาได้");
+ok((await stageBlockers(T, gid, "proposal", "open")).length === 0 && (await moveDeal(T, gid, "open", ME)).ok, "ถอยหลังไม่ตรวจกฎ");
+ok((await bulkDeals(T, [gid], { kind: "stage", stage: "negotiation" }, ME)).done === 0, "ทำหลายรายการก็ผ่านกฎเดียวกัน");
+await setStageRule(T, "won", "open_task", true, ME.id);
+await moveDeal(T, gid, "proposal", ME);
+const cw = await closeDeal(T, gid, "won", "price", "", ME);
+ok(!cw.ok && cw.error.includes("ผู้ตัดสินใจ") && cw.error.includes("งานถัดไป"), "ปิดได้ต้องผ่านกฎของต่อรองและปิดได้");
+ok((await closeDeal(T, gid, "lost", "budget", "", ME)).ok, "ปิดว่าไม่ได้ไม่ติดกฎ");
+await setStageRule(T, "won", "open_task", false, ME.id);
+ok(!(await stageBlockers(T, gid, "negotiation", "won")).some((x) => x.includes("งาน")), "เอากฎออกแล้วไม่ตรวจอีก");
 
 for (const line of out) console.log(line);
 const failed = out.filter((l) => l.startsWith("FAIL"));

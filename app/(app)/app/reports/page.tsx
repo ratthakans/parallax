@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { viewer } from "@/app/(app)/viewer";
 import { reports } from "@/lib/engine/reports";
-import { pipelineAsOf, velocity } from "@/lib/engine/velocity";
+import { closeReasons, pipelineAsOf, velocity } from "@/lib/engine/velocity";
+import { CLOSE_REASON_TH } from "@/lib/shared/deals";
 import { packageReport } from "@/lib/engine/deal-items";
 import { editionRetention, participationRoles } from "@/lib/engine/editions";
 import { bangkokDay, thaiDate } from "@/lib/shared/format";
@@ -32,7 +33,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const shown = past ?? r.pipeline;
   const roles = await participationRoles(v.tenantId);
   const role = sp.role && roles.includes(sp.role) ? sp.role : undefined;
-  const [pkgs, retention] = await Promise.all([packageReport(v.tenantId, who), editionRetention(v.tenantId, who, role)]);
+  const yearAgo = new Date(Date.now() - 365 * 864e5).toISOString();
+  const [pkgs, retention, reasons] = await Promise.all([packageReport(v.tenantId, who), editionRetention(v.tenantId, who, role), closeReasons(v.tenantId, who, yearAgo)]);
   const maxDeal = Math.max(1, ...shown.map((p) => p.value || p.count));
   const maxWeek = Math.max(1, ...r.activity.map((w) => w.meeting + w.call + w.email + w.other));
   const top = Math.max(1, r.funnel[0].count);
@@ -168,6 +170,33 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           <p className="c-thai mt-4 text-[0.78rem] text-[var(--c-text-4)]">
             <Link href="/app/data" className="underline">สุขภาพข้อมูล (รายการที่ต้องแก้)</Link> · <Link href="/app/vault/review" className="underline">ตรวจข้อมูลซ้ำ</Link> · <Link href="/app/sales/purposes" className="underline">ตั้งกฎอายุข้อมูล</Link>
           </p>
+        </Panel>
+
+        {/* ── ทำไมได้ · ทำไมไม่ได้ (docs/crm-plan.md E2) ── */}
+        <Panel className="p-5">
+          <h2 className="c-h2 text-[var(--c-text)]">ทำไมได้ · ทำไมไม่ได้ (12 เดือน)</h2>
+          {reasons.length ? (["lost", "won"] as const).map((st) => {
+            const xs = reasons.filter((r) => r.stage === st);
+            const max = Math.max(1, ...xs.map((x) => x.count));
+            return xs.length ? (
+              <div key={st} className="mt-4">
+                <h3 className="c-thai text-[0.86rem] font-semibold text-[var(--c-text)]">{st === "lost" ? "ไม่ได้เพราะ" : "ได้เพราะ"}</h3>
+                <ul className="mt-2 grid gap-2">
+                  {xs.map((x) => (
+                    <li key={x.reason}>
+                      <div className="c-thai flex justify-between text-[0.82rem]">
+                        <span>{x.reason === "unrecorded" ? "ไม่ได้บันทึกเหตุผล" : CLOSE_REASON_TH[x.reason] ?? x.reason} <span className="text-[var(--c-text-4)]">({num(x.count)})</span></span>
+                        <span className="c-mono">{baht(x.value)}</span>
+                      </div>
+                      <div className="mt-1 h-2 rounded bg-[var(--c-line)]" aria-hidden>
+                        <div className={`h-2 rounded ${st === "lost" ? "bg-[var(--c-warn)]" : "bg-[var(--c-good)]"}`} style={{ width: `${Math.round((x.count / max) * 100)}%` }} />
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null;
+          }) : <p className="c-thai mt-3 text-[0.86rem] text-[var(--c-text-3)]">ยังไม่มีดีลที่ปิดใน 12 เดือน</p>}
         </Panel>
 
         {/* ── แพ็กเกจ (docs/crm-plan.md C4) ── */}

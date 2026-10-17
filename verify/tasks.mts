@@ -81,6 +81,14 @@ if (c1.ok) {
 }
 ok(!(await updateTask(T, tCamp, { due: day(5) }, ME)).ok, "งานแคมเปญเลื่อนที่นี่ไม่ได้ (มอบหมายใหม่ที่แคมเปญ)");
 
+// ── ความสำคัญของงาน ──
+const lo = await createTask(T, { title: "งานไม่รีบ (สมมุติ)", due: day(4), priority: "low" }, ME);
+const hi = await createTask(T, { title: "งานด่วน (สมมุติ)", due: day(4), priority: "high" }, ME);
+const no = await createTask(T, { title: "งานปกติ (สมมุติ)", due: day(4), priority: "urgent!!" }, ME);
+const order = (await listTasks(T, "mine", ME)).filter((t) => [lo, hi, no].some((x) => x.ok && x.id === t.id)).map((t) => t.priority).join();
+ok(order === "high,normal,low", "วันเดียวกัน: ด่วนก่อน · ค่าที่ไม่รู้จัก = ปกติ");
+ok(lo.ok && (await updateTask(T, lo.id, { priority: "high" }, ME)).ok && (await listTasks(T, "mine", ME)).find((t) => t.id === lo.id)?.priority === "high", "เปลี่ยนความสำคัญได้");
+
 for (const line of out) console.log(line);
 const failed = out.filter((l) => l.startsWith("FAIL"));
 if (failed.length) { console.log(`\n=== FAIL ${failed.length} ข้อ ===`); process.exit(1); }

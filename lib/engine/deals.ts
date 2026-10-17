@@ -1,9 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { all, get, tx } from "@/lib/engine/sql";
+import { all, get, run, tx } from "@/lib/engine/sql";
 import { logActivity } from "@/lib/engine/db";
 import { orgAccess, type Viewer } from "@/lib/engine/accounts";
 import { canSee } from "@/lib/shared/accounts";
-import { OPEN_STAGES, isDealRole, isDealStage, type DealStage } from "@/lib/shared/deals";
+import { DEAL_STAGE_TH, OPEN_STAGES, isDealRole, isDealStage, reasonsFor, type DealStage } from "@/lib/shared/deals";
+import { stageBlockers } from "@/lib/engine/stage-rules";
 import type { Classification } from "@/lib/shared/vault";
 
 /* ── ดีล (docs/ux-plan.md U4) ─────────────────────────────────────────────
@@ -143,6 +144,9 @@ export async function moveDeal(tenantId: string, id: string, stage: string, view
   const access = await orgAccess(tenantId, d.org_id, viewer);
   if (!access.ok) return access;
   if (d.stage === stage) return { ok: true, from: d.stage };
+  /* กฎขั้น (D4) — บอกทุกข้อที่ขาดในครั้งเดียว */
+  const missing = await stageBlockers(tenantId, id, d.stage, stage);
+  if (missing.length) return { ok: false, error: `ก่อนเข้าขั้น "${DEAL_STAGE_TH[stage as DealStage] ?? stage}" ดีลต้อง: ${missing.join(" · ")}` };
   const at = new Date().toISOString();
   await tx(async (q) => {
     await q.run(
@@ -258,4 +262,80 @@ export async function dealsOfPerson(tenantId: string, personIds: string[], viewe
   return rows
     .filter((r) => canSee(viewer.clearance, lv(r.classification)) || [r.acc_owner, r.data_owner].includes(viewer.id))
     .map((r) => ({ id: r.id, name: r.name, stage: r.stage, role: r.role, org: r.org, value: r.value == null ? null : Number(r.value) }));
+}
+
+/* ── ปิดดีลพร้อมเหตุผล (docs/crm-plan.md E2) ──────────────────────────────
+   ย้ายขั้นด้วย moveDeal (รุ่นในประวัติเหมือนเดิม) แล้วเก็บเหตุผล — ไม่มีเหตุผล = ไม่ปิด (ยกเว้นทางแคมเปญที่ผลบันทึกในแคมเปญอยู่แล้ว) */
+export async function closeDeal(
+  tenantId: string, id: string, stage: "won" | "lost", reason: string, note: string, viewer: Viewer,
+): Promise<Result> {
+  if (!reasonsFor(stage).includes(reason)) return { ok: false, error: stage === "won" ? "เลือกเหตุผลที่ได้" : "เลือกเหตุผลที่ไม่ได้" };
+  const n = note.trim().slice(0, 500);
+  if (reason === "other" && n.length < 3) return { ok: false, error: "เหตุผล \"อื่น ๆ\" — เขียนสั้น ๆ ว่าเพราะอะไร" };
+  const moved = await moveDeal(tenantId, id, stage, viewer);
+  if (!moved.ok) return moved;
+  await run("UPDATE opportunities SET close_reason = ?, close_note = ? WHERE tenant_id = ? AND id = ?", reason, n || null, tenantId, id);
+  return { ok: true };
+}
+
+/** เปลี่ยนเจ้าของดีล (docs/crm-plan.md E3) — มีรุ่นในประวัติ */
+export async function setDealOwner(tenantId: string, id: string, owner: string, viewer: Viewer): Promise<Result> {
+  const who = owner.trim().slice(0, 120);
+  if (!who) return { ok: false, error: "เลือกเจ้าของ" };
+  const d = await get<{ org_id: string; owner_id: string | null }>("SELECT org_id, owner_id FROM opportunities WHERE tenant_id = ? AND id = ?", tenantId, id);
+  if (!d) return { ok: false, error: "ไม่พบดีลนี้" };
+  const access = await orgAccess(tenantId, d.org_id, viewer);
+  if (!access.ok) return access;
+  if (d.owner_id === who) return { ok: true };
+  const at = new Date().toISOString();
+  await tx(async (q) => {
+    await q.run(
+      "INSERT INTO record_versions (tenant_id, record_kind, record_id, field, old_value, new_value, reason, changed_by, valid_from, recorded_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+      tenantId, "opportunity", id, "owner_id", d.owner_id, who, "เปลี่ยนเจ้าของดีล", viewer.id, null, at);
+    await q.run("UPDATE opportunities SET owner_id = ?, updated_at = ? WHERE tenant_id = ? AND id = ?", who, at, tenantId, id);
+  });
+  return { ok: true };
+}
+
+/* ── ดีลต่อสัญญา (docs/crm-plan.md E4) ─────────────────────────────────────
+   จากดีลที่ปิดได้ → ดีลใหม่ของรอบถัดไป: ชื่อเลื่อนปี (ค.ศ./พ.ศ.) · ปิดคาด +1 ปี · มูลค่าและแพ็กเกจเดิม · เจ้าของเดิม
+   หนึ่งดีลต่อได้หนึ่งครั้ง (มีดีลต่อสัญญาอยู่แล้ว = คืนดีลเดิม) */
+export function renewalName(name: string): string {
+  let bumped = false;
+  const out = name.replace(/\b(20\d{2}|25\d{2})\b/g, (y) => { bumped = true; return String(Number(y) + 1); });
+  return bumped ? out : `${name} (ต่อสัญญา)`;
+}
+
+export async function createRenewal(tenantId: string, id: string, viewer: Viewer): Promise<Result<{ id: string; existed: boolean }>> {
+  const d = await get<{ org_id: string; name: string; stage: string; owner_id: string | null; value: number | string | null; expected_close: string | null; updated_at: string }>(
+    "SELECT org_id, name, stage, owner_id, value, expected_close, updated_at FROM opportunities WHERE tenant_id = ? AND id = ?", tenantId, id);
+  if (!d) return { ok: false, error: "ไม่พบดีลนี้" };
+  if (d.stage !== "won") return { ok: false, error: "ต่อสัญญาได้จากดีลที่ปิดได้แล้วเท่านั้น" };
+  const access = await orgAccess(tenantId, d.org_id, viewer);
+  if (!access.ok) return access;
+  const existing = await get<{ id: string }>("SELECT id FROM opportunities WHERE tenant_id = ? AND renewed_from = ?", tenantId, id);
+  if (existing) return { ok: true, id: existing.id, existed: true };
+  const base = d.expected_close ?? d.updated_at.slice(0, 10);
+  const close = `${Number(base.slice(0, 4)) + 1}${base.slice(4, 10)}`.replace(/-02-29$/, "-02-28");
+  const nid = randomUUID(), at = new Date().toISOString();
+  await tx(async (q) => {
+    await q.run(
+      `INSERT INTO opportunities (id, tenant_id, org_id, name, offer, stage, owner_id, value, expected_close, created_at, updated_at, campaign_id, renewed_from)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`, nid, tenantId, d.org_id, renewalName(d.name), null, "open", d.owner_id ?? viewer.id,
+      d.value == null ? null : Number(d.value), close, at, at, null, id);
+    await q.run(
+      "INSERT INTO record_versions (tenant_id, record_kind, record_id, field, old_value, new_value, reason, changed_by, valid_from, recorded_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+      tenantId, "opportunity", nid, "stage", null, "open", "สร้างดีลต่อสัญญา", viewer.id, null, at);
+    for (const it of await q.all<{ package: string; qty: number | string; unit_price: number | string | null }>(
+      "SELECT package, qty, unit_price FROM deal_items WHERE tenant_id = ? AND opportunity_id = ? ORDER BY created_at, id", tenantId, id)) {
+      await q.run("INSERT INTO deal_items (id, tenant_id, opportunity_id, package, qty, unit_price, created_by, created_at) VALUES (?,?,?,?,?,?,?,?)",
+        `di-${randomUUID()}`, tenantId, nid, it.package, Number(it.qty), it.unit_price == null ? null : Number(it.unit_price), viewer.id, at);
+    }
+    /* คนในดีลเดิม (บทบาทเดิม) ติดไปด้วย — คณะตัดสินใจมักเป็นชุดเดิม */
+    await q.run(
+      `INSERT INTO opportunity_people (tenant_id, opportunity_id, customer_id, role)
+       SELECT tenant_id, ?, customer_id, role FROM opportunity_people WHERE tenant_id = ? AND opportunity_id = ?`, nid, tenantId, id);
+  });
+  await logActivity(tenantId, viewer.id, "deal_renewal", `${id} → ${nid}`);
+  return { ok: true, id: nid, existed: false };
 }

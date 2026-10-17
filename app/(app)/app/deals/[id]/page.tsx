@@ -2,15 +2,18 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { viewer } from "@/app/(app)/viewer";
 import {
-  addDealItemAction, logDealActivityAction, setForecastAction, moveDealAction, removeDealItemAction, removeDealPersonAction, setDealPersonAction, syncDealValueAction, updateDealAction,
+  addDealItemAction, closeDealAction, createRenewalAction, logDealActivityAction, setForecastAction, moveDealAction, removeDealItemAction, removeDealPersonAction, setDealPersonAction, syncDealValueAction, updateDealAction,
 } from "@/app/(app)/deal-actions";
 import { listFields, valuesFor } from "@/lib/engine/custom-fields";
 import { listItems, packageNames } from "@/lib/engine/deal-items";
 import { CustomFieldsPanel } from "@/components/console/custom-fields";
+import { trashDealAction } from "@/app/(app)/bulk-actions";
+import { stageBlockers } from "@/lib/engine/stage-rules";
 import { NewTaskForm, TaskList } from "@/components/console/tasks";
 import { listTasks } from "@/lib/engine/tasks";
 import { teamMembers } from "@/lib/engine/team";
 import { dealCandidates, getDeal } from "@/lib/engine/deals";
+import { CLOSE_REASON_TH, reasonsFor } from "@/lib/shared/deals";
 import { DEAL_ROLES, DEAL_ROLE_TH, DEAL_STAGE_TH, FORECAST_CATEGORIES, FORECAST_TH, OPEN_STAGES, dealRoleTh, effectiveForecast, isDealStage, stageTh } from "@/lib/shared/deals";
 import { get } from "@/lib/engine/sql";
 import { INTERACTION_KINDS, INTERACTION_TH, type InteractionKind } from "@/lib/shared/accounts";
@@ -65,6 +68,16 @@ export default async function DealPage({ params, searchParams }: { params: Promi
     return `${nameOf.get(pid) ?? "บุคคล"}${role ? ` (${dealRoleTh(role)})` : ""}`;
   };
   const closed = d.stage === "won" || d.stage === "lost";
+  const [renewalOf, renewedFrom] = await Promise.all([
+    get<{ id: string; name: string }>("SELECT id, name FROM opportunities WHERE tenant_id = ? AND renewed_from = ?", v.tenantId, d.id),
+    get<{ id: string; name: string }>("SELECT p.id, p.name FROM opportunities o JOIN opportunities p ON p.id = o.renewed_from AND p.tenant_id = o.tenant_id WHERE o.tenant_id = ? AND o.id = ?", v.tenantId, d.id),
+  ]);
+  const links = { renewal: renewalOf ?? null, from: renewedFrom ?? null };
+  /* สิ่งที่ยังขาดก่อนเข้าขั้นถัดไป (D4) — บอกก่อนกด ไม่ใช่หลังกดแล้วโดนปฏิเสธ */
+  const nextStage = !closed && isDealStage(d.stage) ? OPEN_STAGES[OPEN_STAGES.indexOf(d.stage) + 1] ?? "won" : null;
+  const nextMissing = nextStage ? await stageBlockers(v.tenantId, d.id, d.stage, nextStage) : [];
+  const closeInfo = closed ? await get<{ close_reason: string | null; close_note: string | null }>(
+    "SELECT close_reason, close_note FROM opportunities WHERE tenant_id = ? AND id = ?", v.tenantId, d.id) : undefined;
   const pathStages = [...OPEN_STAGES, closed ? (d.stage as "won" | "lost") : "won"];
   const at = isDealStage(d.stage) ? pathStages.indexOf(d.stage) : -1;
   /* วันปิดจริง = ครั้งล่าสุดที่ย้ายเข้าขั้นปัจจุบัน (ประวัติเรียงใหม่ก่อน) — ไม่ต้องเก็บคอลัมน์ซ้ำ */
@@ -95,31 +108,69 @@ export default async function DealPage({ params, searchParams }: { params: Promi
         ]}
       />
 
-      {/* ── Path: ขั้นของดีล กดเพื่อย้าย ── */}
+      {/* ── Path: ขั้นของดีล กดเพื่อย้าย · ปิดดีล (ได้/ไม่ได้) ต้องเลือกเหตุผล (E2) ── */}
       <Panel className="mb-5 p-3">
         <ol className="flex flex-wrap gap-1" aria-label="ขั้นของดีล">
-          {pathStages.map((s, i) => {
-            const state = i < at ? "done" : i === at ? "current" : "todo";
+          {pathStages.filter((s) => s !== "won" && s !== "lost").map((s, i) => {
+            const state = closed || i < at ? "done" : i === at ? "current" : "todo";
             return (
               <li key={s} className="min-w-[7rem] flex-1">
                 {state === "current" ? (
-                  <span aria-current="step" className={`c-btn c-btn-sm w-full ${s === "lost" ? "c-btn-danger" : "c-btn-primary"}`}>{DEAL_STAGE_TH[s]}</span>
+                  <span aria-current="step" className="c-btn c-btn-sm c-btn-primary w-full">{DEAL_STAGE_TH[s]}</span>
                 ) : (
                   <ActionForm action={moveDealAction} fields={{ dealId: d.id, stage: s }} size="sm"
                     label={<>{state === "done" ? "✓ " : ""}{DEAL_STAGE_TH[s]}</>} pendingLabel="กำลังย้าย…"
-                    confirm={s === "won" ? "กดอีกครั้ง — ปิดดีลนี้ว่าได้" : closed ? "กดอีกครั้ง — เปิดดีลนี้ใหม่" : undefined}
+                    confirm={closed ? "กดอีกครั้ง — เปิดดีลนี้ใหม่" : undefined}
                     variant="ghost" full buttonClassName={state === "done" ? "text-[var(--c-good)]" : ""} />
                 )}
               </li>
             );
           })}
-          {!closed && (
+          {closed ? (
             <li className="min-w-[7rem] flex-1">
-              <ActionForm action={moveDealAction} fields={{ dealId: d.id, stage: "lost" }} size="sm" label="ไม่ได้" pendingLabel="กำลังย้าย…" full
-                confirm="กดอีกครั้ง — ปิดดีลนี้ว่าไม่ได้" />
+              <span aria-current="step" className={`c-btn c-btn-sm w-full ${d.stage === "lost" ? "c-btn-danger" : "c-btn-primary"}`}>{DEAL_STAGE_TH[d.stage as "won" | "lost"]}</span>
             </li>
-          )}
+          ) : (["won", "lost"] as const).map((st) => (
+            <li key={st} className="min-w-[7rem] flex-1">
+              <details className="relative">
+                <summary className={`c-btn c-btn-sm w-full cursor-pointer list-none ${st === "won" ? "c-btn-ghost text-[var(--c-good)]" : "c-btn-ghost"}`}>{DEAL_STAGE_TH[st]}</summary>
+                <ActionForm action={closeDealAction} fields={{ dealId: d.id, stage: st }} size="sm" variant={st === "won" ? "primary" : "ghost"}
+                  label={st === "won" ? "ยืนยันปิดได้" : "ยืนยันปิดว่าไม่ได้"} pendingLabel="กำลังบันทึก…"
+                  className="c-panel absolute right-0 z-10 mt-1 grid w-72 gap-2 p-3">
+                  <label className={LABEL}>{st === "won" ? "ได้เพราะ" : "ไม่ได้เพราะ"}
+                    <select name="reason" className="c-select" required defaultValue="">
+                      <option value="" disabled>เลือกเหตุผล</option>
+                      {reasonsFor(st).map((r) => <option key={r} value={r}>{CLOSE_REASON_TH[r]}</option>)}
+                    </select>
+                  </label>
+                  <label className={LABEL}>หมายเหตุ (ไม่บังคับ)<input name="note" className="c-input" maxLength={500} /></label>
+                  {st === "won" && (
+                    <label className="c-thai flex items-start gap-2 text-[0.8rem] text-[var(--c-text-2)]">
+                      <input type="checkbox" name="renew" value="1" defaultChecked className="mt-0.5" />
+                      <span>สร้างดีลต่อสัญญารอบถัดไป (ชื่อเลื่อนปี · ปิดคาด +1 ปี · แพ็กเกจและคนในดีลเดิม)</span>
+                    </label>
+                  )}
+                </ActionForm>
+              </details>
+            </li>
+          ))}
         </ol>
+        {nextStage && nextMissing.length > 0 && (
+          <p className="c-thai mt-2 px-1 text-[0.8rem] text-[var(--c-warn)]">ก่อนเข้าขั้น “{DEAL_STAGE_TH[nextStage]}” ดีลต้อง: {nextMissing.join(" · ")}</p>
+        )}
+        {(links.from || links.renewal || d.stage === "won") && (
+          <p className="c-thai mt-2 flex flex-wrap items-center gap-2 px-1 text-[0.82rem] text-[var(--c-text-3)]">
+            {links.from && <>ต่อสัญญาจาก <Link href={`/app/deals/${links.from.id}`} className="text-[var(--c-accent)] hover:underline">{links.from.name}</Link></>}
+            {links.renewal
+              ? <>ดีลต่อสัญญา: <Link href={`/app/deals/${links.renewal.id}`} className="text-[var(--c-accent)] hover:underline">{links.renewal.name}</Link></>
+              : d.stage === "won" && <ActionForm action={createRenewalAction} fields={{ dealId: d.id }} label="สร้างดีลต่อสัญญารอบถัดไป" pendingLabel="กำลังสร้าง…" size="sm" variant="ghost" />}
+          </p>
+        )}
+        {closed && closeInfo?.close_reason && (
+          <p className="c-thai mt-2 px-1 text-[0.82rem] text-[var(--c-text-3)]">
+            {d.stage === "won" ? "ได้เพราะ" : "ไม่ได้เพราะ"} {CLOSE_REASON_TH[closeInfo.close_reason] ?? closeInfo.close_reason}{closeInfo.close_note ? ` — ${closeInfo.close_note}` : ""}
+          </p>
+        )}
       </Panel>
 
       <RecordTabs base={`/app/deals/${d.id}`} active={tab} tabs={[{ key: "overview", label: "ภาพรวม" }, { key: "history", label: "ประวัติ", count: d.history.length }]} />
@@ -127,7 +178,11 @@ export default async function DealPage({ params, searchParams }: { params: Promi
       {tab === "overview" ? (
         <div className="grid gap-5 lg:grid-cols-2">
           <Panel className="p-5">
-            <h2 className="c-h2 text-[var(--c-text)]">รายละเอียด</h2>
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 className="c-h2 text-[var(--c-text)]">รายละเอียด</h2>
+              <ActionForm action={trashDealAction} fields={{ dealId: d.id }} label="ลบดีล" pendingLabel="…" size="sm" variant="ghost"
+                confirm="กดอีกครั้ง — ย้ายดีลไปถังขยะ (กู้คืนได้ 30 วัน)" />
+            </div>
             <dl className="c-thai mt-3 grid gap-3 text-[0.9rem]">
               <div><dt className="text-[0.75rem] text-[var(--c-text-4)]">ชื่อ</dt><dd>{d.name}</dd><Edit dealId={d.id} field="name" label="ชื่อ" value={d.name} /></div>
               <div><dt className="text-[0.75rem] text-[var(--c-text-4)]">มูลค่า</dt><dd>{d.value != null ? baht(d.value) : "ไม่ระบุ"}</dd><Edit dealId={d.id} field="value" label="มูลค่า" value={d.value != null ? String(d.value) : ""} /></div>

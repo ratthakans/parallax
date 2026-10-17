@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { completeTaskAction, createTaskAction, updateTaskAction } from "@/app/(app)/task-actions";
-import type { TaskRow } from "@/lib/engine/tasks";
+import { PRIORITY_TH, TASK_PRIORITIES, type TaskRow } from "@/lib/engine/tasks";
 import { bangkokDay, thaiDate } from "@/lib/shared/format";
 import { ActionForm } from "@/components/console/action-form";
 
@@ -20,6 +20,9 @@ export function NewTaskForm({ link, team, people, compact }: {
       <label className={`${LABEL} ${compact ? "" : "sm:col-span-2"}`}>ต้องทำอะไร<input name="title" className="c-input" required maxLength={200} placeholder="เช่น ส่งใบเสนอราคา Gold" /></label>
       <label className={LABEL}>ครบกำหนด<input type="date" name="due" defaultValue={inDays(3)} className="c-input" /></label>
       <label className={LABEL}>ให้ใคร<input name="owner" list="task-team" defaultValue={team[0] ?? ""} className="c-input" autoComplete="off" /></label>
+      <label className={LABEL}>ความสำคัญ
+        <select name="priority" className="c-select" defaultValue="normal">{TASK_PRIORITIES.map((p) => <option key={p} value={p}>{PRIORITY_TH[p]}</option>)}</select>
+      </label>
       {people && people.length > 0 && !link.personId && (
         <label className={`${LABEL} ${compact ? "" : "sm:col-span-2"}`}>กับใคร (ไม่บังคับ)
           <select name="personId" className="c-select" defaultValue="">
@@ -44,6 +47,7 @@ export function TaskList({ tasks, link, showRecord }: { tasks: TaskRow[]; link: 
           <li key={t.id} className="c-thai py-2.5 text-[0.88rem]">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <span className="min-w-0">
+                {t.priority === "high" && <span className="c-pill c-pill-warn mr-1.5">ด่วน</span>}
                 <span className="text-[var(--c-text)]">{t.title}</span>
                 <span className="block text-[0.76rem] text-[var(--c-text-3)]">
                   {t.owner ?? "ไม่มีผู้รับ"}{t.person && !link.personId ? ` · ${t.person}` : ""}
@@ -62,6 +66,7 @@ export function TaskList({ tasks, link, showRecord }: { tasks: TaskRow[]; link: 
                   <ActionForm action={updateTaskAction} fields={{ ...fields, taskId: t.id }} label="บันทึก" pendingLabel="…" size="sm" className="mt-1 flex flex-wrap items-end gap-2">
                     <input type="date" name="due" defaultValue={t.due?.slice(0, 10) ?? ""} className="c-input w-40" aria-label="วันครบกำหนดใหม่" />
                     <input name="owner" list="task-team" defaultValue={t.owner ?? ""} className="c-input w-48" aria-label="ผู้รับงาน" />
+                    <select name="priority" defaultValue={t.priority} className="c-select w-28" aria-label="ความสำคัญ">{TASK_PRIORITIES.map((p) => <option key={p} value={p}>{PRIORITY_TH[p]}</option>)}</select>
                   </ActionForm>
                 </details>
               </div>

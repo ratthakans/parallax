@@ -57,17 +57,25 @@ export async function dataHealth(tenantId: string, viewer: Viewer, now = new Dat
        WHERE p.tenant_id = ? AND p.stage NOT IN ('won', 'lost') ORDER BY p.expected_close, p.name`, tenantId),
     all<{ n: number | string }>("SELECT COUNT(*) AS n FROM review_items WHERE tenant_id = ? AND status = 'open'", tenantId),
   ]);
+  /* ดีลที่ปิดได้ใน 9–15 เดือนที่แล้ว และยังไม่มีดีลต่อสัญญา (E4) — รอบถัดไปของลูกค้าเดิมที่ยังไม่มีใครเริ่มคุย */
+  const renewFrom = new Date(+now - 15 * 30.44 * 864e5).toISOString(), renewTo = new Date(+now - 9 * 30.44 * 864e5).toISOString();
+  const unrenewed = await all<{ id: string; name: string; org: string; classification: string | null; account_owner_id: string | null; data_owner_id: string | null; updated_at: string; owner_id: string | null }>(
+    `SELECT p.id, p.name, o.name AS org, o.classification, o.account_owner_id, o.data_owner_id, p.updated_at, p.owner_id
+     FROM opportunities p JOIN orgs o ON o.id = p.org_id AND o.tenant_id = p.tenant_id
+     WHERE p.tenant_id = ? AND p.stage = 'won' AND p.updated_at BETWEEN ? AND ?
+       AND NOT EXISTS (SELECT 1 FROM opportunities r WHERE r.tenant_id = p.tenant_id AND r.renewed_from = p.id)
+     ORDER BY p.updated_at`, tenantId, renewFrom, renewTo);
 
   const visOrgs = orgs.filter(seeOrg);
   const active = (o: Org) => Number(o.cur) > 0 || Number(o.open_deals) > 0;
-  const orgItem = (o: Org, detail?: string): HealthItem => ({ id: o.id, name: o.name, href: `/app/accounts/${o.id}?tab=details`, detail });
+  const orgItem = (o: Org, detail?: string, anchor = ""): HealthItem => ({ id: o.id, name: o.name, href: `/app/accounts/${o.id}?tab=details${anchor}`, detail });
   const check = (key: string, title: string, why: string, severity: HealthCheck["severity"], all_: HealthItem[], action?: HealthCheck["action"]): HealthCheck =>
     ({ key, title, why, severity, count: all_.length, items: all_.slice(0, SAMPLE), action });
 
   /* เลขนิติบุคคลซ้ำ — ควรเป็นบริษัทเดียวกัน (การแก้ด้วยมือกันไว้แล้ว แต่ข้อมูลเก่าก่อน C2 อาจมี) */
   const byTax = new Map<string, Org[]>();
   for (const o of visOrgs) if (o.tax_id) byTax.set(o.tax_id, [...(byTax.get(o.tax_id) ?? []), o]);
-  const taxDup = [...byTax.values()].filter((g) => g.length > 1).flatMap((g) => g.map((o) => orgItem(o, `เลข ${o.tax_id} · ซ้ำกับ ${g.filter((x) => x !== o).map((x) => x.name).join(", ")}`)));
+  const taxDup = [...byTax.values()].filter((g) => g.length > 1).flatMap((g) => g.map((o) => orgItem(o, `เลข ${o.tax_id} · ซ้ำกับ ${g.filter((x) => x !== o).map((x) => x.name).join(", ")} — เปิดแล้วกด "รวมเข้าบริษัทนี้"`, "#merge")));
 
   const visStale = stale.filter((s) => seeOrg({ classification: s.org_class, account_owner_id: s.account_owner_id, data_owner_id: s.data_owner_id })
     && canSee(viewer.clearance, lv(s.person_class)));
@@ -82,8 +90,10 @@ export async function dataHealth(tenantId: string, viewer: Viewer, now = new Dat
         detail: `${s.org} · เห็นล่าสุด ${s.seen ? s.seen.slice(0, 10) : "ไม่ทราบ"}` }))),
     check("deal_overdue", "ดีลเปิดที่เลยวันปิดคาดแล้ว", "ไปป์ไลน์และพยากรณ์จะเพี้ยน — เลื่อนวันปิดคาด หรือปิดดีลว่าไม่ได้", "risk",
       visDeals.filter((d) => d.expected_close && d.expected_close < today).map((d) => dealItem(d, `ปิดคาด ${d.expected_close} · ${d.owner_id ?? "ไม่มีเจ้าของ"}`))),
+    check("renewal_missing", "ลูกค้าที่ปิดได้ราวหนึ่งปีก่อน แต่ยังไม่มีดีลต่อสัญญา", "รอบถัดไปของลูกค้าเดิมคือดีลที่ปิดง่ายที่สุด — สร้างดีลต่อสัญญาจากหน้าดีลเดิม", "risk",
+      unrenewed.filter(seeOrg).map((d) => ({ id: d.id, name: d.name, href: `/app/deals/${d.id}`, detail: `${d.org} · ปิดได้ ${d.updated_at.slice(0, 10)} · ${d.owner_id ?? "ไม่มีเจ้าของ"}` }))),
     check("tax_duplicate", "บริษัทที่เลขนิติบุคคลซ้ำกัน", "เลขเดียวกัน = นิติบุคคลเดียวกัน — ควรรวมเป็นแฟ้มเดียว ไม่งั้นประวัติและดีลกระจายสองที่", "risk", taxDup,
-      { label: "ไปที่คิวตรวจข้อมูลซ้ำ", href: "/app/vault/review" }),
+      { label: "หรือดูคิวตรวจข้อมูลซ้ำ", href: "/app/vault/review" }),
     check("deal_no_value", "ดีลเปิดที่ยังไม่มีมูลค่า", "ไม่ถูกนับในไปป์ไลน์และพยากรณ์", "gap",
       visDeals.filter((d) => d.value == null).map((d) => dealItem(d, d.owner_id ?? "ไม่มีเจ้าของ"))),
     check("deal_no_close", "ดีลเปิดที่ยังไม่มีวันปิดคาด", "ไม่ถูกนับในพยากรณ์รายไตรมาส", "gap",

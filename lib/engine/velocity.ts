@@ -114,3 +114,25 @@ export function closedAt(steps: Step[]): string | null {
   const last = steps.at(-1);
   return last && (last.stage === "won" || last.stage === "lost") ? last.at : null;
 }
+
+/** เหตุผลที่ได้/ไม่ได้ (docs/crm-plan.md E2) — ดีลที่ปิดตั้งแต่ since (วันปิดจริงจากประวัติขั้น) · ไม่มีเหตุผล = "ไม่ได้บันทึก" */
+export async function closeReasons(tenantId: string, viewer: Viewer, since: string): Promise<{ stage: "won" | "lost"; reason: string; count: number; value: number }[]> {
+  const closed = (await listDeals(tenantId, { view: "all", limit: 20000 }, viewer)).filter((d) => d.stage === "won" || d.stage === "lost");
+  const tl = await stageTimelines(tenantId, closed);
+  const deals = closed.filter((d) => (closedAt(tl.get(d.id) ?? []) ?? d.updatedAt) >= since);
+  const reasons = new Map<string, string | null>();
+  for (let i = 0; i < deals.length; i += 500) {
+    const c = deals.slice(i, i + 500);
+    for (const r of await all<{ id: string; close_reason: string | null }>(
+      `SELECT id, close_reason FROM opportunities WHERE tenant_id = ? AND id IN (${c.map(() => "?").join(",")})`, tenantId, ...c.map((d) => d.id))) reasons.set(r.id, r.close_reason);
+  }
+  const by = new Map<string, { stage: "won" | "lost"; reason: string; count: number; value: number }>();
+  for (const d of deals) {
+    const reason = reasons.get(d.id) ?? "unrecorded";
+    const k = `${d.stage}|${reason}`;
+    const r = by.get(k) ?? { stage: d.stage as "won" | "lost", reason, count: 0, value: 0 };
+    r.count++; r.value += d.value ?? 0;
+    by.set(k, r);
+  }
+  return [...by.values()].sort((a, b) => b.count - a.count || b.value - a.value);
+}
