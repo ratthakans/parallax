@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { viewer } from "@/app/(app)/viewer";
-import { completeTaskAction } from "@/app/(app)/task-actions";
+import { completeTaskAction, createTaskAction, updateTaskAction } from "@/app/(app)/task-actions";
+import { listAccounts } from "@/lib/engine/accounts";
+import { teamMembers } from "@/lib/engine/team";
+import { OrgPicker } from "@/components/console/org-picker";
 import { recordOutcomeAction } from "@/app/(app)/sales-actions";
 import { OUTCOMES, TARGET_STATUS_TH } from "@/lib/shared/policy";
 import { TASK_VIEWS, listTasks, type TaskView } from "@/lib/engine/tasks";
@@ -29,13 +32,29 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   const sp = await searchParams;
   const v = await viewer();
   const view = (TASK_VIEWS as readonly string[]).includes(sp.view ?? "") ? (sp.view as TaskView) : "mine";
-  const rows = await listTasks(v.tenantId, view, { id: v.actor, clearance: v.clearance });
+  const [rows, team, orgs] = await Promise.all([
+    listTasks(v.tenantId, view, { id: v.actor, clearance: v.clearance }), teamMembers(v.tenantId, v.actor),
+    listAccounts(v.tenantId, { sort: "name", limit: 1000, viewer: { id: v.actor, clearance: v.clearance } }),
+  ]);
+  const inDays = (n: number) => bangkokDay(new Date(Date.now() + n * 864e5));
   const state: ListState = { view, defaultView: "mine" };
   const today = bangkokDay();
 
   return (
     <>
       <PageHead label="งาน" title="งาน" />
+      <datalist id="task-team">{team.map((m) => <option key={m} value={m} />)}</datalist>
+      <details id="new" className="mb-4">
+        <summary className="c-btn c-btn-primary c-btn-sm inline-flex cursor-pointer list-none">+ งาน</summary>
+        <ActionForm action={createTaskAction} label="สร้างงาน" pendingLabel="กำลังบันทึก…" size="sm" className="c-panel mt-2 grid max-w-3xl gap-2 p-4 sm:grid-cols-2">
+          <label className={`${LABEL} sm:col-span-2`}>ต้องทำอะไร<input name="title" className="c-input" required maxLength={200} placeholder="เช่น โทรนัดประชุมไตรมาสหน้า" /></label>
+          <label className={LABEL}>ครบกำหนด<input type="date" name="due" defaultValue={inDays(3)} className="c-input" /></label>
+          <label className={LABEL}>ให้ใคร<input name="owner" list="task-team" defaultValue={v.actor} className="c-input" autoComplete="off" /></label>
+          <label className={`${LABEL} sm:col-span-2`}>บริษัท (ไม่บังคับ)
+            <OrgPicker id="task-org" name="orgName" names={orgs.rows.map((r) => r.name)} placeholder="พิมพ์ชื่อบริษัท หรือเว้นว่าง" />
+          </label>
+        </ActionForm>
+      </details>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <ListViews base={BASE} state={state} views={VIEWS} />
         <span className="c-thai text-[0.84rem] text-[var(--c-text-3)]">{num(rows.length)} งาน</span>
@@ -53,6 +72,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
                       {t.person && (t.personId ? <Link href={`/app/customers/${t.personId}`} className="text-[var(--c-accent)] hover:underline">{t.person}</Link> : <span>{t.person}</span>)}
                       {t.org && t.orgId && <Link href={`/app/accounts/${t.orgId}`} className="hover:text-[var(--c-accent)]">{t.org}</Link>}
                       {t.campaignId && <Link href={`/app/sales/${t.campaignId}`} className="hover:text-[var(--c-accent)]">· งานแคมเปญ</Link>}
+                      {t.dealId && t.deal && <Link href={`/app/deals/${t.dealId}`} className="hover:text-[var(--c-accent)]">· ดีล {t.deal}</Link>}
                       <span>· {t.owner ?? "ยังไม่มีผู้รับผิดชอบ"}</span>
                       {t.status === "done" && <span>· เสร็จ {thaiDate(t.doneAt)}{t.outcome ? ` — ${t.outcome}` : ""}</span>}
                     </p>
@@ -60,7 +80,17 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
                   <div className="flex flex-wrap items-center gap-2 md:justify-end">
                     {t.due && <span className={`c-pill ${late ? "c-pill-bad" : ""}`}>{late ? "เลยกำหนด " : "ครบ "}{thaiDate(t.due)}</span>}
                     {t.status === "open" && !t.targetId && (
-                      <ActionForm action={completeTaskAction} fields={{ taskId: t.id }} label="เสร็จแล้ว" pendingLabel="กำลังบันทึก…" size="sm" />
+                      <>
+                        <ActionForm action={completeTaskAction} fields={{ taskId: t.id }} label="เสร็จแล้ว" pendingLabel="กำลังบันทึก…" size="sm" />
+                        <details className="relative">
+                          <summary className="c-btn c-btn-ghost c-btn-sm inline-flex cursor-pointer list-none">เลื่อน</summary>
+                          <ActionForm action={updateTaskAction} fields={{ taskId: t.id }} label="บันทึก" pendingLabel="…" size="sm"
+                            className="c-panel absolute right-0 z-10 mt-1 grid w-64 gap-2 p-3">
+                            <input type="date" name="due" defaultValue={t.due?.slice(0, 10) ?? ""} className="c-input" aria-label="วันครบกำหนดใหม่" />
+                            <input name="owner" list="task-team" defaultValue={t.owner ?? ""} className="c-input" aria-label="ผู้รับงาน" />
+                          </ActionForm>
+                        </details>
+                      </>
                     )}
                   </div>
                   {t.status === "open" && t.targetId && t.campaignId && (

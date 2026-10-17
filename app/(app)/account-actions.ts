@@ -9,6 +9,7 @@ import {
 import { generateBrief } from "@/lib/engine/accounts/brief";
 import { orgAccess } from "@/lib/engine/accounts";
 import { get } from "@/lib/engine/sql";
+import { createTask } from "@/lib/engine/tasks";
 import type { ActionState } from "@/lib/shared/action-state";
 import type { Classification } from "@/lib/shared/vault";
 
@@ -122,7 +123,16 @@ export async function logInteractionAction(_p: ActionState, fd: FormData): Promi
     kind: str(fd, "kind"), occurredAt: str(fd, "occurredAt"), personId: str(fd, "personId"),
     summary: str(fd, "summary"), outcome: str(fd, "outcome"), classification: str(fd, "classification"),
   }, v.actor);
-  return done(orgId, "บันทึกการติดต่อแล้ว", res.ok ? { ok: true } : res);
+  if (!res.ok) return { error: res.error };
+  /* งานถัดไป (E1) */
+  const next = str(fd, "nextTitle").trim();
+  if (next) {
+    const t = await createTask(v.tenantId, { title: next, due: str(fd, "nextDue"), orgId, personId: str(fd, "personId") || undefined }, who(v));
+    revalidatePath("/app/tasks");
+    if (!t.ok) return done(orgId, `บันทึกการติดต่อแล้ว แต่สร้างงานถัดไปไม่ได้: ${t.error}`, { ok: true });
+    return done(orgId, "บันทึกการติดต่อและงานถัดไปแล้ว", { ok: true });
+  }
+  return done(orgId, "บันทึกการติดต่อแล้ว", { ok: true });
 }
 
 export async function generateBriefAction(_p: ActionState, fd: FormData): Promise<ActionState> {

@@ -45,6 +45,7 @@ const SETUP_PATHS = ["/app/sales/purposes"];
 const NEW_ITEMS = [
   { href: "/app/customers/new", label: "ผู้ติดต่อ" },
   { href: "/app/deals/new", label: "ดีล" },
+  { href: "/app/tasks#new", label: "งาน" },
   { href: "/app/sales#new", label: "แคมเปญ" },
   { href: "/app/vault/cards", label: "นามบัตร" },
   { href: "/app/requests", label: "คำขอสิทธิ" },
