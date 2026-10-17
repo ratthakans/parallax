@@ -5,7 +5,8 @@
 --
 -- opportunities.close_reason · close_note   เหตุผลที่ได้/ไม่ได้ (E2)
 -- opportunities.renewed_from                  ดีลต่อสัญญาสร้างจากดีลไหน (E4)
--- opportunities/orgs.deleted_at · deleted_by  ถังขยะ 30 วัน (D3) — แถวที่มี deleted_at ไม่ขึ้นที่ใดนอกจากถังขยะ
+-- trash                                       ถังขยะ 30 วัน (D3) — ลบ = ย้ายภาพของระเบียนมาเก็บที่นี่แล้วลบออกจากตารางจริง
+--                                             (ไม่ใช่คอลัมน์ deleted_at: คำสั่งอ่านทั้งระบบไม่ต้องกรอง ไม่มีทางหลุดขึ้นจอ) · กู้คืน = ใส่กลับ
 -- tasks.priority                              high · normal · low (E1)
 -- stage_rules                                 ดีลต้องมีอะไรก่อนเข้าขั้นไหน (D4)
 -- org_update_batches · org_update_changes     นำเข้าไฟล์ระดับบริษัทเพื่ออัปเดต · ย้อนได้ทั้งชุด (D2)
@@ -16,12 +17,26 @@
 alter table opportunities add column if not exists close_reason text;
 alter table opportunities add column if not exists close_note text;
 alter table opportunities add column if not exists renewed_from text;
-alter table opportunities add column if not exists deleted_at text;
-alter table opportunities add column if not exists deleted_by text;
-alter table orgs add column if not exists deleted_at text;
-alter table orgs add column if not exists deleted_by text;
 alter table tasks add column if not exists priority text not null default 'normal'
   check (priority in ('high', 'normal', 'low'));
+
+create table if not exists trash (
+  id text not null primary key,
+  tenant_id text not null references tenants (id) on delete cascade,
+  kind text not null check (kind in ('deal', 'org')),
+  record_id text not null,
+  name text not null,
+  payload text not null,
+  deleted_by text not null,
+  deleted_at text not null,
+  restored_by text,
+  restored_at text
+);
+create index if not exists ix_trash_tenant on trash (tenant_id, deleted_at);
+alter table trash enable row level security;
+create policy tenant_read on trash for select using (tenant_id in (select app.user_tenants()));
+create policy tenant_write on trash for all using (app.can_write(tenant_id)) with check (app.can_write(tenant_id));
+grant select, insert, update, delete on trash to authenticated;
 
 create table if not exists stage_rules (
   tenant_id text not null references tenants (id) on delete cascade,

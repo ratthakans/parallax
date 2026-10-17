@@ -880,6 +880,19 @@ export async function ensureSchema(): Promise<void> {
       updated_at TEXT NOT NULL
     );
     /* ══ จัดการฐานข้อมูลรอบสอง (docs/crm-plan.md D2–D4) — สเปกเดียวกับ supabase/migrations/0025_data_management.sql ══ */
+    CREATE TABLE IF NOT EXISTS trash (
+      id TEXT NOT NULL PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      kind TEXT NOT NULL CHECK (kind IN ('deal', 'org')),
+      record_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      payload TEXT NOT NULL,
+      deleted_by TEXT NOT NULL,
+      deleted_at TEXT NOT NULL,
+      restored_by TEXT,
+      restored_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS ix_trash_tenant ON trash (tenant_id, deleted_at);
     CREATE TABLE IF NOT EXISTS stage_rules (
       tenant_id TEXT NOT NULL,
       stage TEXT NOT NULL,
@@ -1098,14 +1111,13 @@ export async function ensureSchema(): Promise<void> {
     /* หมวดพยากรณ์ (C6 · 0024) */
     if (!have.has("forecast_category")) await exec("ALTER TABLE opportunities ADD COLUMN forecast_category TEXT");
     /* รอบสอง (0025) */
-    for (const c of ["close_reason", "close_note", "renewed_from", "deleted_at", "deleted_by"]) {
+    for (const c of ["close_reason", "close_note", "renewed_from"]) {
       if (!have.has(c)) await exec(`ALTER TABLE opportunities ADD COLUMN ${c} TEXT`);
     }
   }
   {
     const have = await columnsOf("orgs");
     if (!have.has("team_id")) await exec("ALTER TABLE orgs ADD COLUMN team_id TEXT");
-    for (const c of ["deleted_at", "deleted_by"]) if (!have.has(c)) await exec(`ALTER TABLE orgs ADD COLUMN ${c} TEXT`);
   }
   {
     const have = await columnsOf("tasks");

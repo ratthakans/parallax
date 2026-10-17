@@ -28,6 +28,8 @@ import { listTeams } from "@/lib/engine/forecast";
 import { listTasks } from "@/lib/engine/tasks";
 import { teamMembers } from "@/lib/engine/team";
 import { NewTaskForm, TaskList } from "@/components/console/tasks";
+import { trashOrgAction } from "@/app/(app)/bulk-actions";
+import { orgIsEmpty } from "@/lib/engine/trash";
 import { setOrgTeamAction } from "@/app/(app)/field-actions";
 import { get as getRow } from "@/lib/engine/sql";
 
@@ -169,7 +171,9 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
     getRow<{ team_id: string | null }>("SELECT team_id FROM orgs WHERE tenant_id = ? AND id = ?", v.tenantId, id),
   ]);
   const team = teams.find((t) => t.id === teamRow?.team_id) ?? null;
-  const [orgTasks, teamList] = await Promise.all([listTasks(v.tenantId, "open", who, new Date(), { orgId: id }), teamMembers(v.tenantId, v.actor)]);
+  const [orgTasks, teamList, notEmpty] = await Promise.all([
+    listTasks(v.tenantId, "open", who, new Date(), { orgId: id }), teamMembers(v.tenantId, v.actor), orgIsEmpty(v.tenantId, id),
+  ]);
   const TABS = ["overview", "details", "people", "deals", "events", "group", "relationships"] as const;
   const sp = await searchParams;
   const tab = pickTab(TABS, sp.tab);
@@ -360,6 +364,13 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
               </div>
             )}
           </Panel>
+          {!notEmpty && (
+            <Panel className="p-5 md:p-6">
+              <p className="c-thai text-[0.86rem] text-[var(--c-text-3)]">แฟ้มนี้ว่าง (ไม่มีคน ดีล หรือกิจกรรม) — ถ้าสร้างผิด ลบได้ และกู้คืนได้ 30 วัน</p>
+              <ActionForm action={trashOrgAction} fields={{ orgId: o.id }} label="ลบแฟ้มว่างนี้" pendingLabel="…" size="sm" variant="ghost" className="mt-2"
+                confirm="กดอีกครั้ง — ย้ายแฟ้มไปถังขยะ" />
+            </Panel>
+          )}
           <Panel className="p-5 md:p-6">
             <h2 className="c-h2 text-[var(--c-text)]">ข้อมูลบริษัท</h2>
             <div className="mt-3">

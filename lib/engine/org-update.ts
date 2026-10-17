@@ -87,13 +87,13 @@ export async function planOrgUpdate(
     /* หาบริษัท: เลขนิติบุคคล (ตรงกับที่มีอยู่) > รหัส > ชื่อ */
     const tax = normaliseTaxId(cell(row, iTax));
     let orgId: string | null = null;
-    if (tax) orgId = (await get<{ id: string }>("SELECT id FROM orgs WHERE tenant_id = ? AND tax_id = ? AND deleted_at IS NULL", tenantId, tax))?.id ?? null;
-    if (!orgId && cell(row, iId)) orgId = (await get<{ id: string }>("SELECT id FROM orgs WHERE tenant_id = ? AND id = ? AND deleted_at IS NULL", tenantId, cell(row, iId)))?.id ?? null;
+    if (tax) orgId = (await get<{ id: string }>("SELECT id FROM orgs WHERE tenant_id = ? AND tax_id = ?", tenantId, tax))?.id ?? null;
+    if (!orgId && cell(row, iId)) orgId = (await get<{ id: string }>("SELECT id FROM orgs WHERE tenant_id = ? AND id = ?", tenantId, cell(row, iId)))?.id ?? null;
     if (!orgId && cell(row, iName)) {
       orgId = await orgByName(tenantId, cell(row, iName));
       if (!orgId) {
         const key = orgInfo(cell(row, iName)).key;
-        if (key) orgId = (await get<{ id: string }>("SELECT id FROM orgs WHERE tenant_id = ? AND id = ? AND deleted_at IS NULL", tenantId, orgIdFor(tenantId, key)))?.id ?? null;
+        if (key) orgId = (await get<{ id: string }>("SELECT id FROM orgs WHERE tenant_id = ? AND id = ?", tenantId, orgIdFor(tenantId, key)))?.id ?? null;
       }
     }
     if (!orgId) { plan.problems.push({ line, reason: `ไม่พบบริษัท "${cell(row, iName) || cell(row, iTax) || cell(row, iId)}" — ไฟล์นี้อัปเดตบริษัทที่มีอยู่เท่านั้น` }); continue; }

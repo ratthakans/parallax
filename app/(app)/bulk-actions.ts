@@ -6,6 +6,9 @@ import { bulkDeals, bulkOrgs, MAX_BULK, type BulkResult, type DealBulk, type Org
 import type { ActionState } from "@/lib/shared/action-state";
 import { applyOrgUpdate, planOrgUpdate, undoOrgUpdate, type OrgUpdatePlan, type Target } from "@/lib/engine/org-update";
 import { MAX_UPLOAD_BYTES } from "@/lib/engine/vault/scan";
+import { restoreTrash, trashDeal, trashOrg } from "@/lib/engine/trash";
+import { redirect } from "next/navigation";
+import { get } from "@/lib/engine/sql";
 
 /* ── ทำทีละหลายรายการ (docs/crm-plan.md E3) ── สิทธิ์ write · ทุกแถวตรวจด่านบริษัทและเขียนประวัติเหมือนแก้ทีละแถว */
 
@@ -96,4 +99,39 @@ export async function undoOrgUpdateAction(_p: ActionState, fd: FormData): Promis
   revalidatePath("/app/data/update");
   revalidatePath("/app/accounts");
   return { ok: `ย้อนแล้ว ${r.reverted} ช่อง${r.kept ? ` · คงไว้ ${r.kept} ช่องที่มีคนแก้ต่อหลังนำเข้า` : ""}` };
+}
+
+/* ── ถังขยะ (docs/crm-plan.md D3) ── ลบดีล = write · ลบแฟ้มบริษัทว่าง = review · กู้คืนใช้สิทธิ์เดียวกับการลบของชนิดนั้น */
+export async function trashDealAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  const v = await viewer();
+  const no = denied(v, "write");
+  if (no) return { error: no };
+  const r = await trashDeal(v.tenantId, str(fd, "dealId"), { id: v.actor, clearance: v.clearance });
+  if (!r.ok) return { error: r.error };
+  revalidatePath("/app/deals");
+  revalidatePath("/app/data/trash");
+  redirect("/app/deals?deleted=1");
+}
+
+export async function trashOrgAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  const v = await viewer();
+  const no = denied(v, "review");
+  if (no) return { error: no };
+  const r = await trashOrg(v.tenantId, str(fd, "orgId"), { id: v.actor, clearance: v.clearance });
+  if (!r.ok) return { error: r.error };
+  revalidatePath("/app/accounts");
+  revalidatePath("/app/data/trash");
+  redirect("/app/accounts?deleted=1");
+}
+
+export async function restoreTrashAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  const v = await viewer();
+  const kind = (await get<{ kind: string }>("SELECT kind FROM trash WHERE tenant_id = ? AND id = ?", v.tenantId, str(fd, "trashId")))?.kind;
+  const no = denied(v, kind === "org" ? "review" : "write");
+  if (no) return { error: no };
+  const r = await restoreTrash(v.tenantId, str(fd, "trashId"), { id: v.actor, clearance: v.clearance });
+  if (!r.ok) return { error: r.error };
+  revalidatePath("/app/data/trash");
+  revalidatePath(r.kind === "deal" ? "/app/deals" : "/app/accounts");
+  return { ok: "กู้คืนแล้ว" };
 }

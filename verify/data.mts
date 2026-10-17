@@ -14,6 +14,10 @@ import { all } from "@/lib/engine/sql";
 import { applyOrgUpdate, planOrgUpdate, undoOrgUpdate } from "@/lib/engine/org-update";
 import { updateOrgField } from "@/lib/engine/accounts/edit";
 import { createHash } from "node:crypto";
+import { listTrash, purgeTrash, restoreTrash, trashDeal, trashOrg } from "@/lib/engine/trash";
+import { addItem, listItems } from "@/lib/engine/deal-items";
+import { createDeal, createRenewal, closeDeal, setDealPerson } from "@/lib/engine/deals";
+import { createTask } from "@/lib/engine/tasks";
 
 const out: string[] = [];
 const ok = (c: boolean, m: string) => out.push(`${c ? "PASS" : "FAIL"}  ${m}`);
@@ -173,6 +177,54 @@ await run("INSERT INTO org_update_changes (id, tenant_id, batch_id, org_id, fiel
 await run("INSERT INTO org_update_batches (id, tenant_id, filename, sha256, rows, changes, applied_by, applied_at) VALUES (?,?,?,?,?,?,?,?)", "ou-evil", T, "evil.csv", "x", 1, 1, ME.id, new Date().toISOString());
 const evil = await undoOrgUpdate(T, "ou-evil", ME);
 ok(evil.ok && evil.reverted === 0 && (await get<{ name: string }>("SELECT name FROM orgs WHERE tenant_id = ? AND id = ?", T, A))?.name !== "x", "ชื่อคอลัมน์ที่ไม่อยู่ในรายการที่อนุญาต = ไม่ถูกต่อเข้า SQL");
+
+// ── D3 · ถังขยะ ──
+const dd = await createDeal(T, { orgId: A, name: "ดีลที่จะลบ 2026 (สมมุติ)", value: "120000" }, ME);
+const delId = dd.ok ? dd.id : "";
+await addItem(T, delId, { package: "Silver", qty: "1", unitPrice: "120000" }, ME);
+await setDealPerson(T, delId, pNew, "decision_maker", ME);
+const dField = await createField(T, { entity: "deal", label: "ช่องทางขาย", kind: "text" }, ME.id);
+const dfId = dField.ok ? dField.id : "";
+const { setValue } = await import("@/lib/engine/custom-fields");
+await setValue(T, "deal", delId, dfId, "งานแสดงสินค้า", ME);
+const task = await createTask(T, { title: "ส่งสัญญา (สมมุติ)", dealId: delId }, ME);
+await closeDeal(T, delId, "won", "fit", "", ME);
+const ren = await createRenewal(T, delId, ME);
+const tr = await trashDeal(T, delId, ME);
+ok(tr.ok && !(await get("SELECT 1 AS x FROM opportunities WHERE tenant_id = ? AND id = ?", T, delId)), "ลบดีลแล้วหายจากตารางจริง (ทุกหน้าไม่ต้องกรอง)");
+ok(!(await get("SELECT 1 AS x FROM deal_items WHERE tenant_id = ? AND opportunity_id = ?", T, delId)) && !(await get("SELECT 1 AS x FROM opportunity_people WHERE tenant_id = ? AND opportunity_id = ?", T, delId)), "แพ็กเกจและคนในดีลไปกับดีล");
+ok(task.ok && (await get<{ opportunity_id: string | null }>("SELECT opportunity_id FROM tasks WHERE tenant_id = ? AND id = ?", T, task.id))?.opportunity_id === null, "งานที่ผูกอยู่ยังอยู่ แต่ตัดลิงก์");
+ok(ren.ok && (await get<{ renewed_from: string | null }>("SELECT renewed_from FROM opportunities WHERE tenant_id = ? AND id = ?", T, ren.id))?.renewed_from === null, "ดีลต่อสัญญายังอยู่ แต่ตัดลิงก์กับดีลที่ลบ");
+ok(Number((await get<{ n: number | string }>("SELECT COUNT(*) AS n FROM record_versions WHERE tenant_id = ? AND record_kind = 'opportunity' AND record_id = ?", T, delId))?.n) > 0, "ประวัติของดีลที่ลบยังอยู่");
+ok((await listTrash(T)).some((t) => t.recordId === delId && t.daysLeft === 30), "อยู่ในถังขยะ เหลือ 30 วัน");
+ok(!(await trashDeal("mst-golf", delId, ME)).ok, "ลบข้ามบัญชีไม่ได้");
+const rs = tr.ok ? await restoreTrash(T, tr.trashId, ME) : null;
+ok(Boolean(rs?.ok), "กู้คืนได้");
+ok((await listItems(T, delId)).length === 1 && Boolean(await get("SELECT 1 AS x FROM opportunity_people WHERE tenant_id = ? AND opportunity_id = ?", T, delId))
+  && (await valuesFor(T, "deal", [delId])).get(delId)?.get(dfId) === "งานแสดงสินค้า", "กู้คืนครบ: แพ็กเกจ · คนในดีล · ฟิลด์ของดีล");
+ok(task.ok && (await get<{ opportunity_id: string | null }>("SELECT opportunity_id FROM tasks WHERE tenant_id = ? AND id = ?", T, task.id))?.opportunity_id === delId
+  && ren.ok && (await get<{ renewed_from: string | null }>("SELECT renewed_from FROM opportunities WHERE tenant_id = ? AND id = ?", T, ren.id))?.renewed_from === delId, "ลิงก์งานและดีลต่อสัญญาผูกคืน");
+ok(tr.ok && !(await restoreTrash(T, tr.trashId, ME)).ok, "กู้ซ้ำไม่ได้");
+// เกิน 30 วัน
+const tr2 = await trashDeal(T, delId, ME);
+const later = new Date(Date.now() + 31 * 864e5);
+ok(tr2.ok && !(await restoreTrash(T, tr2.trashId, ME, later)).ok, "เกิน 30 วันกู้คืนไม่ได้");
+ok((await purgeTrash(T, later)) >= 1 && !(await listTrash(T, later)).some((t) => t.recordId === delId), "เกิน 30 วันถูกลบถาวรเมื่อเปิดถังขยะ");
+// บริษัท: ลบได้เฉพาะแฟ้มว่าง
+ok(!(await trashOrg(T, A, ME)).ok, "บริษัทที่มีคน/ดีลลบไม่ได้ (ให้รวมแทน)");
+const empty = await org("บริษัท แฟ้มว่าง จำกัด (สมมุติ)", { industry: "ทดสอบ" });
+const child = await org("บริษัท ลูกของแฟ้มว่าง จำกัด (สมมุติ)");
+await run("UPDATE orgs SET parent_id = ? WHERE tenant_id = ? AND id = ?", empty, T, child);
+await run("INSERT INTO org_domains (tenant_id, org_id, domain) VALUES (?,?,?)", T, empty, "faemwang.example");
+const to = await trashOrg(T, empty, ME);
+ok(to.ok && !(await get("SELECT 1 AS x FROM orgs WHERE tenant_id = ? AND id = ?", T, empty)) && (await get<{ parent_id: string | null }>("SELECT parent_id FROM orgs WHERE tenant_id = ? AND id = ?", T, child))?.parent_id === null, "ลบแฟ้มว่างได้ · บริษัทลูกถูกตัดลิงก์");
+ok(to.ok && (await restoreTrash(T, to.trashId, ME)).ok && (await get<{ parent_id: string }>("SELECT parent_id FROM orgs WHERE tenant_id = ? AND id = ?", T, child))?.parent_id === empty
+  && Boolean(await get("SELECT 1 AS x FROM org_domains WHERE tenant_id = ? AND domain = ?", T, "faemwang.example")), "กู้แฟ้มคืน: โดเมนและบริษัทลูกผูกคืน");
+// payload ที่ถูกแก้ผ่าน RLS ห้ามพาคอลัมน์แปลก ๆ เข้า SQL
+await run("INSERT INTO trash (id, tenant_id, kind, record_id, name, payload, deleted_by, deleted_at) VALUES (?,?,?,?,?,?,?,?)", "tr-evil", T, "deal", "d-evil", "evil",
+  JSON.stringify({ deal: { id: "d-evil", tenant_id: T, org_id: A, name: "x", stage: "open", created_at: "x", updated_at: "x", "name) VALUES ('a'); --": 1 } }), ME.id, new Date().toISOString());
+const ev = await restoreTrash(T, "tr-evil", ME);
+ok(ev.ok && Boolean(await get("SELECT 1 AS x FROM opportunities WHERE tenant_id = ? AND id = 'd-evil'", T)), "คีย์แปลกใน payload ถูกตัดทิ้ง ใช้เฉพาะคอลัมน์ในรายการคงที่");
 
 for (const line of out) console.log(line);
 const failed = out.filter((l) => l.startsWith("FAIL"));

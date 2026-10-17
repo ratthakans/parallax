@@ -62,8 +62,8 @@ export async function dataHealth(tenantId: string, viewer: Viewer, now = new Dat
   const unrenewed = await all<{ id: string; name: string; org: string; classification: string | null; account_owner_id: string | null; data_owner_id: string | null; updated_at: string; owner_id: string | null }>(
     `SELECT p.id, p.name, o.name AS org, o.classification, o.account_owner_id, o.data_owner_id, p.updated_at, p.owner_id
      FROM opportunities p JOIN orgs o ON o.id = p.org_id AND o.tenant_id = p.tenant_id
-     WHERE p.tenant_id = ? AND p.stage = 'won' AND p.deleted_at IS NULL AND p.updated_at BETWEEN ? AND ?
-       AND NOT EXISTS (SELECT 1 FROM opportunities r WHERE r.tenant_id = p.tenant_id AND r.renewed_from = p.id AND r.deleted_at IS NULL)
+     WHERE p.tenant_id = ? AND p.stage = 'won' AND p.updated_at BETWEEN ? AND ?
+       AND NOT EXISTS (SELECT 1 FROM opportunities r WHERE r.tenant_id = p.tenant_id AND r.renewed_from = p.id)
      ORDER BY p.updated_at`, tenantId, renewFrom, renewTo);
 
   const visOrgs = orgs.filter(seeOrg);

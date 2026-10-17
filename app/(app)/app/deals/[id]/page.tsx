@@ -7,6 +7,7 @@ import {
 import { listFields, valuesFor } from "@/lib/engine/custom-fields";
 import { listItems, packageNames } from "@/lib/engine/deal-items";
 import { CustomFieldsPanel } from "@/components/console/custom-fields";
+import { trashDealAction } from "@/app/(app)/bulk-actions";
 import { NewTaskForm, TaskList } from "@/components/console/tasks";
 import { listTasks } from "@/lib/engine/tasks";
 import { teamMembers } from "@/lib/engine/team";
@@ -67,7 +68,7 @@ export default async function DealPage({ params, searchParams }: { params: Promi
   };
   const closed = d.stage === "won" || d.stage === "lost";
   const [renewalOf, renewedFrom] = await Promise.all([
-    get<{ id: string; name: string }>("SELECT id, name FROM opportunities WHERE tenant_id = ? AND renewed_from = ? AND deleted_at IS NULL", v.tenantId, d.id),
+    get<{ id: string; name: string }>("SELECT id, name FROM opportunities WHERE tenant_id = ? AND renewed_from = ?", v.tenantId, d.id),
     get<{ id: string; name: string }>("SELECT p.id, p.name FROM opportunities o JOIN opportunities p ON p.id = o.renewed_from AND p.tenant_id = o.tenant_id WHERE o.tenant_id = ? AND o.id = ?", v.tenantId, d.id),
   ]);
   const links = { renewal: renewalOf ?? null, from: renewedFrom ?? null };
@@ -170,7 +171,11 @@ export default async function DealPage({ params, searchParams }: { params: Promi
       {tab === "overview" ? (
         <div className="grid gap-5 lg:grid-cols-2">
           <Panel className="p-5">
-            <h2 className="c-h2 text-[var(--c-text)]">รายละเอียด</h2>
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 className="c-h2 text-[var(--c-text)]">รายละเอียด</h2>
+              <ActionForm action={trashDealAction} fields={{ dealId: d.id }} label="ลบดีล" pendingLabel="…" size="sm" variant="ghost"
+                confirm="กดอีกครั้ง — ย้ายดีลไปถังขยะ (กู้คืนได้ 30 วัน)" />
+            </div>
             <dl className="c-thai mt-3 grid gap-3 text-[0.9rem]">
               <div><dt className="text-[0.75rem] text-[var(--c-text-4)]">ชื่อ</dt><dd>{d.name}</dd><Edit dealId={d.id} field="name" label="ชื่อ" value={d.name} /></div>
               <div><dt className="text-[0.75rem] text-[var(--c-text-4)]">มูลค่า</dt><dd>{d.value != null ? baht(d.value) : "ไม่ระบุ"}</dd><Edit dealId={d.id} field="value" label="มูลค่า" value={d.value != null ? String(d.value) : ""} /></div>

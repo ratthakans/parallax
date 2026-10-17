@@ -57,6 +57,8 @@ const SETUP_GROUPS: { title: string; links: { href: string; label: string }[] }[
     links: [
       { href: "/app", label: "ภาพรวมข้อมูล" },
       { href: "/app/data", label: "สุขภาพข้อมูล" },
+      { href: "/app/data/update", label: "อัปเดตบริษัทจากไฟล์" },
+      { href: "/app/data/trash", label: "ถังขยะ" },
       { href: "/app/vault", label: "นำเข้าข้อมูล" },
       { href: "/app/vault/review", label: "ตรวจข้อมูลซ้ำ" },
       { href: "/app/vault/cards", label: "นามบัตร" },

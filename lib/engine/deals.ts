@@ -309,7 +309,7 @@ export async function createRenewal(tenantId: string, id: string, viewer: Viewer
   if (d.stage !== "won") return { ok: false, error: "ต่อสัญญาได้จากดีลที่ปิดได้แล้วเท่านั้น" };
   const access = await orgAccess(tenantId, d.org_id, viewer);
   if (!access.ok) return access;
-  const existing = await get<{ id: string }>("SELECT id FROM opportunities WHERE tenant_id = ? AND renewed_from = ? AND deleted_at IS NULL", tenantId, id);
+  const existing = await get<{ id: string }>("SELECT id FROM opportunities WHERE tenant_id = ? AND renewed_from = ?", tenantId, id);
   if (existing) return { ok: true, id: existing.id, existed: true };
   const base = d.expected_close ?? d.updated_at.slice(0, 10);
   const close = `${Number(base.slice(0, 4)) + 1}${base.slice(4, 10)}`.replace(/-02-29$/, "-02-28");
