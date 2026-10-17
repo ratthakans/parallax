@@ -7,9 +7,13 @@ import { get, run } from "@/lib/engine/sql";
 import { dataHealth } from "@/lib/engine/data-health";
 import { reaffirmAffiliation, endAffiliation } from "@/lib/engine/accounts/edit";
 import { createTeam, listTeams } from "@/lib/engine/forecast";
+import { taxIdChecksum } from "@/lib/shared/tax-id";
 import { bulkDeals, bulkOrgs } from "@/lib/engine/bulk";
 import { createField, valuesFor } from "@/lib/engine/custom-fields";
 import { all } from "@/lib/engine/sql";
+import { applyOrgUpdate, planOrgUpdate, undoOrgUpdate } from "@/lib/engine/org-update";
+import { updateOrgField } from "@/lib/engine/accounts/edit";
+import { createHash } from "node:crypto";
 
 const out: string[] = [];
 const ok = (c: boolean, m: string) => out.push(`${c ? "PASS" : "FAIL"}  ${m}`);
@@ -45,8 +49,9 @@ const deal = async (o: string, name: string, value: number | null, close: string
   return id;
 };
 
-const A = await org("บริษัท สุขภาพดี จำกัด (สมมุติ)", { industry: "พลังงาน", owner: ME.id, tax: "0105555000011" });
-const B = await org("บริษัท ซ้ำเลข จำกัด (สมมุติ)", { tax: "0105555000011" });
+const TAX = "010555500001" + String(taxIdChecksum("010555500001"));
+const A = await org("บริษัท สุขภาพดี จำกัด (สมมุติ)", { industry: "พลังงาน", owner: ME.id, tax: TAX });
+const B = await org("บริษัท ซ้ำเลข จำกัด (สมมุติ)", { tax: TAX });
 const C = await org("บริษัท ไม่มีเจ้าของ จำกัด (สมมุติ)");
 const S = await org("บริษัท ลับสุดยอด จำกัด (สมมุติ)", { cls: "restricted_high" });
 const pOld = await person("สมเก่า ทดสอบ"), pNew = await person("สมใหม่ ทดสอบ"), pNo = await person("ไร้ช่องทาง ทดสอบ", "confidential", false);
@@ -115,6 +120,59 @@ ok((await bulkDeals(T, dealIds, { kind: "owner", owner: "nok@verify" }, ME)).don
 ok((await bulkDeals(T, dealIds, { kind: "forecast", category: "commit" }, ME)).done === dealIds.length, "ตั้งหมวดพยากรณ์หลายดีล");
 ok((await bulkOrgs("mst-golf", [A], { kind: "owner", owner: "x@verify" }, ME)).done === 0, "ทำหลายรายการข้ามบัญชีไม่ได้");
 ok((await bulkOrgs(T, Array.from({ length: 250 }, () => A), { kind: "team", teamId }, ME)).done === 1, "รหัสซ้ำนับครั้งเดียว");
+
+// ── D2 · อัปเดตบริษัทจากไฟล์ ──
+const csv = (lines: string[]) => new TextEncoder().encode(lines.join("\n"));
+const sha = (b: Uint8Array) => createHash("sha256").update(b).digest("hex");
+const f1 = csv([
+  "บริษัท,เลขนิติบุคคล,อุตสาหกรรม,ทีม,ภาค",
+  `บริษัท ไม่มีเจ้าของ จำกัด (สมมุติ),0105555000029,ค้าปลีก,ทีมทดสอบ,เหนือ`,
+  `,${TAX},พลังงานทดแทน,ทีมที่ไม่มี,ใต้`,
+  `บริษัท ที่ไม่มีอยู่ จำกัด,,ไอที,,`,
+  `บริษัท ลับสุดยอด จำกัด (สมมุติ),,อาวุธ,,`,
+  `บริษัท ไม่มีเจ้าของ จำกัด (สมมุติ),,ซ้ำ,,`,
+  `บริษัท สุขภาพดี จำกัด (สมมุติ),${TAX},,,`,
+]);
+const p1 = await planOrgUpdate(T, f1, "orgs.csv", ME);
+ok(p1.ok, "อ่านไฟล์และวางแผนได้");
+const plan = p1.ok ? p1.plan : null;
+ok(plan?.columns.map((c) => c.target).join() === `match_name,tax_id,industry,team,cf.${fid}`, "จับคู่คอลัมน์ให้เอง รวมฟิลด์ของบัญชีตามชื่อ");
+ok(Boolean(plan?.changes.some((c) => c.orgId === C && c.field === "industry" && c.newValue === "ค้าปลีก")) && !plan?.changes.some((c) => c.orgId === C && c.field === "team_id"),
+  "หาบริษัทจากชื่อ · เปลี่ยนอุตสาหกรรม · ทีมที่ตรงกับค่าเดิมแล้วไม่นับเป็นการเปลี่ยน");
+ok(Boolean(plan?.problems.some((p) => p.line === 2 && p.reason.includes("ไม่ถูกต้อง"))), "เลขนิติบุคคล checksum ผิดในไฟล์ = ข้ามช่องนั้นพร้อมบอกแถว");
+ok(Boolean(plan?.changes.some((c) => c.orgId === A && c.field === "industry" && c.newValue === "พลังงานทดแทน")), "หาบริษัทจากเลขนิติบุคคลได้แม้ไม่มีชื่อ");
+const probs = plan?.problems.map((p) => p.reason).join(" | ") ?? "";
+ok(probs.includes("ไม่พบบริษัท") && probs.includes("มากกว่าหนึ่งแถว") && probs.includes("ไม่มีทีมชื่อ") && probs.includes("ตัวเลือก"), "รายการที่ข้ามบอกเหตุผล: ไม่พบ · ซ้ำในไฟล์ · ทีมไม่มี · ค่าฟิลด์ไม่ผ่าน");
+ok(!plan?.changes.some((c) => c.orgId === S) && Boolean(plan?.problems.some((p) => p.line === 5)), "บริษัทเกินสิทธิ์ไม่ถูกแตะ และขึ้นในรายการที่ข้าม");
+const f3 = csv(["บริษัท,เลขนิติบุคคล", `บริษัท ไม่มีเจ้าของ จำกัด (สมมุติ),${TAX}`]);
+const p3 = await planOrgUpdate(T, f3, "twin.csv", ME);
+ok(p3.ok && p3.plan.changes.length === 0 && p3.plan.problems.some((p) => p.reason.includes("เป็นของ")), "เลขนิติบุคคลที่เป็นของบริษัทอื่นแล้ว = ไม่เปลี่ยน พร้อมบอกว่าเป็นของใคร");
+ok(!(await applyOrgUpdate(T, f1, "orgs.csv", "wrong-sha", ME)).ok, "ไฟล์ไม่ตรงกับที่ดูตัวอย่าง = ไม่บันทึก");
+const ap = await applyOrgUpdate(T, f1, "orgs.csv", sha(f1), ME);
+ok(ap.ok && ap.changes === (plan?.changes.length ?? -1), "ยืนยันแล้วเปลี่ยนตามตัวอย่างทุกช่อง");
+const cRow = await get<{ industry: string; team_id: string }>("SELECT industry, team_id FROM orgs WHERE tenant_id = ? AND id = ?", T, C);
+ok(cRow?.industry === "ค้าปลีก" && cRow?.team_id === teamId, "ค่าใหม่อยู่ในฐาน (ทีมเก็บเป็นรหัส)");
+ok(Number((await get<{ n: number | string }>("SELECT COUNT(*) AS n FROM record_versions WHERE tenant_id = ? AND record_kind = 'org' AND reason = 'นำเข้าไฟล์ orgs.csv'", T))?.n)
+  === (plan?.changes.filter((c) => !c.field.startsWith("cf.")).length ?? -1), "ทุกการเปลี่ยนช่องของบริษัทมีประวัติพร้อมชื่อไฟล์");
+const f2 = csv(["บริษัท,อุตสาหกรรม", "บริษัท ไม่มีเจ้าของ จำกัด (สมมุติ),ค้าปลีก"]);
+const p2 = await planOrgUpdate(T, f2, "same.csv", ME);
+ok(p2.ok && p2.plan.changes.length === 0 && !(await applyOrgUpdate(T, f2, "same.csv", sha(f2), ME)).ok, "ไฟล์ที่ค่าตรงกับในระบบแล้ว = ไม่มีอะไรเปลี่ยน ไม่สร้างชุด");
+// ย้อน: ช่องที่มีคนแก้ต่อแล้วต้องคงไว้
+await updateOrgField(T, A, "industry", "พลังงานลม", "แก้หลังนำเข้า", ME.id);
+const un = ap.ok ? await undoOrgUpdate(T, ap.batchId, ME) : null;
+ok(Boolean(un?.ok && un.kept === 1), "ย้อนทั้งชุด: ช่องที่มีคนแก้ต่อหลังนำเข้าไม่ถูกทับ");
+const after2 = await all<{ id: string; industry: string | null; team_id: string | null }>("SELECT id, industry, team_id FROM orgs WHERE tenant_id = ? AND id IN (?, ?)", T, A, C);
+ok(after2.find((o) => o.id === C)?.industry === null && after2.find((o) => o.id === C)?.team_id === teamId && after2.find((o) => o.id === A)?.industry === "พลังงานลม",
+  "ค่าที่มาจากชุดคืนเป็นค่าเดิม · ช่องที่ไม่ได้อยู่ในชุดไม่ถูกแตะ");
+ok((await valuesFor(T, "org", [C])).get(C)?.get(fid) === "ตะวันออก", "ฟิลด์ของบัญชีคืนค่าเดิมด้วย");
+ok(ap.ok && !(await undoOrgUpdate(T, ap.batchId, ME)).ok, "ย้อนซ้ำไม่ได้");
+const other = await planOrgUpdate("mst-golf", f1, "orgs.csv", ME);
+ok(other.ok && other.plan.matched === 0 && other.plan.changes.length === 0, "ไฟล์เดียวกันในบัญชีอื่นไม่เจอบริษัทของบัญชีนี้");
+await run("INSERT INTO org_update_changes (id, tenant_id, batch_id, org_id, field, old_value, new_value) VALUES (?,?,?,?,?,?,?)",
+  "oc-evil", T, "ou-evil", A, "name = 'x', industry", "x", "พลังงานลม");
+await run("INSERT INTO org_update_batches (id, tenant_id, filename, sha256, rows, changes, applied_by, applied_at) VALUES (?,?,?,?,?,?,?,?)", "ou-evil", T, "evil.csv", "x", 1, 1, ME.id, new Date().toISOString());
+const evil = await undoOrgUpdate(T, "ou-evil", ME);
+ok(evil.ok && evil.reverted === 0 && (await get<{ name: string }>("SELECT name FROM orgs WHERE tenant_id = ? AND id = ?", T, A))?.name !== "x", "ชื่อคอลัมน์ที่ไม่อยู่ในรายการที่อนุญาต = ไม่ถูกต่อเข้า SQL");
 
 for (const line of out) console.log(line);
 const failed = out.filter((l) => l.startsWith("FAIL"));

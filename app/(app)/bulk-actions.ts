@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { denied, viewer } from "@/app/(app)/viewer";
 import { bulkDeals, bulkOrgs, MAX_BULK, type BulkResult, type DealBulk, type OrgBulk } from "@/lib/engine/bulk";
 import type { ActionState } from "@/lib/shared/action-state";
+import { applyOrgUpdate, planOrgUpdate, undoOrgUpdate, type OrgUpdatePlan, type Target } from "@/lib/engine/org-update";
+import { MAX_UPLOAD_BYTES } from "@/lib/engine/vault/scan";
 
 /* ── ทำทีละหลายรายการ (docs/crm-plan.md E3) ── สิทธิ์ write · ทุกแถวตรวจด่านบริษัทและเขียนประวัติเหมือนแก้ทีละแถว */
 
@@ -49,4 +51,49 @@ export async function bulkDealsAction(_p: ActionState, fd: FormData): Promise<Ac
   const r = await bulkDeals(v.tenantId, ids, op, { id: v.actor, clearance: v.clearance });
   revalidatePath("/app/deals");
   return summary(r);
+}
+
+/* ── นำเข้าไฟล์ระดับบริษัทเพื่ออัปเดต (docs/crm-plan.md D2) ── สิทธิ์ import · ดูตัวอย่าง → ยืนยัน → ย้อนได้ทั้งชุด
+   ไฟล์อยู่ที่เบราว์เซอร์ระหว่างสองขั้นและส่งซ้ำตอนยืนยัน (เทียบ sha256) — เซิร์ฟเวอร์ไม่เก็บไฟล์ */
+async function fileOf(fd: FormData): Promise<{ bytes: Uint8Array; name: string } | string> {
+  const f = fd.get("file");
+  if (!(f instanceof File)) return "ไม่พบไฟล์ — เลือกไฟล์ใหม่";
+  if (f.size > MAX_UPLOAD_BYTES) return `ไฟล์ใหญ่เกิน ${MAX_UPLOAD_BYTES / 1_000_000}MB`;
+  return { bytes: new Uint8Array(await f.arrayBuffer()), name: f.name };
+}
+function mappingOf(fd: FormData): Record<number, Target> | undefined {
+  try { const m = JSON.parse(str(fd, "mapping") || "null"); return m && typeof m === "object" ? m : undefined; } catch { return undefined; }
+}
+
+export async function planOrgUpdateAction(fd: FormData): Promise<{ ok: true; plan: OrgUpdatePlan } | { ok: false; error: string }> {
+  const v = await viewer();
+  const no = denied(v, "import");
+  if (no) return { ok: false, error: no };
+  const file = await fileOf(fd);
+  if (typeof file === "string") return { ok: false, error: file };
+  return planOrgUpdate(v.tenantId, file.bytes, file.name, { id: v.actor, clearance: v.clearance }, mappingOf(fd));
+}
+
+export async function applyOrgUpdateAction(fd: FormData): Promise<{ ok: true; changes: number } | { ok: false; error: string }> {
+  const v = await viewer();
+  const no = denied(v, "import");
+  if (no) return { ok: false, error: no };
+  const file = await fileOf(fd);
+  if (typeof file === "string") return { ok: false, error: file };
+  const r = await applyOrgUpdate(v.tenantId, file.bytes, file.name, str(fd, "sha256"), { id: v.actor, clearance: v.clearance }, mappingOf(fd));
+  if (!r.ok) return r;
+  revalidatePath("/app/data/update");
+  revalidatePath("/app/accounts");
+  return { ok: true, changes: r.changes };
+}
+
+export async function undoOrgUpdateAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  const v = await viewer();
+  const no = denied(v, "import");
+  if (no) return { error: no };
+  const r = await undoOrgUpdate(v.tenantId, str(fd, "batchId"), { id: v.actor, clearance: v.clearance });
+  if (!r.ok) return { error: r.error };
+  revalidatePath("/app/data/update");
+  revalidatePath("/app/accounts");
+  return { ok: `ย้อนแล้ว ${r.reverted} ช่อง${r.kept ? ` · คงไว้ ${r.kept} ช่องที่มีคนแก้ต่อหลังนำเข้า` : ""}` };
 }
