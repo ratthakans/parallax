@@ -65,8 +65,8 @@ ok(c("deal_overdue")?.count === 1 && c("deal_overdue")?.items[0].name === "เ�
 ok(c("tax_duplicate")?.count === 2, "บริษัทเลขนิติบุคคลซ้ำ = ทั้งสองแฟ้ม");
 ok(c("deal_no_value")?.count === 1 && c("deal_no_close")?.count === 1, "ดีลไม่มีมูลค่า · ไม่มีวันปิดคาด");
 ok(c("org_no_owner")?.count === 1 && c("org_no_owner")?.items[0].id === C, "บริษัทมีดีลเปิดแต่ไม่มีเจ้าของ");
-ok(c("org_no_industry")?.items.some((i) => i.id === C) && !c("org_no_industry")?.items.some((i) => i.id === B), "ไม่ระบุอุตสาหกรรม: นับเฉพาะบริษัทที่มีคนหรือดีล (แฟ้มว่างไม่รก)");
-ok(c("person_no_contact")?.items.some((i) => i.id === pNo) && !c("person_no_contact")?.items.some((i) => i.id === pOld), "ผู้ติดต่อไม่มีอีเมล/เบอร์");
+ok(Boolean(c("org_no_industry")?.items.some((i) => i.id === C)) && !c("org_no_industry")?.items.some((i) => i.id === B), "ไม่ระบุอุตสาหกรรม: นับเฉพาะบริษัทที่มีคนหรือดีล (แฟ้มว่างไม่รก)");
+ok(Boolean(c("person_no_contact")?.items.some((i) => i.id === pNo)) && !c("person_no_contact")?.items.some((i) => i.id === pOld), "ผู้ติดต่อไม่มีอีเมล/เบอร์");
 ok(!c("org_no_team"), "ยังไม่มีทีม = ไม่แสดงข้อ 'ไม่ระบุทีม'");
 ok(h.findIndex((x) => x.severity === "gap") > h.findLastIndex((x) => x.severity === "risk"), "ข้อที่เสี่ยงต่องานขายขึ้นก่อนข้อความครบถ้วน");
 const all_ = JSON.stringify(h);
