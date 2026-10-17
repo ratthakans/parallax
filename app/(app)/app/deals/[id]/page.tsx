@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { viewer } from "@/app/(app)/viewer";
 import {
-  addDealItemAction, logDealActivityAction, setForecastAction, moveDealAction, removeDealItemAction, removeDealPersonAction, setDealPersonAction, syncDealValueAction, updateDealAction,
+  addDealItemAction, closeDealAction, logDealActivityAction, setForecastAction, moveDealAction, removeDealItemAction, removeDealPersonAction, setDealPersonAction, syncDealValueAction, updateDealAction,
 } from "@/app/(app)/deal-actions";
 import { listFields, valuesFor } from "@/lib/engine/custom-fields";
 import { listItems, packageNames } from "@/lib/engine/deal-items";
@@ -11,6 +11,7 @@ import { NewTaskForm, TaskList } from "@/components/console/tasks";
 import { listTasks } from "@/lib/engine/tasks";
 import { teamMembers } from "@/lib/engine/team";
 import { dealCandidates, getDeal } from "@/lib/engine/deals";
+import { CLOSE_REASON_TH, reasonsFor } from "@/lib/shared/deals";
 import { DEAL_ROLES, DEAL_ROLE_TH, DEAL_STAGE_TH, FORECAST_CATEGORIES, FORECAST_TH, OPEN_STAGES, dealRoleTh, effectiveForecast, isDealStage, stageTh } from "@/lib/shared/deals";
 import { get } from "@/lib/engine/sql";
 import { INTERACTION_KINDS, INTERACTION_TH, type InteractionKind } from "@/lib/shared/accounts";
@@ -65,6 +66,8 @@ export default async function DealPage({ params, searchParams }: { params: Promi
     return `${nameOf.get(pid) ?? "บุคคล"}${role ? ` (${dealRoleTh(role)})` : ""}`;
   };
   const closed = d.stage === "won" || d.stage === "lost";
+  const closeInfo = closed ? await get<{ close_reason: string | null; close_note: string | null }>(
+    "SELECT close_reason, close_note FROM opportunities WHERE tenant_id = ? AND id = ?", v.tenantId, d.id) : undefined;
   const pathStages = [...OPEN_STAGES, closed ? (d.stage as "won" | "lost") : "won"];
   const at = isDealStage(d.stage) ? pathStages.indexOf(d.stage) : -1;
   /* วันปิดจริง = ครั้งล่าสุดที่ย้ายเข้าขั้นปัจจุบัน (ประวัติเรียงใหม่ก่อน) — ไม่ต้องเก็บคอลัมน์ซ้ำ */
@@ -95,31 +98,52 @@ export default async function DealPage({ params, searchParams }: { params: Promi
         ]}
       />
 
-      {/* ── Path: ขั้นของดีล กดเพื่อย้าย ── */}
+      {/* ── Path: ขั้นของดีล กดเพื่อย้าย · ปิดดีล (ได้/ไม่ได้) ต้องเลือกเหตุผล (E2) ── */}
       <Panel className="mb-5 p-3">
         <ol className="flex flex-wrap gap-1" aria-label="ขั้นของดีล">
-          {pathStages.map((s, i) => {
-            const state = i < at ? "done" : i === at ? "current" : "todo";
+          {pathStages.filter((s) => s !== "won" && s !== "lost").map((s, i) => {
+            const state = closed || i < at ? "done" : i === at ? "current" : "todo";
             return (
               <li key={s} className="min-w-[7rem] flex-1">
                 {state === "current" ? (
-                  <span aria-current="step" className={`c-btn c-btn-sm w-full ${s === "lost" ? "c-btn-danger" : "c-btn-primary"}`}>{DEAL_STAGE_TH[s]}</span>
+                  <span aria-current="step" className="c-btn c-btn-sm c-btn-primary w-full">{DEAL_STAGE_TH[s]}</span>
                 ) : (
                   <ActionForm action={moveDealAction} fields={{ dealId: d.id, stage: s }} size="sm"
                     label={<>{state === "done" ? "✓ " : ""}{DEAL_STAGE_TH[s]}</>} pendingLabel="กำลังย้าย…"
-                    confirm={s === "won" ? "กดอีกครั้ง — ปิดดีลนี้ว่าได้" : closed ? "กดอีกครั้ง — เปิดดีลนี้ใหม่" : undefined}
+                    confirm={closed ? "กดอีกครั้ง — เปิดดีลนี้ใหม่" : undefined}
                     variant="ghost" full buttonClassName={state === "done" ? "text-[var(--c-good)]" : ""} />
                 )}
               </li>
             );
           })}
-          {!closed && (
+          {closed ? (
             <li className="min-w-[7rem] flex-1">
-              <ActionForm action={moveDealAction} fields={{ dealId: d.id, stage: "lost" }} size="sm" label="ไม่ได้" pendingLabel="กำลังย้าย…" full
-                confirm="กดอีกครั้ง — ปิดดีลนี้ว่าไม่ได้" />
+              <span aria-current="step" className={`c-btn c-btn-sm w-full ${d.stage === "lost" ? "c-btn-danger" : "c-btn-primary"}`}>{DEAL_STAGE_TH[d.stage as "won" | "lost"]}</span>
             </li>
-          )}
+          ) : (["won", "lost"] as const).map((st) => (
+            <li key={st} className="min-w-[7rem] flex-1">
+              <details className="relative">
+                <summary className={`c-btn c-btn-sm w-full cursor-pointer list-none ${st === "won" ? "c-btn-ghost text-[var(--c-good)]" : "c-btn-ghost"}`}>{DEAL_STAGE_TH[st]}</summary>
+                <ActionForm action={closeDealAction} fields={{ dealId: d.id, stage: st }} size="sm" variant={st === "won" ? "primary" : "ghost"}
+                  label={st === "won" ? "ยืนยันปิดได้" : "ยืนยันปิดว่าไม่ได้"} pendingLabel="กำลังบันทึก…"
+                  className="c-panel absolute right-0 z-10 mt-1 grid w-72 gap-2 p-3">
+                  <label className={LABEL}>{st === "won" ? "ได้เพราะ" : "ไม่ได้เพราะ"}
+                    <select name="reason" className="c-select" required defaultValue="">
+                      <option value="" disabled>เลือกเหตุผล</option>
+                      {reasonsFor(st).map((r) => <option key={r} value={r}>{CLOSE_REASON_TH[r]}</option>)}
+                    </select>
+                  </label>
+                  <label className={LABEL}>หมายเหตุ (ไม่บังคับ)<input name="note" className="c-input" maxLength={500} /></label>
+                </ActionForm>
+              </details>
+            </li>
+          ))}
         </ol>
+        {closed && closeInfo?.close_reason && (
+          <p className="c-thai mt-2 px-1 text-[0.82rem] text-[var(--c-text-3)]">
+            {d.stage === "won" ? "ได้เพราะ" : "ไม่ได้เพราะ"} {CLOSE_REASON_TH[closeInfo.close_reason] ?? closeInfo.close_reason}{closeInfo.close_note ? ` — ${closeInfo.close_note}` : ""}
+          </p>
+        )}
       </Panel>
 
       <RecordTabs base={`/app/deals/${d.id}`} active={tab} tabs={[{ key: "overview", label: "ภาพรวม" }, { key: "history", label: "ประวัติ", count: d.history.length }]} />

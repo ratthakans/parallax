@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { all, get, tx } from "@/lib/engine/sql";
+import { all, get, run, tx } from "@/lib/engine/sql";
 import { logActivity } from "@/lib/engine/db";
 import { orgAccess, type Viewer } from "@/lib/engine/accounts";
 import { canSee } from "@/lib/shared/accounts";
-import { OPEN_STAGES, isDealRole, isDealStage, type DealStage } from "@/lib/shared/deals";
+import { OPEN_STAGES, isDealRole, isDealStage, reasonsFor, type DealStage } from "@/lib/shared/deals";
 import type { Classification } from "@/lib/shared/vault";
 
 /* ── ดีล (docs/ux-plan.md U4) ─────────────────────────────────────────────
@@ -258,4 +258,18 @@ export async function dealsOfPerson(tenantId: string, personIds: string[], viewe
   return rows
     .filter((r) => canSee(viewer.clearance, lv(r.classification)) || [r.acc_owner, r.data_owner].includes(viewer.id))
     .map((r) => ({ id: r.id, name: r.name, stage: r.stage, role: r.role, org: r.org, value: r.value == null ? null : Number(r.value) }));
+}
+
+/* ── ปิดดีลพร้อมเหตุผล (docs/crm-plan.md E2) ──────────────────────────────
+   ย้ายขั้นด้วย moveDeal (รุ่นในประวัติเหมือนเดิม) แล้วเก็บเหตุผล — ไม่มีเหตุผล = ไม่ปิด (ยกเว้นทางแคมเปญที่ผลบันทึกในแคมเปญอยู่แล้ว) */
+export async function closeDeal(
+  tenantId: string, id: string, stage: "won" | "lost", reason: string, note: string, viewer: Viewer,
+): Promise<Result> {
+  if (!reasonsFor(stage).includes(reason)) return { ok: false, error: stage === "won" ? "เลือกเหตุผลที่ได้" : "เลือกเหตุผลที่ไม่ได้" };
+  const n = note.trim().slice(0, 500);
+  if (reason === "other" && n.length < 3) return { ok: false, error: "เหตุผล \"อื่น ๆ\" — เขียนสั้น ๆ ว่าเพราะอะไร" };
+  const moved = await moveDeal(tenantId, id, stage, viewer);
+  if (!moved.ok) return moved;
+  await run("UPDATE opportunities SET close_reason = ?, close_note = ? WHERE tenant_id = ? AND id = ?", reason, n || null, tenantId, id);
+  return { ok: true };
 }

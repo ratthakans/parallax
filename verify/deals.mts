@@ -5,7 +5,9 @@ import "./isolate.mts";
 import { randomUUID } from "node:crypto";
 import { ensureReady } from "@/lib/engine/bootstrap";
 import { all, run } from "@/lib/engine/sql";
-import { createDeal, getDeal, listDeals, moveDeal, updateDeal } from "@/lib/engine/deals";
+import { closeDeal, createDeal, getDeal, listDeals, moveDeal, updateDeal } from "@/lib/engine/deals";
+import { closeReasons } from "@/lib/engine/velocity";
+import { get } from "@/lib/engine/sql";
 
 const out: string[] = [];
 const ok = (c: boolean, m: string) => out.push(`${c ? "PASS" : "FAIL"}  ${m}`);
@@ -50,12 +52,31 @@ ok(!(await listDeals(T, { view: "open" }, ME)).some((x) => x.id === id) && (awai
 // บริษัทเกินสิทธิ์
 ok(!(await createDeal(T, { orgId: SECRET, name: "ดีลลับ (สมมุติ)" }, ME)).ok, "สร้างดีลในบริษัทที่เกินสิทธิ์ไม่ได้");
 const sid = randomUUID();
+const SECRET_DEAL = () => sid;
 await run("INSERT INTO opportunities (id, tenant_id, org_id, name, stage, owner_id, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)", sid, T, SECRET, "ดีลลับ (สมมุติ)", "open", "boss@verify", now, now);
 ok(!(await listDeals(T, { view: "all" }, ME)).some((x) => x.id === sid), "ดีลของบริษัทเกินสิทธิ์ไม่โผล่ในรายการ");
 ok((await getDeal(T, sid, ME)) === "masked" && !(await moveDeal(T, sid, "won", ME)).ok, "เปิดหรือย้ายขั้นดีลของบริษัทเกินสิทธิ์ไม่ได้");
 ok((await listDeals(T, { view: "all" }, { id: "boss@verify", clearance: "confidential" })).some((x) => x.id === sid), "เจ้าของบัญชีของบริษัทนั้นยังเห็นดีลตัวเอง");
 const leaked = await all<{ n: number }>("SELECT COUNT(*) AS n FROM record_versions WHERE tenant_id = ? AND record_kind = 'opportunity' AND record_id = ?", T, sid);
 ok(Number(leaked[0].n) === 0, "การย้ายที่ถูกปฏิเสธไม่ทิ้งประวัติ");
+
+// ── E2 · ปิดดีลพร้อมเหตุผล ──
+const mkd = async (name: string, value: string) => { const r = await createDeal(T, { orgId: A, name, value }, ME); return r.ok ? r.id : ""; };
+const L1 = await mkd("แพ้ราคา (สมมุติ)", "100000"), L2 = await mkd("แพ้คู่แข่ง (สมมุติ)", "200000"), W1 = await mkd("ได้เพราะสัมพันธ์ (สมมุติ)", "300000");
+ok(!(await closeDeal(T, L1, "lost", "", "", ME)).ok && !(await closeDeal(T, L1, "lost", "audience", "", ME)).ok, "ไม่เลือกเหตุผล · เหตุผลของฝั่งได้ใช้กับไม่ได้ = ไม่ปิด");
+ok(!(await closeDeal(T, L1, "lost", "other", "", ME)).ok, "เหตุผล 'อื่น ๆ' ต้องเขียนหมายเหตุ");
+ok((await closeDeal(T, L1, "lost", "price", "แพงกว่าเจ้าอื่น 20%", ME)).ok, "ปิดว่าไม่ได้พร้อมเหตุผล");
+const l1 = await get<{ stage: string; close_reason: string; close_note: string }>("SELECT stage, close_reason, close_note FROM opportunities WHERE tenant_id = ? AND id = ?", T, L1);
+ok(l1?.stage === "lost" && l1.close_reason === "price" && l1.close_note === "แพงกว่าเจ้าอื่น 20%", "ขั้น เหตุผล และหมายเหตุถูกบันทึก");
+const h1 = await getDeal(T, L1, ME);
+ok(h1 !== null && h1 !== "masked" && h1.history.some((h) => h.field === "stage" && h.newValue === "lost"), "การปิดยังมีประวัติขั้นเหมือนการย้ายปกติ");
+await closeDeal(T, L2, "lost", "competitor", "", ME);
+await closeDeal(T, W1, "won", "relationship", "", ME);
+ok(!(await closeDeal(T, SECRET_DEAL(), "won", "price", "", ME)).ok, "ปิดดีลของบริษัทเกินสิทธิ์ไม่ได้");
+const rs = await closeReasons(T, ME, new Date(Date.now() - 864e5).toISOString());
+ok(rs.find((r) => r.stage === "lost" && r.reason === "price")?.value === 100000 && rs.find((r) => r.stage === "lost" && r.reason === "competitor")?.count === 1
+  && rs.find((r) => r.stage === "won" && r.reason === "relationship")?.value === 300000, "รายงานเหตุผลรวมตามฝั่งและเหตุผล");
+ok(rs.some((r) => r.reason === "unrecorded"), "ดีลที่ปิดโดยไม่มีเหตุผล (ทางเดิม) นับเป็น 'ไม่ได้บันทึก'");
 
 for (const line of out) console.log(line);
 const failed = out.filter((l) => l.startsWith("FAIL"));

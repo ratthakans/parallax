@@ -879,6 +879,38 @@ export async function ensureSchema(): Promise<void> {
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
+    /* ══ จัดการฐานข้อมูลรอบสอง (docs/crm-plan.md D2–D4) — สเปกเดียวกับ supabase/migrations/0025_data_management.sql ══ */
+    CREATE TABLE IF NOT EXISTS stage_rules (
+      tenant_id TEXT NOT NULL,
+      stage TEXT NOT NULL,
+      requirement TEXT NOT NULL,
+      created_by TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (tenant_id, stage, requirement)
+    );
+    CREATE TABLE IF NOT EXISTS org_update_batches (
+      id TEXT NOT NULL PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      filename TEXT NOT NULL,
+      sha256 TEXT NOT NULL,
+      rows INTEGER NOT NULL DEFAULT 0,
+      changes INTEGER NOT NULL DEFAULT 0,
+      applied_by TEXT NOT NULL,
+      applied_at TEXT NOT NULL,
+      undone_by TEXT,
+      undone_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS ix_org_update_batches ON org_update_batches (tenant_id, applied_at);
+    CREATE TABLE IF NOT EXISTS org_update_changes (
+      id TEXT NOT NULL PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      batch_id TEXT NOT NULL,
+      org_id TEXT NOT NULL,
+      field TEXT NOT NULL,
+      old_value TEXT,
+      new_value TEXT
+    );
+    CREATE INDEX IF NOT EXISTS ix_org_update_changes ON org_update_changes (tenant_id, batch_id);
     /* ══ เป้ายอดขาย · ทีม (docs/crm-plan.md C6) — สเปกเดียวกับ supabase/migrations/0024_forecast_teams.sql ══ */
     CREATE TABLE IF NOT EXISTS quotas (
       tenant_id TEXT NOT NULL,
@@ -1065,10 +1097,19 @@ export async function ensureSchema(): Promise<void> {
     if (!have.has("campaign_id")) await exec("ALTER TABLE opportunities ADD COLUMN campaign_id TEXT");
     /* หมวดพยากรณ์ (C6 · 0024) */
     if (!have.has("forecast_category")) await exec("ALTER TABLE opportunities ADD COLUMN forecast_category TEXT");
+    /* รอบสอง (0025) */
+    for (const c of ["close_reason", "close_note", "renewed_from", "deleted_at", "deleted_by"]) {
+      if (!have.has(c)) await exec(`ALTER TABLE opportunities ADD COLUMN ${c} TEXT`);
+    }
   }
   {
     const have = await columnsOf("orgs");
     if (!have.has("team_id")) await exec("ALTER TABLE orgs ADD COLUMN team_id TEXT");
+    for (const c of ["deleted_at", "deleted_by"]) if (!have.has(c)) await exec(`ALTER TABLE orgs ADD COLUMN ${c} TEXT`);
+  }
+  {
+    const have = await columnsOf("tasks");
+    if (!have.has("priority")) await exec("ALTER TABLE tasks ADD COLUMN priority TEXT NOT NULL DEFAULT 'normal'");
   }
   /* แม่แบบวัตถุประสงค์และขอบเขตของฐาน (docs/solo-plan.md S4 · 0013) */
   {
