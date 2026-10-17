@@ -19,8 +19,12 @@ export type TaskRow = {
   id: string; title: string; status: string; due: string | null; owner: string | null;
   orgId: string | null; org: string | null; personId: string | null; person: string | null;
   campaignId: string | null; targetId: string | null; doneAt: string | null; outcome: string | null;
-  dealId: string | null; deal: string | null;
+  dealId: string | null; deal: string | null; priority: TaskPriority;
 };
+export const TASK_PRIORITIES = ["high", "normal", "low"] as const;
+export type TaskPriority = (typeof TASK_PRIORITIES)[number];
+export const PRIORITY_TH: Record<TaskPriority, string> = { high: "ด่วน", normal: "ปกติ", low: "ไม่รีบ" };
+const asPriority = (p: string | null | undefined): TaskPriority => ((TASK_PRIORITIES as readonly string[]).includes(p ?? "") ? (p as TaskPriority) : "normal");
 
 const lv = (c: string | null) => (c ?? "confidential") as Classification;
 
@@ -41,13 +45,15 @@ export async function listTasks(
     if (view === "today") { where.push("substr(t.due_at, 1, 10) = ?"); params.push(today); }
     if (view === "overdue") { where.push("t.due_at IS NOT NULL AND substr(t.due_at, 1, 10) < ?"); params.push(today); }
   }
-  const order = view === "done" ? "t.done_at DESC" : "COALESCE(t.due_at, '9999') ASC, t.created_at ASC";
+  /* ด่วนขึ้นก่อนภายในวันเดียวกัน — ไม่ข้ามวัน (งานเลยกำหนดยังมาก่อนงานด่วนของสัปดาห์หน้า) */
+  const order = view === "done" ? "t.done_at DESC"
+    : "COALESCE(substr(t.due_at, 1, 10), '9999') ASC, CASE t.priority WHEN 'high' THEN 0 WHEN 'low' THEN 2 ELSE 1 END, t.created_at ASC";
   const rows = await all<{ id: string; title: string; status: string; due_at: string | null; owner_id: string | null; org_id: string | null; org: string | null;
     org_class: string | null; acc_owner: string | null; customer_id: string | null; person: string | null; person_class: string | null;
-    campaign_id: string | null; target_id: string | null; done_at: string | null; outcome: string | null; opportunity_id: string | null; deal: string | null }>(
+    campaign_id: string | null; target_id: string | null; done_at: string | null; outcome: string | null; opportunity_id: string | null; deal: string | null; priority: string | null }>(
     `SELECT t.id, t.title, t.status, t.due_at, t.owner_id, t.org_id, o.name AS org, o.classification AS org_class, o.account_owner_id AS acc_owner,
        t.customer_id, c.name AS person, c.classification AS person_class, t.campaign_id, t.target_id, t.done_at, t.outcome,
-       t.opportunity_id, p.name AS deal
+       t.opportunity_id, p.name AS deal, t.priority
      FROM tasks t
      LEFT JOIN orgs o ON o.id = t.org_id AND o.tenant_id = t.tenant_id
      LEFT JOIN customers c ON c.id = t.customer_id AND c.tenant_id = t.tenant_id
@@ -59,7 +65,7 @@ export async function listTasks(
       id: r.id, title: r.title, status: r.status, due: r.due_at, owner: r.owner_id, orgId: r.org_id, org: r.org,
       personId: r.customer_id, person: r.customer_id ? (canSee(viewer.clearance, lv(r.person_class)) ? r.person : MASKED_PERSON) : null,
       campaignId: r.campaign_id, targetId: r.target_id, doneAt: r.done_at, outcome: r.outcome,
-      dealId: r.opportunity_id, deal: r.deal,
+      dealId: r.opportunity_id, deal: r.deal, priority: asPriority(r.priority),
     }));
 }
 
@@ -68,7 +74,7 @@ export async function listTasks(
    งานผูกกับบริษัท · คน · ดีล ได้พร้อมกัน — ดีลบอกบริษัทเอง · คนต้องสังกัด (หรือเคยสังกัด) บริษัทนั้น
    ผู้รับงานเป็นใครก็ได้ในทีม (ค่าเริ่มต้น = ผู้สร้าง) · ตรวจสิทธิ์บริษัทแบบเดียวกับการแก้แฟ้ม */
 
-export type TaskInput = { title: string; due?: string; owner?: string; orgId?: string; personId?: string; dealId?: string };
+export type TaskInput = { title: string; due?: string; owner?: string; orgId?: string; personId?: string; dealId?: string; priority?: string };
 
 export async function createTask(tenantId: string, input: TaskInput, viewer: Viewer): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const title = input.title.trim().slice(0, 200);
@@ -102,14 +108,14 @@ export async function createTask(tenantId: string, input: TaskInput, viewer: Vie
   const owner = input.owner?.trim().slice(0, 120) || viewer.id;
   const id = randomUUID();
   await run(
-    `INSERT INTO tasks (id, tenant_id, title, status, due_at, owner_id, org_id, customer_id, opportunity_id, outcome, created_by, created_at, done_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`, id, tenantId, title, "open", due, owner, org, person, deal, null, viewer.id, new Date().toISOString(), null);
+    `INSERT INTO tasks (id, tenant_id, title, status, due_at, owner_id, org_id, customer_id, opportunity_id, outcome, created_by, created_at, done_at, priority)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, id, tenantId, title, "open", due, owner, org, person, deal, null, viewer.id, new Date().toISOString(), null, asPriority(input.priority));
   await logActivity(tenantId, viewer.id, "task_create", `${id}${owner !== viewer.id ? ` → ${owner}` : ""}`);
   return { ok: true, id };
 }
 
 /** เลื่อนวัน · เปลี่ยนผู้รับ — งานแคมเปญเปลี่ยนที่หน้าแคมเปญ (มอบหมายใหม่ตรวจนโยบายซ้ำ) */
-export async function updateTask(tenantId: string, id: string, input: { due?: string; owner?: string; title?: string }, viewer: Viewer): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function updateTask(tenantId: string, id: string, input: { due?: string; owner?: string; title?: string; priority?: string }, viewer: Viewer): Promise<{ ok: true } | { ok: false; error: string }> {
   const t = await get<{ status: string; org_id: string | null; target_id: string | null }>("SELECT status, org_id, target_id FROM tasks WHERE tenant_id = ? AND id = ?", tenantId, id);
   if (!t) return { ok: false, error: "ไม่พบงานนี้" };
   if (t.status !== "open") return { ok: false, error: "งานนี้ปิดไปแล้ว" };
@@ -134,6 +140,7 @@ export async function updateTask(tenantId: string, id: string, input: { due?: st
     if (ti.length < 2) return { ok: false, error: "ชื่องานสั้นเกินไป" };
     sets.push("title = ?"); params.push(ti);
   }
+  if (input.priority !== undefined) { sets.push("priority = ?"); params.push(asPriority(input.priority)); }
   if (!sets.length) return { ok: true };
   await run(`UPDATE tasks SET ${sets.join(", ")} WHERE tenant_id = ? AND id = ? AND status = 'open'`, ...params, tenantId, id);
   await logActivity(tenantId, viewer.id, "task_update", id);

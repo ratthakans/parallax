@@ -50,6 +50,9 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
           <label className={`${LABEL} sm:col-span-2`}>ต้องทำอะไร<input name="title" className="c-input" required maxLength={200} placeholder="เช่น โทรนัดประชุมไตรมาสหน้า" /></label>
           <label className={LABEL}>ครบกำหนด<input type="date" name="due" defaultValue={inDays(3)} className="c-input" /></label>
           <label className={LABEL}>ให้ใคร<input name="owner" list="task-team" defaultValue={v.actor} className="c-input" autoComplete="off" /></label>
+          <label className={LABEL}>ความสำคัญ
+            <select name="priority" className="c-select" defaultValue="normal"><option value="high">ด่วน</option><option value="normal">ปกติ</option><option value="low">ไม่รีบ</option></select>
+          </label>
           <label className={`${LABEL} sm:col-span-2`}>บริษัท (ไม่บังคับ)
             <OrgPicker id="task-org" name="orgName" names={orgs.rows.map((r) => r.name)} placeholder="พิมพ์ชื่อบริษัท หรือเว้นว่าง" />
           </label>
@@ -67,7 +70,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
               return (
                 <li key={t.id} className="grid gap-2 px-5 py-3.5 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
                   <div className="min-w-0">
-                    <p className="c-thai text-[0.92rem] text-[var(--c-text)]">{t.title}</p>
+                    <p className="c-thai text-[0.92rem] text-[var(--c-text)]">{t.priority === "high" && <span className="c-pill c-pill-warn mr-1.5">ด่วน</span>}{t.title}</p>
                     <p className="c-thai mt-0.5 flex flex-wrap gap-x-2 text-[0.8rem] text-[var(--c-text-3)]">
                       {t.person && (t.personId ? <Link href={`/app/customers/${t.personId}`} className="text-[var(--c-accent)] hover:underline">{t.person}</Link> : <span>{t.person}</span>)}
                       {t.org && t.orgId && <Link href={`/app/accounts/${t.orgId}`} className="hover:text-[var(--c-accent)]">{t.org}</Link>}

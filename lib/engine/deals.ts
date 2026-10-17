@@ -3,7 +3,8 @@ import { all, get, run, tx } from "@/lib/engine/sql";
 import { logActivity } from "@/lib/engine/db";
 import { orgAccess, type Viewer } from "@/lib/engine/accounts";
 import { canSee } from "@/lib/shared/accounts";
-import { OPEN_STAGES, isDealRole, isDealStage, reasonsFor, type DealStage } from "@/lib/shared/deals";
+import { DEAL_STAGE_TH, OPEN_STAGES, isDealRole, isDealStage, reasonsFor, type DealStage } from "@/lib/shared/deals";
+import { stageBlockers } from "@/lib/engine/stage-rules";
 import type { Classification } from "@/lib/shared/vault";
 
 /* ── ดีล (docs/ux-plan.md U4) ─────────────────────────────────────────────
@@ -143,6 +144,9 @@ export async function moveDeal(tenantId: string, id: string, stage: string, view
   const access = await orgAccess(tenantId, d.org_id, viewer);
   if (!access.ok) return access;
   if (d.stage === stage) return { ok: true, from: d.stage };
+  /* กฎขั้น (D4) — บอกทุกข้อที่ขาดในครั้งเดียว */
+  const missing = await stageBlockers(tenantId, id, d.stage, stage);
+  if (missing.length) return { ok: false, error: `ก่อนเข้าขั้น "${DEAL_STAGE_TH[stage as DealStage] ?? stage}" ดีลต้อง: ${missing.join(" · ")}` };
   const at = new Date().toISOString();
   await tx(async (q) => {
     await q.run(

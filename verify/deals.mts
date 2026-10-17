@@ -7,6 +7,9 @@ import { ensureReady } from "@/lib/engine/bootstrap";
 import { all, run } from "@/lib/engine/sql";
 import { closeDeal, createDeal, createRenewal, getDeal, listDeals, moveDeal, renewalName, updateDeal } from "@/lib/engine/deals";
 import { addItem, listItems } from "@/lib/engine/deal-items";
+import { setStageRule, stageBlockers } from "@/lib/engine/stage-rules";
+import { bulkDeals } from "@/lib/engine/bulk";
+import { createTask } from "@/lib/engine/tasks";
 import { closeReasons } from "@/lib/engine/velocity";
 import { get } from "@/lib/engine/sql";
 
@@ -99,6 +102,31 @@ ok(!(await createRenewal("mst-golf", r0, ME)).ok, "ต่อสัญญาข�
 const leap = await createDeal(T, { orgId: A, name: "ดีลวันอธิกสุรทิน 2028 (สมมุติ)", expectedClose: "2028-02-29" }, ME);
 if (leap.ok) { await closeDeal(T, leap.id, "won", "timing", "", ME); const lr = await createRenewal(T, leap.id, ME);
   ok(lr.ok && (await get<{ expected_close: string }>("SELECT expected_close FROM opportunities WHERE tenant_id = ? AND id = ?", T, lr.id))?.expected_close === "2029-02-28", "29 ก.พ. ต่อปีถัดไปเป็น 28 ก.พ."); }
+
+// ── D4 · กฎขั้นของดีล ──
+ok(!(await setStageRule(T, "open", "value", true, ME.id)).ok && !(await setStageRule(T, "proposal", "magic", true, ME.id)).ok, "ตั้งกฎกับขั้นเริ่มคุย · เงื่อนไขที่ไม่รู้จัก = ไม่ได้");
+await setStageRule(T, "proposal", "value", true, ME.id);
+await setStageRule(T, "proposal", "close_date", true, ME.id);
+await setStageRule(T, "negotiation", "decision_maker", true, ME.id);
+const g = await createDeal(T, { orgId: A, name: "ดีลทดสอบกฎ (สมมุติ)" }, ME);
+const gid = g.ok ? g.id : "";
+const m1 = await moveDeal(T, gid, "proposal", ME);
+ok(!m1.ok && m1.error.includes("มีมูลค่า") && m1.error.includes("มีวันปิดคาด"), "เข้าเสนอราคาไม่ได้ และบอกทุกข้อที่ขาดในครั้งเดียว");
+ok((await moveDeal(T, gid, "qualified", ME)).ok, "ขั้นที่ไม่มีกฎย้ายได้ตามปกติ");
+await updateDeal(T, gid, "value", "50000", ME);
+await updateDeal(T, gid, "expected_close", "2027-01-31", ME);
+const m2 = await moveDeal(T, gid, "negotiation", ME);
+ok(!m2.ok && m2.error.includes("ผู้ตัดสินใจ") && !m2.error.includes("มูลค่า"), "ข้ามขั้นต้องผ่านกฎของขั้นที่ข้ามด้วย · บอกเฉพาะที่ยังขาด");
+ok((await moveDeal(T, gid, "proposal", ME)).ok, "ครบแล้วเข้าเสนอราคาได้");
+ok((await stageBlockers(T, gid, "proposal", "open")).length === 0 && (await moveDeal(T, gid, "open", ME)).ok, "ถอยหลังไม่ตรวจกฎ");
+ok((await bulkDeals(T, [gid], { kind: "stage", stage: "negotiation" }, ME)).done === 0, "ทำหลายรายการก็ผ่านกฎเดียวกัน");
+await setStageRule(T, "won", "open_task", true, ME.id);
+await moveDeal(T, gid, "proposal", ME);
+const cw = await closeDeal(T, gid, "won", "price", "", ME);
+ok(!cw.ok && cw.error.includes("ผู้ตัดสินใจ") && cw.error.includes("งานถัดไป"), "ปิดได้ต้องผ่านกฎของต่อรองและปิดได้");
+ok((await closeDeal(T, gid, "lost", "budget", "", ME)).ok, "ปิดว่าไม่ได้ไม่ติดกฎ");
+await setStageRule(T, "won", "open_task", false, ME.id);
+ok(!(await stageBlockers(T, gid, "negotiation", "won")).some((x) => x.includes("งาน")), "เอากฎออกแล้วไม่ตรวจอีก");
 
 for (const line of out) console.log(line);
 const failed = out.filter((l) => l.startsWith("FAIL"));

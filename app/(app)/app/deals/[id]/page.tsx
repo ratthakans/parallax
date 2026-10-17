@@ -8,6 +8,7 @@ import { listFields, valuesFor } from "@/lib/engine/custom-fields";
 import { listItems, packageNames } from "@/lib/engine/deal-items";
 import { CustomFieldsPanel } from "@/components/console/custom-fields";
 import { trashDealAction } from "@/app/(app)/bulk-actions";
+import { stageBlockers } from "@/lib/engine/stage-rules";
 import { NewTaskForm, TaskList } from "@/components/console/tasks";
 import { listTasks } from "@/lib/engine/tasks";
 import { teamMembers } from "@/lib/engine/team";
@@ -72,6 +73,9 @@ export default async function DealPage({ params, searchParams }: { params: Promi
     get<{ id: string; name: string }>("SELECT p.id, p.name FROM opportunities o JOIN opportunities p ON p.id = o.renewed_from AND p.tenant_id = o.tenant_id WHERE o.tenant_id = ? AND o.id = ?", v.tenantId, d.id),
   ]);
   const links = { renewal: renewalOf ?? null, from: renewedFrom ?? null };
+  /* สิ่งที่ยังขาดก่อนเข้าขั้นถัดไป (D4) — บอกก่อนกด ไม่ใช่หลังกดแล้วโดนปฏิเสธ */
+  const nextStage = !closed && isDealStage(d.stage) ? OPEN_STAGES[OPEN_STAGES.indexOf(d.stage) + 1] ?? "won" : null;
+  const nextMissing = nextStage ? await stageBlockers(v.tenantId, d.id, d.stage, nextStage) : [];
   const closeInfo = closed ? await get<{ close_reason: string | null; close_note: string | null }>(
     "SELECT close_reason, close_note FROM opportunities WHERE tenant_id = ? AND id = ?", v.tenantId, d.id) : undefined;
   const pathStages = [...OPEN_STAGES, closed ? (d.stage as "won" | "lost") : "won"];
@@ -151,6 +155,9 @@ export default async function DealPage({ params, searchParams }: { params: Promi
             </li>
           ))}
         </ol>
+        {nextStage && nextMissing.length > 0 && (
+          <p className="c-thai mt-2 px-1 text-[0.8rem] text-[var(--c-warn)]">ก่อนเข้าขั้น “{DEAL_STAGE_TH[nextStage]}” ดีลต้อง: {nextMissing.join(" · ")}</p>
+        )}
         {(links.from || links.renewal || d.stage === "won") && (
           <p className="c-thai mt-2 flex flex-wrap items-center gap-2 px-1 text-[0.82rem] text-[var(--c-text-3)]">
             {links.from && <>ต่อสัญญาจาก <Link href={`/app/deals/${links.from.id}`} className="text-[var(--c-accent)] hover:underline">{links.from.name}</Link></>}

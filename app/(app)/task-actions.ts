@@ -41,7 +41,7 @@ export async function createTaskAction(_p: ActionState, fd: FormData): Promise<A
   }
   const res = await createTask(v.tenantId, {
     title: str(fd, "title"), due: str(fd, "due"), owner: str(fd, "owner"), orgId: orgId || undefined,
-    personId: str(fd, "personId") || undefined, dealId: str(fd, "dealId") || undefined,
+    personId: str(fd, "personId") || undefined, dealId: str(fd, "dealId") || undefined, priority: str(fd, "priority") || undefined,
   }, { id: v.actor, clearance: v.clearance });
   if (!res.ok) return { error: res.error };
   refresh(fd);
@@ -55,6 +55,7 @@ export async function updateTaskAction(_p: ActionState, fd: FormData): Promise<A
   if (no) return { error: no };
   const res = await updateTask(v.tenantId, str(fd, "taskId"), {
     due: fd.has("due") ? str(fd, "due") : undefined, owner: fd.has("owner") ? str(fd, "owner") : undefined,
+    priority: fd.has("priority") ? str(fd, "priority") : undefined,
   }, { id: v.actor, clearance: v.clearance });
   if (!res.ok) return { error: res.error };
   refresh(fd);
