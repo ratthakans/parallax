@@ -141,6 +141,22 @@ export async function confirmAffiliation(tenantId: string, affiliationId: string
   return { ok: true };
 }
 
+/** ยังอยู่ที่นี่ (docs/crm-plan.md D1) — คนยืนยันว่าข้อมูลสังกัดยังจริง ณ วันนี้: ยืนยัน + เลื่อน "เห็นล่าสุด" เป็นวันนี้
+    สังกัดที่ปิดแล้วยืนยันว่ายังอยู่ไม่ได้ (ต้องเพิ่มสังกัดใหม่) */
+export async function reaffirmAffiliation(tenantId: string, affiliationId: string, actor: string): Promise<EditResult> {
+  const a = await get<{ valid_to: string | null; last_seen_at: string | null; confirmed_by: string | null }>(
+    "SELECT valid_to, last_seen_at, confirmed_by FROM affiliations WHERE tenant_id = ? AND id = ?", tenantId, affiliationId);
+  if (!a) return { ok: false, error: "ไม่พบสังกัดนี้" };
+  if (a.valid_to) return { ok: false, error: "สังกัดนี้ปิดไปแล้ว — ถ้ากลับมาทำงานที่เดิม ให้เพิ่มสังกัดใหม่" };
+  const at = now();
+  await tx(async (q) => {
+    await version(q, tenantId, "affiliation", affiliationId, "last_seen_at", a.last_seen_at, at, "ยืนยันว่ายังอยู่", actor);
+    await q.run("UPDATE affiliations SET last_seen_at = ?, confirmed_by = ?, recorded_at = ? WHERE tenant_id = ? AND id = ?", at, actor, at, tenantId, affiliationId);
+  });
+  await logActivity(tenantId, actor, "affiliation_reaffirm", affiliationId);
+  return { ok: true };
+}
+
 /** คนนี้ไม่อยู่ที่นี่แล้ว — ปิดช่วงสังกัด ไม่ลบ (ประวัติตามเวลายังอยู่) */
 export async function endAffiliation(tenantId: string, affiliationId: string, endedOn: string, reason: string, actor: string): Promise<EditResult> {
   const a = await get<{ valid_from: string | null; valid_to: string | null }>(

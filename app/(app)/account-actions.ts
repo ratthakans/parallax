@@ -3,11 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { denied, viewer } from "@/app/(app)/viewer";
 import {
-  addMemberLink, addRelationship, confirmAffiliation, endAffiliation, endRelationship, logInteraction, setAccountOwner,
+  addMemberLink, addRelationship, confirmAffiliation, endAffiliation, endRelationship, logInteraction, reaffirmAffiliation, setAccountOwner,
   setClassification, setParent, updateOrgField, verifyOrg,
 } from "@/lib/engine/accounts/edit";
 import { generateBrief } from "@/lib/engine/accounts/brief";
 import { orgAccess } from "@/lib/engine/accounts";
+import { get } from "@/lib/engine/sql";
 import type { ActionState } from "@/lib/shared/action-state";
 import type { Classification } from "@/lib/shared/vault";
 
@@ -153,4 +154,39 @@ export async function addMemberLinkAction(_p: ActionState, fd: FormData): Promis
   if (!res.ok) return { error: res.error };
   revalidatePath(`/app/accounts/${orgId}`);
   return { ok: res.existed ? "บันทึกไว้แล้วก่อนหน้านี้" : "บันทึกแล้ว — คุณเป็นเส้นทางเข้าถึงคนนี้ของทีม" };
+}
+
+/* ── สังกัดเก่าจากหน้าสุขภาพข้อมูล (docs/crm-plan.md D1) ── ยังอยู่ / ออกแล้ว · ตรวจสิทธิ์บริษัทของสังกัดก่อน */
+async function affOrg(tenantId: string, affiliationId: string) {
+  return (await get<{ org_id: string; customer_id: string }>("SELECT org_id, customer_id FROM affiliations WHERE tenant_id = ? AND id = ?", tenantId, affiliationId)) ?? null;
+}
+
+export async function reaffirmAffiliationAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  const v = await viewer();
+  const no = denied(v, "write");
+  if (no) return { error: no };
+  const a = await affOrg(v.tenantId, str(fd, "affiliationId"));
+  if (!a) return { error: "ไม่พบสังกัดนี้" };
+  const access = await orgAccess(v.tenantId, a.org_id, who(v));
+  if (!access.ok) return { error: access.error };
+  const res = await reaffirmAffiliation(v.tenantId, str(fd, "affiliationId"), v.actor);
+  if (!res.ok) return { error: res.error };
+  revalidatePath("/app/data");
+  revalidatePath(`/app/accounts/${a.org_id}`);
+  return { ok: "ยืนยันว่ายังอยู่แล้ว" };
+}
+
+export async function leftCompanyAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  const v = await viewer();
+  const no = denied(v, "write");
+  if (no) return { error: no };
+  const a = await affOrg(v.tenantId, str(fd, "affiliationId"));
+  if (!a) return { error: "ไม่พบสังกัดนี้" };
+  const access = await orgAccess(v.tenantId, a.org_id, who(v));
+  if (!access.ok) return { error: access.error };
+  const res = await endAffiliation(v.tenantId, str(fd, "affiliationId"), str(fd, "endedOn"), str(fd, "reason") || "ตรวจจากหน้าสุขภาพข้อมูล", v.actor);
+  if (!res.ok) return { error: res.error };
+  revalidatePath("/app/data");
+  revalidatePath(`/app/accounts/${a.org_id}`);
+  return { ok: "บันทึกว่าออกแล้ว — ประวัติยังอยู่" };
 }
