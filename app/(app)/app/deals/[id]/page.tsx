@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { viewer } from "@/app/(app)/viewer";
 import {
-  addDealItemAction, closeDealAction, logDealActivityAction, setForecastAction, moveDealAction, removeDealItemAction, removeDealPersonAction, setDealPersonAction, syncDealValueAction, updateDealAction,
+  addDealItemAction, closeDealAction, createRenewalAction, logDealActivityAction, setForecastAction, moveDealAction, removeDealItemAction, removeDealPersonAction, setDealPersonAction, syncDealValueAction, updateDealAction,
 } from "@/app/(app)/deal-actions";
 import { listFields, valuesFor } from "@/lib/engine/custom-fields";
 import { listItems, packageNames } from "@/lib/engine/deal-items";
@@ -66,6 +66,11 @@ export default async function DealPage({ params, searchParams }: { params: Promi
     return `${nameOf.get(pid) ?? "บุคคล"}${role ? ` (${dealRoleTh(role)})` : ""}`;
   };
   const closed = d.stage === "won" || d.stage === "lost";
+  const [renewalOf, renewedFrom] = await Promise.all([
+    get<{ id: string; name: string }>("SELECT id, name FROM opportunities WHERE tenant_id = ? AND renewed_from = ? AND deleted_at IS NULL", v.tenantId, d.id),
+    get<{ id: string; name: string }>("SELECT p.id, p.name FROM opportunities o JOIN opportunities p ON p.id = o.renewed_from AND p.tenant_id = o.tenant_id WHERE o.tenant_id = ? AND o.id = ?", v.tenantId, d.id),
+  ]);
+  const links = { renewal: renewalOf ?? null, from: renewedFrom ?? null };
   const closeInfo = closed ? await get<{ close_reason: string | null; close_note: string | null }>(
     "SELECT close_reason, close_note FROM opportunities WHERE tenant_id = ? AND id = ?", v.tenantId, d.id) : undefined;
   const pathStages = [...OPEN_STAGES, closed ? (d.stage as "won" | "lost") : "won"];
@@ -134,11 +139,25 @@ export default async function DealPage({ params, searchParams }: { params: Promi
                     </select>
                   </label>
                   <label className={LABEL}>หมายเหตุ (ไม่บังคับ)<input name="note" className="c-input" maxLength={500} /></label>
+                  {st === "won" && (
+                    <label className="c-thai flex items-start gap-2 text-[0.8rem] text-[var(--c-text-2)]">
+                      <input type="checkbox" name="renew" value="1" defaultChecked className="mt-0.5" />
+                      <span>สร้างดีลต่อสัญญารอบถัดไป (ชื่อเลื่อนปี · ปิดคาด +1 ปี · แพ็กเกจและคนในดีลเดิม)</span>
+                    </label>
+                  )}
                 </ActionForm>
               </details>
             </li>
           ))}
         </ol>
+        {(links.from || links.renewal || d.stage === "won") && (
+          <p className="c-thai mt-2 flex flex-wrap items-center gap-2 px-1 text-[0.82rem] text-[var(--c-text-3)]">
+            {links.from && <>ต่อสัญญาจาก <Link href={`/app/deals/${links.from.id}`} className="text-[var(--c-accent)] hover:underline">{links.from.name}</Link></>}
+            {links.renewal
+              ? <>ดีลต่อสัญญา: <Link href={`/app/deals/${links.renewal.id}`} className="text-[var(--c-accent)] hover:underline">{links.renewal.name}</Link></>
+              : d.stage === "won" && <ActionForm action={createRenewalAction} fields={{ dealId: d.id }} label="สร้างดีลต่อสัญญารอบถัดไป" pendingLabel="กำลังสร้าง…" size="sm" variant="ghost" />}
+          </p>
+        )}
         {closed && closeInfo?.close_reason && (
           <p className="c-thai mt-2 px-1 text-[0.82rem] text-[var(--c-text-3)]">
             {d.stage === "won" ? "ได้เพราะ" : "ไม่ได้เพราะ"} {CLOSE_REASON_TH[closeInfo.close_reason] ?? closeInfo.close_reason}{closeInfo.close_note ? ` — ${closeInfo.close_note}` : ""}

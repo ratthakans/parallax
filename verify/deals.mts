@@ -5,7 +5,8 @@ import "./isolate.mts";
 import { randomUUID } from "node:crypto";
 import { ensureReady } from "@/lib/engine/bootstrap";
 import { all, run } from "@/lib/engine/sql";
-import { closeDeal, createDeal, getDeal, listDeals, moveDeal, updateDeal } from "@/lib/engine/deals";
+import { closeDeal, createDeal, createRenewal, getDeal, listDeals, moveDeal, renewalName, updateDeal } from "@/lib/engine/deals";
+import { addItem, listItems } from "@/lib/engine/deal-items";
 import { closeReasons } from "@/lib/engine/velocity";
 import { get } from "@/lib/engine/sql";
 
@@ -77,6 +78,27 @@ const rs = await closeReasons(T, ME, new Date(Date.now() - 864e5).toISOString())
 ok(rs.find((r) => r.stage === "lost" && r.reason === "price")?.value === 100000 && rs.find((r) => r.stage === "lost" && r.reason === "competitor")?.count === 1
   && rs.find((r) => r.stage === "won" && r.reason === "relationship")?.value === 300000, "รายงานเหตุผลรวมตามฝั่งและเหตุผล");
 ok(rs.some((r) => r.reason === "unrecorded"), "ดีลที่ปิดโดยไม่มีเหตุผล (ทางเดิม) นับเป็น 'ไม่ได้บันทึก'");
+
+// ── E4 · ดีลต่อสัญญา ──
+ok(renewalName("สปอนเซอร์ Gold งาน 2026") === "สปอนเซอร์ Gold งาน 2027" && renewalName("บูธ ปี 2569") === "บูธ ปี 2570" && renewalName("แพ็กเกจพิเศษ") === "แพ็กเกจพิเศษ (ต่อสัญญา)", "ชื่อดีลเลื่อนปี (ค.ศ./พ.ศ.) · ไม่มีปี = ต่อท้าย");
+const R0 = (await createDeal(T, { orgId: A, name: "สปอนเซอร์ Gold งาน 2026 (สมมุติ)", value: "400000", expectedClose: "2026-03-15" }, ME));
+const r0 = R0.ok ? R0.id : "";
+await addItem(T, r0, { package: "Gold", qty: "1", unitPrice: "400000" }, ME);
+ok(!(await createRenewal(T, r0, ME)).ok, "ดีลที่ยังไม่ปิดได้ ต่อสัญญาไม่ได้");
+await closeDeal(T, r0, "won", "relationship", "", ME);
+const rn = await createRenewal(T, r0, ME);
+ok(rn.ok && !rn.existed, "สร้างดีลต่อสัญญาจากดีลที่ปิดได้");
+const nd = rn.ok ? await get<{ name: string; stage: string; value: number; expected_close: string; renewed_from: string; owner_id: string }>(
+  "SELECT name, stage, value, expected_close, renewed_from, owner_id FROM opportunities WHERE tenant_id = ? AND id = ?", T, rn.id) : undefined;
+ok(nd?.name === "สปอนเซอร์ Gold งาน 2027 (สมมุติ)" && nd.stage === "open" && Number(nd.value) === 400000 && nd.expected_close === "2027-03-15" && nd.renewed_from === r0 && nd.owner_id === ME.id,
+  "ดีลใหม่: ชื่อปีถัดไป · เริ่มคุย · มูลค่าเดิม · ปิดคาด +1 ปี · ผูกกับดีลเดิม · เจ้าของเดิม");
+ok(rn.ok && (await listItems(T, rn.id)).map((i) => `${i.package}:${i.total}`).join() === "Gold:400000", "แพ็กเกจเดิมติดไปด้วย");
+const again = await createRenewal(T, r0, ME);
+ok(again.ok && again.existed && rn.ok && again.id === rn.id, "ต่อสัญญาซ้ำ = คืนดีลเดิม ไม่สร้างซ้ำ");
+ok(!(await createRenewal("mst-golf", r0, ME)).ok, "ต่อสัญญาข้ามบัญชีไม่ได้");
+const leap = await createDeal(T, { orgId: A, name: "ดีลวันอธิกสุรทิน 2028 (สมมุติ)", expectedClose: "2028-02-29" }, ME);
+if (leap.ok) { await closeDeal(T, leap.id, "won", "timing", "", ME); const lr = await createRenewal(T, leap.id, ME);
+  ok(lr.ok && (await get<{ expected_close: string }>("SELECT expected_close FROM opportunities WHERE tenant_id = ? AND id = ?", T, lr.id))?.expected_close === "2029-02-28", "29 ก.พ. ต่อปีถัดไปเป็น 28 ก.พ."); }
 
 for (const line of out) console.log(line);
 const failed = out.filter((l) => l.startsWith("FAIL"));
