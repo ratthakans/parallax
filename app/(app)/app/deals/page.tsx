@@ -9,6 +9,10 @@ import { teamMembers } from "@/lib/engine/team";
 import { cleanQuery, listViews } from "@/lib/engine/saved-views";
 import { can } from "@/lib/shared/roles";
 import { SavedViews } from "@/components/console/saved-views";
+import { bulkDealsAction } from "@/app/(app)/bulk-actions";
+import { ActionForm } from "@/components/console/action-form";
+import { SelectAll } from "@/components/console/select-all";
+import { FORECAST_CATEGORIES, FORECAST_TH, DEAL_STAGE_TH } from "@/lib/shared/deals";
 import { PageHead, Panel, baht, num } from "@/components/console/ui";
 import { ListViews, SortTh, listHref, type ListState } from "@/components/console/list-view";
 import { DealBoard } from "@/components/console/deal-board";
@@ -133,10 +137,35 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
         </>
       ) : (
         <Panel className="p-0">
+          {/* ── ทำทีละหลายรายการ (E3) ── ปิดดีลหลายรายการไม่ได้ (ต้องมีเหตุผลต่อดีล) */}
+          <div className="flex justify-end border-b border-[var(--c-line)] px-5 py-2">
+            <details className="relative">
+              <summary className="c-btn c-btn-ghost c-btn-sm inline-flex cursor-pointer list-none">เปลี่ยนรายการที่ติ๊ก…</summary>
+              <ActionForm id="bulk-deals" action={bulkDealsAction} label="เปลี่ยน" pendingLabel="กำลังเปลี่ยน…" size="sm"
+                className="c-panel absolute right-0 z-10 mt-1 grid w-80 gap-2 p-3">
+                <label className={LABEL}>เปลี่ยนอะไร
+                  <select name="op" className="c-select" defaultValue="owner">
+                    <option value="owner">เจ้าของดีล</option><option value="stage">ขั้น (ที่ยังเปิด)</option><option value="forecast">หมวดพยากรณ์</option>
+                    {fields.map((f) => <option key={f.id} value={`df.${f.id}`}>{f.label}</option>)}
+                  </select>
+                </label>
+                <label className={LABEL}>เจ้าของใหม่<input name="owner" list="bulk-team" className="c-input" autoComplete="off" /></label>
+                <label className={LABEL}>ขั้นใหม่
+                  <select name="stage" className="c-select" defaultValue="qualified">{OPEN_STAGES.map((x) => <option key={x} value={x}>{DEAL_STAGE_TH[x]}</option>)}</select>
+                </label>
+                <label className={LABEL}>หมวดพยากรณ์
+                  <select name="category" className="c-select" defaultValue=""><option value="">ตามขั้น</option>{FORECAST_CATEGORIES.map((c) => <option key={c} value={c}>{FORECAST_TH[c]}</option>)}</select>
+                </label>
+                {fields.length > 0 && <label className={LABEL}>ค่าใหม่ของฟิลด์ (ว่าง = ล้างค่า)<input name="value" className="c-input" /></label>}
+                <datalist id="bulk-team">{team.map((m) => <option key={m} value={m} />)}</datalist>
+              </ActionForm>
+            </details>
+          </div>
           <div className="c-scroll px-5 py-2" tabIndex={0} role="region" aria-label="ตารางดีล">
             <table className="c-table min-w-[52rem]">
               <thead>
                 <tr>
+                  <th className="w-8"><SelectAll form="bulk-deals" /></th>
                   <SortTh base={BASE} state={state} col="name" label="ดีล" />
                   <SortTh base={BASE} state={state} col="org" label="บริษัท" />
                   <th className="font-sans text-[0.75rem] normal-case tracking-normal">ขั้น</th>
@@ -149,6 +178,7 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
               <tbody>
                 {deals.map((d) => (
                   <tr key={d.id}>
+                    <td><input type="checkbox" form="bulk-deals" name="ids" value={d.id} aria-label={`เลือก ${d.name}`} className="h-4 w-4" /></td>
                     <td><Link href={`/app/deals/${d.id}`} className="c-thai text-[var(--c-accent)] hover:underline">{d.name}</Link></td>
                     <td className="c-thai text-[0.84rem]"><Link href={`/app/accounts/${d.orgId}`} className="hover:text-[var(--c-accent)]">{d.org}</Link></td>
                     <td><span className={`c-pill ${d.stage === "won" ? "c-pill-good" : d.stage === "lost" ? "" : "c-pill-reach"}`}>{stageTh(d.stage)}</span></td>

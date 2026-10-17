@@ -6,7 +6,10 @@ import { ensureReady } from "@/lib/engine/bootstrap";
 import { get, run } from "@/lib/engine/sql";
 import { dataHealth } from "@/lib/engine/data-health";
 import { reaffirmAffiliation, endAffiliation } from "@/lib/engine/accounts/edit";
-import { createTeam } from "@/lib/engine/forecast";
+import { createTeam, listTeams } from "@/lib/engine/forecast";
+import { bulkDeals, bulkOrgs } from "@/lib/engine/bulk";
+import { createField, valuesFor } from "@/lib/engine/custom-fields";
+import { all } from "@/lib/engine/sql";
 
 const out: string[] = [];
 const ok = (c: boolean, m: string) => out.push(`${c ? "PASS" : "FAIL"}  ${m}`);
@@ -87,6 +90,31 @@ ok(Number(v?.n) === 1, "การยืนยันมีประวัติ")
 await endAffiliation(T, aOld, "2026-10-17", "ทดสอบ", ME.id);
 ok(!(await reaffirmAffiliation(T, aOld, ME.id)).ok, "สังกัดที่ปิดแล้วยืนยันว่ายังอยู่ไม่ได้");
 ok(!(await reaffirmAffiliation("mst-golf", aOld, ME.id)).ok, "แก้สังกัดข้ามบัญชีไม่ได้");
+
+// ── E3 · ทำทีละหลายรายการ ──
+const teamId = (await listTeams(T))[0].id;
+const rOwner = await bulkOrgs(T, [A, C, S, "o-nope"], { kind: "owner", owner: "nok@verify" }, ME);
+ok(rOwner.done === 2 && rOwner.skipped.length === 2, "เปลี่ยนเจ้าของหลายบริษัท: ข้ามบริษัทเกินสิทธิ์และที่ไม่มีอยู่ ไม่ล้มทั้งชุด");
+const owners = await all<{ id: string; account_owner_id: string | null }>("SELECT id, account_owner_id FROM orgs WHERE tenant_id = ? AND id IN (?, ?, ?)", T, A, C, S);
+ok(owners.find((o) => o.id === A)?.account_owner_id === "nok@verify" && owners.find((o) => o.id === S)?.account_owner_id === null, "บริษัทลับไม่ถูกแตะ");
+ok((await bulkOrgs(T, [A, C], { kind: "team", teamId }, ME)).done === 2, "ตั้งทีมหลายบริษัท");
+const tf = await createField(T, { entity: "org", label: "ภาค", kind: "choice", options: "ตะวันออก, เหนือ" }, ME.id);
+const fid = tf.ok ? tf.id : "";
+const rField = await bulkOrgs(T, [A, C], { kind: "field", fieldId: fid, value: "ใต้" }, ME);
+ok(rField.done === 0 && rField.skipped.every((x) => x.reason.includes("ตัวเลือก")), "ค่าที่ไม่ผ่านตรวจ = ข้ามทุกแถวพร้อมเหตุผล");
+await bulkOrgs(T, [A, C], { kind: "field", fieldId: fid, value: "ตะวันออก" }, ME);
+const vals = await valuesFor(T, "org", [A, C]);
+ok(vals.get(A)?.get(fid) === "ตะวันออก" && vals.get(C)?.get(fid) === "ตะวันออก", "ตั้งฟิลด์หลายบริษัท");
+const vCount = await get<{ n: number | string }>("SELECT COUNT(*) AS n FROM record_versions WHERE tenant_id = ? AND record_kind = 'org' AND field = 'team_id'", T);
+ok(Number(vCount?.n) === 2, "ทุกแถวมีประวัติเหมือนแก้ทีละแถว");
+const dealIds = (await all<{ id: string }>("SELECT id FROM opportunities WHERE tenant_id = ? AND org_id IN (?, ?) AND stage = 'open'", T, A, C)).map((x) => x.id);
+ok((await bulkDeals(T, dealIds, { kind: "stage", stage: "won" }, ME)).done === 0, "ปิดดีลหลายรายการไม่ได้ (ต้องมีเหตุผลต่อดีล)");
+ok((await bulkDeals(T, dealIds, { kind: "stage", stage: "proposal" }, ME)).done === dealIds.length, "ย้ายขั้นหลายดีล");
+ok((await bulkDeals(T, dealIds, { kind: "owner", owner: "nok@verify" }, ME)).done === dealIds.length
+  && (await all<{ owner_id: string }>("SELECT owner_id FROM opportunities WHERE tenant_id = ? AND id IN (" + dealIds.map(() => "?").join(",") + ")", T, ...dealIds)).every((x) => x.owner_id === "nok@verify"), "เปลี่ยนเจ้าของหลายดีล");
+ok((await bulkDeals(T, dealIds, { kind: "forecast", category: "commit" }, ME)).done === dealIds.length, "ตั้งหมวดพยากรณ์หลายดีล");
+ok((await bulkOrgs("mst-golf", [A], { kind: "owner", owner: "x@verify" }, ME)).done === 0, "ทำหลายรายการข้ามบัญชีไม่ได้");
+ok((await bulkOrgs(T, Array.from({ length: 250 }, () => A), { kind: "team", teamId }, ME)).done === 1, "รหัสซ้ำนับครั้งเดียว");
 
 for (const line of out) console.log(line);
 const failed = out.filter((l) => l.startsWith("FAIL"));

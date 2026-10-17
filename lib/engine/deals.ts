@@ -273,3 +273,22 @@ export async function closeDeal(
   await run("UPDATE opportunities SET close_reason = ?, close_note = ? WHERE tenant_id = ? AND id = ?", reason, n || null, tenantId, id);
   return { ok: true };
 }
+
+/** เปลี่ยนเจ้าของดีล (docs/crm-plan.md E3) — มีรุ่นในประวัติ */
+export async function setDealOwner(tenantId: string, id: string, owner: string, viewer: Viewer): Promise<Result> {
+  const who = owner.trim().slice(0, 120);
+  if (!who) return { ok: false, error: "เลือกเจ้าของ" };
+  const d = await get<{ org_id: string; owner_id: string | null }>("SELECT org_id, owner_id FROM opportunities WHERE tenant_id = ? AND id = ?", tenantId, id);
+  if (!d) return { ok: false, error: "ไม่พบดีลนี้" };
+  const access = await orgAccess(tenantId, d.org_id, viewer);
+  if (!access.ok) return access;
+  if (d.owner_id === who) return { ok: true };
+  const at = new Date().toISOString();
+  await tx(async (q) => {
+    await q.run(
+      "INSERT INTO record_versions (tenant_id, record_kind, record_id, field, old_value, new_value, reason, changed_by, valid_from, recorded_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+      tenantId, "opportunity", id, "owner_id", d.owner_id, who, "เปลี่ยนเจ้าของดีล", viewer.id, null, at);
+    await q.run("UPDATE opportunities SET owner_id = ?, updated_at = ? WHERE tenant_id = ? AND id = ?", who, at, tenantId, id);
+  });
+  return { ok: true };
+}
