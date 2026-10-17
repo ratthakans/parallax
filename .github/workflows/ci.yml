@@ -205,6 +205,10 @@ jobs:
       - name: CRM
         run: npm run verify:crm
 
+      # จัดการฐานข้อมูล (D): สุขภาพข้อมูลนับถูกและเคารพระดับความลับ · แก้สังกัดเก่าได้พร้อมประวัติ
+      - name: Data management
+        run: npm run verify:data
+
       # งาน (U5): มุมมองถูก · งานแคมเปญปิดที่แคมเปญเท่านั้น · บริษัทเกินสิทธิ์ไม่โผล่
       - name: Tasks
         run: npm run verify:tasks

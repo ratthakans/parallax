@@ -166,7 +166,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
             ))}
           </ul>
           <p className="c-thai mt-4 text-[0.78rem] text-[var(--c-text-4)]">
-            <Link href="/app/vault/review" className="underline">ตรวจข้อมูลซ้ำ</Link> · <Link href="/app/sales/purposes" className="underline">ตั้งกฎอายุข้อมูล</Link>
+            <Link href="/app/data" className="underline">สุขภาพข้อมูล (รายการที่ต้องแก้)</Link> · <Link href="/app/vault/review" className="underline">ตรวจข้อมูลซ้ำ</Link> · <Link href="/app/sales/purposes" className="underline">ตั้งกฎอายุข้อมูล</Link>
           </p>
         </Panel>
 
