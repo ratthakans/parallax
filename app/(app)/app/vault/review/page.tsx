@@ -16,6 +16,7 @@ import { thaiDate, thaiDateTime } from "@/lib/shared/format";
 import { ActionForm } from "@/components/console/action-form";
 import { Metric, PageHead, Panel, num, pct } from "@/components/console/ui";
 
+export const metadata = { title: "ตรวจข้อมูลซ้ำ" };
 export const dynamic = "force-dynamic";
 
 /* ── คิวตรวจตัวตน (docs/plan.md B3 · Blueprint 2.0 บท 3) ─────────────

@@ -31,7 +31,7 @@ export async function createDealAction(_p: ActionState, fd: FormData): Promise<A
   /* มาจากปุ่ม "+ ดีล" ของหน้าบริษัท และไม่ได้แก้ชื่อ = บริษัทนั้นแน่นอน (ชื่อซ้ำกันได้) — engine ตรวจสิทธิ์ซ้ำ */
   const prefilled = str(fd, "prefillOrgId") && str(fd, "orgName").trim() === str(fd, "prefillOrgName") ? str(fd, "prefillOrgId") : "";
   const orgId = prefilled || (await orgByName(v.tenantId, str(fd, "orgName")));
-  if (!orgId) return { error: "ไม่พบบริษัทชื่อนี้ — พิมพ์แล้วเลือกจากรายการ (บริษัทใหม่: เพิ่มผู้ติดต่อพร้อมชื่อบริษัทก่อน)" };
+  if (!orgId) return { error: "ไม่พบบริษัทชื่อนี้ — พิมพ์แล้วเลือกจากรายการ หรือสร้างบริษัทใหม่ก่อน (+ ใหม่ › บริษัท)" };
   const res = await createDeal(v.tenantId, {
     orgId, name: str(fd, "name"), value: str(fd, "value"), expectedClose: str(fd, "expectedClose"), stage: str(fd, "stage"),
   }, { id: v.actor, clearance: v.clearance });

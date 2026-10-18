@@ -103,9 +103,9 @@ export async function todayQueue(tenantId: string, viewer: Viewer, now = new Dat
 
   /* ── 2–3 · งานที่ครบกำหนดและเลยกำหนด ── ของผู้อ่าน + งานที่ยังไม่มีผู้รับผิดชอบ */
   const tasks = await all<{ id: string; title: string; due_at: string; owner_id: string | null; org_id: string | null; customer_id: string | null;
-    campaign_id: string | null; org: string | null; oc: string | null; o_owner: string | null; o_data: string | null;
+    campaign_id: string | null; target_id: string | null; org: string | null; oc: string | null; o_owner: string | null; o_data: string | null;
     person: string | null; pc: string | null }>(
-    `SELECT k.id, k.title, k.due_at, k.owner_id, k.org_id, k.customer_id, k.campaign_id,
+    `SELECT k.id, k.title, k.due_at, k.owner_id, k.org_id, k.customer_id, k.campaign_id, k.target_id,
        o.name AS org, o.classification AS oc, o.account_owner_id AS o_owner, o.data_owner_id AS o_data,
        c.name AS person, c.classification AS pc
      FROM tasks k LEFT JOIN orgs o ON o.id = k.org_id AND o.tenant_id = k.tenant_id
@@ -137,6 +137,7 @@ export async function todayQueue(tenantId: string, viewer: Viewer, now = new Dat
       ].filter(Boolean),
       href: k.campaign_id ? `/app/sales/${k.campaign_id}` : k.org_id && !orgHidden ? `/app/accounts/${k.org_id}` : null,
       at: k.due_at, eligibility, snoozable: true, ackable: false,
+      task: { campaignId: k.campaign_id, targetId: k.target_id },
     });
   }
 

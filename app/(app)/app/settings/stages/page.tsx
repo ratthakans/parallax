@@ -7,6 +7,7 @@ import { can } from "@/lib/shared/roles";
 import { ActionForm } from "@/components/console/action-form";
 import { PageHead, Panel } from "@/components/console/ui";
 
+export const metadata = { title: "กฎขั้นของดีล" };
 export const dynamic = "force-dynamic";
 
 /* ── กฎขั้นของดีล (docs/crm-plan.md D4) ── ดีลต้องมีอะไรก่อนเข้าขั้นไหน · ตรวจทุกครั้งที่ย้ายขั้นด้วยมือ (Path · ลาก · หลายรายการ · ปิดดีล) */
@@ -36,7 +37,8 @@ export default async function StageRulesPage() {
                       <td key={r} className="text-center">
                         {manage ? (
                           <ActionForm action={setStageRuleAction} fields={{ stage: s, requirement: r, on: on ? "0" : "1" }} size="sm" variant={on ? "primary" : "ghost"}
-                            label={on ? "✓ ต้องมี" : "—"} pendingLabel="…" />
+                            label={on ? "✓ ต้องมี" : "+ ตั้ง"} pendingLabel="…"
+                            ariaLabel={`${on ? "เลิกบังคับ" : "บังคับ"}ให้${REQUIREMENT_TH[r]} ก่อนเข้าขั้น ${DEAL_STAGE_TH[s]}`} />
                         ) : <span className="c-thai text-[0.82rem]">{on ? "✓ ต้องมี" : "—"}</span>}
                       </td>
                     );

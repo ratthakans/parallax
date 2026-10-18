@@ -5,6 +5,7 @@ import { TARGET_STATUS_TH, TARGET_STATUSES } from "@/lib/shared/policy";
 import { baht, thaiDate } from "@/lib/shared/format";
 import { PageHead, Panel, num } from "@/components/console/ui";
 
+export const metadata = { title: "สรุปรายสัปดาห์" };
 export const dynamic = "force-dynamic";
 
 /* ── ทบทวนรายสัปดาห์ (docs/plan.md หัวข้อ 3.3) ─────────────────────

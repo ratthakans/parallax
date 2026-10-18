@@ -38,11 +38,11 @@ export async function similarOrgs(tenantId: string, input: { orgId?: string; nam
     const why = taxId && r.tax_id === taxId ? "เลขนิติบุคคลเดียวกัน"
       : domainOrgs.has(r.id) ? "โดเมนอีเมลเดียวกัน"
       : key && rk === key ? "ชื่อเดียวกันเมื่อตัดคำนิติบุคคล"
-      : key.length >= 4 && rk.length >= 4 && (rk.includes(key) || key.includes(rk)) ? "ชื่อคล้ายกัน"
+      : key.length >= 4 && rk.length >= 4 && (rk.includes(key) || key.includes(rk)) ? "ชื่อคล้ายกัน — ตรวจก่อน อาจเป็นคนละบริษัท"
       : null;
     if (why) out.push({ id: r.id, name: r.name, why });
   }
-  const rank = (w: string) => ["เลขนิติบุคคลเดียวกัน", "โดเมนอีเมลเดียวกัน", "ชื่อเดียวกันเมื่อตัดคำนิติบุคคล", "ชื่อคล้ายกัน"].indexOf(w);
+  const rank = (w: string) => ["เลขนิติบุคคลเดียวกัน", "โดเมนอีเมลเดียวกัน", "ชื่อเดียวกันเมื่อตัดคำนิติบุคคล", "ชื่อคล้ายกัน — ตรวจก่อน อาจเป็นคนละบริษัท"].indexOf(w);
   return out.sort((a, b) => rank(a.why) - rank(b.why) || a.name.localeCompare(b.name, "th")).slice(0, 8);
 }
 

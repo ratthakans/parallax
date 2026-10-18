@@ -6,6 +6,7 @@ import { Metric, PageHead, Panel, baht, num, pct } from "@/components/console/ui
 import { RevenueBars } from "@/components/console/revenue-bars";
 import { switchTenantAction } from "../../actions";
 
+export const metadata = { title: "ภาพรวมผู้บริหาร" };
 export const dynamic = "force-dynamic";
 
 /* ── ภาพรวมผู้บริหาร ─────────────────────────────────────────────

@@ -7,6 +7,7 @@ import { can } from "@/lib/shared/roles";
 import { ActionForm } from "@/components/console/action-form";
 import { PageHead, Panel, num } from "@/components/console/ui";
 
+export const metadata = { title: "ทีมและเขตการขาย" };
 export const dynamic = "force-dynamic";
 
 /* ── ทีมและเขตการขาย (docs/crm-plan.md C6) ── ใครอยู่ทีมไหน · บริษัทไหนเป็นของทีมไหน (ตั้งที่แฟ้มบริษัท)

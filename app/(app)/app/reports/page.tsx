@@ -9,6 +9,7 @@ import { bangkokDay, thaiDate } from "@/lib/shared/format";
 import { DEAL_STAGE_TH } from "@/lib/shared/deals";
 import { PageHead, Panel, baht, num } from "@/components/console/ui";
 
+export const metadata = { title: "รายงาน" };
 export const dynamic = "force-dynamic";
 
 /* ── รายงาน (docs/ux-plan.md U6) ── 4 กราฟตายตัว เปิดแล้วอ่านได้เลย · ทบทวนรายสัปดาห์แบบละเอียดอยู่ที่ลิงก์ด้านบน

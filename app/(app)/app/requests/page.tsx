@@ -11,6 +11,7 @@ import { ActionForm } from "@/components/console/action-form";
 import { Metric, PageHead, Panel, num } from "@/components/console/ui";
 import { DueBadge } from "@/components/console/dsar-badge";
 
+export const metadata = { title: "คำขอสิทธิ" };
 export const dynamic = "force-dynamic";
 
 /* ── คำขอสิทธิ (docs/plan.md หัวข้อ 7.4 · B6) ─────────────────────

@@ -17,6 +17,7 @@ import {
 import { togglePlayAction, updateGuardsAction } from "../../actions";
 import { ActionForm } from "@/components/console/action-form";
 
+export const metadata = { title: "แผนการขาย" };
 export const dynamic = "force-dynamic";
 
 export default async function PlaysPage() {

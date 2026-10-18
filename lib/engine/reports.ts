@@ -39,8 +39,10 @@ export async function reports(tenantId: string, viewer: Viewer, now = new Date()
   const monday = new Date(+today - ((today.getUTCDay() + 6) % 7) * 864e5);
   const weeks = Array.from({ length: 12 }, (_, i) => new Date(+monday - (11 - i) * 7 * 864e5).toISOString().slice(0, 10));
   const since = weeks[0];
-  const acts = await all<{ kind: string; day: string }>(
-    "SELECT kind, substr(occurred_at, 1, 10) AS day FROM interactions WHERE tenant_id = ? AND substr(occurred_at, 1, 10) >= ?", tenantId, since);
+  /* นับตามวันเวลาไทย — ตัด substr ของเวลา UTC ทำให้กิจกรรมหลังเที่ยงคืนวันจันทร์ (ไทย) ตกไปสัปดาห์ก่อน */
+  const acts = (await all<{ kind: string; occurred_at: string }>(
+    "SELECT kind, occurred_at FROM interactions WHERE tenant_id = ? AND substr(occurred_at, 1, 10) >= ?", tenantId, prevDay(since)))
+    .map((a) => ({ kind: a.kind, day: a.occurred_at.length > 10 ? bangkokDay(new Date(a.occurred_at)) : a.occurred_at.slice(0, 10) }));
   const activity = weeks.map((w, i) => {
     const end = weeks[i + 1] ?? "9999";
     const xs = acts.filter((a) => a.day >= w && a.day < end);
@@ -76,4 +78,8 @@ export async function reports(tenantId: string, viewer: Viewer, now = new Date()
     { label: "คนที่ยังไม่มีกฎอายุข้อมูล", count: ret.noRule, of: ret.people, good: false },
   ];
   return { pipeline, wonThisQuarter: { count: wonQ.length, value: wonQ.reduce((s, d) => s + (d.value ?? 0), 0) }, activity, funnel, quality };
+}
+
+function prevDay(day: string): string {
+  return new Date(+new Date(`${day}T00:00:00Z`) - 864e5).toISOString().slice(0, 10);
 }

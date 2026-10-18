@@ -9,12 +9,13 @@ import { listTeams } from "@/lib/engine/forecast";
 import { bulkOrgsAction } from "@/app/(app)/bulk-actions";
 import { teamMembers } from "@/lib/engine/team";
 import { ActionForm } from "@/components/console/action-form";
-import { SelectAll } from "@/components/console/select-all";
+import { SelectAll, SelectedCount } from "@/components/console/select-all";
 import { CLASSIFICATION_TH, LIFECYCLE_TH, type LifecycleState } from "@/lib/shared/vault";
 import { thaiDate } from "@/lib/shared/format";
 import { PageHead, Panel, num } from "@/components/console/ui";
 import { ListViews, Pager, SortTh, type ListState } from "@/components/console/list-view";
 
+export const metadata = { title: "บริษัท" };
 export const dynamic = "force-dynamic";
 
 /* ── รายการบริษัท (docs/plan.md B4 · docs/ux-plan.md U3) ─────────────
@@ -27,7 +28,7 @@ const VIEWS: { key: AccountView; label: string }[] = [
   { key: "all", label: "ทั้งหมด" },
   { key: "mine", label: "บัญชีของฉัน" },
   { key: "open_deals", label: "มีดีลเปิด" },
-  { key: "quiet", label: "เงียบเกิน 30 วัน" },
+  { key: "quiet", label: "ดูแลอยู่แต่เงียบ 30 วัน" },
   { key: "no_owner", label: "ยังไม่มีเจ้าของ" },
 ];
 
@@ -68,7 +69,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
   const current = cleanQuery(new URLSearchParams(Object.entries({ view: view !== "all" ? view : "", sort: sort ?? "", dir: dir ?? "", ...extra }).filter((e) => e[1])).toString());
   return (
     <>
-      <PageHead label="บริษัท" title="บริษัท" />
+      <PageHead label="บริษัท" title="บริษัท" actions={<Link href="/app/accounts/new" className="c-btn c-btn-primary">+ บริษัท</Link>} />
       <SavedViews list="accounts" base={BASE} views={saved} current={current} canShare={can(v.role, "fields")} />
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -85,6 +86,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
         <summary className="c-thai cursor-pointer text-[0.86rem] text-[var(--c-accent)]">ตัวกรอง{nFilters ? ` (${nFilters})` : ""}</summary>
         <form action={BASE} className="c-panel mt-2 grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
           {view !== "all" && <input type="hidden" name="view" value={view} />}
+          {sp.q && <input type="hidden" name="q" value={sp.q} />}
           <label className={LABEL}>อุตสาหกรรม
             <select name="industry" defaultValue={filters.industry ?? ""} className="c-select">
               <option value="">ทั้งหมด</option>{opts.industries.map((x) => <option key={x} value={x}>{x}</option>)}
@@ -135,7 +137,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
           {rows.length > 0 && (
             <details className="relative">
               <summary className="c-btn c-btn-ghost c-btn-sm inline-flex cursor-pointer list-none">เปลี่ยนรายการที่ติ๊ก…</summary>
-              <ActionForm id="bulk-orgs" action={bulkOrgsAction} label="เปลี่ยน" pendingLabel="กำลังเปลี่ยน…" size="sm"
+              <ActionForm id="bulk-orgs" action={bulkOrgsAction} label="เปลี่ยน" pendingLabel="กำลังเปลี่ยน…" size="sm" closeOnSuccess
                 className="c-panel absolute right-0 z-10 mt-1 grid w-80 gap-2 p-3">
                 <label className={LABEL}>เปลี่ยนอะไร
                   <select name="op" className="c-select" defaultValue="owner">
@@ -144,7 +146,9 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
                     {fields.map((f) => <option key={f.id} value={`cf.${f.id}`}>{f.label}</option>)}
                   </select>
                 </label>
-                <label className={LABEL}>เจ้าของใหม่ (ว่าง = ปล่อยบัญชี)<input name="owner" list="bulk-people" className="c-input" autoComplete="off" /></label>
+                <SelectedCount form="bulk-orgs" />
+                <label className={LABEL}>เจ้าของใหม่<input name="owner" list="bulk-people" className="c-input" autoComplete="off" /></label>
+                <label className="c-thai flex items-center gap-2 text-[0.78rem] text-[var(--c-text-3)]"><input type="checkbox" name="confirmRelease" value="1" /> ปล่อยบัญชีที่ติ๊กทั้งหมด (ไม่ใส่เจ้าของใหม่)</label>
                 {teams.length > 0 && (
                   <label className={LABEL}>ทีม
                     <select name="teamId" className="c-select" defaultValue=""><option value="">ไม่ระบุ</option>{teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select>

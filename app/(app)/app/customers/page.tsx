@@ -18,6 +18,7 @@ import { Metric, PageHead, Panel, baht, num, pct } from "@/components/console/ui
 import { deriveAction } from "../../actions";
 import { ActionForm } from "@/components/console/action-form";
 
+export const metadata = { title: "ผู้ติดต่อ" };
 export const dynamic = "force-dynamic";
 
 /* หัวตารางภาษาไทย — .c-table th เป็นแบบ mono ตัวพิมพ์ใหญ่ถ่างช่องไฟของภาษาอังกฤษ

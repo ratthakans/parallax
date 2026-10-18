@@ -6,6 +6,7 @@ import { Panel } from "@/components/console/ui";
 import { ActionForm } from "@/components/console/action-form";
 import { registerSourceAction } from "../../../../vault-actions";
 
+export const metadata = { title: "เพิ่มแหล่งข้อมูล" };
 export const dynamic = "force-dynamic";
 
 /* ── ลงทะเบียนแหล่งข้อมูล (Blueprint บท 4 ขั้น 1) ─────────────────────

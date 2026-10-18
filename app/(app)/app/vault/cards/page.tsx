@@ -5,6 +5,7 @@ import { bangkokDay } from "@/lib/shared/format";
 import { Panel } from "@/components/console/ui";
 import { CardCapture } from "@/components/console/card-capture";
 
+export const metadata = { title: "นามบัตร" };
 export const dynamic = "force-dynamic";
 
 /* ── กรอกนามบัตร (docs/solo-plan.md S6 · 6a) ─────────────────────────

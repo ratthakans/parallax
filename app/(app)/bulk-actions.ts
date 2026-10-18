@@ -33,6 +33,10 @@ export async function bulkOrgsAction(_p: ActionState, fd: FormData): Promise<Act
     : kind === "team" ? { kind, teamId: str(fd, "teamId") }
     : kind.startsWith("cf.") ? { kind: "field", fieldId: kind.slice(3), value: str(fd, "value") } : null;
   if (!op) return { error: "เลือกว่าจะเปลี่ยนอะไร" };
+  /* เจ้าของว่าง = ปล่อยบัญชีทุกแถวที่ติ๊ก — ต้องติ๊กยืนยันเอง ไม่ใช่ผลข้างเคียงของช่องที่ลืมกรอก (BUG-09) */
+  if (op.kind === "owner" && !op.owner.trim() && str(fd, "confirmRelease") !== "1") {
+    return { error: `ช่องเจ้าของว่าง = ปล่อยบัญชีทั้ง ${ids.length} รายการ — ใส่เจ้าของใหม่ หรือติ๊ก "ปล่อยบัญชีที่ติ๊กทั้งหมด" แล้วกดอีกครั้ง` };
+  }
   const r = await bulkOrgs(v.tenantId, ids, op, { id: v.actor, clearance: v.clearance });
   revalidatePath("/app/accounts");
   return summary(r);

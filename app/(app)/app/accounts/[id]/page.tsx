@@ -37,6 +37,7 @@ import { get as getRow } from "@/lib/engine/sql";
 
 const baht = (n: number) => `฿${n.toLocaleString("th-TH", { maximumFractionDigits: 0 })}`;
 
+export const metadata = { title: "บริษัท" };
 export const dynamic = "force-dynamic";
 
 /* ── แฟ้มบริษัท (docs/plan.md B4 · หัวข้อ 3.5 ข้อ 1–2) ─────────────────
@@ -96,7 +97,7 @@ function Fact({ d, field, value }: { d: Dossier; field: OrgEditable; value: stri
   );
 }
 
-export default async function AccountPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string; asof?: string }> }) {
+export default async function AccountPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string; asof?: string; merged?: string; existed?: string }> }) {
   const { id } = await params;
   const v = await viewer();
   const who = { id: v.actor, clearance: v.clearance };
@@ -188,6 +189,15 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
 
   return (
     <>
+      {/* หลังรวมบริษัท — บอกผลและทางย้อน (docs/qa-plan.md BUG-14) */}
+      {sp.existed === "1" && (
+        <p role="status" className="c-msg c-msg-ok mt-4">มีบริษัทนี้อยู่แล้ว — เปิดแฟ้มเดิมให้แทนการสร้างซ้ำ</p>
+      )}
+      {sp.merged === "1" && (
+        <p role="status" className="c-msg c-msg-ok mb-4">
+          รวมบริษัทเข้าแฟ้มนี้แล้ว — คน ดีล กิจกรรม และงานย้ายมาที่นี่ · รวมผิดย้อนได้ที่ <Link href="/app/vault/review" className="underline">ตรวจข้อมูลซ้ำ › ประวัติการรวม › แยกคืน</Link>
+        </p>
+      )}
       <RecordHeader
         back={{ href: "/app/accounts", label: "บริษัททั้งหมด" }}
         kind="บริษัท"
@@ -222,7 +232,7 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
           <RecordTabs base={base} active={tab} tabs={[
             { key: "overview", label: "ภาพรวม" },
             { key: "details", label: "รายละเอียด" },
-            { key: "people", label: "คน", count: d.people.length },
+            { key: "people", label: "คน", count: current.length },
             { key: "deals", label: "ดีล", count: d.opportunities.length },
             ...(editions.length ? [{ key: "events", label: "งานที่ร่วม", count: editions.reduce((t, p) => t + p.editions.length, 0) }] : []),
             ...(inGroup ? [{ key: "group", label: "บริษัทในเครือ", count: group!.members.length }] : []),
@@ -367,36 +377,6 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
               </div>
             )}
           </Panel>
-          {/* ── บริษัทที่อาจซ้ำ · รวมเข้าบริษัทนี้ ── */}
-          <Panel className="scroll-mt-28 p-5 md:p-6">
-            <h2 id="merge" className="c-h2 text-[var(--c-text)]">บริษัทที่อาจซ้ำกับบริษัทนี้</h2>
-            <p className="c-thai mt-1 text-[0.82rem] text-[var(--c-text-3)]">รวมแล้วคน ดีล กิจกรรม และงานของอีกแฟ้มย้ายมาที่นี่ · ย้อนได้ที่ ตรวจข้อมูลซ้ำ › ประวัติการรวม · เลขนิติบุคคลต่างกันรวมไม่ได้</p>
-            {dupes.length ? (
-              <ul className="mt-3 divide-y divide-[var(--c-line)]">
-                {dupes.map((x) => (
-                  <li key={x.id} className="c-thai flex flex-wrap items-center justify-between gap-2 py-2 text-[0.88rem]">
-                    <span><Link href={`/app/accounts/${x.id}`} className="text-[var(--c-accent)] hover:underline">{x.name}</Link> <span className="text-[0.76rem] text-[var(--c-text-3)]">· {x.why}</span></span>
-                    <ActionForm action={mergeOrgHereAction} fields={{ orgId: o.id, dropId: x.id }} label="รวมเข้าบริษัทนี้" pendingLabel="กำลังรวม…" size="sm" variant="ghost"
-                      confirm={`กดอีกครั้ง — รวม "${x.name}" เข้า "${o.name}"`} />
-                  </li>
-                ))}
-              </ul>
-            ) : <p className="c-thai mt-3 text-[0.86rem] text-[var(--c-text-3)]">ไม่พบบริษัทที่น่าจะซ้ำ</p>}
-            <details className="mt-3">
-              <summary className="c-thai cursor-pointer text-[0.82rem] text-[var(--c-accent)]">รวมบริษัทอื่นที่ไม่อยู่ในรายการ</summary>
-              <ActionForm action={mergeOrgHereAction} fields={{ orgId: o.id }} label="รวมเข้าบริษัทนี้" pendingLabel="กำลังรวม…" size="sm" className="mt-2 grid max-w-md gap-2"
-                confirm="กดอีกครั้ง — รวมบริษัทที่เลือกเข้าบริษัทนี้">
-                <OrgPicker id="merge-org" name="dropName" names={others.map((x) => x.name)} placeholder="พิมพ์ชื่อบริษัทที่จะรวมเข้ามา" required />
-              </ActionForm>
-            </details>
-          </Panel>
-          {!notEmpty && (
-            <Panel className="p-5 md:p-6">
-              <p className="c-thai text-[0.86rem] text-[var(--c-text-3)]">แฟ้มนี้ว่าง (ไม่มีคน ดีล หรือกิจกรรม) — ถ้าสร้างผิด ลบได้ และกู้คืนได้ 30 วัน</p>
-              <ActionForm action={trashOrgAction} fields={{ orgId: o.id }} label="ลบแฟ้มว่างนี้" pendingLabel="…" size="sm" variant="ghost" className="mt-2"
-                confirm="กดอีกครั้ง — ย้ายแฟ้มไปถังขยะ" />
-            </Panel>
-          )}
           <Panel className="p-5 md:p-6">
             <h2 className="c-h2 text-[var(--c-text)]">ข้อมูลบริษัท</h2>
             <div className="mt-3">
@@ -464,6 +444,36 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
               </div>
             </div>
           </Panel>
+          {/* ── บริษัทที่อาจซ้ำ · รวมเข้าบริษัทนี้ ── */}
+          <Panel className="scroll-mt-28 p-5 md:p-6">
+            <h2 id="merge" className="c-h2 text-[var(--c-text)]">บริษัทที่อาจซ้ำกับบริษัทนี้</h2>
+            <p className="c-thai mt-1 text-[0.82rem] text-[var(--c-text-3)]">รวมแล้วคน ดีล กิจกรรม และงานของอีกแฟ้มย้ายมาที่นี่ · ย้อนได้ที่ ตรวจข้อมูลซ้ำ › ประวัติการรวม · เลขนิติบุคคลต่างกันรวมไม่ได้</p>
+            {dupes.length ? (
+              <ul className="mt-3 divide-y divide-[var(--c-line)]">
+                {dupes.map((x) => (
+                  <li key={x.id} className="c-thai flex flex-wrap items-center justify-between gap-2 py-2 text-[0.88rem]">
+                    <span><Link href={`/app/accounts/${x.id}`} className="text-[var(--c-accent)] hover:underline">{x.name}</Link> <span className="text-[0.76rem] text-[var(--c-text-3)]">· {x.why}</span></span>
+                    <ActionForm action={mergeOrgHereAction} fields={{ orgId: o.id, dropId: x.id }} label="รวมเข้าบริษัทนี้" pendingLabel="กำลังรวม…" size="sm" variant="ghost"
+                      confirm={`กดอีกครั้ง — รวม "${x.name}" เข้า "${o.name}"`} />
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="c-thai mt-3 text-[0.86rem] text-[var(--c-text-3)]">ไม่พบบริษัทที่น่าจะซ้ำ</p>}
+            <details className="mt-3">
+              <summary className="c-thai cursor-pointer text-[0.82rem] text-[var(--c-accent)]">รวมบริษัทอื่นที่ไม่อยู่ในรายการ</summary>
+              <ActionForm action={mergeOrgHereAction} fields={{ orgId: o.id }} label="รวมเข้าบริษัทนี้" pendingLabel="กำลังรวม…" size="sm" className="mt-2 grid max-w-md gap-2"
+                confirm="กดอีกครั้ง — รวมบริษัทที่เลือกเข้าบริษัทนี้">
+                <OrgPicker id="merge-org" name="dropName" names={others.map((x) => x.name)} placeholder="พิมพ์ชื่อบริษัทที่จะรวมเข้ามา" required />
+              </ActionForm>
+            </details>
+          </Panel>
+          {!notEmpty && (
+            <Panel className="p-5 md:p-6">
+              <p className="c-thai text-[0.86rem] text-[var(--c-text-3)]">แฟ้มนี้ว่าง (ไม่มีคน ดีล หรือกิจกรรม) — ถ้าสร้างผิด ลบได้ และกู้คืนได้ 30 วัน</p>
+              <ActionForm action={trashOrgAction} fields={{ orgId: o.id }} label="ลบแฟ้มว่างนี้" pendingLabel="…" size="sm" variant="ghost" className="mt-2"
+                confirm="กดอีกครั้ง — ย้ายแฟ้มไปถังขยะ" />
+            </Panel>
+          )}
 
             </>}
             {tab === "people" && <>

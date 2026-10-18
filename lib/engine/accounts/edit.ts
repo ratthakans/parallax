@@ -49,7 +49,7 @@ export async function updateOrgField(
     if (!tax) return { ok: false, error: "เลขนิติบุคคลไม่ถูกต้อง — 13 หลัก ขึ้นต้นด้วย 0 และหลักสุดท้ายต้องตรงกับเลขตรวจสอบ" };
     /* เลขเดียวกัน = นิติบุคคลเดียวกัน — บอกให้รวมบริษัท แทนที่จะมีสองแฟ้มที่เลขเดียวกัน */
     const twin = await get<{ id: string; name: string }>("SELECT id, name FROM orgs WHERE tenant_id = ? AND tax_id = ? AND id <> ?", tenantId, tax, orgId);
-    if (twin) return { ok: false, error: `เลขนี้เป็นของ "${twin.name}" อยู่แล้ว — เป็นบริษัทเดียวกัน ให้รวมสองแฟ้มที่คิวตรวจข้อมูลซ้ำแทน` };
+    if (twin) return { ok: false, error: `เลขนี้เป็นของ "${twin.name}" อยู่แล้ว — เป็นบริษัทเดียวกัน ให้รวมสองแฟ้ม (แท็บรายละเอียด › บริษัทที่อาจซ้ำ › รวมเข้าบริษัทนี้)` };
     next = tax;
   }
   if (field === "primary_domain" && next) {
@@ -378,13 +378,57 @@ export async function affiliateManual(
   return { ok: true, orgId, created };
 }
 
-/** บริษัทที่ชื่อตรงทุกตัวอักษร (ช่องเลือกบริษัทแบบพิมพ์ค้นหาส่งชื่อมา) — หลายบริษัทชื่อซ้ำ = เอาที่มีคนสังกัดมากสุด */
+/** หาบริษัทจากชื่อที่ผู้ใช้พิมพ์ (ช่องเลือกบริษัทแบบพิมพ์ค้นหา)
+    1) ชื่อตรงทุกตัวอักษร · 2) กุญแจชื่อตรงกัน (ตัด "บริษัท … จำกัด" · ช่องว่าง · ตัวพิมพ์) — "สุวรรณพาวเวอร์ กรุ๊ป" = "บริษัท สุวรรณพาวเวอร์ กรุ๊ป จำกัด"
+    3) ชื่อที่ถูกรวมแล้ว (org_alias) ชี้ไปบริษัทที่คงอยู่ · หลายบริษัทตรงกัน = เอาที่มีคนสังกัดมากสุด (docs/qa-plan.md BUG-23) */
 export async function orgByName(tenantId: string, name: string): Promise<string | null> {
   const n = name.normalize("NFC").replace(/\s+/g, " ").trim();
   if (!n) return null;
-  const r = await get<{ id: string }>(
-    `SELECT o.id FROM orgs o WHERE o.tenant_id = ? AND o.name = ?
-     ORDER BY (SELECT COUNT(*) FROM affiliations a WHERE a.tenant_id = o.tenant_id AND a.org_id = o.id AND a.valid_to IS NULL) DESC, o.id LIMIT 1`,
-    tenantId, n);
-  return r?.id ?? null;
+  const rank = "ORDER BY (SELECT COUNT(*) FROM affiliations a WHERE a.tenant_id = o.tenant_id AND a.org_id = o.id AND a.valid_to IS NULL) DESC, o.id LIMIT 1";
+  const exact = await get<{ id: string }>(`SELECT o.id FROM orgs o WHERE o.tenant_id = ? AND o.name = ? ${rank}`, tenantId, n);
+  if (exact) return exact.id;
+  const key = orgInfo(n).key;
+  if (!key) return null;
+  const byKey = await get<{ id: string }>(`SELECT o.id FROM orgs o WHERE o.tenant_id = ? AND (o.name_norm = ? OR o.id = ?) ${rank}`, tenantId, key, orgIdFor(tenantId, key));
+  if (byKey) return byKey.id;
+  const alias = await get<{ b_id: string }>(
+    "SELECT r.b_id FROM resolution_overrides r JOIN orgs o ON o.id = r.b_id AND o.tenant_id = r.tenant_id WHERE r.tenant_id = ? AND r.kind = 'org_alias' AND r.a_id = ?", tenantId, key);
+  return alias?.b_id ?? null;
+}
+
+/* ── สร้างบริษัทด้วยมือ (docs/qa-plan.md BUG-21) ──────────────────────────
+   ใช้กุญแจเดียวกับการนำเข้า (orgIdFor) — ชื่อที่ตรงกับบริษัทเดิมเมื่อตัดคำนิติบุคคล = คืนบริษัทเดิม ไม่สร้างซ้ำ
+   เลขนิติบุคคลตรวจ checksum และต้องไม่ซ้ำ · บันทึกว่าคนสร้างยืนยันข้อมูลแล้ว */
+export async function createOrg(
+  tenantId: string, input: { name: string; industry?: string; domain?: string; taxId?: string; owner?: string | null }, actor: string,
+): Promise<{ ok: true; id: string; existed: boolean } | { ok: false; error: string }> {
+  const info = orgInfo(clean(input.name, 200));
+  if (!info.key) return { ok: false, error: "ใส่ชื่อบริษัท" };
+  const id = orgIdFor(tenantId, info.key);
+  if (await orgExists(tenantId, id)) return { ok: true, id, existed: true };
+  let tax: string | null = null;
+  if (input.taxId?.trim()) {
+    tax = normaliseTaxId(input.taxId);
+    if (!tax) return { ok: false, error: "เลขนิติบุคคลไม่ถูกต้อง — 13 หลัก ขึ้นต้นด้วย 0" };
+    const twin = await get<{ id: string; name: string }>("SELECT id, name FROM orgs WHERE tenant_id = ? AND tax_id = ?", tenantId, tax);
+    if (twin) return { ok: false, error: `เลขนี้เป็นของ "${twin.name}" อยู่แล้ว — เปิดบริษัทนั้นแทน` };
+  }
+  let domain: string | null = null;
+  if (input.domain?.trim()) {
+    domain = input.domain.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/.*$/, "");
+    if (!/^[a-z0-9.-]+\.[a-z]{2,}$/.test(domain)) return { ok: false, error: "โดเมนไม่ถูกรูปแบบ เช่น example.co.th" };
+    const owner = await get<{ org_id: string }>("SELECT org_id FROM org_domains WHERE tenant_id = ? AND domain = ?", tenantId, domain);
+    if (owner) return { ok: false, error: "โดเมนนี้ผูกกับบริษัทอื่นอยู่แล้ว — อาจเป็นบริษัทเดียวกัน" };
+  }
+  const at = now();
+  await tx(async (q) => {
+    await q.run(
+      `INSERT INTO orgs (id, tenant_id, name, name_norm, tax_id, primary_domain, industry, account_owner_id, lifecycle_state, last_verified_at, created_at, recorded_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+      id, tenantId, info.display, info.key, tax, domain, clean(input.industry, 120) || null, input.owner ?? null, "confirmed", at, at, at);
+    if (domain) await q.run("INSERT INTO org_domains (tenant_id, org_id, domain) VALUES (?,?,?)", tenantId, id, domain);
+    await version(q, tenantId, "org", id, "name", null, info.display, "สร้างบริษัทด้วยมือ", actor);
+  });
+  await logActivity(tenantId, actor, "org_create", id);
+  return { ok: true, id, existed: false };
 }

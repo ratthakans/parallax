@@ -6,6 +6,7 @@ import { SOURCE_KIND_TH } from "@/lib/shared/vault";
 import { thaiDateTime } from "@/lib/shared/format";
 import { PageHead, Panel, num } from "@/components/console/ui";
 
+export const metadata = { title: "นำเข้าข้อมูล" };
 export const dynamic = "force-dynamic";
 
 /* ── Data Vault · แหล่งข้อมูล ─────────────────────────────────────

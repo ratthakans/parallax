@@ -396,7 +396,12 @@ export async function createCustomer(
      ที่มีเบอร์นี้จึงเติมประวัติให้คนเดิม ไม่ใช่สร้างคนซ้ำ */
   const ident = IDENTITY_KINDS.map((k) => contacts.find((c) => c.kind === k)).find(Boolean);
   if (!ident) {
-    return { ok: false, error: "ใส่อย่างน้อยหนึ่งอย่าง: เบอร์โทร อีเมล LINE หรือรหัสสมาชิก — ระบบใช้ค่านี้รู้ว่าเป็นคนเดียวกันตอนนำเข้าไฟล์ครั้งถัดไป" };
+    /* บอกเฉพาะช่องที่ฟอร์มนี้มีจริง — ฟอร์ม B2B ไม่มี LINE/รหัสสมาชิก (docs/qa-plan.md BUG-16) */
+    const TH: Record<string, string> = { phone: "เบอร์โทร", email: "อีเมล", line: "LINE", member_no: "รหัสสมาชิก" };
+    const offered = ["phone", "email", "line", "member_no"].filter((k) => input.contacts.some((c) => c.kind === k));
+    const names = (offered.length ? offered : ["phone", "email"]).map((k) => TH[k]);
+    const list = names.length > 1 ? `${names.slice(0, -1).join(" ")} หรือ${/^[A-Za-z]/.test(names[names.length - 1]) ? " " : ""}${names[names.length - 1]}` : names[0];
+    return { ok: false, error: `ใส่อย่างน้อยหนึ่งอย่าง: ${list} — ระบบใช้ค่านี้รู้ว่าเป็นคนเดียวกันตอนนำเข้าไฟล์ครั้งถัดไป` };
   }
   const id = customerIdFor(tenantId, ident.kind, ident.value);
 

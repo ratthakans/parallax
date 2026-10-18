@@ -7,6 +7,7 @@ import { MFA_NEEDED_TH, can, deniedTh } from "@/lib/shared/roles";
 import { ActionForm } from "@/components/console/action-form";
 import { PageHead, Panel, num } from "@/components/console/ui";
 
+export const metadata = { title: "ส่งออกข้อมูล" };
 export const dynamic = "force-dynamic";
 
 /* ── ส่งออกแบบขออนุมัติ (B6 · docs/solo-plan.md หัวข้อ 6.1) ─────────────

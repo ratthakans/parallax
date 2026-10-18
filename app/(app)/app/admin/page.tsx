@@ -7,6 +7,7 @@ import { Metric, PageHead, Panel, num } from "@/components/console/ui";
 import { ActionForm } from "@/components/console/action-form";
 import { mockCreateShopAction, mockInviteUserAction } from "../../admin-actions";
 
+export const metadata = { title: "ผู้ดูแลระบบ" };
 export const dynamic = "force-dynamic";
 
 /* ── ผู้ดูแลระบบ ──────────────────────────────────────────────────

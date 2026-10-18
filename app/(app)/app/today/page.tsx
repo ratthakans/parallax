@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { viewer } from "@/app/(app)/viewer";
 import { acknowledgeAction, snoozeAction } from "@/app/(app)/today-actions";
+import { completeTaskAction } from "@/app/(app)/task-actions";
+import { recordOutcomeAction } from "@/app/(app)/sales-actions";
+import { OUTCOMES, TARGET_STATUS_TH } from "@/lib/shared/policy";
 import { todayQueue } from "@/lib/engine/today";
 import { MAX_SNOOZES, QUEUE_SECTION_TH, type QueueItem, type QueueSection } from "@/lib/shared/today";
 import type { Eligibility } from "@/lib/shared/vault";
@@ -9,6 +12,7 @@ import { ActionForm } from "@/components/console/action-form";
 import { EligibilityPill } from "@/components/console/eligibility";
 import { PageHead, Panel } from "@/components/console/ui";
 
+export const metadata = { title: "หน้าแรก" };
 export const dynamic = "force-dynamic";
 
 /* ── วันนี้ (docs/solo-plan.md S1) ───────────────────────────────
@@ -22,6 +26,8 @@ const MORE_HREF: Partial<Record<QueueSection, string>> = {
   review: "/app/vault/review",
   quiet: "/app/accounts",
 };
+
+const LABEL = "c-thai flex min-w-0 flex-col gap-1 text-[0.78rem] text-[var(--c-text-3)]";
 
 function Item({ it, canWrite }: { it: QueueItem; canWrite: boolean }) {
   const contactBlocked = it.eligibility && it.eligibility.status !== "eligible";
@@ -47,6 +53,7 @@ function Item({ it, canWrite }: { it: QueueItem; canWrite: boolean }) {
         {canWrite && (
           <div className="flex flex-wrap gap-2">
             {it.ackable && <ActionForm action={acknowledgeAction} label="รับทราบ" size="sm" fields={{ kind: it.kind, id: it.id }} />}
+            {it.task && !it.task.targetId && <ActionForm action={completeTaskAction} label="เสร็จแล้ว" size="sm" variant="primary" fields={{ taskId: it.id }} />}
             {it.snoozable && it.snoozes < MAX_SNOOZES && (
               <>
                 <ActionForm action={snoozeAction} label="พรุ่งนี้" size="sm" fields={{ kind: it.kind, id: it.id, days: 1 }} />
@@ -59,6 +66,24 @@ function Item({ it, canWrite }: { it: QueueItem; canWrite: boolean }) {
           </div>
         )}
       </div>
+      {/* งานแคมเปญ: บันทึกผลจากที่นี่ได้เลย — action เดียวกับหน้างาน/แคมเปญ จึงตรวจนโยบายซ้ำ */}
+      {canWrite && it.task?.targetId && it.task.campaignId && !contactBlocked && (
+        <details className="mt-2">
+          <summary className="c-btn c-btn-primary c-btn-sm inline-flex cursor-pointer list-none">บันทึกผล</summary>
+          <ActionForm action={recordOutcomeAction} fields={{ campaignId: it.task.campaignId, targetId: it.task.targetId }} label="บันทึกผล"
+            pendingLabel="กำลังตรวจนโยบาย…" size="sm" className="mt-3 grid max-w-2xl gap-2 sm:grid-cols-2">
+            <label className={LABEL}>ผล
+              <select name="outcome" className="c-select" defaultValue="contacted">
+                {OUTCOMES.map((o) => <option key={o} value={o}>{TARGET_STATUS_TH[o]}</option>)}
+              </select>
+            </label>
+            <label className={LABEL}>มูลค่า (ถ้าปิดได้ · บาท)<input name="value" inputMode="numeric" className="c-input" /></label>
+            <label className={`${LABEL} sm:col-span-2`}>เกิดอะไรขึ้น<input name="note" className="c-input" required /></label>
+            <label className={LABEL}>ขั้นตอนถัดไป (ไม่บังคับ)<input name="nextStep" className="c-input" /></label>
+            <label className={LABEL}>ครบกำหนดขั้นถัดไป<input type="date" name="nextDue" className="c-input" /></label>
+          </ActionForm>
+        </details>
+      )}
     </li>
   );
 }

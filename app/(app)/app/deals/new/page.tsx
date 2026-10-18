@@ -7,6 +7,7 @@ import { ActionForm } from "@/components/console/action-form";
 import { PageHead, Panel } from "@/components/console/ui";
 import { OrgPicker } from "@/components/console/org-picker";
 
+export const metadata = { title: "สร้างดีล" };
 export const dynamic = "force-dynamic";
 
 /* ── สร้างดีล (docs/ux-plan.md U4 · 5.4) ── ช่องบังคับสองช่อง (บริษัท · ชื่อ) ที่เหลือเติมทีหลังในหน้าดีล */

@@ -7,6 +7,7 @@ import { can } from "@/lib/shared/roles";
 import { PageHead, Panel, baht, num } from "@/components/console/ui";
 import { SavedViews } from "@/components/console/saved-views";
 
+export const metadata = { title: "รายงานเลือกมิติ" };
 export const dynamic = "force-dynamic";
 
 /* ── รายงานเลือกมิติเอง (docs/crm-plan.md C5) ── แถว × คอลัมน์ × จำนวนหรือมูลค่า · ทุกอย่างอยู่ใน URL บันทึกเป็นมุมมองได้ */

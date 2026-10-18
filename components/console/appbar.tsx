@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Mark } from "@/components/brand";
 
@@ -43,9 +43,10 @@ const TABS = [
 const SETUP_PATHS = ["/app/sales/purposes"];
 
 const NEW_ITEMS = [
+  { href: "/app/accounts/new", label: "บริษัท" },
   { href: "/app/customers/new", label: "ผู้ติดต่อ" },
   { href: "/app/deals/new", label: "ดีล" },
-  { href: "/app/tasks#new", label: "งาน" },
+  { href: "/app/tasks?new=1", label: "งาน" },
   { href: "/app/sales#new", label: "แคมเปญ" },
   { href: "/app/vault/cards", label: "นามบัตร" },
   { href: "/app/requests", label: "คำขอสิทธิ" },
@@ -123,7 +124,11 @@ export function AppBar({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const params = useSearchParams();
   const [q, setQ] = useState("");
+  /* หน้าผลค้นหาคงคำค้นไว้ในช่อง (BUG-03) · ออกจากหน้าค้นหาแล้วล้าง */
+  const searched = pathname === "/app/search" ? params.get("q") ?? "" : "";
+  useEffect(() => setQ(searched), [searched]);
 
   /* แท็บที่ตรงยาวที่สุดชนะ — /app/sales/weekly ไม่ทำให้ "แคมเปญ" ติดด้วย · หน้าตั้งค่าไม่ทำให้แท็บไหนติด */
   const matches = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
@@ -204,7 +209,7 @@ export function AppBar({
                 </>
               )}
               <hr className="c-hair my-1.5" />
-              <form action={setThemeAction}>
+              <form action={setThemeAction} onSubmit={close}>
                 <input type="hidden" name="theme" value={theme === "dark" ? "light" : "dark"} />
                 <button type="submit" className="c-navlink w-full text-left" role="menuitem">
                   {theme === "dark" ? "ใช้ธีมสว่าง" : "ใช้ธีมมืด"}
