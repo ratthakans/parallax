@@ -10,6 +10,7 @@ import { get } from "@/lib/engine/sql";
 import { customerMode, setCustomerMode } from "@/lib/engine/tenant-mode";
 import { createSignupTenant } from "@/lib/engine/signup";
 import { CUSTOMER_MODES, RETAIL_DEMO_IDS, hasB2B, hasB2C } from "@/lib/shared/tenants";
+import { listContacts } from "@/lib/engine/accounts/contacts-list";
 
 const out: string[] = [];
 const ok = (c: boolean, m: string) => out.push(`${c ? "PASS" : "FAIL"}  ${m}`);
@@ -31,6 +32,22 @@ ok((await setCustomerMode(T, "hybrid", "verify")).ok
   && Number((await get<{ n: number }>("SELECT COUNT(*) AS n FROM activity_log WHERE tenant_id = ? AND action = 'customer_mode'", T))?.n) === 1,
   "ตั้งค่าเดิมซ้ำ ไม่บันทึกประวัติซ้ำ");
 await setCustomerMode(T, "b2c", "verify");
+
+// ── F2 · รายชื่อแบบรวม (บัญชีเดโมค้าปลีกมียอดซื้อ ไม่มีบริษัท) ──
+{
+  const ME = { id: "owner@verify", clearance: "restricted_high" as const };
+  const buyers = await listContacts(T, { view: "buyers", purchases: true, sort: "spent", pageSize: 100 }, ME);
+  const spent = buyers.rows.map((r) => r.spent ?? 0);
+  ok(buyers.total > 0 && buyers.rows.every((r) => (r.orders ?? 0) > 0), "มุมมองเคยซื้อ = มียอดซื้อทุกแถว");
+  ok(spent.every((x, i) => i === 0 || spent[i - 1] >= x), "เรียงตามยอดซื้อมากไปน้อย");
+  const indiv = await listContacts(T, { view: "no_org", pageSize: 10 }, ME);
+  const all = await listContacts(T, { pageSize: 10 }, ME);
+  ok(indiv.total === all.total && all.total > 0, "ลูกค้าบุคคล = คนที่ไม่มีสังกัดบริษัท");
+  const plain = await listContacts(T, { sort: "spent", pageSize: 10 }, ME);
+  ok(plain.rows.every((r) => r.orders === undefined), "ไม่ขอยอดซื้อ = ไม่คำนวณ (บัญชี B2B ล้วนไม่เสียแรง) และเรียงตามยอดซื้อไม่ได้");
+  const masked = await listContacts(T, { view: "buyers", purchases: true, pageSize: 100 }, { id: "x", clearance: "public" as const });
+  ok(masked.rows.filter((r) => !r.visible).every((r) => r.orders === null && r.spent === null), "คนเกินสิทธิ์ไม่เห็นยอดซื้อ");
+}
 
 // ── สมัครเอง ──
 process.env.SIGNUP_ENABLED = "1";

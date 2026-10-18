@@ -166,7 +166,8 @@ export default async function CustomerPage({
   const v = profileFor(tenantId).vocab.th;
   /* บัญชี B2B ได้หน้าระเบียนแบบผู้ติดต่อ (สังกัด · แคมเปญ · กิจกรรม) — บัญชีค้าปลีกเดิมได้ตัวเลขการซื้อตามเดิม */
   const me = await viewer();
-  const b2b = hasB2B(await activeMode()) ? await personB2B(tenantId, cid, { id: me.actor, clearance: me.clearance }) : null;
+  const mode = await activeMode();
+  const b2b = hasB2B(mode) ? await personB2B(tenantId, cid, { id: me.actor, clearance: me.clearance }) : null;
   const purposes = b2b ? (await listBases(tenantId)).map((b) => ({ id: b.purpose_id, name: b.name })) : [];
   const deals = b2b ? await dealsOfPerson(tenantId, await personIdsOf(tenantId, cid), { id: me.actor, clearance: me.clearance }) : [];
   const [personTasks, team] = b2b
@@ -175,6 +176,12 @@ export default async function CustomerPage({
   const currentJob = b2b?.jobs.find((j) => j.current) ?? null;
 
   const s = c.stats;
+  /* ทั้งสองแบบ (docs/crm-plan.md F2) — สลับตามระเบียน ไม่ใช่ตามบัญชี:
+     ส่วนบริษัทเมื่อคนนี้มีสังกัด · ส่วนการซื้อเมื่อเคยซื้อหรือเป็นลูกค้าบุคคล · ดีล งาน กิจกรรม ความยินยอม ใช้กับทุกคน */
+  const hybrid = mode === "hybrid";
+  const orgPerson = !!b2b?.jobs.length;
+  const showPurchases = !b2b || (hybrid && (s.orders > 0 || !orgPerson));
+  const showJobs = !hybrid || orgPerson;
   const cycle = s.cycleDays ?? s.modelCycleDays;
   const since = s.lastAt ? Math.floor((Date.now() - Date.parse(s.lastAt)) / 86400000) : null;
   const ratio = cycle && since != null ? since / Math.max(1, cycle) : null;
@@ -202,7 +209,7 @@ export default async function CustomerPage({
     <>
       {sp.created === "1" && (
         <p role="status" className="c-msg c-msg-ok mt-4">
-          เพิ่ม{v.person}แล้ว — ไฟล์ที่นำเข้าทีหลังซึ่งมี{b2b ? "เบอร์หรืออีเมลเดียวกัน" : "เบอร์ อีเมล หรือรหัสเดียวกัน"} จะเติมประวัติให้คนนี้
+          เพิ่ม{v.person}แล้ว — ไฟล์ที่นำเข้าทีหลังซึ่งมี{b2b && !hybrid ? "เบอร์หรืออีเมลเดียวกัน" : "เบอร์ อีเมล LINE หรือรหัสสมาชิกเดียวกัน"} จะเติมประวัติให้คนนี้
         </p>
       )}
 
@@ -215,7 +222,7 @@ export default async function CustomerPage({
 
       <RecordHeader
         back={{ href: "/app/customers", label: `${v.people}ทั้งหมด` }}
-        kind={b2b ? "ผู้ติดต่อ" : v.person}
+        kind={b2b ? (hybrid && !orgPerson ? "ลูกค้าบุคคล" : "ผู้ติดต่อ") : v.person}
         title={c.name}
         badges={<>
           {b2b?.stop && <span className="c-pill c-pill-bad">{PREFERENCE_TH[b2b.stop]}แล้ว</span>}
@@ -225,11 +232,17 @@ export default async function CustomerPage({
         </>}
         actions={b2b ? <a href="#activity" className="c-btn c-btn-ghost c-btn-sm xl:hidden">บันทึกกิจกรรม</a> : undefined}
         highlights={b2b ? [
-          { label: "ตำแหน่ง", value: currentJob?.title ?? "ไม่ทราบ" },
-          { label: "บริษัท", value: currentJob ? (currentJob.visible ? <Link href={`/app/accounts/${currentJob.orgId}`} className="text-[var(--c-accent)] hover:underline">{currentJob.org}</Link> : currentJob.org) : "ไม่ทราบ" },
+          ...(showJobs ? [
+            { label: "ตำแหน่ง", value: currentJob?.title ?? "ไม่ทราบ" },
+            { label: "บริษัท", value: currentJob ? (currentJob.visible ? <Link href={`/app/accounts/${currentJob.orgId}`} className="text-[var(--c-accent)] hover:underline">{currentJob.org}</Link> : currentJob.org) : "ไม่ทราบ" },
+          ] : []),
+          ...(showPurchases ? [
+            { label: "ยอดซื้อรวม", value: s.orders ? `${baht(s.spent)} · ${num(s.orders)} ครั้ง` : "ยังไม่เคยซื้อ" },
+            { label: "ซื้อล่าสุด", value: s.lastAt ? daysAgoLabel(s.lastAt) : "—" },
+          ] : []),
           { label: "ช่องทาง", value: kinds.length ? kinds.map((k) => CONTACT_KIND_LABEL[k]).join(" · ") : "ไม่มี" },
           { label: "ติดต่อล่าสุด", value: b2b.interactions[0] ? thaiDate(b2b.interactions[0].at) : "ยังไม่เคย" },
-          { label: "แคมเปญ", value: num(b2b.campaigns.length) },
+          ...(showJobs && showPurchases ? [] : [{ label: "แคมเปญ", value: num(b2b.campaigns.length) }]),
           { label: "เพิ่มเมื่อ", value: thaiDate(c.createdAt) },
         ] : [
           { label: `${v.spend}รวม`, value: s.orders ? baht(s.spent) : "—" },
@@ -251,8 +264,8 @@ export default async function CustomerPage({
           ]} />
           <div className="grid min-w-0 content-start gap-5">
             {tab === "overview" && <>
-              {b2b ? <>
-          <Panel className="p-5 md:p-6">
+              {b2b && <>
+          {showJobs && <Panel className="p-5 md:p-6">
             <h2 className="c-h2 text-[var(--c-text)]">สังกัดตามเวลา</h2>
             {b2b!.jobs.length ? (
               <ul className="mt-3 divide-y divide-[var(--c-line)]">
@@ -268,7 +281,7 @@ export default async function CustomerPage({
                 ))}
               </ul>
             ) : <p className="c-thai mt-3 text-[0.88rem] text-[var(--c-text-3)]">ไม่ทราบ — ยังไม่มีสังกัดในฐาน</p>}
-          </Panel>
+          </Panel>}
           <Panel className="p-5 md:p-6">
             <h2 className="c-h2 text-[var(--c-text)]">ดีล</h2>
             {deals.length ? (
@@ -304,9 +317,10 @@ export default async function CustomerPage({
               </ul>
             ) : <p className="c-thai mt-3 text-[0.88rem] text-[var(--c-text-3)]">ยังไม่อยู่ในแคมเปญใด</p>}
           </Panel>
-              </> : <>
+              </>}
+              {showPurchases && <>
           <Panel className="p-5 md:p-6">
-            <h2 className="c-h2 text-[var(--c-text)]">ประวัติ</h2>
+            <h2 className="c-h2 text-[var(--c-text)]">{b2b ? "ประวัติการซื้อ" : "ประวัติ"}</h2>
             <p className="c-thai mt-1 text-[0.78rem] text-[var(--c-text-4)]">
               {v.purchase} ข้อความ แคมเปญ และความยินยอม เรียงจากล่าสุด
             </p>
