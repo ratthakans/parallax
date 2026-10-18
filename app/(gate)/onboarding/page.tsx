@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { CUSTOMER_MODES, CUSTOMER_MODE_TH } from "@/lib/shared/tenants";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
@@ -90,6 +91,18 @@ export default async function OnboardingPage() {
             <span className="c-label-th">ชื่อบัญชี (ชื่อองค์กรหรือทีมของคุณ)</span>
             <input name="name" required minLength={2} maxLength={80} className="c-input" />
           </label>
+          {/* โหมดลูกค้า (docs/crm-plan.md F1) — เปลี่ยนภายหลังได้ที่ ตั้งค่า */}
+          <fieldset className="flex flex-col gap-2">
+            <legend className="c-label-th mb-2">ลูกค้าของคุณเป็นใคร</legend>
+            {CUSTOMER_MODES.map((m) => (
+              <label key={m} className="c-thai flex items-start gap-2.5 rounded-[var(--c-radius)] border border-[var(--c-line)] p-3 text-[0.86rem]">
+                <input type="radio" name="mode" value={m} defaultChecked={m === "b2b"} className="mt-1" />
+                <span><span className="font-semibold text-[var(--c-text)]">{CUSTOMER_MODE_TH[m].label}</span>
+                  <span className="block text-[0.78rem] text-[var(--c-text-3)]">{CUSTOMER_MODE_TH[m].lead}</span></span>
+              </label>
+            ))}
+            <span className="c-thai text-[0.75rem] text-[var(--c-text-4)]">เปลี่ยนภายหลังได้ที่ ตั้งค่า</span>
+          </fieldset>
         </ActionForm>
         <SignOut />
       </div>

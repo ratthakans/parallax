@@ -1,4 +1,7 @@
-import { activeTenantId } from "@/app/(app)/tenant";
+import { activeMode, activeTenantId } from "@/app/(app)/tenant";
+import { viewer } from "@/app/(app)/viewer";
+import { can } from "@/lib/shared/roles";
+import { ModePanel } from "@/components/console/mode-panel";
 import { all, withIdentity } from "@/lib/engine/sql";
 import { aiCacheStats, aiConfigured } from "@/lib/engine/ai";
 import { getTenant } from "@/lib/engine/match";
@@ -90,6 +93,8 @@ export default async function SettingsPage() {
       <MfaPanel />
 
       <DigestPanel tenantId={tenantId} />
+
+      <ModePanel mode={await activeMode()} canEdit={can((await viewer()).role, "account_admin")} />
 
       {/* ── โปรไฟล์บัญชี ── */}
       <Panel className="mb-6 p-5 md:p-6">

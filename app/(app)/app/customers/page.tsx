@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Form from "next/form";
-import { activeTenantId } from "@/app/(app)/tenant";
+import { activeMode, activeTenantId } from "@/app/(app)/tenant";
 import { loadFeatures } from "@/lib/engine/derive";
 import {
   CUSTOMER_FILTERS,
@@ -9,7 +9,7 @@ import {
   type CustomerFilter,
   type CustomerSort,
 } from "@/lib/engine/customers";
-import { isB2BTenant, profileFor } from "@/lib/shared/tenants";
+import { hasB2B, profileFor } from "@/lib/shared/tenants";
 import { B2BContacts } from "./b2b-list";
 import type { DiscountAffinity, ReachableBy } from "@/lib/shared/types";
 import { CONTACT_KIND_LABEL } from "@/lib/shared/contact-kinds";
@@ -85,7 +85,7 @@ export default async function CustomersPage({
 
   const tenantId = await activeTenantId();
   /* บัญชี B2B: รายการผู้ติดต่อแบบ CRM (docs/ux-plan.md U3) · บัญชีค้าปลีกใช้หน้าเดิมด้านล่าง */
-  if (isB2BTenant(tenantId)) return <B2BContacts sp={sp} />;
+  if (hasB2B(await activeMode())) return <B2BContacts sp={sp} />;
   const v = profileFor(tenantId).vocab;
   const [list, features] = await Promise.all([
     searchCustomers(tenantId, {

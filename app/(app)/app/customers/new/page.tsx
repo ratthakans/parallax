@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { activeTenantId } from "@/app/(app)/tenant";
+import { activeMode, activeTenantId } from "@/app/(app)/tenant";
 import { profileFor } from "@/lib/shared/tenants";
 import { CONTACT_KIND_LABEL } from "@/lib/shared/contact-kinds";
 import { FIELD_LABEL } from "@/lib/shared/ingest-types";
@@ -7,7 +7,7 @@ import { Panel } from "@/components/console/ui";
 import { ActionForm } from "@/components/console/action-form";
 import { createCustomerAction } from "../../../customers-actions";
 import { OrgPicker } from "@/components/console/org-picker";
-import { isB2BTenant } from "@/lib/shared/tenants";
+import { hasB2B } from "@/lib/shared/tenants";
 import { viewer } from "@/app/(app)/viewer";
 import { listAccounts } from "@/lib/engine/accounts";
 
@@ -39,7 +39,7 @@ const PROFILE: { name: keyof typeof FIELD_LABEL; type?: string }[] = [
 
 export default async function NewCustomerPage({ searchParams }: { searchParams: Promise<{ org?: string }> }) {
   const tenantId = await activeTenantId();
-  if (isB2BTenant(tenantId)) return <NewContactB2B org={(await searchParams).org} />;
+  if (hasB2B(await activeMode())) return <NewContactB2B org={(await searchParams).org} />;
   const v = profileFor(tenantId).vocab.th;
 
   return (

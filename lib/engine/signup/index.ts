@@ -11,6 +11,7 @@ import {
   onboardingStep, signupEnabled, workspaceNameError, type OnboardingStep,
 } from "@/lib/shared/signup";
 import { templateOf } from "@/lib/shared/purpose-templates";
+import { isCustomerMode, type CustomerMode } from "@/lib/shared/tenants";
 import { fileBytes, generateSynthetic } from "@/lib/shared/synthetic-b2b";
 import type { MfaLevel } from "@/lib/shared/roles";
 
@@ -36,8 +37,10 @@ export async function tenantsOfUser(userId: string): Promise<string[]> {
    Postgres: ผ่าน app.create_signup_tenant (0019) ในนามผู้ใช้ — ฐานข้อมูลตรวจเองว่าทำให้ auth.uid() เท่านั้น
    และผู้ใช้ยังไม่มีบัญชี (เหตุผลที่ไม่ใช้ asSystem อยู่หัวไฟล์ migration)
    sqlite (เครื่องพัฒนา · ชุดตรวจ): ไม่มี RLS และฟังก์ชัน — ทำเงื่อนไขเดียวกันในธุรกรรมเดียว */
-export async function createSignupTenant(userId: string, name: string, actor: string): Promise<Result<{ tenantId: string }>> {
+export async function createSignupTenant(userId: string, name: string, actor: string, modeInput: string = "b2b"): Promise<Result<{ tenantId: string }>> {
   if (!signupEnabled()) return { ok: false, error: SIGNUP_CLOSED_TH };
+  /* โหมดลูกค้า (docs/crm-plan.md F1) — เลือกตอนสร้าง · ค่าแปลก = b2b ตามค่าตั้งต้นของคอลัมน์ */
+  const mode: CustomerMode = isCustomerMode(modeInput) ? modeInput : "b2b";
   const nameErr = workspaceNameError(name);
   if (nameErr) return { ok: false, error: nameErr };
   const clean = name.trim();
@@ -47,6 +50,8 @@ export async function createSignupTenant(userId: string, name: string, actor: st
   if (usingPostgres()) {
     try {
       await asUser(userId, (t) => t.get("SELECT app.create_signup_tenant(?, ?) AS id", id, clean));
+      /* ฟังก์ชันสร้างบัญชีไม่รู้จักโหมด — ตั้งต่อในนามผู้ใช้ที่เพิ่งเป็นเจ้าของ (tenants_update · 0002) */
+      if (mode !== "b2b") await asUser(userId, (t) => t.run("UPDATE tenants SET customer_mode = ? WHERE id = ?", mode, id));
     } catch (e) {
       const msg = e instanceof Error ? e.message : "";
       return { ok: false, error: msg.includes("มีบัญชีอยู่แล้ว") ? ALREADY : "สร้างบัญชีไม่สำเร็จ — ลองอีกครั้ง" };
@@ -56,7 +61,7 @@ export async function createSignupTenant(userId: string, name: string, actor: st
     const at = iso(now), ends = iso(new Date(now.getTime() + TRIAL_DAYS * 864e5));
     const made = await tx(async (q) => {
       if (await q.get("SELECT 1 AS x FROM tenant_users WHERE user_id = ?", userId)) return false;
-      await q.run("INSERT INTO tenants (id, name, cycle_shape, tier, created_at, message_credits) VALUES (?,?,?,?,?,?)", id, clean, "considered", "growth", at, 0);
+      await q.run("INSERT INTO tenants (id, name, cycle_shape, tier, created_at, message_credits, customer_mode) VALUES (?,?,?,?,?,?,?)", id, clean, "considered", "growth", at, 0, mode);
       await q.run("INSERT INTO tenant_users (tenant_id, user_id, role, created_at) VALUES (?,?,?,?)", id, userId, "owner", at);
       await q.run("INSERT INTO tenant_billing (tenant_id, state, is_customer, trial_ends_at, updated_at, updated_by) VALUES (?,?,?,?,?,?)", id, "trial", 1, ends, at, "signup");
       await q.run("INSERT INTO tenant_settings (tenant_id, mode, signup_source, created_at, updated_at) VALUES (?,?,?,?,?)", id, "solo", "self", at, at);
@@ -64,7 +69,7 @@ export async function createSignupTenant(userId: string, name: string, actor: st
     });
     if (!made) return { ok: false, error: ALREADY };
   }
-  await logActivity(id, actor, "signup_tenant_created", `trial ${TRIAL_DAYS} days · mode solo`);
+  await logActivity(id, actor, "signup_tenant_created", `trial ${TRIAL_DAYS} days · mode solo · ${mode}`);
   return { ok: true, tenantId: id };
 }
 

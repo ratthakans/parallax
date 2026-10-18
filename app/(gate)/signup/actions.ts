@@ -52,7 +52,7 @@ export async function createWorkspaceAction(_p: ActionState, fd: FormData): Prom
   if (user.mfa === "pending") redirect("/login/mfa?next=/onboarding");
   /* ทุก query ต่อจากนี้ในนามผู้ใช้ — บน Postgres ฟังก์ชันสร้างบัญชีอ่าน auth.uid() จากตรงนี้ */
   enterIdentity(user.userId);
-  const res = await createSignupTenant(user.userId, String(fd.get("name") ?? ""), user.email || user.userId);
+  const res = await createSignupTenant(user.userId, String(fd.get("name") ?? ""), user.email || user.userId, String(fd.get("mode") ?? "b2b"));
   if (!res.ok) return { error: res.error };
   (await cookies()).set(TENANT_COOKIE, res.tenantId, TENANT_COOKIE_OPTIONS);
   redirect("/onboarding");

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { activeTenantId } from "@/app/(app)/tenant";
+import { activeMode, activeTenantId } from "@/app/(app)/tenant";
 import { findDuplicates, getCustomer, type TimelineItem } from "@/lib/engine/customers";
 import { requestsFor } from "@/lib/engine/dsar";
 import { DSAR_KIND_TH } from "@/lib/shared/dsar";
@@ -24,7 +24,7 @@ import { teamMembers } from "@/lib/engine/team";
 import { NewTaskForm, TaskList } from "@/components/console/tasks";
 import { personIdsOf } from "@/lib/engine/vault/merge";
 import { dealRoleTh, stageTh } from "@/lib/shared/deals";
-import { isB2BTenant } from "@/lib/shared/tenants";
+import { hasB2B } from "@/lib/shared/tenants";
 import { INTERACTION_TH, type InteractionKind } from "@/lib/shared/accounts";
 import { ELIGIBILITY_TH, PREFERENCE_TH, type Eligibility } from "@/lib/shared/vault";
 import { TARGET_STATUS_TH, type TargetStatus } from "@/lib/shared/policy";
@@ -166,7 +166,7 @@ export default async function CustomerPage({
   const v = profileFor(tenantId).vocab.th;
   /* บัญชี B2B ได้หน้าระเบียนแบบผู้ติดต่อ (สังกัด · แคมเปญ · กิจกรรม) — บัญชีค้าปลีกเดิมได้ตัวเลขการซื้อตามเดิม */
   const me = await viewer();
-  const b2b = isB2BTenant(tenantId) ? await personB2B(tenantId, cid, { id: me.actor, clearance: me.clearance }) : null;
+  const b2b = hasB2B(await activeMode()) ? await personB2B(tenantId, cid, { id: me.actor, clearance: me.clearance }) : null;
   const purposes = b2b ? (await listBases(tenantId)).map((b) => ({ id: b.purpose_id, name: b.name })) : [];
   const deals = b2b ? await dealsOfPerson(tenantId, await personIdsOf(tenantId, cid), { id: me.actor, clearance: me.clearance }) : [];
   const [personTasks, team] = b2b

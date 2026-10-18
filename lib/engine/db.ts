@@ -1,5 +1,5 @@
 import { all, exec, run, usingPostgres } from "@/lib/engine/sql";
-import { CONSOLE_PROFILES } from "@/lib/shared/tenants";
+import { CONSOLE_PROFILES, RETAIL_DEMO_IDS } from "@/lib/shared/tenants";
 import { appendAudit } from "@/lib/engine/audit";
 
 /* ── ชั้นเก็บข้อมูล ────────────────────────────────────────────
@@ -1057,6 +1057,11 @@ export async function ensureSchema(): Promise<void> {
   }
   if (!(await columnsOf("tenant_billing")).has("trial_ends_at")) {
     await exec("ALTER TABLE tenant_billing ADD COLUMN trial_ends_at TEXT");
+  }
+  /* โหมดลูกค้า (docs/crm-plan.md F1 · 0026) — เดโมค้าปลีกเดิมได้ b2c ให้หน้าจอเหมือนเดิม */
+  if (!(await columnsOf("tenants")).has("customer_mode")) {
+    await exec("ALTER TABLE tenants ADD COLUMN customer_mode TEXT NOT NULL DEFAULT 'b2b' CHECK (customer_mode IN ('b2b', 'b2c', 'hybrid'))");
+    await exec(`UPDATE tenants SET customer_mode = 'b2c' WHERE id IN (${RETAIL_DEMO_IDS.map((i) => `'${i}'`).join(", ")})`);
   }
   if (!(await columnsOf("tenants")).has("billing_day")) {
     await exec(
