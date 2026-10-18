@@ -19,6 +19,7 @@ import { thaiDateTime } from "@/lib/shared/format";
 import { measureAllAction } from "../../actions";
 import { ActionForm } from "@/components/console/action-form";
 
+export const metadata = { title: "แคมเปญ" };
 export const dynamic = "force-dynamic";
 
 type Row = {

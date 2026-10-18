@@ -11,6 +11,7 @@ import { ActionForm } from "@/components/console/action-form";
 import { PageHead, Panel } from "@/components/console/ui";
 import { DueBadge } from "@/components/console/dsar-badge";
 
+export const metadata = { title: "คำขอสิทธิ" };
 export const dynamic = "force-dynamic";
 
 /* ── คำขอสิทธิหนึ่งเรื่อง ── ยืนยันตัวตน → (รายงาน) → ปิด · ขั้นที่ทำไม่ได้แสดงว่าทำไม ไม่ซ่อน */

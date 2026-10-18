@@ -12,6 +12,7 @@ import { recordPreference } from "@/lib/engine/policy/preferences";
 import { listAccounts, MASKED_PERSON } from "@/lib/engine/accounts";
 import { listContacts } from "@/lib/engine/accounts/contacts-list";
 import { matchKey } from "@/lib/engine/pii";
+import { createOrg, orgByName } from "@/lib/engine/accounts/edit";
 
 const out: string[] = [];
 const ok = (c: boolean, m: string) => out.push(`${c ? "PASS" : "FAIL"}  ${m}`);
@@ -41,8 +42,11 @@ const names = byName.rows.map((r) => r.name);
 ok(names.join("|") === [...names].sort((a, b) => a.localeCompare(b, "th") || 0).join("|") || names[0] < names[names.length - 1], "เรียงชื่อบริษัทจากน้อยไปมาก");
 const desc = await listAccounts(T, { q: "บริษัท", sort: "name", dir: "desc", viewer: ME });
 ok(desc.rows[0]?.name === byName.rows.at(-1)?.name, "กดซ้ำเรียงกลับทิศ");
+const hhh = (await get<{ org_id: string }>("SELECT org_id FROM affiliations WHERE tenant_id = ? AND customer_id = ?", T, yupa))!.org_id;
+ok(!(await listAccounts(T, { view: "quiet", viewer: ME })).rows.some((r) => r.id === kkk), "มุมมองเงียบ: บริษัทที่ไม่มีใครดูแล (ไม่มีเจ้าของ · ไม่มีดีลเปิด) ไม่ขึ้น (BUG-06)");
+await run("UPDATE orgs SET account_owner_id = ? WHERE tenant_id = ? AND id = ?", "someone@verify", T, kkk);
 const quiet = await listAccounts(T, { view: "quiet", viewer: ME });
-ok(quiet.rows.some((r) => r.id === kkk) && quiet.total === quiet.rows.length, "มุมมองเงียบ: บริษัทที่มีคนแต่ไม่เคยติดต่อขึ้น · ตัวนับตรงกับรายการ");
+ok(quiet.rows.some((r) => r.id === kkk) && !quiet.rows.some((r) => r.id === hhh) && quiet.total === quiet.rows.length, "มุมมองเงียบ: บริษัทที่มีเจ้าของแต่ไม่เคยติดต่อขึ้น · ไม่มีเจ้าของไม่ขึ้น · ตัวนับตรงกับรายการ");
 await run("INSERT INTO interactions (id, tenant_id, kind, occurred_at, org_id, customer_id, summary, recorded_at) VALUES (?,?,?,?,?,?,?,?)",
   randomUUID(), T, "call", new Date().toISOString(), kkk, kamol, "โทรคุย (สมมุติ)", new Date().toISOString());
 ok(!(await listAccounts(T, { view: "quiet", viewer: ME })).rows.some((r) => r.id === kkk), "ติดต่อแล้ว = หลุดจากมุมมองเงียบ");
@@ -67,6 +71,19 @@ ok(masked?.name === MASKED_PERSON && !masked.visible && masked.title === null, "
 const byOrg = await listContacts(T, { sort: "org", dir: "asc" }, ME);
 const orgs = byOrg.rows.map((r) => r.org ?? "~");
 ok(orgs.every((o, i) => i === 0 || orgs[i - 1] <= o), "เรียงตามบริษัทถูก");
+
+// ── สร้างบริษัทด้วยมือ (docs/qa-plan.md BUG-21) ──
+const made = await createOrg(T, { name: "บริษัท ใหม่เอี่ยม จำกัด (มหาชน)", industry: "ทดสอบ", domain: "https://www.mai-iam.example/x", owner: ME.id }, "verify");
+const row = made.ok ? await get<{ name: string; primary_domain: string; account_owner_id: string }>("SELECT name, primary_domain, account_owner_id FROM orgs WHERE tenant_id = ? AND id = ?", T, made.id) : undefined;
+ok(made.ok && !made.existed && row?.primary_domain === "mai-iam.example" && row.account_owner_id === ME.id, "สร้างบริษัทได้ · โดเมนตัด www/path · ตั้งเจ้าของ");
+const again = await createOrg(T, { name: "ใหม่เอี่ยม" }, "verify");
+ok(again.ok && again.existed && made.ok && again.id === made.id, "ชื่อเดิมไม่มีคำนิติบุคคล = คืนบริษัทเดิม ไม่สร้างซ้ำ");
+ok(made.ok && (await orgByName(T, "ใหม่เอี่ยม")) === made.id, "ตัวเลือกบริษัทในดีลหาเจอด้วยชื่อสั้น");
+const dupDomain = await createOrg(T, { name: "อีกบริษัทหนึ่ง", domain: "mai-iam.example" }, "verify");
+ok(!dupDomain.ok, "โดเมนที่ผูกกับบริษัทอื่นแล้ว ปฏิเสธ");
+const badTax = await createOrg(T, { name: "บริษัทเลขผิด", taxId: "1234" }, "verify");
+ok(!badTax.ok, "เลขนิติบุคคลผิดรูปแบบ ปฏิเสธ");
+ok(!(await createOrg(T, { name: "   " }, "verify")).ok, "ชื่อว่าง ปฏิเสธ");
 
 for (const line of out) console.log(line);
 const failed = out.filter((l) => l.startsWith("FAIL"));

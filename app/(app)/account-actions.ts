@@ -11,7 +11,8 @@ import { orgAccess } from "@/lib/engine/accounts";
 import { get } from "@/lib/engine/sql";
 import { createTask } from "@/lib/engine/tasks";
 import { mergeOrgs } from "@/lib/engine/vault/merge";
-import { orgByName } from "@/lib/engine/accounts/edit";
+import { createOrg, orgByName } from "@/lib/engine/accounts/edit";
+import { similarOrgs } from "@/lib/engine/duplicates";
 import { redirect } from "next/navigation";
 import type { ActionState } from "@/lib/shared/action-state";
 import type { Classification } from "@/lib/shared/vault";
@@ -222,4 +223,25 @@ export async function mergeOrgHereAction(_p: ActionState, fd: FormData): Promise
   revalidatePath("/app/accounts");
   revalidatePath("/app/data");
   redirect(`/app/accounts/${keep}?tab=details&merged=1`);
+}
+
+/* ── สร้างบริษัทด้วยมือ (BUG-21) ── เตือนบริษัทที่อาจซ้ำก่อน · ยืนยันแล้วสร้างได้ */
+export async function createOrgAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  const v = await viewer();
+  const no = denied(v, "write");
+  if (no) return { error: no };
+  /* ชื่อเดียวกันเมื่อตัดคำนิติบุคคล = บริษัทเดิมแน่นอน — เปิดแฟ้มเดิมเลย ไม่ต้องถาม */
+  const same = await orgByName(v.tenantId, str(fd, "name"));
+  if (same) redirect(`/app/accounts/${same}?existed=1`);
+  if (str(fd, "confirmDup") !== "1") {
+    const like = await similarOrgs(v.tenantId, { name: str(fd, "name"), email: str(fd, "domain") ? `x@${str(fd, "domain").replace(/^https?:\/\//, "").replace(/^www\./, "")}` : "" }, who(v));
+    if (like.length) return { error: `บริษัทนี้อาจมีอยู่แล้ว: ${like.slice(0, 3).map((x) => `${x.name} (${x.why})`).join(" · ")} — ถ้าเป็นบริษัทใหม่จริง ติ๊ก "ตรวจแล้ว ไม่ใช่รายเดิม" แล้วกดอีกครั้ง` };
+  }
+  const r = await createOrg(v.tenantId, {
+    name: str(fd, "name"), industry: str(fd, "industry"), domain: str(fd, "domain"), taxId: str(fd, "taxId"),
+    owner: str(fd, "mine") === "1" ? v.actor : null,
+  }, v.actor);
+  if (!r.ok) return { error: r.error };
+  revalidatePath("/app/accounts");
+  redirect(`/app/accounts/${r.id}${r.existed ? "?existed=1" : ""}`);
 }

@@ -23,6 +23,7 @@ import { ciLabel, thaiDate, thaiDateTime } from "@/lib/shared/format";
 import { measureAction, sendAction } from "../../../actions";
 import { ActionForm } from "@/components/console/action-form";
 
+export const metadata = { title: "แคมเปญ" };
 export const dynamic = "force-dynamic";
 
 /* หัวตารางภาษาไทยไม่ใช้ mono ตัวพิมพ์ใหญ่ของ .c-table th (ดู console.css) */

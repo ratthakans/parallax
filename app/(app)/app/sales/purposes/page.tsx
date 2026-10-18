@@ -10,6 +10,7 @@ import { can, deniedTh } from "@/lib/shared/roles";
 import { ActionForm } from "@/components/console/action-form";
 import { PageHead, Panel } from "@/components/console/ui";
 
+export const metadata = { title: "วัตถุประสงค์และอายุข้อมูล" };
 export const dynamic = "force-dynamic";
 
 /* ── วัตถุประสงค์และฐานการประมวลผล (docs/plan.md หัวข้อ 6 · ROPA เต็มใน B6) ─────

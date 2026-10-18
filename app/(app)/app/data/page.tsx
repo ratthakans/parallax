@@ -6,6 +6,7 @@ import { bangkokDay } from "@/lib/shared/format";
 import { ActionForm } from "@/components/console/action-form";
 import { PageHead, Panel, num } from "@/components/console/ui";
 
+export const metadata = { title: "สุขภาพข้อมูล" };
 export const dynamic = "force-dynamic";
 
 /* ── สุขภาพข้อมูล (docs/crm-plan.md D1) ── รายการสิ่งที่ต้องแก้ ไม่ใช่คะแนน

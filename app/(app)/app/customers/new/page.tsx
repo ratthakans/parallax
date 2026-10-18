@@ -11,6 +11,7 @@ import { isB2BTenant } from "@/lib/shared/tenants";
 import { viewer } from "@/app/(app)/viewer";
 import { listAccounts } from "@/lib/engine/accounts";
 
+export const metadata = { title: "เพิ่มผู้ติดต่อ" };
 export const dynamic = "force-dynamic";
 
 /* ── เพิ่มลูกค้าทีละคน ───────────────────────────────────────────

@@ -46,7 +46,8 @@ export async function personB2B(tenantId: string, customerId: string, viewer: Vi
   /* ป้ายบนหัว: ความต้องการล่าสุด ถ้าเป็นการหยุด (ยินยอมใหม่หลังถอน = ไม่ขึ้น) — การตัดสินจริงต่อวัตถุประสงค์อยู่ที่บริการนโยบาย */
   const latest = prefs[0];
   return {
-    jobs: jobs.map((j) => {
+    /* สังกัดปัจจุบันซ้ำที่บริษัทเดียวกัน (หลังรวมบริษัท · BUG-15) = แสดงแถวเดียว */
+    jobs: jobs.filter((j, i) => j.valid_to != null || jobs.findIndex((x) => x.valid_to == null && x.org_id === j.org_id) === i).map((j) => {
       const visible = seeOrg(j);
       return { orgId: j.org_id, org: visible ? j.org : "บริษัทที่จำกัดการเข้าถึง", visible, title: visible ? j.title : null, from: j.valid_from, to: j.valid_to, current: j.valid_to == null };
     }),

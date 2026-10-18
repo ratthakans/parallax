@@ -6,6 +6,7 @@ import { CONTACT_KIND_LABEL, CONTACT_KIND_ORDER } from "@/lib/shared/contact-kin
 import { daysAgoLabel, thaiDateTime } from "@/lib/shared/format";
 import { Metric, PageHead, Panel, num, pct } from "@/components/console/ui";
 
+export const metadata = { title: "ภาพรวมข้อมูล" };
 export const dynamic = "force-dynamic";
 
 /* ── ภาพรวม Data Vault ──────────────────────────────────────────

@@ -58,7 +58,8 @@ export async function createCustomerAction(_prev: ActionState, fd: FormData): Pr
   const { tenantId, actor } = await scope(fd);
   const no = denied(await viewer(), "write");
   if (no) return { error: no };
-  const contacts = CONTACT_KIND_ORDER.map((kind) => ({ kind, value: field(fd, `contact_${kind}`) }));
+  /* เฉพาะช่องที่ฟอร์มมีจริง — ข้อความแจ้งเตือนจึงพูดถึงแค่ช่องที่ผู้ใช้เห็น (BUG-16) */
+  const contacts = CONTACT_KIND_ORDER.filter((kind) => fd.has(`contact_${kind}`)).map((kind) => ({ kind, value: field(fd, `contact_${kind}`) }));
   /* กันซ้ำตั้งแต่ตอนกรอก (บัญชี B2B) — เตือนก่อนสร้าง · ผู้ใช้ยืนยันว่าไม่ใช่รายเดิมได้ด้วยช่องติ๊ก */
   if (isB2BTenant(tenantId) && fd.get("confirmDup") !== "1") {
     const v = await viewer();

@@ -77,6 +77,8 @@ if (camp.ok) {
 const people = await all<{ name: string }>("SELECT name FROM customers WHERE tenant_id = ? ORDER BY id LIMIT 200", T);
 const orgs = await all<{ id: string; name: string }>("SELECT id, name FROM orgs WHERE tenant_id = ? ORDER BY id LIMIT 200", T);
 const pick = <X,>(xs: X[], i: number) => xs[(i * 37) % xs.length];
+/* มุมมองเงียบนับเฉพาะบัญชีที่มีคนดูแล (docs/qa-plan.md BUG-06) — ให้ครึ่งหนึ่งมีเจ้าของ เหมือนบัญชีที่ใช้งานจริง */
+await as(() => run("UPDATE orgs SET account_owner_id = ? WHERE tenant_id = ? AND id IN (SELECT id FROM orgs WHERE tenant_id = ? ORDER BY id LIMIT (SELECT COUNT(*) / 2 FROM orgs WHERE tenant_id = ?))", ME, T, T, T));
 /* แต่ละการอ่านคืนจำนวนรายการที่ได้ — ได้ศูนย์ในรอบอุ่นเครื่อง = วัดของว่าง (เร็วเพราะไม่ได้ทำอะไร) ถือว่าตก */
 const cases: { name: string; fn: (i: number) => Promise<number> }[] = [
   { name: "ค้นรายชื่อด้วยชื่อ", fn: async (i) => (await searchCustomers(T, { q: pick(people, i).name.split(" ")[0] })).rows.length },

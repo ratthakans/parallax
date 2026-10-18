@@ -6,6 +6,7 @@ import { thaiDateTime } from "@/lib/shared/format";
 import { ActionForm } from "@/components/console/action-form";
 import { PageHead, Panel } from "@/components/console/ui";
 
+export const metadata = { title: "ถังขยะ" };
 export const dynamic = "force-dynamic";
 
 /* ── ถังขยะ (docs/crm-plan.md D3) ── ดีลและแฟ้มบริษัทว่างที่ถูกลบ · กู้คืนได้ภายใน 30 วัน · คนไม่อยู่ที่นี่ (ลบคน = ตามคำขอสิทธิ) */

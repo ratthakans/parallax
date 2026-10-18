@@ -23,6 +23,7 @@ import { ActionForm } from "@/components/console/action-form";
 import { Panel, baht } from "@/components/console/ui";
 import { RecordHeader, RecordTabs, pickTab } from "@/components/console/record";
 
+export const metadata = { title: "ดีล" };
 export const dynamic = "force-dynamic";
 
 /* ── หน้าดีล (docs/ux-plan.md U4) ── หัวสรุป + Path (กดขั้นเพื่อย้าย) + แท็บ ภาพรวม/ประวัติ */

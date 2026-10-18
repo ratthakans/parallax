@@ -8,6 +8,7 @@ import { thaiDateTime } from "@/lib/shared/format";
 import { Panel, num } from "@/components/console/ui";
 import { VaultImporter } from "@/components/console/vault-importer";
 
+export const metadata = { title: "แหล่งข้อมูล" };
 export const dynamic = "force-dynamic";
 
 /* ── หนึ่งแหล่งข้อมูล: ข้อตกลงของแหล่ง + อัปโหลด + ไฟล์ที่นำเข้าแล้ว ── */

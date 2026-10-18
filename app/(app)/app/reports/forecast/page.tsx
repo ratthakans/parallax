@@ -7,6 +7,7 @@ import { can } from "@/lib/shared/roles";
 import { ActionForm } from "@/components/console/action-form";
 import { PageHead, Panel, baht } from "@/components/console/ui";
 
+export const metadata = { title: "พยากรณ์ยอดขาย" };
 export const dynamic = "force-dynamic";
 
 /* ── พยากรณ์และเป้า (docs/crm-plan.md C6) ── ผลรวมของสิ่งที่คนขายบอก ไม่ใช่การเดาของระบบ

@@ -9,6 +9,7 @@ import { ActionForm } from "@/components/console/action-form";
 import { PageHead, Panel, num } from "@/components/console/ui";
 import { CriteriaFields } from "./criteria-fields";
 
+export const metadata = { title: "แคมเปญ" };
 export const dynamic = "force-dynamic";
 
 /* ── Campaign Workspace · แคมเปญขาย (docs/plan.md B5) ─────────────

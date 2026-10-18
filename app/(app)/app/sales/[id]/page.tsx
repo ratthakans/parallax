@@ -19,7 +19,9 @@ import { DraftPanel } from "@/components/console/draft-panel";
 import { Panel, num } from "@/components/console/ui";
 import { RecordHeader, RecordTabs, pickTab } from "@/components/console/record";
 import { CriteriaFields } from "../criteria-fields";
+import { PreferenceForm } from "@/components/console/preference-form";
 
+export const metadata = { title: "แคมเปญ" };
 export const dynamic = "force-dynamic";
 
 /* ── แคมเปญหนึ่งแคมเปญ (docs/plan.md B5 · หัวข้อ 3.5 ข้อ 4) ─────────────
@@ -93,26 +95,7 @@ function Target({ t, campaignId, me, purposes, draftable }: { t: TargetView; cam
               <label className={LABEL}>ครบกำหนดขั้นถัดไป<input type="date" name="nextDue" className="c-input" /></label>
             </ActionForm>
           )}
-          <ActionForm action={recordPreferenceAction} fields={{ customerId: t.customerId, back: `/app/sales/${campaignId}` }} label="บันทึกความต้องการของเจ้าของข้อมูล" pendingLabel="กำลังบันทึก…" size="sm" className="grid gap-2 sm:grid-cols-3">
-            <label className={LABEL}>ชนิด
-              <select name="kind" className="c-select" defaultValue="objection">
-                {PREFERENCE_KINDS.map((k) => <option key={k} value={k}>{PREFERENCE_TH[k]}</option>)}
-              </select>
-            </label>
-            <label className={LABEL}>วัตถุประสงค์
-              <select name="purposeId" className="c-select" defaultValue="">
-                <option value="">ทุกวัตถุประสงค์ (คัดค้าน/ถอน/จำกัด)</option>
-                {purposes.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            </label>
-            <label className={LABEL}>ช่องทาง
-              <select name="channel" className="c-select" defaultValue="any">
-                <option value="any">ทุกช่องทาง</option>
-                {CHANNELS.map((c) => <option key={c} value={c}>{CHANNEL_TH[c]}</option>)}
-              </select>
-            </label>
-            <label className={`${LABEL} sm:col-span-3`}>หลักฐาน — รับแจ้งทางไหน เมื่อไร<input name="evidence" className="c-input" placeholder="เช่น ตอบอีเมลว่าไม่ต้องการรับข้อเสนอ 3 พ.ย." required /></label>
-          </ActionForm>
+          <PreferenceForm customerId={t.customerId} back={`/app/sales/${campaignId}`} purposes={purposes} />
         </div>
       </details>
     </li>

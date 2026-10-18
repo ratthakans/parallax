@@ -6,6 +6,7 @@ import { can } from "@/lib/shared/roles";
 import { ActionForm } from "@/components/console/action-form";
 import { PageHead, Panel } from "@/components/console/ui";
 
+export const metadata = { title: "ฟิลด์ของบัญชี" };
 export const dynamic = "force-dynamic";
 
 /* ── ฟิลด์ของบัญชี (docs/crm-plan.md C4) ── มิติที่บัญชีกำหนดเองบนบริษัทและดีล

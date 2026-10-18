@@ -473,6 +473,16 @@
     color: var(--c-text-2);
   }
 
+  /* ข้อความผลของปุ่มเดี่ยว ลอยมุมจอ (ActionForm · BUG-11) */
+  .c-toast {
+    background: var(--c-panel);
+    border: 1px solid var(--c-line);
+    border-inline-start-width: 3px;
+    border-radius: var(--c-radius);
+    padding: 0.6rem 0.9rem;
+    box-shadow: 0 6px 24px rgb(0 0 0 / 0.12);
+  }
+
   /* ── pills ──────────────────────────────────────────────────── */
 
   .c-pill {

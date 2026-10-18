@@ -23,6 +23,7 @@ import { ActionForm } from "@/components/console/action-form";
 import { hasSyntheticData } from "@/lib/engine/synthetic";
 import { proofBlockedReason } from "@/lib/engine/billing";
 
+export const metadata = { title: "หลักฐานผลลัพธ์" };
 export const dynamic = "force-dynamic";
 
 export default async function ProofPage() {

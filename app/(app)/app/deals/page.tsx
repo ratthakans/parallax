@@ -11,12 +11,13 @@ import { can } from "@/lib/shared/roles";
 import { SavedViews } from "@/components/console/saved-views";
 import { bulkDealsAction } from "@/app/(app)/bulk-actions";
 import { ActionForm } from "@/components/console/action-form";
-import { SelectAll } from "@/components/console/select-all";
+import { SelectAll, SelectedCount } from "@/components/console/select-all";
 import { FORECAST_CATEGORIES, FORECAST_TH, DEAL_STAGE_TH } from "@/lib/shared/deals";
 import { PageHead, Panel, baht, num } from "@/components/console/ui";
 import { ListViews, SortTh, listHref, type ListState } from "@/components/console/list-view";
 import { DealBoard } from "@/components/console/deal-board";
 
+export const metadata = { title: "ดีล" };
 export const dynamic = "force-dynamic";
 
 /* ── ดีล (docs/ux-plan.md U4) ── ไปป์ไลน์ลากวาง (ค่าเริ่มต้น) หรือรายการ · มุมมองสำเร็จรูปเหมือนหน้ารายการอื่น */
@@ -83,6 +84,7 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
         <form action={BASE} className="c-panel mt-2 grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
           {view !== "open" && <input type="hidden" name="view" value={view} />}
           {state.mode && <input type="hidden" name="mode" value={state.mode} />}
+          {sp.q && <input type="hidden" name="q" value={sp.q} />}
           <label className={LABEL}>เจ้าของ
             <select name="owner" defaultValue={filters.owner ?? ""} className="c-select">
               <option value="">ทั้งหมด</option>{team.map((x) => <option key={x} value={x}>{x}</option>)}
@@ -141,8 +143,9 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
           <div className="flex justify-end border-b border-[var(--c-line)] px-5 py-2">
             <details className="relative">
               <summary className="c-btn c-btn-ghost c-btn-sm inline-flex cursor-pointer list-none">เปลี่ยนรายการที่ติ๊ก…</summary>
-              <ActionForm id="bulk-deals" action={bulkDealsAction} label="เปลี่ยน" pendingLabel="กำลังเปลี่ยน…" size="sm"
+              <ActionForm id="bulk-deals" action={bulkDealsAction} label="เปลี่ยน" pendingLabel="กำลังเปลี่ยน…" size="sm" closeOnSuccess
                 className="c-panel absolute right-0 z-10 mt-1 grid w-80 gap-2 p-3">
+                <SelectedCount form="bulk-deals" />
                 <label className={LABEL}>เปลี่ยนอะไร
                   <select name="op" className="c-select" defaultValue="owner">
                     <option value="owner">เจ้าของดีล</option><option value="stage">ขั้น (ที่ยังเปิด)</option><option value="forecast">หมวดพยากรณ์</option>

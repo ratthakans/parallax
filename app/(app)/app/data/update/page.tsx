@@ -9,6 +9,7 @@ import { ActionForm } from "@/components/console/action-form";
 import { OrgUpdater } from "@/components/console/org-updater";
 import { PageHead, Panel, num } from "@/components/console/ui";
 
+export const metadata = { title: "อัปเดตบริษัทจากไฟล์" };
 export const dynamic = "force-dynamic";
 
 /* ── อัปเดตบริษัทจากไฟล์ (docs/crm-plan.md D2) ── เช่น ไฟล์รายชื่อบริษัทพร้อมอุตสาหกรรม · เลขนิติบุคคล · ทีม · tier

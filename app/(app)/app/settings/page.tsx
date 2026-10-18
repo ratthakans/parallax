@@ -28,6 +28,7 @@ import { digestPrefs } from "@/lib/engine/digest";
 import { saveDigestPrefsAction } from "../../digest-actions";
 import { DIGEST_WEEKDAYS, WEEKDAY_TH } from "@/lib/shared/digest";
 
+export const metadata = { title: "ตั้งค่าและความปลอดภัย" };
 export const dynamic = "force-dynamic";
 
 const AI_JOB_LABEL: Record<string, string> = {

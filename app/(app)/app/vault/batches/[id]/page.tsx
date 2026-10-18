@@ -6,6 +6,7 @@ import { IMPORT_ROW_TH, type ImportRowStatus } from "@/lib/shared/vault";
 import { thaiDateTime } from "@/lib/shared/format";
 import { Metric, Panel, num } from "@/components/console/ui";
 
+export const metadata = { title: "ชุดนำเข้า" };
 export const dynamic = "force-dynamic";
 
 /* ── รายงานตรวจยอดของไฟล์หนึ่งไฟล์ (Blueprint บท 4 ขั้น 5) ────────────

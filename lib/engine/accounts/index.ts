@@ -53,8 +53,10 @@ const VIEW_SQL: Record<AccountView, string> = {
   all: "",
   mine: "",
   open_deals: "EXISTS (SELECT 1 FROM opportunities p WHERE p.tenant_id = o.tenant_id AND p.org_id = o.id AND p.stage NOT IN ('won', 'lost'))",
-  /* เงียบ = มีคนสังกัดอยู่ แต่ไม่มีปฏิสัมพันธ์ใน 30 วัน (หรือไม่เคยมี) */
-  quiet: "COALESCE(a.cur, 0) > 0 AND (i.last_at IS NULL OR i.last_at < ?)",
+  /* เงียบ = บัญชีที่มีคนดูแล (มีดีลเปิดหรือมีเจ้าของบัญชี) แต่ไม่มีปฏิสัมพันธ์ใน 30 วัน — เดิมนับทุกบริษัทที่มีคน
+     ได้ 203/206 ใช้ทำงานไม่ได้ (docs/qa-plan.md BUG-06) · ตรงกับ "บัญชีที่เงียบ" ของหน้าแรกที่ดูดีลเปิด */
+  quiet: `(o.account_owner_id IS NOT NULL OR EXISTS (SELECT 1 FROM opportunities p WHERE p.tenant_id = o.tenant_id AND p.org_id = o.id AND p.stage NOT IN ('won', 'lost')))
+    AND (i.last_at IS NULL OR i.last_at < ?)`,
   no_owner: "o.account_owner_id IS NULL",
 };
 const SORT_SQL: Record<AccountSort, string> = {
@@ -271,7 +273,9 @@ export async function getDossier(tenantId: string, orgId: string, viewer: Viewer
     subsidiaries: subs,
     domains: domains.map((d) => ({ domain: d.domain, rows: domainRows.get(d.domain) ?? [] })),
     namesAsWritten: [...nameRows].sort((a, b) => b[1].length - a[1].length).map(([name, rows]) => ({ name, rows })),
-    people: affs.map((a) => {
+    /* หลังรวมบริษัท คนที่อยู่ทั้งสองแฟ้มมีสังกัดปัจจุบันสองแถวที่บริษัทเดียวกัน (docs/qa-plan.md BUG-15)
+       แถวยังต้องอยู่ (แยกคืนต้องย้ายกลับได้ตรงแถว) แต่แสดงและนับเป็นคนเดียว: แถวที่ยืนยันแล้วก่อน · เริ่มเก่าสุดก่อน */
+    people: dedupeCurrent(affs).map((a) => {
       const hidden = hiddenPerson(a.person_class);
       return {
         affiliationId: a.id, personId: a.customer_id, name: hidden ? MASKED_PERSON : a.name, title: hidden ? null : a.title,
@@ -337,4 +341,17 @@ export async function accountFilterOptions(tenantId: string): Promise<{ industri
     all<{ v: string }>("SELECT DISTINCT account_owner_id AS v FROM orgs WHERE tenant_id = ? AND account_owner_id IS NOT NULL ORDER BY account_owner_id", tenantId),
   ]);
   return { industries: ind.map((r) => r.v), owners: own.map((r) => r.v) };
+}
+
+/** สังกัดปัจจุบันหนึ่งแถวต่อคน (ช่วงที่ปิดแล้วคงไว้ทุกแถว — คนที่ออกแล้วกลับมาคือประวัติจริง) */
+export function dedupeCurrent<T extends { customer_id: string | null; valid_to: string | null; valid_from: string | null; confirmed_by: string | null }>(rows: T[]): T[] {
+  const best = new Map<string, T>();
+  for (const r of rows) {
+    if (r.valid_to != null || !r.customer_id) continue;
+    const b = best.get(r.customer_id);
+    const better = !b || (Boolean(r.confirmed_by) && !b.confirmed_by)
+      || (Boolean(r.confirmed_by) === Boolean(b.confirmed_by) && (r.valid_from ?? "9999") < (b.valid_from ?? "9999"));
+    if (better) best.set(r.customer_id, r);
+  }
+  return rows.filter((r) => r.valid_to != null || !r.customer_id || best.get(r.customer_id) === r);
 }

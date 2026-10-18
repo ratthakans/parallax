@@ -4,6 +4,7 @@ import { searchEverything } from "@/lib/engine/search";
 import { PageHead, Panel } from "@/components/console/ui";
 import { stageTh } from "@/lib/shared/deals";
 
+export const metadata = { title: "ค้นหา" };
 export const dynamic = "force-dynamic";
 
 /* ── ผลค้นหารวม (docs/ux-plan.md U1) ── ช่องค้นหาอยู่ที่แถบบนทุกหน้า */

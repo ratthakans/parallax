@@ -12,6 +12,7 @@ import { ActionForm } from "@/components/console/action-form";
 import { PageHead, Panel, num } from "@/components/console/ui";
 import { ListViews, type ListState } from "@/components/console/list-view";
 
+export const metadata = { title: "งาน" };
 export const dynamic = "force-dynamic";
 
 /* ── งาน (docs/ux-plan.md U5) ── ทุกงานในที่เดียว
@@ -28,7 +29,7 @@ const VIEWS: { key: TaskView; label: string }[] = [
   { key: "done", label: "เสร็จแล้ว" },
 ];
 
-export default async function TasksPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
+export default async function TasksPage({ searchParams }: { searchParams: Promise<{ view?: string; new?: string }> }) {
   const sp = await searchParams;
   const v = await viewer();
   const view = (TASK_VIEWS as readonly string[]).includes(sp.view ?? "") ? (sp.view as TaskView) : "mine";
@@ -44,7 +45,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
     <>
       <PageHead label="งาน" title="งาน" />
       <datalist id="task-team">{team.map((m) => <option key={m} value={m} />)}</datalist>
-      <details id="new" className="mb-4">
+      <details id="new" className="mb-4" open={sp.new === "1"}>
         <summary className="c-btn c-btn-primary c-btn-sm inline-flex cursor-pointer list-none">+ งาน</summary>
         <ActionForm action={createTaskAction} label="สร้างงาน" pendingLabel="กำลังบันทึก…" size="sm" className="c-panel mt-2 grid max-w-3xl gap-2 p-4 sm:grid-cols-2">
           <label className={`${LABEL} sm:col-span-2`}>ต้องทำอะไร<input name="title" className="c-input" required maxLength={200} placeholder="เช่น โทรนัดประชุมไตรมาสหน้า" /></label>

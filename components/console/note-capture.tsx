@@ -15,7 +15,8 @@ import type { NoteDraft } from "@/lib/shared/capture";
 
 const LABEL = "c-thai flex min-w-0 flex-col gap-1 text-[0.8rem] text-[var(--c-text-3)]";
 
-export function NoteCapture({ orgId, people }: { orgId: string; people: { personId: string; name: string }[] }) {
+/* subject = คนที่เปิดหน้าอยู่ (หน้าผู้ติดต่อ) — ติ๊กไว้ให้เสมอ ไม่งั้นโน้ตไปผูกแค่บริษัทและไม่ขึ้นที่หน้าคนนั้น (docs/qa-plan.md BUG-20) */
+export function NoteCapture({ orgId, people, subject }: { orgId: string; people: { personId: string; name: string }[]; subject?: string }) {
   const [note, setNote] = useState("");
   const [draft, setDraft] = useState<NoteDraft | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +42,7 @@ export function NoteCapture({ orgId, people }: { orgId: string; people: { person
     setNote("");
   }
 
-  const chosen = new Set(draft?.participants.map((p) => p.personId));
+  const chosen = new Set([...(draft?.participants.map((p) => p.personId) ?? []), ...(subject ? [subject] : [])]);
 
   return (
     <div className="grid gap-3">

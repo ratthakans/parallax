@@ -51,6 +51,8 @@ export type QueueItem = {
   ackable: boolean;
   /** เลื่อนมาแล้วกี่ครั้ง */
   snoozes: number;
+  /** งาน: ปิดหรือบันทึกผลได้จากหน้าแรกเลย (docs/qa-plan.md BUG-05) — งานแคมเปญบันทึกผลผ่านการตรวจนโยบาย */
+  task?: { campaignId: string | null; targetId: string | null };
 };
 
 export type TodayQueue = {

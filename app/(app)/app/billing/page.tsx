@@ -27,6 +27,7 @@ import { thaiDate } from "@/lib/shared/format";
 import { buyCreditsAction, changePlanAction } from "../../actions";
 import { ActionForm } from "@/components/console/action-form";
 
+export const metadata = { title: "แพ็กเกจและการชำระเงิน" };
 export const dynamic = "force-dynamic";
 
 /* หัวตารางภาษาไทยไม่ใช้ mono ตัวพิมพ์ใหญ่ของ .c-table th (ดู console.css) */

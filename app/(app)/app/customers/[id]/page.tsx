@@ -17,6 +17,8 @@ import { NoteCapture } from "@/components/console/note-capture";
 import { viewer } from "@/app/(app)/viewer";
 import { personB2B } from "@/lib/engine/accounts/person";
 import { dealsOfPerson } from "@/lib/engine/deals";
+import { listBases } from "@/lib/engine/policy";
+import { PreferenceForm } from "@/components/console/preference-form";
 import { listTasks } from "@/lib/engine/tasks";
 import { teamMembers } from "@/lib/engine/team";
 import { NewTaskForm, TaskList } from "@/components/console/tasks";
@@ -37,6 +39,7 @@ import {
   updateCustomerAction,
 } from "../../../customers-actions";
 
+export const metadata = { title: "ผู้ติดต่อ" };
 export const dynamic = "force-dynamic";
 
 const CHANNEL_LABEL: Record<string, string> = {
@@ -164,6 +167,7 @@ export default async function CustomerPage({
   /* บัญชี B2B ได้หน้าระเบียนแบบผู้ติดต่อ (สังกัด · แคมเปญ · กิจกรรม) — บัญชีค้าปลีกเดิมได้ตัวเลขการซื้อตามเดิม */
   const me = await viewer();
   const b2b = isB2BTenant(tenantId) ? await personB2B(tenantId, cid, { id: me.actor, clearance: me.clearance }) : null;
+  const purposes = b2b ? (await listBases(tenantId)).map((b) => ({ id: b.purpose_id, name: b.name })) : [];
   const deals = b2b ? await dealsOfPerson(tenantId, await personIdsOf(tenantId, cid), { id: me.actor, clearance: me.clearance }) : [];
   const [personTasks, team] = b2b
     ? await Promise.all([listTasks(tenantId, "open", { id: me.actor, clearance: me.clearance }, new Date(), { personId: cid }), teamMembers(tenantId, me.actor)])
@@ -198,7 +202,7 @@ export default async function CustomerPage({
     <>
       {sp.created === "1" && (
         <p role="status" className="c-msg c-msg-ok mt-4">
-          เพิ่ม{v.person}แล้ว — ไฟล์ที่นำเข้าทีหลังซึ่งมีเบอร์ อีเมล หรือรหัสเดียวกัน จะเติมประวัติให้คนนี้
+          เพิ่ม{v.person}แล้ว — ไฟล์ที่นำเข้าทีหลังซึ่งมี{b2b ? "เบอร์หรืออีเมลเดียวกัน" : "เบอร์ อีเมล หรือรหัสเดียวกัน"} จะเติมประวัติให้คนนี้
         </p>
       )}
 
@@ -485,9 +489,13 @@ export default async function CustomerPage({
                   ))}
                 </ul>
               ) : <p className="c-thai mt-3 text-[0.88rem] text-[var(--c-text-3)]">ยังไม่มีบันทึก</p>}
+              <div className="mt-4 border-t border-[var(--c-line)] pt-4">
+                <PreferenceForm customerId={c.id} back={`/app/customers/${c.id}`} purposes={purposes} />
+              </div>
             </Panel>
           )}
-          <Panel className="p-5">
+          {/* ความยินยอมรับข่าวสารแบบค้าปลีก — บัญชี B2B ใช้แผงด้านบน (บริการนโยบายตัดสินต่อวัตถุประสงค์) ไม่แสดงสองระบบซ้อนกัน (BUG-17) */}
+          {!b2b && <Panel className="p-5">
             <h2 className="c-h2 text-[var(--c-text)]">การรับข่าวสาร</h2>
             <p
               className={`c-thai mt-2 text-[0.9rem] ${c.consent.granted ? "text-[var(--c-good)]" : "text-[var(--c-text-2)]"}`}
@@ -521,7 +529,7 @@ export default async function CustomerPage({
                 />
               )}
             </div>
-          </Panel>
+          </Panel>}
 
             </>}
             {tab === "manage" && <>
@@ -601,7 +609,7 @@ export default async function CustomerPage({
             <h2 className="c-h2 text-[var(--c-text)]">กิจกรรม</h2>
             {currentJob?.visible && (
               <div className="mt-3">
-                <NoteCapture orgId={currentJob.orgId} people={[{ personId: c.id, name: c.name }]} />
+                <NoteCapture orgId={currentJob.orgId} people={[{ personId: c.id, name: c.name }]} subject={c.id} />
               </div>
             )}
             {b2b!.interactions.length ? (

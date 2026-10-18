@@ -6,6 +6,7 @@ import { profileFor } from "@/lib/shared/tenants";
 import { Metric, PageHead, Panel, num } from "@/components/console/ui";
 import { Importer } from "@/components/console/importer";
 
+export const metadata = { title: "นำเข้า" };
 export const dynamic = "force-dynamic";
 
 export default async function ImportPage() {

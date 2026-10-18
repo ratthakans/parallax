@@ -4,7 +4,26 @@
     {
       "name": "parallax",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--", "--port", "3040"],
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "3040"
+      ],
+      "port": 3040
+    },
+    {
+      "name": "parallax-demo",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "PARALLAX_DB_PATH=.data/demo-seta.db",
+        "npx",
+        "next",
+        "dev",
+        "--port",
+        "3040"
+      ],
       "port": 3040
     }
   ]
