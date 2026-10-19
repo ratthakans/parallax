@@ -11,6 +11,9 @@ import { customerMode, setCustomerMode } from "@/lib/engine/tenant-mode";
 import { createSignupTenant } from "@/lib/engine/signup";
 import { CUSTOMER_MODES, RETAIL_DEMO_IDS, hasB2B, hasB2C } from "@/lib/shared/tenants";
 import { listContacts } from "@/lib/engine/accounts/contacts-list";
+import { repurchaseDue } from "@/lib/engine/today/repurchase";
+import { recordPreference } from "@/lib/engine/policy/preferences";
+import { createDeal } from "@/lib/engine/deals";
 
 const out: string[] = [];
 const ok = (c: boolean, m: string) => out.push(`${c ? "PASS" : "FAIL"}  ${m}`);
@@ -47,6 +50,28 @@ await setCustomerMode(T, "b2c", "verify");
   ok(plain.rows.every((r) => r.orders === undefined), "ไม่ขอยอดซื้อ = ไม่คำนวณ (บัญชี B2B ล้วนไม่เสียแรง) และเรียงตามยอดซื้อไม่ได้");
   const masked = await listContacts(T, { view: "buyers", purchases: true, pageSize: 100 }, { id: "x", clearance: "public" as const });
   ok(masked.rows.filter((r) => !r.visible).every((r) => r.orders === null && r.spent === null), "คนเกินสิทธิ์ไม่เห็นยอดซื้อ");
+}
+
+// ── F4 · ถึงรอบซื้อซ้ำ ──
+{
+  const ME = { id: "owner@verify", clearance: "restricted_high" as const };
+  /* เดโมสังเคราะห์มีวันที่ซื้อกระจาย — ลองหลายวันอ้างอิงจนเจอรายการ (ไม่ผูกกับวันที่รันชุดตรวจ) */
+  let at = new Date(), due = await repurchaseDue(T, ME, at, 50);
+  for (let i = 1; i <= 24 && !due.items.length; i++) { at = new Date(Date.now() - i * 30 * 864e5); due = await repurchaseDue(T, ME, at, 50); }
+  const inWindow = due.items.every((r) => r.cycleDays >= 7 && r.sinceDays >= r.cycleDays - 1 && r.sinceDays <= r.cycleDays * 2 && r.orders >= 2);
+  ok(due.items.length > 0 && inWindow, "ถึงรอบซื้อซ้ำ = เลยรอบปกติแต่ไม่เกินสองเท่า · ซื้ออย่างน้อย 2 ครั้ง");
+  ok(due.items.every((r, i) => i === 0 || due.items[i - 1].spent >= r.spent), "เรียงตามยอดซื้อรวม");
+  const top = due.items[0];
+  if (top) {
+    await createDeal(T, { customerId: top.id, name: "ดีลติดตามรอบซื้อ (สมมุติ)" }, ME);
+    ok(!(await repurchaseDue(T, ME, at, 50)).items.some((r) => r.id === top.id), "มีดีลเปิดอยู่แล้ว = ไม่ขึ้นซ้ำ");
+  }
+  const second = due.items[1];
+  if (second) {
+    await recordPreference(T, second.id, { kind: "objection", evidence: "คัดค้านทางโทรศัพท์ (สมมุติ)" }, "verify");
+    ok(!(await repurchaseDue(T, ME, at, 50)).items.some((r) => r.id === second.id), "คนที่คัดค้านแล้วไม่ขึ้น");
+  }
+  ok((await repurchaseDue(T, { id: "x", clearance: "public" as const }, at, 50)).items.length === 0, "คนเกินสิทธิ์ไม่ขึ้น (ผู้อ่านระดับสาธารณะ)");
 }
 
 // ── สมัครเอง ──

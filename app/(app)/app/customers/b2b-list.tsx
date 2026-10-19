@@ -49,7 +49,9 @@ export async function B2BContacts({ sp, mode = "b2b" }: { sp: Record<string, str
         title={buy ? "ลูกค้าและผู้ติดต่อ" : "ผู้ติดต่อ"}
         actions={<>
           <Link href="/app/customers/new" className="c-btn c-btn-primary">+ ผู้ติดต่อ</Link>
-          <Link href="/app/vault" className="c-btn c-btn-ghost">นำเข้าไฟล์</Link>
+          <Link href="/app/vault" className="c-btn c-btn-ghost">{buy ? "นำเข้ารายชื่อ" : "นำเข้าไฟล์"}</Link>
+          {/* ไฟล์ยอดขาย/ออเดอร์ (F4) — ตัวนำเข้าเดิมจับคนจากเบอร์/อีเมลเดียวกับรายชื่อ ยอดซื้อจึงไปอยู่กับคนเดิม */}
+          {buy && <Link href="/app/import" className="c-btn c-btn-ghost">นำเข้ายอดขาย</Link>}
           <Link href={`/app/exports${q ? `?q=${encodeURIComponent(q)}` : ""}`} className="c-btn c-btn-ghost">ส่งออก CSV</Link>
         </>}
       />
