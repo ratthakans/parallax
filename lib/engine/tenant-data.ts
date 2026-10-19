@@ -125,6 +125,12 @@ export async function erasePersonHistory(q: Sql, tenantId: string, ids: string[]
     await q.run("DELETE FROM preferences WHERE tenant_id = ? AND customer_id = ?", tenantId, id);
     await q.run("DELETE FROM record_versions WHERE tenant_id = ? AND record_kind = 'person' AND record_id = ?", tenantId, id);
   }
+  /* ประวัติของดีลที่ลบไปพร้อมคน (F3) — ตรงกับ 0027 · ดีลในถังขยะยังเก็บประวัติไว้ */
+  await q.run(
+    `DELETE FROM record_versions WHERE tenant_id = ? AND record_kind = 'opportunity'
+       AND NOT EXISTS (SELECT 1 FROM opportunities o WHERE o.tenant_id = record_versions.tenant_id AND o.id = record_versions.record_id)
+       AND NOT EXISTS (SELECT 1 FROM trash x WHERE x.tenant_id = record_versions.tenant_id AND x.kind = 'deal' AND x.record_id = record_versions.record_id)`,
+    tenantId);
   /* หลักฐานของโน้ต (S6) และความสัมพันธ์ที่ปฏิสัมพันธ์/ความสัมพันธ์ถูกลบไปแล้ว — ตรงกับ 0021 */
   await q.run(
     "DELETE FROM evidence WHERE tenant_id = ? AND ref LIKE 'interaction:%' AND NOT EXISTS (SELECT 1 FROM interactions i WHERE i.tenant_id = evidence.tenant_id AND i.id = substr(evidence.ref, 13))",
@@ -149,6 +155,26 @@ async function deleteOneId(q: Sql, tenantId: string, customerId: string): Promis
     "DELETE FROM line_items WHERE tenant_id = ? AND txn_id IN (SELECT id FROM transactions WHERE tenant_id = ? AND customer_id = ?)",
     tenantId, tenantId, customerId,
   );
+  /* ดีลลูกค้าบุคคลของคนนี้ (docs/crm-plan.md F3) — ดีลคือข้อมูลของเขา ลบทั้งดีลพร้อมของที่ผูก
+     งาน/กิจกรรมของคนอื่นที่อ้างดีลนี้ถูกปลดการอ้าง (ไม่ลบงานของคนอื่น) · ดีลที่อยู่ในถังขยะลบด้วย (กู้ไม่ได้อยู่แล้ว)
+     ประวัติขั้นของดีล (record_versions) ลบใน erasePersonHistory หลังดีลหายแล้ว */
+  const own = `SELECT id FROM opportunities WHERE tenant_id = ? AND org_id IS NULL AND customer_id = ?`;
+  for (const t of ["deal_items", "opportunity_people"]) {
+    await q.run(`DELETE FROM ${t} WHERE tenant_id = ? AND opportunity_id IN (${own})`, tenantId, tenantId, customerId);
+  }
+  await q.run(`DELETE FROM custom_values WHERE tenant_id = ? AND entity = 'deal' AND record_id IN (${own})`, tenantId, tenantId, customerId);
+  for (const t of ["tasks", "interactions"]) {
+    await q.run(`UPDATE ${t} SET opportunity_id = NULL WHERE tenant_id = ? AND opportunity_id IN (${own})`, tenantId, tenantId, customerId);
+  }
+  await q.run(`UPDATE opportunities SET renewed_from = NULL WHERE tenant_id = ? AND renewed_from IN (${own})`, tenantId, tenantId, customerId);
+  await q.run("DELETE FROM opportunities WHERE tenant_id = ? AND org_id IS NULL AND customer_id = ?", tenantId, customerId);
+  /* ถังขยะ: เฉพาะดีลที่เป็นของคนนี้เอง — ดีลบริษัทที่เขาเป็นแค่คนในดีลยังอยู่ (เทียบใน JSON ไม่ใช่ LIKE ซึ่งจะโดนรายชื่อคนในดีลด้วย) */
+  for (const t of await q.all<{ id: string; payload: string }>(
+    "SELECT id, payload FROM trash WHERE tenant_id = ? AND kind = 'deal' AND payload LIKE ?", tenantId, `%${customerId}%`)) {
+    let deal: { org_id?: unknown; customer_id?: unknown } | undefined;
+    try { deal = (JSON.parse(t.payload) as { deal?: typeof deal }).deal; } catch { deal = undefined; }
+    if (deal && !deal.org_id && deal.customer_id === customerId) await q.run("DELETE FROM trash WHERE tenant_id = ? AND id = ?", tenantId, t.id);
+  }
   for (const l of PERSON_LINKED) {
     if (APPEND_ONLY.has(l.table)) continue; // ลบใน erasePersonHistory หลังแถว customers หายแล้ว
     await q.run(

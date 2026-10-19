@@ -408,8 +408,10 @@ export async function weeklyReview(tenantId: string, since = new Date(Date.now()
     all<{ id: string; title: string; due_at: string; owner_id: string | null; org: string | null; org_id: string | null }>(
       `SELECT k.id, k.title, k.due_at, k.owner_id, o.name AS org, k.org_id FROM tasks k LEFT JOIN orgs o ON o.id = k.org_id AND o.tenant_id = k.tenant_id
        WHERE k.tenant_id = ? AND k.status = 'open' AND k.due_at < ? ORDER BY k.due_at LIMIT 50`, tenantId, today),
-    all<{ id: string; name: string; stage: string; org: string; org_id: string; value: number | null; updated_at: string }>(
-      `SELECT p.id, p.name, p.stage, o.name AS org, p.org_id, p.value, p.updated_at FROM opportunities p JOIN orgs o ON o.id = p.org_id AND o.tenant_id = p.tenant_id
+    all<{ id: string; name: string; stage: string; org: string; org_id: string | null; value: number | null; updated_at: string }>(
+      `SELECT p.id, p.name, p.stage, COALESCE(o.name, pc.name) AS org, p.org_id, p.value, p.updated_at FROM opportunities p
+       LEFT JOIN orgs o ON o.id = p.org_id AND o.tenant_id = p.tenant_id
+       LEFT JOIN customers pc ON p.org_id IS NULL AND pc.id = p.customer_id AND pc.tenant_id = p.tenant_id
        WHERE p.tenant_id = ? AND p.updated_at >= ? ORDER BY p.updated_at DESC`, tenantId, since),
     all<{ actor: string; kind: string; n: number | string }>(
       "SELECT actor, kind, COUNT(*) AS n FROM work_log WHERE tenant_id = ? AND at >= ? AND is_staff = 0 GROUP BY actor, kind", tenantId, since),

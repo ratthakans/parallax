@@ -24,7 +24,7 @@ import { teamMembers } from "@/lib/engine/team";
 import { NewTaskForm, TaskList } from "@/components/console/tasks";
 import { personIdsOf } from "@/lib/engine/vault/merge";
 import { dealRoleTh, stageTh } from "@/lib/shared/deals";
-import { hasB2B } from "@/lib/shared/tenants";
+import { hasB2B, hasB2C } from "@/lib/shared/tenants";
 import { INTERACTION_TH, type InteractionKind } from "@/lib/shared/accounts";
 import { ELIGIBILITY_TH, PREFERENCE_TH, type Eligibility } from "@/lib/shared/vault";
 import { TARGET_STATUS_TH, type TargetStatus } from "@/lib/shared/policy";
@@ -290,16 +290,19 @@ export default async function CustomerPage({
                   <li key={x.id} className="c-thai flex flex-wrap items-baseline justify-between gap-2 py-2 text-[0.88rem]">
                     <span className="min-w-0">
                       <Link href={`/app/deals/${x.id}`} className="text-[var(--c-accent)] hover:underline">{x.name}</Link>
-                      <span className="text-[var(--c-text-3)]"> · {x.org}</span>
+                      {!x.own && <span className="text-[var(--c-text-3)]"> · {x.org}</span>}
                     </span>
                     <span className="flex gap-1.5">
+                      {x.own && <span className="c-pill">ดีลของลูกค้าคนนี้</span>}
                       {x.role && <span className="c-pill">{dealRoleTh(x.role)}</span>}
                       <span className="c-pill">{stageTh(x.stage)}</span>
                     </span>
                   </li>
                 ))}
               </ul>
-            ) : <p className="c-thai mt-3 text-[0.88rem] text-[var(--c-text-3)]">ยังไม่อยู่ในดีลใด — เพิ่มได้จากหน้าดีล (คนในดีล)</p>}
+            ) : <p className="c-thai mt-3 text-[0.88rem] text-[var(--c-text-3)]">ยังไม่อยู่ในดีลใด{showPurchases ? "" : " — เพิ่มได้จากหน้าดีล (คนในดีล)"}</p>}
+            {/* ดีลกับลูกค้าบุคคล (F3) — บัญชีที่มีลูกค้าบุคคล และคนนี้ไม่ได้มาในนามบริษัท */}
+            {hasB2C(mode) && !orgPerson && <Link href={`/app/deals/new?person=${encodeURIComponent(c.id)}`} className="c-btn c-btn-ghost c-btn-sm mt-3 inline-flex">+ ดีลกับลูกค้าคนนี้</Link>}
           </Panel>
           <Panel className="p-5 md:p-6">
             <h2 className="c-h2 text-[var(--c-text)]">แคมเปญ</h2>

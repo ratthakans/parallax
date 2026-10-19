@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { all, get, run, tx, type Sql } from "@/lib/engine/sql";
 import { logActivity } from "@/lib/engine/db";
-import { orgAccess, type Viewer } from "@/lib/engine/accounts";
+import { dealPartyAccess, orgAccess, type Viewer } from "@/lib/engine/accounts";
 
 /* ── ถังขยะ (docs/crm-plan.md D3) ─────────────────────────────────────────
 
@@ -19,7 +19,7 @@ type Row = Record<string, string | number | null>;
 type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 
 const COLS: Record<string, readonly string[]> = {
-  opportunities: ["id", "tenant_id", "org_id", "name", "offer", "stage", "owner_id", "value", "expected_close", "created_at", "updated_at",
+  opportunities: ["id", "tenant_id", "org_id", "customer_id", "name", "offer", "stage", "owner_id", "value", "expected_close", "created_at", "updated_at",
     "campaign_id", "forecast_category", "close_reason", "close_note", "renewed_from"],
   deal_items: ["id", "tenant_id", "opportunity_id", "package", "qty", "unit_price", "created_by", "created_at"],
   opportunity_people: ["tenant_id", "opportunity_id", "customer_id", "role"],
@@ -43,7 +43,7 @@ async function insertRows(q: Sql, table: keyof typeof COLS, tenantId: string, ro
 export async function trashDeal(tenantId: string, id: string, viewer: Viewer): Promise<Result<{ trashId: string }>> {
   const d = await get<Row>("SELECT * FROM opportunities WHERE tenant_id = ? AND id = ?", tenantId, id);
   if (!d) return { ok: false, error: "ไม่พบดีลนี้" };
-  const access = await orgAccess(tenantId, String(d.org_id), viewer);
+  const access = await dealPartyAccess(tenantId, { org_id: (d.org_id as string | null) ?? null, customer_id: (d.customer_id as string | null) ?? null }, viewer);
   if (!access.ok) return access;
   const [items, people, values, tasks, inter, renewals] = await Promise.all([
     all<Row>("SELECT * FROM deal_items WHERE tenant_id = ? AND opportunity_id = ?", tenantId, id),
@@ -143,10 +143,15 @@ export async function restoreTrash(tenantId: string, trashId: string, viewer: Vi
   if (t.kind === "deal") {
     const deal = p.deal as Row;
     if (!deal || deal.id !== t.record_id) return { ok: false, error: "ข้อมูลในถังขยะไม่ตรงกับรายการ" };
-    if (!(await get("SELECT 1 AS x FROM orgs WHERE tenant_id = ? AND id = ?", tenantId, String(deal.org_id)))) {
+    const party = { org_id: (deal.org_id as string | null) ?? null, customer_id: (deal.customer_id as string | null) ?? null };
+    if (party.org_id && !(await get("SELECT 1 AS x FROM orgs WHERE tenant_id = ? AND id = ?", tenantId, party.org_id))) {
       return { ok: false, error: "บริษัทของดีลนี้ไม่อยู่แล้ว — กู้บริษัทคืนก่อน" };
     }
-    const access = await orgAccess(tenantId, String(deal.org_id), viewer);
+    /* ดีลลูกค้าบุคคล (F3): คนถูกลบไปแล้ว (เช่น ตามคำขอสิทธิ) = กู้ไม่ได้ — ไม่ปลุกข้อมูลของคนที่ขอลบกลับมา */
+    if (!party.org_id && !(await get("SELECT 1 AS x FROM customers WHERE tenant_id = ? AND id = ?", tenantId, String(party.customer_id)))) {
+      return { ok: false, error: "ลูกค้าของดีลนี้ถูกลบแล้ว — กู้คืนไม่ได้" };
+    }
+    const access = await dealPartyAccess(tenantId, party, viewer);
     if (!access.ok) return access;
     if (await get("SELECT 1 AS x FROM opportunities WHERE tenant_id = ? AND id = ?", tenantId, t.record_id)) return { ok: false, error: "มีดีลนี้อยู่แล้ว" };
     const links = (p.links ?? {}) as { tasks?: string[]; interactions?: string[]; renewals?: string[] };

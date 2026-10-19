@@ -52,6 +52,7 @@
     "verify:tasks": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/tasks.mts",
     "verify:reports": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/reports.mts",
     "verify:modes": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/modes.mts",
+    "verify:person-deals": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/person-deals.mts",
     "erasures": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs scripts/erasures.mts",
     "pg:test-db": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs scripts/pg-test-db.mts",
     "verify:pg": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/pg-rls.mts"

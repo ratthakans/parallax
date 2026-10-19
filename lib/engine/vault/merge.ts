@@ -44,6 +44,8 @@ const PERSON_MOVES: { table: string; key: string[]; column: string; where?: stri
   { table: "import_rows", key: ["batch_id", "line"], column: "customer_id" },
   { table: "sample_checks", key: ["id"], column: "customer_id" },
   { table: "opportunity_people", key: ["opportunity_id"], column: "customer_id" },
+  /* ดีลลูกค้าบุคคล (F3) ย้ายตามคน — แยกคืนได้ตรงแถว */
+  { table: "opportunities", key: ["id"], column: "customer_id", where: "org_id IS NULL" },
   { table: "campaign_targets", key: ["id"], column: "customer_id" },
   { table: "relationship_assertions", key: ["id"], column: "from_id", where: "from_kind = 'person'" },
   { table: "relationship_assertions", key: ["id"], column: "to_id", where: "to_kind = 'person'" },

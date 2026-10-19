@@ -169,7 +169,7 @@ export async function todayQueue(tenantId: string, viewer: Viewer, now = new Dat
     all<{ id: string }>(
       `SELECT org_id AS id FROM campaign_targets WHERE tenant_id = ? AND status NOT IN (${inList(FINAL.length)}) AND org_id IS NOT NULL
        UNION SELECT org_id AS id FROM tasks WHERE tenant_id = ? AND status = 'open' AND org_id IS NOT NULL
-       UNION SELECT org_id AS id FROM opportunities WHERE tenant_id = ? AND stage NOT IN ('won', 'lost')`,
+       UNION SELECT org_id AS id FROM opportunities WHERE tenant_id = ? AND stage NOT IN ('won', 'lost') AND org_id IS NOT NULL`,
       tenantId, ...FINAL, tenantId, tenantId),
     all<{ id: string; kind: string; subject_ids: string; signals: string; created_at: string }>(
       "SELECT id, kind, subject_ids, signals, created_at FROM review_items WHERE tenant_id = ? AND status = 'open' ORDER BY created_at, id", tenantId),

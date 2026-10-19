@@ -248,7 +248,11 @@ export async function buildReport(tenantId: string, id: string, actor: string, n
   const opportunities = await all<Record<string, unknown>>(
     `SELECT o.name AS opportunity, o.stage, op.role, o.created_at FROM opportunity_people op
      JOIN opportunities o ON o.id = op.opportunity_id AND o.tenant_id = op.tenant_id
-     WHERE op.tenant_id = ? AND op.customer_id IN (${IN}) ORDER BY o.created_at`, T, ...ids);
+     WHERE op.tenant_id = ? AND op.customer_id IN (${IN})
+     UNION
+     SELECT o.name AS opportunity, o.stage, 'customer' AS role, o.created_at FROM opportunities o
+     WHERE o.tenant_id = ? AND o.org_id IS NULL AND o.customer_id IN (${IN})
+     ORDER BY created_at`, T, ...ids, T, ...ids);
   const fieldHistory = await all<Record<string, unknown>>(
     `SELECT field, old_value, new_value, reason, changed_by, valid_from, recorded_at FROM record_versions
      WHERE tenant_id = ? AND record_kind = 'person' AND record_id IN (${IN}) ORDER BY recorded_at`, T, ...ids);

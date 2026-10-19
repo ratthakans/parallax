@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { all, get, run } from "@/lib/engine/sql";
 import { logActivity } from "@/lib/engine/db";
-import { orgAccess, MASKED_PERSON, type Viewer } from "@/lib/engine/accounts";
+import { dealPartyAccess, orgAccess, MASKED_PERSON, type Viewer } from "@/lib/engine/accounts";
 import { canSee } from "@/lib/shared/accounts";
 import { bangkokDay } from "@/lib/shared/format";
 import type { Classification } from "@/lib/shared/vault";
@@ -83,11 +83,18 @@ export async function createTask(tenantId: string, input: TaskInput, viewer: Vie
   if (due && !/^\d{4}-\d{2}-\d{2}$/.test(due)) return { ok: false, error: "เลือกวันครบกำหนด" };
   let org = input.orgId?.trim() || null;
   const deal = input.dealId?.trim() || null;
-  const person = input.personId?.trim() || null;
+  let person = input.personId?.trim() || null;
   if (deal) {
-    const d = await get<{ org_id: string }>("SELECT org_id FROM opportunities WHERE tenant_id = ? AND id = ?", tenantId, deal);
+    const d = await get<{ org_id: string | null; customer_id: string | null }>("SELECT org_id, customer_id FROM opportunities WHERE tenant_id = ? AND id = ?", tenantId, deal);
     if (!d) return { ok: false, error: "ไม่พบดีลนี้" };
     if (org && org !== d.org_id) return { ok: false, error: "ดีลนี้ไม่ใช่ของบริษัทที่เลือก" };
+    /* ดีลลูกค้าบุคคล (F3): งานผูกกับลูกค้าคนนั้น · ด่านเดียวกับดีล */
+    if (!d.org_id) {
+      if (person && person !== d.customer_id) return { ok: false, error: "ดีลนี้เป็นของลูกค้าคนอื่น" };
+      const access = await dealPartyAccess(tenantId, d, viewer);
+      if (!access.ok) return access;
+      person = d.customer_id;
+    }
     org = d.org_id;
   }
   if (person) {

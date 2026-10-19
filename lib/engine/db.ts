@@ -1120,6 +1120,31 @@ export async function ensureSchema(): Promise<void> {
       if (!have.has(c)) await exec(`ALTER TABLE opportunities ADD COLUMN ${c} TEXT`);
     }
   }
+  /* ดีลกับบุคคล (docs/crm-plan.md F3 · 0027) — org_id เลิกบังคับ + customer_id + ต้องมีอย่างน้อยหนึ่งฝั่ง
+     sqlite ถอด NOT NULL ด้วย ALTER ไม่ได้ จึงสร้างตารางใหม่จากนิยามเดิม (รวมคอลัมน์ที่เพิ่มทีหลัง) แล้วย้ายแถวในธุรกรรมเดียว
+     ไม่มีตารางไหนอ้าง opportunities ด้วย FOREIGN KEY — ลบตารางเดิมได้โดยไม่กระทบตารางอื่น */
+  {
+    const cols = await all<{ name: string; notnull: number }>("PRAGMA table_info(opportunities)");
+    if (cols.find((c) => c.name === "org_id")?.notnull) {
+      const def = (await all<{ sql: string }>("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'opportunities'"))[0]?.sql ?? "";
+      const idx = (await all<{ sql: string | null }>("SELECT sql FROM sqlite_master WHERE type = 'index' AND tbl_name = 'opportunities' AND sql IS NOT NULL")).map((r) => r.sql!);
+      const ddl = def
+        .replace(/^CREATE TABLE\s+(IF NOT EXISTS\s+)?"?opportunities"?/i, "CREATE TABLE opportunities__f3")
+        .replace(/\borg_id\s+TEXT\s+NOT\s+NULL/i, "org_id TEXT")
+        .replace(/\)\s*$/, ",\n  customer_id TEXT,\n  CONSTRAINT opportunities_party CHECK (org_id IS NOT NULL OR customer_id IS NOT NULL)\n)");
+      if (!ddl.startsWith("CREATE TABLE opportunities__f3") || /org_id\s+TEXT\s+NOT\s+NULL/i.test(ddl)) throw new Error("ปรับตาราง opportunities ไม่ได้ — นิยามเดิมไม่ตรงรูปแบบ");
+      const names = cols.map((c) => c.name).join(", ");
+      await exec([
+        "BEGIN", ddl,
+        `INSERT INTO opportunities__f3 (${names}) SELECT ${names} FROM opportunities`,
+        "DROP TABLE opportunities",
+        "ALTER TABLE opportunities__f3 RENAME TO opportunities",
+        ...idx,
+        "COMMIT",
+      ].join(";\n"));
+    }
+    await exec("CREATE INDEX IF NOT EXISTS ix_opp_customer ON opportunities (tenant_id, customer_id) WHERE customer_id IS NOT NULL");
+  }
   {
     const have = await columnsOf("orgs");
     if (!have.has("team_id")) await exec("ALTER TABLE orgs ADD COLUMN team_id TEXT");
