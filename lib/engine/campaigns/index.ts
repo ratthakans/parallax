@@ -9,7 +9,8 @@ import {
   CHANNELS, MESSAGE_KINDS, OUTCOMES, TARGET_STATUS_TH, describeCriteria,
   type Channel, type Criteria, type MessageKind, type TargetStatus,
 } from "@/lib/shared/policy";
-import type { Eligibility } from "@/lib/shared/vault";
+import type { Classification, Eligibility } from "@/lib/shared/vault";
+import { canSee } from "@/lib/shared/accounts";
 
 /* ── Campaign Workspace (docs/plan.md B5 · Blueprint 2.0 บท 2, 5) ─────────────
 
@@ -451,7 +452,8 @@ export async function getCampaign(tenantId: string, id: string) {
 }
 
 /* ── ทบทวนรายสัปดาห์ (plan หัวข้อ 3.3) ── นับกิจกรรมที่มีผล ไม่นับ login และไม่นับทีม PARALLAX */
-export async function weeklyReview(tenantId: string, since = new Date(Date.now() - 7 * 864e5).toISOString()) {
+/* viewer (หน้าทบทวน) = ตัดดีลที่เกินสิทธิ์ออกแบบเดียวกับหน้าดีล · ไม่ส่ง (สรุปทางอีเมล) = นับอย่างเดียว ไม่มีชื่อออกไป */
+export async function weeklyReview(tenantId: string, since = new Date(Date.now() - 7 * 864e5).toISOString(), viewer?: { id: string; clearance: Classification }) {
   const today = bangkokDay();
   const [byCampaign, overdue, opps, activity, moves] = await Promise.all([
     all<{ id: string; name: string; status: string; n: number | string }>(
@@ -460,8 +462,11 @@ export async function weeklyReview(tenantId: string, since = new Date(Date.now()
     all<{ id: string; title: string; due_at: string; owner_id: string | null; org: string | null; org_id: string | null }>(
       `SELECT k.id, k.title, k.due_at, k.owner_id, o.name AS org, k.org_id FROM tasks k LEFT JOIN orgs o ON o.id = k.org_id AND o.tenant_id = k.tenant_id
        WHERE k.tenant_id = ? AND k.status = 'open' AND k.due_at < ? ORDER BY k.due_at LIMIT 50`, tenantId, today),
-    all<{ id: string; name: string; stage: string; org: string; org_id: string | null; value: number | null; updated_at: string }>(
-      `SELECT p.id, p.name, p.stage, COALESCE(o.name, pc.name) AS org, p.org_id, p.value, p.updated_at FROM opportunities p
+    all<{ id: string; name: string; stage: string; org: string; org_id: string | null; customer_id: string | null; value: number | null; updated_at: string;
+      classification: string | null; acc_owner: string | null; data_owner: string | null }>(
+      `SELECT p.id, p.name, p.stage, COALESCE(o.name, pc.name) AS org, p.org_id, p.customer_id, p.value, p.updated_at,
+         CASE WHEN p.org_id IS NOT NULL THEN o.classification ELSE pc.classification END AS classification,
+         o.account_owner_id AS acc_owner, COALESCE(o.data_owner_id, pc.data_owner_id) AS data_owner FROM opportunities p
        LEFT JOIN orgs o ON o.id = p.org_id AND o.tenant_id = p.tenant_id
        LEFT JOIN customers pc ON p.org_id IS NULL AND pc.id = p.customer_id AND pc.tenant_id = p.tenant_id
        WHERE p.tenant_id = ? AND p.updated_at >= ? ORDER BY p.updated_at DESC`, tenantId, since),
@@ -482,7 +487,10 @@ export async function weeklyReview(tenantId: string, since = new Date(Date.now()
     else if (a.kind.startsWith("outcome:")) p.outcomes += Number(a.n);
     people.set(a.actor, p);
   }
-  return { since, campaigns: [...campaigns.values()], overdue, opportunities: opps, activity: [...people.values()], staffActions: Number(moves?.n ?? 0) };
+  const visibleOpps = viewer
+    ? opps.filter((o) => canSee(viewer.clearance, (o.classification ?? "confidential") as Classification) || [o.acc_owner, o.data_owner].includes(viewer.id))
+    : opps;
+  return { since, campaigns: [...campaigns.values()], overdue, opportunities: visibleOpps, activity: [...people.values()], staffActions: Number(moves?.n ?? 0) };
 }
 
 export async function isStaffUser(tenantId: string, userId: string | null | undefined) {

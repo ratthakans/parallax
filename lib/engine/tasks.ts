@@ -60,7 +60,10 @@ export async function listTasks(
      LEFT JOIN opportunities p ON p.id = t.opportunity_id AND p.tenant_id = t.tenant_id
      WHERE ${where.join(" AND ")} ORDER BY ${order}, t.id LIMIT 300`, ...params);
   return rows
-    .filter((r) => !r.org_id || canSee(viewer.clearance, lv(r.org_class)) || r.acc_owner === viewer.id || r.owner_id === viewer.id)
+    /* งานไม่มีบริษัท (ดีลลูกค้าบุคคล · F3) ตัดตามระดับของคนนั้นแทน — ชื่องานและชื่อดีลบอกเรื่องของเขาได้ */
+    .filter((r) => r.owner_id === viewer.id || (r.org_id
+      ? canSee(viewer.clearance, lv(r.org_class)) || r.acc_owner === viewer.id
+      : !r.customer_id || canSee(viewer.clearance, lv(r.person_class))))
     .map((r) => ({
       id: r.id, title: r.title, status: r.status, due: r.due_at, owner: r.owner_id, orgId: r.org_id, org: r.org,
       personId: r.customer_id, person: r.customer_id ? (canSee(viewer.clearance, lv(r.person_class)) ? r.person : MASKED_PERSON) : null,

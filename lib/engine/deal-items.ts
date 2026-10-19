@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { all, get, run } from "@/lib/engine/sql";
-import { orgAccess, type Viewer } from "@/lib/engine/accounts";
+import { dealPartyAccess, type Viewer } from "@/lib/engine/accounts";
 import { listDeals } from "@/lib/engine/deals";
 
 /* ── แพ็กเกจในดีล (docs/crm-plan.md C4) ── ชื่อแพ็กเกจ · จำนวน · ราคาต่อหน่วย → รายงานแพ็กเกจไหนขายดี
@@ -9,8 +9,9 @@ import { listDeals } from "@/lib/engine/deals";
 export type DealItem = { id: string; package: string; qty: number; unitPrice: number | null; total: number | null };
 type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 
-async function dealOrg(tenantId: string, dealId: string) {
-  return (await get<{ org_id: string }>("SELECT org_id FROM opportunities WHERE tenant_id = ? AND id = ?", tenantId, dealId))?.org_id ?? null;
+/* คู่ค้าของดีล — บริษัท หรือลูกค้าบุคคล (F3) · ด่านเดียวกับการแก้ดีล */
+async function dealParty(tenantId: string, dealId: string) {
+  return (await get<{ org_id: string | null; customer_id: string | null }>("SELECT org_id, customer_id FROM opportunities WHERE tenant_id = ? AND id = ?", tenantId, dealId)) ?? null;
 }
 
 export async function listItems(tenantId: string, dealId: string): Promise<DealItem[]> {
@@ -23,9 +24,9 @@ export async function listItems(tenantId: string, dealId: string): Promise<DealI
 }
 
 export async function addItem(tenantId: string, dealId: string, input: { package: string; qty?: string; unitPrice?: string }, viewer: Viewer): Promise<Result> {
-  const org = await dealOrg(tenantId, dealId);
-  if (!org) return { ok: false, error: "ไม่พบดีลนี้" };
-  const access = await orgAccess(tenantId, org, viewer);
+  const party = await dealParty(tenantId, dealId);
+  if (!party) return { ok: false, error: "ไม่พบดีลนี้" };
+  const access = await dealPartyAccess(tenantId, party, viewer);
   if (!access.ok) return access;
   const name = input.package.trim().slice(0, 120);
   if (name.length < 2) return { ok: false, error: "ใส่ชื่อแพ็กเกจ เช่น \"Gold\" หรือ \"บูธ 18 ตร.ม.\"" };
@@ -41,9 +42,9 @@ export async function addItem(tenantId: string, dealId: string, input: { package
 }
 
 export async function removeItem(tenantId: string, dealId: string, itemId: string, viewer: Viewer): Promise<Result> {
-  const org = await dealOrg(tenantId, dealId);
-  if (!org) return { ok: false, error: "ไม่พบดีลนี้" };
-  const access = await orgAccess(tenantId, org, viewer);
+  const party = await dealParty(tenantId, dealId);
+  if (!party) return { ok: false, error: "ไม่พบดีลนี้" };
+  const access = await dealPartyAccess(tenantId, party, viewer);
   if (!access.ok) return access;
   const it = await get<{ id: string }>("SELECT id FROM deal_items WHERE tenant_id = ? AND opportunity_id = ? AND id = ?", tenantId, dealId, itemId);
   if (!it) return { ok: false, error: "ไม่พบรายการนี้" };

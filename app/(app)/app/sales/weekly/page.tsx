@@ -17,7 +17,7 @@ const STAGE_TH: Record<string, string> = { proposal: "ส่งข้อเส�
 
 export default async function WeeklyPage() {
   const v = await viewer();
-  const r = await weeklyReview(v.tenantId);
+  const r = await weeklyReview(v.tenantId, undefined, { id: v.actor, clearance: v.clearance });
   const shownStatuses = TARGET_STATUSES.filter((s) => r.campaigns.some((c) => c.counts[s]));
 
   return (
@@ -71,7 +71,7 @@ export default async function WeeklyPage() {
             <ul className="c-thai mt-3 grid gap-2 text-[0.86rem] text-[var(--c-text-2)]">
               {r.opportunities.map((o) => (
                 <li key={o.id}>
-                  <Link href={`/app/accounts/${o.org_id}`} className="text-[var(--c-text)] hover:text-[var(--c-accent)]">{o.org}</Link> · {o.name} · {STAGE_TH[o.stage] ?? o.stage}
+                  <Link href={o.org_id ? `/app/accounts/${o.org_id}` : `/app/customers/${o.customer_id}`} className="text-[var(--c-text)] hover:text-[var(--c-accent)]">{o.org}</Link> · {o.name} · {STAGE_TH[o.stage] ?? o.stage}
                   {o.value ? <span className="c-mono"> · {baht(Number(o.value))}</span> : null}
                   <span className="text-[var(--c-text-4)]"> · {thaiDate(o.updated_at)}</span>
                 </li>
