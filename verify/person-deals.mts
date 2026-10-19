@@ -13,6 +13,7 @@ import { createTask } from "@/lib/engine/tasks";
 import { createOrg, logInteraction } from "@/lib/engine/accounts/edit";
 import { trashDeal, restoreTrash } from "@/lib/engine/trash";
 import { pivot } from "@/lib/engine/pivot";
+import { revenueBySegment } from "@/lib/engine/reports";
 import { mergePersons, unmerge } from "@/lib/engine/vault/merge";
 import { MAX_PEOPLE, assignTarget, buildTargets, createCampaign, matchCriteria, recordOutcome } from "@/lib/engine/campaigns";
 import { adoptTemplate } from "@/lib/engine/policy/templates";
@@ -76,6 +77,8 @@ ok(mine.some((x) => x.id === D && x.own), "หน้าคนเห็นดี�
 const pv = await pivot(T, ME, { rows: "customer_type", measure: "count" });
 ok(pv.rows.includes("ลูกค้าบุคคล"), "pivot แยกชนิดลูกค้าได้");
 ok((await moveDeal(T, D, "won", ME)).ok, "ปิดได้");
+const seg = await revenueBySegment(T, ME);
+ok(seg[1].count >= 1 && seg[1].value >= 30000 && seg[0].count === 0, "รายได้ไตรมาสนี้: ดีลลูกค้าบุคคลแยกจากดีลบริษัท");
 const ren = await createRenewal(T, D, ME);
 const renRow = ren.ok ? await get<{ customer_id: string; org_id: string | null }>("SELECT customer_id, org_id FROM opportunities WHERE tenant_id = ? AND id = ?", T, ren.id) : undefined;
 ok(renRow?.customer_id === A && renRow.org_id === null, "ต่อสัญญาได้ ดีลใหม่เป็นของลูกค้าคนเดิม");
