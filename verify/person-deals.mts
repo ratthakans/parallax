@@ -14,6 +14,11 @@ import { createOrg, logInteraction } from "@/lib/engine/accounts/edit";
 import { trashDeal, restoreTrash } from "@/lib/engine/trash";
 import { pivot } from "@/lib/engine/pivot";
 import { mergePersons, unmerge } from "@/lib/engine/vault/merge";
+import { MAX_PEOPLE, assignTarget, buildTargets, createCampaign, matchCriteria, recordOutcome } from "@/lib/engine/campaigns";
+import { adoptTemplate } from "@/lib/engine/policy/templates";
+import { affiliateManual } from "@/lib/engine/accounts/edit";
+import { describeCriteria } from "@/lib/shared/policy";
+import { recordPreference } from "@/lib/engine/policy/preferences";
 
 const out: string[] = [];
 const ok = (c: boolean, m: string) => out.push(`${c ? "PASS" : "FAIL"}  ${m}`);
@@ -88,6 +93,51 @@ const m = await mergePersons(T, A, B, "verify", "ทดสอบ", null);
 ok(m.ok && (await get<{ customer_id: string }>("SELECT customer_id FROM opportunities WHERE tenant_id = ? AND id = ?", T, d3.ok ? d3.id : ""))?.customer_id === A, "รวมคน = ดีลย้ายไปคนที่คงอยู่");
 ok(m.ok && (await unmerge(T, m.mergeId, "verify")).ok
   && (await get<{ customer_id: string }>("SELECT customer_id FROM opportunities WHERE tenant_id = ? AND id = ?", T, d3.ok ? d3.id : ""))?.customer_id === B, "แยกคืน = ดีลกลับไปคนเดิม");
+
+// ── F5 · แคมเปญถึงลูกค้าบุคคล ──
+{
+  const base = await matchCriteria(T, { audience: "person", minOrders: 2 });
+  const ms = base.matches;
+  ok(ms.length > 0 && ms.every((m) => m.orgId === null) && ms.every((m, i) => i === 0 || ms[i - 1].rank >= m.rank), "เกณฑ์ลูกค้าบุคคล: ไม่มีบริษัท · เรียงตามยอดซื้อ");
+  const lapsed = (await matchCriteria(T, { audience: "person", lapsedForDays: 365 })).matches;
+  const cutoff = new Date(Date.now() - 365 * 864e5).toISOString().slice(0, 10);
+  ok(lapsed.length > 0 && lapsed.every((m) => (m.reasons[0].match(/ล่าสุด (\d{4}-\d{2}-\d{2})/)?.[1] ?? "9999") <= cutoff), "หายไปนานกว่า N วัน = ซื้อล่าสุดก่อนวันตัด");
+  const cat = (await matchCriteria(T, { audience: "person", boughtCategory: "limousine" })).matches;
+  const catOk = await all<{ customer_id: string }>(
+    `SELECT DISTINCT t.customer_id FROM transactions t JOIN line_items li ON li.txn_id = t.id JOIN products p ON p.id = li.product_id
+     WHERE t.tenant_id = ? AND LOWER(p.category) LIKE '%limousine%'`, T);
+  const catSet = new Set(catOk.map((r) => r.customer_id));
+  ok(cat.length > 0 && cat.length === Math.min(catOk.length, MAX_PEOPLE) && cat.every((m) => catSet.has(m.customerId)), "เคยซื้อหมวดสินค้า = ตรงกับรายการซื้อจริง (เพดาน 500 คน)");
+  const top = ms[0];
+  await affiliateManual(T, top.customerId, { company: "บริษัท ลูกค้าย้ายเป็นบริษัท จำกัด", title: "ผู้จัดการ" }, "verify");
+  ok(!(await matchCriteria(T, { audience: "person", minOrders: 2 })).matches.some((m) => m.customerId === top.customerId), "คนที่มีสังกัดบริษัทแล้ว ไม่อยู่ในกลุ่มลูกค้าบุคคล");
+  const second = ms[1];
+  await createDeal(T, { customerId: second.customerId, name: "ดีลเปิดอยู่ (สมมุติ)" }, ME);
+  ok(!(await matchCriteria(T, { audience: "person", minOrders: 2, excludeOpenOpportunities: true })).matches.some((m) => m.customerId === second.customerId), "ไม่รวมลูกค้าที่มีดีลเปิด");
+  ok(describeCriteria({ audience: "person", minSpent: 20000 })[0].startsWith("ลูกค้าบุคคล") && !describeCriteria({ audience: "person" }).some((x) => x.includes("ต่อบริษัท")), "คำอธิบายเกณฑ์เป็นภาษาลูกค้าบุคคล");
+  ok((await matchCriteria(T, { titleKeywords: ["ผู้จัดการ"] })).matches.every((m) => m.orgId), "ค่าตั้งต้นยังเป็นคนในบริษัทเหมือนเดิม");
+
+  /* แม่แบบที่ใช้กับลูกค้าบุคคลได้ = ฐานความยินยอม ไม่ผูกบริษัท · ยินยอมรายคนก่อน — คนที่ไม่ยินยอมต้องไม่ผ่าน */
+  const purpose = await adoptTemplate(T, "b2b_marketing_consented", "มีหลักฐานความยินยอมรายคน (สมมุติ)", "verify");
+  const consentFor = ms.slice(2, 5).map((m) => m.customerId);
+  if (purpose.ok) for (const id of consentFor) {
+    await recordPreference(T, id, { kind: "consent", purposeId: purpose.purposeId, channel: "phone", evidence: "ยินยอมรับข้อเสนอทางโทรศัพท์ที่หน้าร้าน (สมมุติ)" }, "verify");
+  }
+  const camp = purpose.ok ? await createCampaign(T, { name: "ชวนลูกค้าเดิมกลับมา (สมมุติ)", purposeId: purpose.purposeId, channel: "phone", messageKind: "marketing",
+    criteria: { audience: "person", minOrders: 2 } }, "verify") : undefined;
+  const built = camp?.ok ? await buildTargets(T, camp.id, "verify") : undefined;
+  ok(!!built?.ok && built.people > 0 && built.orgs === 0 && built.eligible === consentFor.length, "สร้างรายชื่อเป้าหมายลูกค้าบุคคลได้ — ผ่านนโยบายเฉพาะคนที่ยินยอม (การซื้อนับเป็นหลักฐานว่าข้อมูลยังใหม่)");
+  const tgt = camp?.ok ? await get<{ id: string; customer_id: string }>(
+    "SELECT id, customer_id FROM campaign_targets WHERE tenant_id = ? AND campaign_id = ? AND eligibility = 'eligible' ORDER BY id LIMIT 1", T, camp.id) : undefined;
+  if (tgt) {
+    ok((await assignTarget(T, tgt.id, "owner@verify", "2026-12-01", "verify")).ok, "มอบหมายเป้าหมายลูกค้าบุคคลได้");
+    const rec = await recordOutcome(T, tgt.id, { outcome: "proposal", note: "เสนอแพ็กเกจรายเดือน (สมมุติ)", value: 12000 }, "verify");
+    const opp = await get<{ org_id: string | null; customer_id: string; value: number }>(
+      "SELECT org_id, customer_id, value FROM opportunities WHERE tenant_id = ? AND campaign_id = ?", T, camp!.ok ? camp!.id : "");
+    ok(rec.ok && opp?.org_id === null && opp.customer_id === tgt.customer_id && Number(opp.value) === 12000, "ส่งข้อเสนอ = เกิดดีลลูกค้าบุคคล");
+    ok(!!(await get("SELECT 1 AS x FROM interactions WHERE tenant_id = ? AND customer_id = ? AND org_id IS NULL", T, tgt.customer_id)), "ผลการติดต่อเป็นกิจกรรมของลูกค้าคนนั้น");
+  } else ok(false, "มีเป้าหมายที่นโยบายอนุญาตให้ติดต่อ");
+}
 
 // ── ลบตามคำขอสิทธิ ──
 const org = await createOrg(T, { name: "บริษัท ทดสอบดีลบุคคล จำกัด" }, "verify");

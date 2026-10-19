@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { viewer } from "@/app/(app)/viewer";
+import { activeMode } from "@/app/(app)/tenant";
+import { hasB2B } from "@/lib/shared/tenants";
 import { createCampaignAction } from "@/app/(app)/sales-actions";
 import { listCampaigns } from "@/lib/engine/campaigns";
 import { listBases } from "@/lib/engine/policy";
@@ -24,6 +26,7 @@ export default async function SalesPage() {
   const v = await viewer();
   const [campaigns, bases] = await Promise.all([listCampaigns(v.tenantId), listBases(v.tenantId)]);
   const withBasis = bases.filter((b) => b.lawful_basis);
+  const mode = await activeMode();
 
   return (
     <>
@@ -116,8 +119,8 @@ export default async function SalesPage() {
             <label className={LABEL}>สิ้นสุด<input type="date" name="endsAt" className="c-input" /></label>
           </div>
           <fieldset className="grid gap-3">
-            <legend className="c-thai mb-2 text-[0.86rem] text-[var(--c-text-2)]">เกณฑ์เป้าหมาย (เว้นว่าง = ทุกคนที่ยังสังกัดบริษัท)</legend>
-            <CriteriaFields />
+            <legend className="c-thai mb-2 text-[0.86rem] text-[var(--c-text-2)]">เกณฑ์เป้าหมาย (เว้นว่าง = {hasB2B(mode) ? "ทุกคนในกลุ่มที่เลือก" : "ลูกค้าบุคคลทุกคน"})</legend>
+            <CriteriaFields mode={mode} />
           </fieldset>
         </ActionForm>
       </Panel>
