@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { viewer } from "@/app/(app)/viewer";
-import { reports } from "@/lib/engine/reports";
+import { reports, revenueBySegment } from "@/lib/engine/reports";
+import { activeMode } from "@/app/(app)/tenant";
+import { hasB2C } from "@/lib/shared/tenants";
 import { closeReasons, pipelineAsOf, velocity } from "@/lib/engine/velocity";
 import { CLOSE_REASON_TH } from "@/lib/shared/deals";
 import { packageReport } from "@/lib/engine/deal-items";
@@ -39,6 +41,9 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const maxDeal = Math.max(1, ...shown.map((p) => p.value || p.count));
   const maxWeek = Math.max(1, ...r.activity.map((w) => w.meeting + w.call + w.email + w.other));
   const top = Math.max(1, r.funnel[0].count);
+  /* บัญชีที่มีลูกค้าบุคคล (F6) — รายได้ไตรมาสนี้แยกกลุ่ม */
+  const seg = hasB2C(await activeMode()) ? await revenueBySegment(v.tenantId, who) : null;
+  const segTotal = seg ? seg.reduce((t, s) => t + s.value, 0) : 0;
 
   return (
     <>
@@ -48,6 +53,22 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         <Link href="/app/sales/weekly" className="c-btn c-btn-ghost">ทบทวนรายสัปดาห์แบบละเอียด</Link>
       </>} />
       <div className="grid gap-5 lg:grid-cols-2">
+        {seg && (
+          <Panel className="p-5 lg:col-span-2">
+            <h2 className="c-h2 text-[var(--c-text)]">รายได้ไตรมาสนี้ตามกลุ่มลูกค้า</h2>
+            <p className="c-thai mt-1 text-[0.78rem] text-[var(--c-text-4)]">ดีลนับตามวันที่ปิดได้จริง · ยอดซื้อนับตามวันที่ซื้อ · รวม {baht(segTotal)}</p>
+            <ul className="mt-4 grid gap-3">
+              {seg.map((s) => (
+                <li key={s.label} className="c-thai grid gap-1 text-[0.86rem]">
+                  <span className="flex justify-between gap-2"><span>{s.label}</span><span className="c-mono">{baht(s.value)} <span className="text-[var(--c-text-4)]">· {num(s.count)} {s.unit}</span></span></span>
+                  <span className="h-2 rounded-full bg-[var(--c-line)]" aria-hidden>
+                    <span className="block h-2 rounded-full bg-[var(--c-accent)]" style={{ width: `${segTotal ? Math.round((s.value / segTotal) * 100) : 0}%` }} />
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </Panel>
+        )}
         {/* ── 1 · ไปป์ไลน์ ── */}
         <Panel className="p-5">
           <div className="flex flex-wrap items-baseline justify-between gap-2">

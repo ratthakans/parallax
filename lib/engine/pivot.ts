@@ -21,7 +21,10 @@ const BASE_DIMS: PivotDim[] = [
   { key: "industry", label: "อุตสาหกรรม" }, { key: "group", label: "กลุ่มบริษัท" }, { key: "close_month", label: "เดือนปิดคาด" },
   { key: "created_month", label: "เดือนที่สร้าง" }, { key: "package", label: "แพ็กเกจ" }, { key: "campaign", label: "แคมเปญ" },
   { key: "team", label: "ทีมที่ดูแลบริษัท" }, { key: "forecast", label: "หมวดพยากรณ์" }, { key: "close_reason", label: "เหตุผลที่ได้/ไม่ได้" },
+  { key: "customer_type", label: "ชนิดลูกค้า" },
 ];
+/* ดีลลูกค้าบุคคล (F3) ไม่มีบริษัท — มิติฝั่งบริษัทจัดไว้กลุ่มเดียวกัน แทนที่จะหายหรือปนกับ "ไม่ระบุ" */
+const INDIVIDUAL = "ลูกค้าบุคคล";
 
 export async function pivotDims(tenantId: string): Promise<PivotDim[]> {
   const fields = await listFields(tenantId);
@@ -37,7 +40,7 @@ export async function pivot(
   const deals = await listDeals(tenantId, { view: opts.view ?? "all", limit: 20000 }, viewer);
   const dims = [opts.rows, opts.cols].filter((d): d is string => Boolean(d));
   const need = (k: string) => dims.some((d) => d === k || d.startsWith(`${k}.`));
-  const orgIds = [...new Set(deals.map((d) => d.orgId))], dealIds = deals.map((d) => d.id);
+  const orgIds = [...new Set(deals.map((d) => d.orgId).filter((x): x is string => !!x))], dealIds = deals.map((d) => d.id);
   const chunked = async <T,>(ids: string[], q: (marks: string) => string, extra: (string | number)[] = []) => {
     const out: T[] = [];
     for (let i = 0; i < ids.length; i += 500) {
@@ -96,13 +99,14 @@ export async function pivot(
     switch (dim) {
       case "stage": return [[stageTh(d.stage), v]];
       case "owner": return [[d.owner ?? NONE, v]];
-      case "company": return [[d.org, v]];
-      case "industry": return [[orgInfo.get(d.orgId)?.industry ?? NONE, v]];
-      case "group": return [[await rootName(d.orgId), v]];
+      case "company": return [[d.orgId ? d.org : INDIVIDUAL, v]];
+      case "customer_type": return [[d.orgId ? "ลูกค้าบริษัท" : INDIVIDUAL, v]];
+      case "industry": return [[d.orgId ? orgInfo.get(d.orgId)?.industry ?? NONE : INDIVIDUAL, v]];
+      case "group": return [[d.orgId ? await rootName(d.orgId) : INDIVIDUAL, v]];
       case "close_month": return [[month(d.expectedClose), v]];
       case "created_month": return [[month(d.createdAt), v]];
       case "campaign": return [[d.campaign ?? NONE, v]];
-      case "team": return [[teamOfOrg.get(d.orgId) ?? NONE, v]];
+      case "team": return [[d.orgId ? teamOfOrg.get(d.orgId) ?? NONE : INDIVIDUAL, v]];
       case "close_reason": {
         if (d.stage !== "won" && d.stage !== "lost") return [["ยังไม่ปิด", v]];
         const r = reasonOf.get(d.id);
@@ -113,7 +117,8 @@ export async function pivot(
     }
     const [kind, id] = dim.split(".");
     if ((kind === "cf" || kind === "df") && fieldOf.has(id)) {
-      const raw = (kind === "cf" ? orgVals.get(d.orgId) : dealVals.get(d.id))?.get(id);
+      if (kind === "cf" && !d.orgId) return [[INDIVIDUAL, v]];
+      const raw = (kind === "cf" ? orgVals.get(d.orgId!) : dealVals.get(d.id))?.get(id);
       return [[raw ?? NONE, v]];
     }
     return [[NONE, v]];

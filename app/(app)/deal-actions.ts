@@ -9,8 +9,10 @@ import { get } from "@/lib/engine/sql";
 import { addItem, listItems, removeItem } from "@/lib/engine/deal-items";
 import { setForecast } from "@/lib/engine/forecast";
 import { createTask } from "@/lib/engine/tasks";
-import { orgAccess } from "@/lib/engine/accounts";
+import { dealPartyAccess } from "@/lib/engine/accounts";
 import type { ActionState } from "@/lib/shared/action-state";
+import { customerMode } from "@/lib/engine/tenant-mode";
+import { hasB2C } from "@/lib/shared/tenants";
 
 /* ── ดีล (docs/ux-plan.md U4) ── สร้าง · ย้ายขั้น · แก้ทีละช่อง = งานประจำของคนขาย (write)
    บัญชีและผู้กระทำมาจากฝั่งเซิร์ฟเวอร์ · แฟ้มบริษัทที่เกินสิทธิ์ถูกปฏิเสธใน engine (orgAccess) */
@@ -27,6 +29,18 @@ export async function createDealAction(_p: ActionState, fd: FormData): Promise<A
   const v = await viewer();
   const no = denied(v, "write");
   if (no) return { error: no };
+  /* ดีลลูกค้าบุคคล (docs/crm-plan.md F3) — มาจากปุ่ม "+ ดีล" ของหน้าคน · เฉพาะบัญชีที่มีลูกค้าบุคคล · engine ตรวจสิทธิ์ของคนนั้น */
+  const personId = str(fd, "personId");
+  if (personId) {
+    if (!hasB2C(await customerMode(v.tenantId))) return { error: "บัญชีนี้ขายให้บริษัท — เปลี่ยนเป็น \"ทั้งสองแบบ\" ที่ ตั้งค่า ก่อนสร้างดีลกับบุคคล" };
+    const res = await createDeal(v.tenantId, {
+      customerId: personId, name: str(fd, "name"), value: str(fd, "value"), expectedClose: str(fd, "expectedClose"), stage: str(fd, "stage"),
+    }, { id: v.actor, clearance: v.clearance });
+    if (!res.ok) return { error: res.error };
+    refresh(res.id);
+    revalidatePath(`/app/customers/${personId}`);
+    redirect(`/app/deals/${res.id}`);
+  }
   /* ช่องบริษัทส่งชื่อ (OrgPicker) — หาบริษัทจากชื่อฝั่งเซิร์ฟเวอร์ */
   /* มาจากปุ่ม "+ ดีล" ของหน้าบริษัท และไม่ได้แก้ชื่อ = บริษัทนั้นแน่นอน (ชื่อซ้ำกันได้) — engine ตรวจสิทธิ์ซ้ำ */
   const prefilled = str(fd, "prefillOrgId") && str(fd, "orgName").trim() === str(fd, "prefillOrgName") ? str(fd, "prefillOrgId") : "";
@@ -96,24 +110,26 @@ export async function logDealActivityAction(_p: ActionState, fd: FormData): Prom
   if (no) return { error: no };
   const id = str(fd, "dealId");
   /* บริษัทมาจากดีลในฐาน ไม่ใช่จากฟอร์ม · ตรวจสิทธิ์บริษัทเหมือนการแก้ดีล */
-  const d = await get<{ org_id: string }>("SELECT org_id FROM opportunities WHERE tenant_id = ? AND id = ?", v.tenantId, id);
+  const d = await get<{ org_id: string | null; customer_id: string | null }>("SELECT org_id, customer_id FROM opportunities WHERE tenant_id = ? AND id = ?", v.tenantId, id);
   if (!d) return { error: "ไม่พบดีลนี้" };
-  const access = await orgAccess(v.tenantId, d.org_id, { id: v.actor, clearance: v.clearance });
+  const access = await dealPartyAccess(v.tenantId, d, { id: v.actor, clearance: v.clearance });
   if (!access.ok) return { error: access.error };
+  /* ดีลลูกค้าบุคคล (F3): กิจกรรมผูกกับลูกค้าคนนั้นเสมอ */
+  const personFor = d.org_id ? str(fd, "personId") : d.customer_id ?? "";
   const res = await logInteraction(v.tenantId, d.org_id, {
-    kind: str(fd, "kind"), occurredAt: str(fd, "occurredAt"), personId: str(fd, "personId") || undefined, opportunityId: id,
+    kind: str(fd, "kind"), occurredAt: str(fd, "occurredAt"), personId: personFor || undefined, opportunityId: id,
     summary: str(fd, "summary"), outcome: str(fd, "outcome"), classification: str(fd, "classification") || undefined,
   }, v.actor);
   if (!res.ok) return { error: res.error };
-  const person = str(fd, "personId");
+  const person = personFor;
   /* งานถัดไป (E1) — สร้างหลังบันทึกกิจกรรมสำเร็จเท่านั้น */
   const next = str(fd, "nextTitle").trim();
   const task = next ? await createTask(v.tenantId, { title: next, due: str(fd, "nextDue"), dealId: id, personId: person || undefined }, { id: v.actor, clearance: v.clearance }) : null;
-  refresh(id, d.org_id);
+  refresh(id, d.org_id ?? undefined);
   revalidatePath("/app/tasks");
   if (person) revalidatePath(`/app/customers/${person}`);
   if (task && !task.ok) return { ok: `บันทึกกิจกรรมแล้ว แต่สร้างงานถัดไปไม่ได้: ${task.error}` };
-  return { ok: task ? "บันทึกกิจกรรมและงานถัดไปแล้ว" : "บันทึกแล้ว — ขึ้นทั้งหน้าดีล หน้าบริษัท และหน้าผู้ติดต่อ" };
+  return { ok: task ? "บันทึกกิจกรรมและงานถัดไปแล้ว" : (d.org_id ? "บันทึกแล้ว — ขึ้นทั้งหน้าดีล หน้าบริษัท และหน้าผู้ติดต่อ" : "บันทึกแล้ว — ขึ้นทั้งหน้าดีลและหน้าลูกค้า") };
 }
 
 /* ── แพ็กเกจในดีล (docs/crm-plan.md C4) ── */

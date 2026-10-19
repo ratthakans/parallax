@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { all, get, run } from "@/lib/engine/sql";
 import { logActivity } from "@/lib/engine/db";
-import { orgAccess, type Viewer } from "@/lib/engine/accounts";
+import { dealPartyAccess, type Viewer } from "@/lib/engine/accounts";
 
 /* ── ฟิลด์กำหนดเอง (docs/crm-plan.md C4) ─────────────────────────────────
 
@@ -94,10 +94,13 @@ export function normaliseValue(f: Pick<CustomField, "kind" | "options">, raw: st
   return { ok: true, value: v.slice(0, 300) };
 }
 
-/** org_id ที่ใช้ตรวจสิทธิ์ของระเบียน — ดีลใช้บริษัทของดีล */
-async function orgOf(tenantId: string, entity: FieldEntity, recordId: string): Promise<string | null> {
-  if (entity === "org") return (await get<{ id: string }>("SELECT id FROM orgs WHERE tenant_id = ? AND id = ?", tenantId, recordId))?.id ?? null;
-  return (await get<{ org_id: string }>("SELECT org_id FROM opportunities WHERE tenant_id = ? AND id = ?", tenantId, recordId))?.org_id ?? null;
+/** ฝั่งที่ใช้ตรวจสิทธิ์ของระเบียน — ดีลใช้บริษัทของดีล หรือลูกค้าบุคคลของดีล (F3) */
+async function partyOf(tenantId: string, entity: FieldEntity, recordId: string): Promise<{ org_id: string | null; customer_id: string | null } | null> {
+  if (entity === "org") {
+    const id = (await get<{ id: string }>("SELECT id FROM orgs WHERE tenant_id = ? AND id = ?", tenantId, recordId))?.id;
+    return id ? { org_id: id, customer_id: null } : null;
+  }
+  return (await get<{ org_id: string | null; customer_id: string | null }>("SELECT org_id, customer_id FROM opportunities WHERE tenant_id = ? AND id = ?", tenantId, recordId)) ?? null;
 }
 
 export async function setValue(
@@ -105,9 +108,9 @@ export async function setValue(
 ): Promise<Result> {
   const f = (await listFields(tenantId, entity)).find((x) => x.id === fieldId);
   if (!f) return { ok: false, error: "ไม่พบฟิลด์นี้ (อาจถูกซ่อน)" };
-  const org = await orgOf(tenantId, entity, recordId);
-  if (!org) return { ok: false, error: `ไม่พบ${FIELD_ENTITY_TH[entity]}นี้` };
-  const access = await orgAccess(tenantId, org, viewer);
+  const party = await partyOf(tenantId, entity, recordId);
+  if (!party) return { ok: false, error: `ไม่พบ${FIELD_ENTITY_TH[entity]}นี้` };
+  const access = await dealPartyAccess(tenantId, party, viewer);
   if (!access.ok) return access;
   const n = normaliseValue(f, raw);
   if (!n.ok) return n;

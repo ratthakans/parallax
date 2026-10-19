@@ -169,8 +169,10 @@ async function evaluate(tenantId: string, ask: Ask): Promise<Decision> {
     `SELECT MAX(t) AS last FROM (
        SELECT MAX(COALESCE(last_seen_at, valid_from)) AS t FROM affiliations WHERE tenant_id = ? AND customer_id = ?
        UNION ALL SELECT MAX(occurred_at) FROM interactions WHERE tenant_id = ? AND customer_id = ?
-       UNION ALL SELECT MAX(recorded_at) FROM preferences WHERE tenant_id = ? AND customer_id = ?) x`,
-    tenantId, ask.customerId, tenantId, ask.customerId, tenantId, ask.customerId);
+       UNION ALL SELECT MAX(recorded_at) FROM preferences WHERE tenant_id = ? AND customer_id = ?
+       UNION ALL SELECT MAX(occurred_at) FROM transactions WHERE tenant_id = ? AND customer_id = ?) x`,
+    /* การซื้อ (F5) = หลักฐานว่าความสัมพันธ์ยังอยู่ ไม่ต่างจากปฏิสัมพันธ์ — ลูกค้าบุคคลส่วนใหญ่มีแต่การซื้อ */
+    tenantId, ask.customerId, tenantId, ask.customerId, tenantId, ask.customerId, tenantId, ask.customerId);
   if (!fresh?.last) review.push("ไม่ทราบว่าข้อมูลล่าสุดเมื่อไร");
   else if (Date.parse(at) - Date.parse(fresh.last) > STALE_DAYS * 864e5) review.push(`ข้อมูลล่าสุด ${fresh.last.slice(0, 10)} เก่ากว่า 3 ปี — ยืนยันก่อนใช้`);
 

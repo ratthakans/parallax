@@ -10,6 +10,8 @@ import { setRetentionRule } from "@/lib/engine/retention";
 import { recordPreference } from "@/lib/engine/policy/preferences";
 import type { ActionState } from "@/lib/shared/action-state";
 import { draftForTarget, markDraftSent } from "@/lib/engine/campaigns/draft";
+import { customerMode } from "@/lib/engine/tenant-mode";
+import { hasB2B, hasB2C } from "@/lib/shared/tenants";
 import type { Criteria, DraftState } from "@/lib/shared/policy";
 
 /* ── Campaign Workspace (docs/plan.md B5) ─────────────────────────
@@ -30,7 +32,24 @@ function criteriaOf(fd: FormData): Criteria {
     warmPath: (["direct", "any"] as const).find((w) => w === str(fd, "warmPath")),
     interactedWithinDays: Number(str(fd, "interactedWithinDays")) || undefined,
     quietForDays: Number(str(fd, "quietForDays")) || undefined,
+    ...(str(fd, "audience") === "person" ? {
+      audience: "person" as const,
+      boughtWithinDays: Number(str(fd, "boughtWithinDays")) || undefined,
+      lapsedForDays: Number(str(fd, "lapsedForDays")) || undefined,
+      minOrders: Number(str(fd, "minOrders")) || undefined,
+      minSpent: Number(str(fd, "minSpent").replace(/[,฿\s]/g, "")) || undefined,
+      boughtCategory: str(fd, "boughtCategory") || undefined,
+      excludeOpenOpportunities: fd.get("excludeOpenDealsPerson") === "1",
+    } : {}),
   };
+}
+
+/* กลุ่มเป้าหมายต้องตรงกับโหมดของบัญชี (F5) — ขายให้บริษัทอย่างเดียว = คนในบริษัทเสมอ · ขายให้บุคคลอย่างเดียว = ลูกค้าบุคคลเสมอ */
+async function criteriaFor(tenantId: string, fd: FormData): Promise<Criteria> {
+  const mode = await customerMode(tenantId);
+  if (!hasB2C(mode)) fd.set("audience", "org");
+  else if (!hasB2B(mode)) fd.set("audience", "person");
+  return criteriaOf(fd);
 }
 
 export async function createCampaignAction(_p: ActionState, fd: FormData): Promise<ActionState> {
@@ -40,7 +59,7 @@ export async function createCampaignAction(_p: ActionState, fd: FormData): Promi
   const res = await createCampaign(v.tenantId, {
     name: str(fd, "name"), offer: str(fd, "offer"), purposeId: str(fd, "purposeId"), channel: str(fd, "channel"),
     messageKind: str(fd, "messageKind"), disclosurePurposeId: str(fd, "disclosurePurposeId") || undefined,
-    criteria: criteriaOf(fd), startsAt: str(fd, "startsAt"), endsAt: str(fd, "endsAt"),
+    criteria: await criteriaFor(v.tenantId, fd), startsAt: str(fd, "startsAt"), endsAt: str(fd, "endsAt"),
   }, v.actor);
   if (!res.ok) return { error: res.error };
   revalidatePath("/app/sales");
@@ -52,7 +71,7 @@ export async function updateCriteriaAction(_p: ActionState, fd: FormData): Promi
   const no = denied(v, "campaign");
   if (no) return { error: no };
   const id = str(fd, "campaignId");
-  const res = await updateCriteria(v.tenantId, id, criteriaOf(fd), v.actor);
+  const res = await updateCriteria(v.tenantId, id, await criteriaFor(v.tenantId, fd), v.actor);
   if (!res.ok) return { error: res.error };
   revalidatePath(`/app/sales/${id}`);
   return { ok: "บันทึกเกณฑ์แล้ว — กด “สร้างรายชื่อ” เพื่อใช้เกณฑ์ใหม่" };

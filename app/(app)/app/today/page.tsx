@@ -5,9 +5,12 @@ import { completeTaskAction } from "@/app/(app)/task-actions";
 import { recordOutcomeAction } from "@/app/(app)/sales-actions";
 import { OUTCOMES, TARGET_STATUS_TH } from "@/lib/shared/policy";
 import { todayQueue } from "@/lib/engine/today";
+import { repurchaseDue } from "@/lib/engine/today/repurchase";
+import { activeMode } from "@/app/(app)/tenant";
+import { hasB2C } from "@/lib/shared/tenants";
 import { MAX_SNOOZES, QUEUE_SECTION_TH, type QueueItem, type QueueSection } from "@/lib/shared/today";
 import type { Eligibility } from "@/lib/shared/vault";
-import { num } from "@/lib/shared/format";
+import { baht, num } from "@/lib/shared/format";
 import { ActionForm } from "@/components/console/action-form";
 import { EligibilityPill } from "@/components/console/eligibility";
 import { PageHead, Panel } from "@/components/console/ui";
@@ -92,7 +95,9 @@ export default async function TodayPage() {
   const v = await viewer();
   const q = await todayQueue(v.tenantId, { id: v.actor, clearance: v.clearance });
   const canWrite = v.role !== "viewer";
-  const total = q.sections.reduce((n, s) => n + s.items.length + s.more, 0);
+  /* บัญชีที่มีลูกค้าบุคคล (F4) — ลูกค้าที่ถึงรอบซื้อซ้ำ */
+  const repurchase = hasB2C(await activeMode()) ? await repurchaseDue(v.tenantId, { id: v.actor, clearance: v.clearance }) : { items: [], more: 0 };
+  const total = q.sections.reduce((n, s) => n + s.items.length + s.more, 0) + repurchase.items.length;
 
   return (
     <>
@@ -129,6 +134,31 @@ export default async function TodayPage() {
             )}
           </Panel>
         ))}
+        {repurchase.items.length > 0 && (
+          <Panel className="p-5 md:p-6">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 className="c-h2 text-[var(--c-text)]">ถึงรอบซื้อซ้ำ <span className="c-mono text-[var(--c-text-3)]">{num(repurchase.items.length + repurchase.more)}</span></h2>
+              <p className="c-thai text-[0.78rem] text-[var(--c-text-4)]">เลยรอบปกติของเขาแล้ว แต่ยังไม่หายไป — ทักตอนนี้ได้ผลที่สุด · เรียงตามยอดซื้อรวม</p>
+            </div>
+            <ul className="mt-3 divide-y divide-[var(--c-line)]">
+              {repurchase.items.map((r) => (
+                <li key={r.id} className="c-thai flex flex-wrap items-baseline justify-between gap-2 py-2.5 text-[0.88rem]">
+                  <span className="min-w-0">
+                    <Link href={`/app/customers/${encodeURIComponent(r.id)}`} className="text-[var(--c-accent)] hover:underline">{r.name}</Link>
+                    <span className="text-[var(--c-text-3)]"> · ปกติซื้อทุก ~{num(r.cycleDays)} วัน · ล่าสุด {num(r.sinceDays)} วันก่อน</span>
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <span className="c-mono text-[0.82rem] text-[var(--c-text-3)]">{baht(r.spent)} · {num(r.orders)} ครั้ง</span>
+                    {canWrite && <Link href={`/app/deals/new?person=${encodeURIComponent(r.id)}`} className="c-btn c-btn-ghost c-btn-sm">+ ดีล</Link>}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            {repurchase.more > 0 && (
+              <p className="c-thai mt-2 text-[0.82rem] text-[var(--c-text-3)]">และอีก {num(repurchase.more)} คน — <Link href="/app/customers?view=buyers&sort=spent" className="underline">ดูลูกค้าที่เคยซื้อ</Link></p>
+            )}
+          </Panel>
+        )}
       </div>
 
       {q.reviewsNotBlocking > 0 && (

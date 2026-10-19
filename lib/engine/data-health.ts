@@ -2,6 +2,12 @@ import { all } from "@/lib/engine/sql";
 import { canSee } from "@/lib/shared/accounts";
 import { bangkokDay } from "@/lib/shared/format";
 import type { Classification } from "@/lib/shared/vault";
+import { PARTY_JOIN } from "@/lib/engine/deals";
+
+/* ดีลลูกค้าบุคคล (F3) ไม่มีบริษัท — ชื่อคู่ค้าและระดับความลับมาจากฝั่งที่ดีลผูกอยู่ (ชื่อคอลัมน์ตาม seeOrg) */
+const PARTY_COLS_HEALTH = `p.org_id, COALESCE(o.name, pc.name) AS org,
+  CASE WHEN p.org_id IS NOT NULL THEN o.classification ELSE pc.classification END AS classification,
+  o.account_owner_id, COALESCE(o.data_owner_id, pc.data_owner_id) AS data_owner_id`;
 import type { Viewer } from "@/lib/engine/accounts";
 
 /* ── สุขภาพข้อมูล (docs/crm-plan.md D1) ─────────────────────────────────────
@@ -50,18 +56,18 @@ export async function dataHealth(tenantId: string, viewer: Viewer, now = new Dat
        WHERE c.tenant_id = ? AND c.lifecycle_state <> 'pending_review'
          AND NOT EXISTS (SELECT 1 FROM contact_points p WHERE p.tenant_id = c.tenant_id AND p.customer_id = c.id AND p.kind IN ('email', 'phone'))
        ORDER BY c.name`, tenantId),
-    all<{ id: string; name: string; org: string; org_id: string; classification: string | null; account_owner_id: string | null; data_owner_id: string | null;
+    all<{ id: string; name: string; org: string; org_id: string | null; classification: string | null; account_owner_id: string | null; data_owner_id: string | null;
       value: number | string | null; expected_close: string | null; owner_id: string | null }>(
-      `SELECT p.id, p.name, o.name AS org, p.org_id, o.classification, o.account_owner_id, o.data_owner_id, p.value, p.expected_close, p.owner_id
-       FROM opportunities p JOIN orgs o ON o.id = p.org_id AND o.tenant_id = p.tenant_id
+      `SELECT ${PARTY_COLS_HEALTH}, p.id, p.name, p.value, p.expected_close, p.owner_id
+       FROM opportunities p ${PARTY_JOIN}
        WHERE p.tenant_id = ? AND p.stage NOT IN ('won', 'lost') ORDER BY p.expected_close, p.name`, tenantId),
     all<{ n: number | string }>("SELECT COUNT(*) AS n FROM review_items WHERE tenant_id = ? AND status = 'open'", tenantId),
   ]);
   /* ดีลที่ปิดได้ใน 9–15 เดือนที่แล้ว และยังไม่มีดีลต่อสัญญา (E4) — รอบถัดไปของลูกค้าเดิมที่ยังไม่มีใครเริ่มคุย */
   const renewFrom = new Date(+now - 15 * 30.44 * 864e5).toISOString(), renewTo = new Date(+now - 9 * 30.44 * 864e5).toISOString();
   const unrenewed = await all<{ id: string; name: string; org: string; classification: string | null; account_owner_id: string | null; data_owner_id: string | null; updated_at: string; owner_id: string | null }>(
-    `SELECT p.id, p.name, o.name AS org, o.classification, o.account_owner_id, o.data_owner_id, p.updated_at, p.owner_id
-     FROM opportunities p JOIN orgs o ON o.id = p.org_id AND o.tenant_id = p.tenant_id
+    `SELECT ${PARTY_COLS_HEALTH}, p.id, p.name, p.updated_at, p.owner_id
+     FROM opportunities p ${PARTY_JOIN}
      WHERE p.tenant_id = ? AND p.stage = 'won' AND p.updated_at BETWEEN ? AND ?
        AND NOT EXISTS (SELECT 1 FROM opportunities r WHERE r.tenant_id = p.tenant_id AND r.renewed_from = p.id)
      ORDER BY p.updated_at`, tenantId, renewFrom, renewTo);
