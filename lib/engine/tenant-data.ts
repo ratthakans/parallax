@@ -80,6 +80,8 @@ export const PERSON_LINKED: { table: string; column: string; where?: string }[] 
   { table: "participations", column: "customer_id" },
   { table: "interactions", column: "customer_id" },
   { table: "opportunity_people", column: "customer_id" },
+  /* ดีลลูกค้าบุคคล (F3) — deleteOneId ลบพร้อมของที่ผูกไปก่อนแล้ว รายการนี้ทำให้การตรวจ "มีข้อมูลผูกอยู่" เห็นด้วย */
+  { table: "opportunities", column: "customer_id", where: "org_id IS NULL" },
   { table: "tasks", column: "customer_id" },
   { table: "preferences", column: "customer_id" },
   { table: "import_rows", column: "customer_id" },
@@ -95,7 +97,7 @@ export const PERSON_LINKED: { table: string; column: string; where?: string }[] 
 ];
 
 /** ลบข้อมูลของคนหนึ่งคนจากทุกตารางที่ผูกอยู่ (ยกเว้นตัวแถว customers ซึ่งผู้เรียกลบเอง) */
-export async function deletePersonData(q: Sql, tenantId: string, customerId: string): Promise<string[]> {
+export async function deletePersonData(q: Sql, tenantId: string, customerId: string): Promise<{ ids: string[]; dealIds: string[] }> {
   /* คนที่เคยถูกรวมเข้ามา: preferences ของเขายังอยู่ใต้รหัสเดิม (ตารางเพิ่มอย่างเดียว ไม่ถูกย้าย) — ลบตามไปด้วย */
   const ids = [customerId];
   for (let i = 0; i < ids.length; i++) {
@@ -103,18 +105,22 @@ export async function deletePersonData(q: Sql, tenantId: string, customerId: str
       "SELECT merged_id FROM merge_log WHERE tenant_id = ? AND survivor_id = ? AND undone_at IS NULL", tenantId, ids[i],
     )) if (!ids.includes(r.merged_id)) ids.push(r.merged_id);
   }
+  /* ดีลบุคคลของทุกรหัส (F3) — จดไว้ก่อนลบ เพื่อลบประวัติขั้นเฉพาะดีลเหล่านี้ใน erasePersonHistory */
+  const dealIds = (await q.all<{ id: string }>(
+    `SELECT id FROM opportunities WHERE tenant_id = ? AND org_id IS NULL AND customer_id IN (${ids.map(() => "?").join(",")})`, tenantId, ...ids)).map((r) => r.id);
   for (const id of ids.slice(1)) await deleteOneId(q, tenantId, id);
   await deleteOneId(q, tenantId, customerId);
-  return ids;
+  return { ids, dealIds };
 }
 
 /* ── ลบประวัติในตารางเพิ่มอย่างเดียวของคนที่ถูกลบแล้ว ──
    เรียกหลังลบแถว customers ในธุรกรรมเดียวกัน · ids = ผลของ deletePersonData
    บน Postgres ผ่าน app.erase_person_history (0011 · 0021 เพิ่มหลักฐานของโน้ต/ความสัมพันธ์) ซึ่งปฏิเสธถ้าคนยังอยู่ในทะเบียน —
    ลบ "คัดค้าน" ทิ้งแล้วติดต่อต่อไม่ได้ */
-export async function erasePersonHistory(q: Sql, tenantId: string, ids: string[]): Promise<void> {
+export async function erasePersonHistory(q: Sql, tenantId: string, ids: string[], dealIds: string[] = []): Promise<void> {
+  const arr = (xs: string[]) => `{${xs.map((i) => `"${i}"`).join(",")}}`;
   if (usingPostgres()) {
-    await q.run("SELECT app.erase_person_history(?, ?::text[])", tenantId, `{${ids.map((i) => `"${i}"`).join(",")}}`);
+    await q.run("SELECT app.erase_person_history(?, ?::text[], ?::text[])", tenantId, arr(ids), arr(dealIds));
     return;
   }
   for (const id of ids) {
@@ -125,12 +131,13 @@ export async function erasePersonHistory(q: Sql, tenantId: string, ids: string[]
     await q.run("DELETE FROM preferences WHERE tenant_id = ? AND customer_id = ?", tenantId, id);
     await q.run("DELETE FROM record_versions WHERE tenant_id = ? AND record_kind = 'person' AND record_id = ?", tenantId, id);
   }
-  /* ประวัติของดีลที่ลบไปพร้อมคน (F3) — ตรงกับ 0027 · ดีลในถังขยะยังเก็บประวัติไว้ */
-  await q.run(
-    `DELETE FROM record_versions WHERE tenant_id = ? AND record_kind = 'opportunity'
-       AND NOT EXISTS (SELECT 1 FROM opportunities o WHERE o.tenant_id = record_versions.tenant_id AND o.id = record_versions.record_id)
-       AND NOT EXISTS (SELECT 1 FROM trash x WHERE x.tenant_id = record_versions.tenant_id AND x.kind = 'deal' AND x.record_id = record_versions.record_id)`,
-    tenantId);
+  /* ประวัติของดีลบุคคลที่ลบไปพร้อมคนนี้ (F3) — ตรงกับ 0027 · เฉพาะรหัสที่ส่งมา ไม่แตะประวัติของดีลอื่น */
+  for (const d of dealIds) {
+    await q.run(
+      `DELETE FROM record_versions WHERE tenant_id = ? AND record_kind = 'opportunity' AND record_id = ?
+         AND NOT EXISTS (SELECT 1 FROM opportunities o WHERE o.tenant_id = record_versions.tenant_id AND o.id = record_versions.record_id)`,
+      tenantId, d);
+  }
   /* หลักฐานของโน้ต (S6) และความสัมพันธ์ที่ปฏิสัมพันธ์/ความสัมพันธ์ถูกลบไปแล้ว — ตรงกับ 0021 */
   await q.run(
     "DELETE FROM evidence WHERE tenant_id = ? AND ref LIKE 'interaction:%' AND NOT EXISTS (SELECT 1 FROM interactions i WHERE i.tenant_id = evidence.tenant_id AND i.id = substr(evidence.ref, 13))",

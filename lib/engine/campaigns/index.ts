@@ -9,7 +9,8 @@ import {
   CHANNELS, MESSAGE_KINDS, OUTCOMES, TARGET_STATUS_TH, describeCriteria,
   type Channel, type Criteria, type MessageKind, type TargetStatus,
 } from "@/lib/shared/policy";
-import type { Eligibility } from "@/lib/shared/vault";
+import type { Classification, Eligibility } from "@/lib/shared/vault";
+import { canSee } from "@/lib/shared/accounts";
 
 /* ── Campaign Workspace (docs/plan.md B5 · Blueprint 2.0 บท 2, 5) ─────────────
 
@@ -44,8 +45,16 @@ function normaliseCriteria(c: Criteria): Criteria {
     excludeOpenOpportunities: Boolean(c.excludeOpenOpportunities), maxPerOrg: max,
     warmPath: c.warmPath === "direct" || c.warmPath === "any" ? c.warmPath : undefined,
     interactedWithinDays: days(c.interactedWithinDays), quietForDays: days(c.quietForDays),
+    ...(c.audience === "person" ? {
+      audience: "person" as const, boughtWithinDays: days(c.boughtWithinDays), lapsedForDays: days(c.lapsedForDays),
+      minSpent: amount(c.minSpent), minOrders: amount(c.minOrders, 1000), boughtCategory: clean(c.boughtCategory, 60) || undefined,
+    } : {}),
   };
 }
+const amount = (v: unknown, max = 1e10) => {
+  const n = Math.round(Number(String(v ?? "").replace(/[,฿\s]/g, "")));
+  return Number.isFinite(n) && n >= 1 ? Math.min(n, max) : undefined;
+};
 const days = (v: unknown) => {
   const n = Math.round(Number(v));
   return Number.isFinite(n) && n >= 1 ? Math.min(n, 3650) : undefined;
@@ -96,10 +105,51 @@ export async function targetDecision(tenantId: string, campaignId: string, custo
 }
 
 /* ── เกณฑ์ → คนที่เข้าเกณฑ์ พร้อมเหตุผล ── */
-type Match = { customerId: string; orgId: string; reasons: string[]; rank: number };
+type Match = { customerId: string; orgId: string | null; reasons: string[]; rank: number };
+export const MAX_PEOPLE = 500;
+
+/* ── ลูกค้าบุคคล (docs/crm-plan.md F5) ── คนที่ไม่มีสังกัดบริษัทปัจจุบัน · เกณฑ์จากยอดซื้อ · เรียงตามยอดรวม
+   ตัดสินว่าติดต่อได้ไหมด้วยบริการนโยบายเดียวกับฝั่งบริษัท (buildTargets) — ไม่มีทางลัด */
+async function matchPeople(tenantId: string, c: Criteria): Promise<{ matches: Match[]; orgsOverCap: number }> {
+  const rows = await all<{ id: string; n: number | string; spent: number | string | null; last_at: string | null }>(
+    `SELECT cu.id, COUNT(t.id) AS n, SUM(t.total) AS spent, MAX(t.occurred_at) AS last_at
+     FROM customers cu LEFT JOIN transactions t ON t.tenant_id = cu.tenant_id AND t.customer_id = cu.id
+     WHERE cu.tenant_id = ? AND cu.lifecycle_state <> 'pending_review'
+       AND NOT EXISTS (SELECT 1 FROM affiliations a WHERE a.tenant_id = cu.tenant_id AND a.customer_id = cu.id AND a.valid_to IS NULL)
+     GROUP BY cu.id`, tenantId);
+  const cat = c.boughtCategory?.toLowerCase();
+  const boughtCat = cat
+    ? new Set((await all<{ customer_id: string }>(
+      `SELECT DISTINCT t.customer_id FROM transactions t
+       JOIN line_items li ON li.txn_id = t.id AND li.tenant_id = t.tenant_id
+       JOIN products p ON p.id = li.product_id AND p.tenant_id = t.tenant_id
+       WHERE t.tenant_id = ? AND (LOWER(p.category) LIKE ? OR LOWER(p.name) LIKE ?)`, tenantId, `%${cat}%`, `%${cat}%`)).map((r) => r.customer_id))
+    : null;
+  const openDeal = c.excludeOpenOpportunities
+    ? new Set((await all<{ customer_id: string }>(
+      "SELECT DISTINCT customer_id FROM opportunities WHERE tenant_id = ? AND org_id IS NULL AND stage NOT IN ('won','lost')", tenantId)).map((r) => r.customer_id))
+    : new Set<string>();
+  const ago = (n: number) => new Date(Date.now() - n * 864e5).toISOString();
+  const all_: Match[] = [];
+  for (const r of rows) {
+    const n = Number(r.n), spent = Number(r.spent ?? 0), last = r.last_at;
+    if (openDeal.has(r.id)) continue;
+    if (c.boughtWithinDays && !(last && last >= ago(c.boughtWithinDays))) continue;
+    if (c.lapsedForDays && !(last && last < ago(c.lapsedForDays))) continue;
+    if (c.minOrders && n < c.minOrders) continue;
+    if (c.minSpent && spent < c.minSpent) continue;
+    if (boughtCat && !boughtCat.has(r.id)) continue;
+    const reasons = [n ? `ซื้อ ${n} ครั้ง · รวม ${Math.round(spent).toLocaleString("en-US")} บาท · ล่าสุด ${last!.slice(0, 10)}` : "ลูกค้าบุคคล · ยังไม่มียอดซื้อในระบบ"];
+    if (cat) reasons.push(`เคยซื้อสินค้า “${c.boughtCategory}”`);
+    all_.push({ customerId: r.id, orgId: null, reasons, rank: spent });
+  }
+  all_.sort((x, y) => y.rank - x.rank || x.customerId.localeCompare(y.customerId));
+  return { matches: all_.slice(0, MAX_PEOPLE), orgsOverCap: Math.max(0, all_.length - MAX_PEOPLE) };
+}
 
 export async function matchCriteria(tenantId: string, raw: Criteria): Promise<{ matches: Match[]; orgsOverCap: number }> {
   const c = normaliseCriteria(raw);
+  if (c.audience === "person") return matchPeople(tenantId, c);
   const affs = await all<{ customer_id: string; org_id: string; org: string; name: string; title: string | null; valid_from: string | null;
     confirmed_by: string | null; industry: string | null }>(
     `SELECT a.customer_id, a.org_id, o.name AS org, cu.name, a.title, a.valid_from, a.confirmed_by, o.industry
@@ -208,7 +258,7 @@ export async function buildTargets(tenantId: string, campaignId: string, actor: 
   });
   await logActivity(tenantId, actor, "campaign_targets", `${campaignId} · ${matches.length} people`);
   const count = (s: Eligibility) => [...decisions.values()].filter((d) => d.status === s).length;
-  return { ok: true as const, people: matches.length, orgs: new Set(matches.map((m) => m.orgId)).size, orgsOverCap,
+  return { ok: true as const, people: matches.length, orgs: new Set(matches.map((m) => m.orgId).filter(Boolean)).size, orgsOverCap,
     eligible: count("eligible"), review: count("review_required"), suppressed: count("suppressed"), channelInvalid: count("channel_invalid") };
 }
 
@@ -289,11 +339,12 @@ export async function recordOutcome(
       outcome, note, at, tenantId, targetId, ...FINAL);
     if (!claimed.changes) return false;
     const kind = c.channel === "email" ? "email" : c.channel === "phone" ? "call" : "meeting";
+    /* ลูกค้าบุคคล (F5) ไม่มีบริษัท — กิจกรรมผูกกับคนอย่างเดียว */
+    await q.run(
+      `INSERT INTO interactions (id, tenant_id, kind, occurred_at, org_id, customer_id, opportunity_id, summary, outcome, owner_id, source_id, classification, recorded_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      randomUUID(), tenantId, kind, bangkokDay(Date.parse(at)), t.org_id, t.customer_id, null, `${c.name}: ${note}`, TARGET_STATUS_TH[outcome], actor, null, "confidential", at);
     if (t.org_id) {
-      await q.run(
-        `INSERT INTO interactions (id, tenant_id, kind, occurred_at, org_id, customer_id, opportunity_id, summary, outcome, owner_id, source_id, classification, recorded_at)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-        randomUUID(), tenantId, kind, bangkokDay(Date.parse(at)), t.org_id, t.customer_id, null, `${c.name}: ${note}`, TARGET_STATUS_TH[outcome], actor, null, "confidential", at);
       await q.run("DELETE FROM account_briefs WHERE tenant_id = ? AND org_id = ?", tenantId, t.org_id);
     }
     await q.run("UPDATE tasks SET status = 'done', outcome = ?, done_at = ? WHERE tenant_id = ? AND target_id = ? AND status = 'open'", TARGET_STATUS_TH[outcome], at, tenantId, targetId);
@@ -303,18 +354,20 @@ export async function recordOutcome(
          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         randomUUID(), tenantId, nextStep, "open", nextDue, actor, t.org_id, t.customer_id, null, null, actor, at, null, t.campaign_id, targetId);
     }
-    /* โอกาสแบบง่าย: เกิดเมื่อส่งข้อเสนอ · ขั้นตามผล · หนึ่งโอกาสต่อ (แคมเปญ · บริษัท) */
-    if (t.org_id && ["proposal", "won", "lost"].includes(outcome)) {
-      const opp = await q.get<{ id: string }>("SELECT id FROM opportunities WHERE tenant_id = ? AND org_id = ? AND campaign_id = ?", tenantId, t.org_id, t.campaign_id);
+    /* โอกาสแบบง่าย: เกิดเมื่อส่งข้อเสนอ · ขั้นตามผล · หนึ่งโอกาสต่อ (แคมเปญ · บริษัท) หรือ (แคมเปญ · ลูกค้าบุคคล · F5) */
+    if (["proposal", "won", "lost"].includes(outcome)) {
+      const opp = t.org_id
+        ? await q.get<{ id: string }>("SELECT id FROM opportunities WHERE tenant_id = ? AND org_id = ? AND campaign_id = ?", tenantId, t.org_id, t.campaign_id)
+        : await q.get<{ id: string }>("SELECT id FROM opportunities WHERE tenant_id = ? AND org_id IS NULL AND customer_id = ? AND campaign_id = ?", tenantId, t.customer_id, t.campaign_id);
       const stage = outcome === "proposal" ? "proposal" : outcome;
       if (opp) await q.run("UPDATE opportunities SET stage = ?, value = COALESCE(?, value), updated_at = ? WHERE tenant_id = ? AND id = ?", stage, input.value ?? null, at, tenantId, opp.id);
       else if (outcome === "proposal" || outcome === "won") {
         const oid = randomUUID();
         await q.run(
-          `INSERT INTO opportunities (id, tenant_id, org_id, name, offer, stage, owner_id, value, expected_close, created_at, updated_at, campaign_id)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
-          oid, tenantId, t.org_id, c.name, c.offer, stage, actor, input.value ?? null, c.ends_at, at, at, t.campaign_id);
-        await q.run("INSERT INTO opportunity_people (tenant_id, opportunity_id, customer_id, role) VALUES (?,?,?,?)", tenantId, oid, t.customer_id, "ผู้ติดต่อ");
+          `INSERT INTO opportunities (id, tenant_id, org_id, customer_id, name, offer, stage, owner_id, value, expected_close, created_at, updated_at, campaign_id)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          oid, tenantId, t.org_id, t.org_id ? null : t.customer_id, c.name, c.offer, stage, actor, input.value ?? null, c.ends_at, at, at, t.campaign_id);
+        if (t.org_id) await q.run("INSERT INTO opportunity_people (tenant_id, opportunity_id, customer_id, role) VALUES (?,?,?,?)", tenantId, oid, t.customer_id, "ผู้ติดต่อ");
       }
     }
     await logWork(q, tenantId, actor, isStaff, `outcome:${outcome}`, t.campaign_id, targetId);
@@ -399,7 +452,8 @@ export async function getCampaign(tenantId: string, id: string) {
 }
 
 /* ── ทบทวนรายสัปดาห์ (plan หัวข้อ 3.3) ── นับกิจกรรมที่มีผล ไม่นับ login และไม่นับทีม PARALLAX */
-export async function weeklyReview(tenantId: string, since = new Date(Date.now() - 7 * 864e5).toISOString()) {
+/* viewer (หน้าทบทวน) = ตัดดีลที่เกินสิทธิ์ออกแบบเดียวกับหน้าดีล · ไม่ส่ง (สรุปทางอีเมล) = นับอย่างเดียว ไม่มีชื่อออกไป */
+export async function weeklyReview(tenantId: string, since = new Date(Date.now() - 7 * 864e5).toISOString(), viewer?: { id: string; clearance: Classification }) {
   const today = bangkokDay();
   const [byCampaign, overdue, opps, activity, moves] = await Promise.all([
     all<{ id: string; name: string; status: string; n: number | string }>(
@@ -408,8 +462,11 @@ export async function weeklyReview(tenantId: string, since = new Date(Date.now()
     all<{ id: string; title: string; due_at: string; owner_id: string | null; org: string | null; org_id: string | null }>(
       `SELECT k.id, k.title, k.due_at, k.owner_id, o.name AS org, k.org_id FROM tasks k LEFT JOIN orgs o ON o.id = k.org_id AND o.tenant_id = k.tenant_id
        WHERE k.tenant_id = ? AND k.status = 'open' AND k.due_at < ? ORDER BY k.due_at LIMIT 50`, tenantId, today),
-    all<{ id: string; name: string; stage: string; org: string; org_id: string | null; value: number | null; updated_at: string }>(
-      `SELECT p.id, p.name, p.stage, COALESCE(o.name, pc.name) AS org, p.org_id, p.value, p.updated_at FROM opportunities p
+    all<{ id: string; name: string; stage: string; org: string; org_id: string | null; customer_id: string | null; value: number | null; updated_at: string;
+      classification: string | null; acc_owner: string | null; data_owner: string | null }>(
+      `SELECT p.id, p.name, p.stage, COALESCE(o.name, pc.name) AS org, p.org_id, p.customer_id, p.value, p.updated_at,
+         CASE WHEN p.org_id IS NOT NULL THEN o.classification ELSE pc.classification END AS classification,
+         o.account_owner_id AS acc_owner, COALESCE(o.data_owner_id, pc.data_owner_id) AS data_owner FROM opportunities p
        LEFT JOIN orgs o ON o.id = p.org_id AND o.tenant_id = p.tenant_id
        LEFT JOIN customers pc ON p.org_id IS NULL AND pc.id = p.customer_id AND pc.tenant_id = p.tenant_id
        WHERE p.tenant_id = ? AND p.updated_at >= ? ORDER BY p.updated_at DESC`, tenantId, since),
@@ -430,7 +487,10 @@ export async function weeklyReview(tenantId: string, since = new Date(Date.now()
     else if (a.kind.startsWith("outcome:")) p.outcomes += Number(a.n);
     people.set(a.actor, p);
   }
-  return { since, campaigns: [...campaigns.values()], overdue, opportunities: opps, activity: [...people.values()], staffActions: Number(moves?.n ?? 0) };
+  const visibleOpps = viewer
+    ? opps.filter((o) => canSee(viewer.clearance, (o.classification ?? "confidential") as Classification) || [o.acc_owner, o.data_owner].includes(viewer.id))
+    : opps;
+  return { since, campaigns: [...campaigns.values()], overdue, opportunities: visibleOpps, activity: [...people.values()], staffActions: Number(moves?.n ?? 0) };
 }
 
 export async function isStaffUser(tenantId: string, userId: string | null | undefined) {
