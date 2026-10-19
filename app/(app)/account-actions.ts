@@ -13,6 +13,8 @@ import { createTask } from "@/lib/engine/tasks";
 import { mergeOrgs } from "@/lib/engine/vault/merge";
 import { createOrg, orgByName } from "@/lib/engine/accounts/edit";
 import { similarOrgs } from "@/lib/engine/duplicates";
+import { setCustomerMode } from "@/lib/engine/tenant-mode";
+import { CUSTOMER_MODE_TH, isCustomerMode } from "@/lib/shared/tenants";
 import { redirect } from "next/navigation";
 import type { ActionState } from "@/lib/shared/action-state";
 import type { Classification } from "@/lib/shared/vault";
@@ -244,4 +246,16 @@ export async function createOrgAction(_p: ActionState, fd: FormData): Promise<Ac
   if (!r.ok) return { error: r.error };
   revalidatePath("/app/accounts");
   redirect(`/app/accounts/${r.id}${r.existed ? "?existed=1" : ""}`);
+}
+
+/* ── โหมดลูกค้าของบัญชี (docs/crm-plan.md F1) ── เจ้าของบัญชีเท่านั้น */
+export async function setCustomerModeAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  const v = await viewer();
+  const no = denied(v, "account_admin");
+  if (no) return { error: no };
+  const mode = str(fd, "mode");
+  const r = await setCustomerMode(v.tenantId, mode, v.actor);
+  if (!r.ok) return { error: r.error };
+  revalidatePath("/app", "layout");
+  return { ok: `ใช้แบบ "${isCustomerMode(mode) ? CUSTOMER_MODE_TH[mode].label : mode}" แล้ว — เมนูและฟอร์มเปลี่ยนตาม` };
 }

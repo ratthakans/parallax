@@ -98,7 +98,10 @@ export default async function DealPage({ params, searchParams }: { params: Promi
           {!closed && <span className={`c-pill ${daysHere > 30 ? "c-pill-warn" : ""}`}>อยู่ขั้นนี้ {daysHere} วัน</span>}
         </>}
         highlights={[
-          { label: "บริษัท", value: <Link href={`/app/accounts/${d.orgId}`} className="text-[var(--c-accent)] hover:underline">{d.org}</Link> },
+          /* ดีลลูกค้าบุคคล (F3) ชี้ไปหน้าคน */
+          d.orgId
+            ? { label: "บริษัท", value: <Link href={`/app/accounts/${d.orgId}`} className="text-[var(--c-accent)] hover:underline">{d.org}</Link> }
+            : { label: "ลูกค้าบุคคล", value: <Link href={`/app/customers/${d.customerId}`} className="text-[var(--c-accent)] hover:underline">{d.org}</Link> },
           { label: "มูลค่า", value: d.value != null ? baht(d.value) : "ไม่ระบุ" },
           closedAt
             ? { label: d.stage === "won" ? "ปิดได้เมื่อ" : "ปิดเมื่อ", value: thaiDate(closedAt) }
@@ -268,15 +271,17 @@ export default async function DealPage({ params, searchParams }: { params: Promi
                 </label>
               </ActionForm>
             ) : (
-              <p className="c-thai mt-3 text-[0.8rem] text-[var(--c-text-4)]">บริษัทนี้ยังไม่มีคนในระบบ — <Link href={`/app/customers/new?org=${d.orgId}`} className="underline">เพิ่มผู้ติดต่อ</Link></p>
+              d.orgId
+                ? <p className="c-thai mt-3 text-[0.8rem] text-[var(--c-text-4)]">บริษัทนี้ยังไม่มีคนในระบบ — <Link href={`/app/customers/new?org=${d.orgId}`} className="underline">เพิ่มผู้ติดต่อ</Link></p>
+                : <p className="c-thai mt-3 text-[0.8rem] text-[var(--c-text-4)]">ดีลลูกค้าบุคคล — คนในดีลคือลูกค้าคนนั้น</p>
             )}
           </Panel>
           <Panel className="p-5 lg:col-span-2">
             <h2 className="c-h2 text-[var(--c-text)]">งานของดีล <span className="text-[var(--c-text-4)]">({dealTasks.length})</span></h2>
-            <div className="mt-3"><TaskList tasks={dealTasks} link={{ dealId: d.id, orgId: d.orgId }} /></div>
+            <div className="mt-3"><TaskList tasks={dealTasks} link={{ dealId: d.id, orgId: d.orgId ?? undefined }} /></div>
             <details className="mt-3">
               <summary className="c-btn c-btn-ghost c-btn-sm inline-flex cursor-pointer list-none">+ งาน</summary>
-              <div className="mt-3 max-w-2xl"><NewTaskForm link={{ dealId: d.id, orgId: d.orgId }} team={team} people={candidates.filter((c) => c.current)} /></div>
+              <div className="mt-3 max-w-2xl"><NewTaskForm link={{ dealId: d.id, orgId: d.orgId ?? undefined }} team={team} people={candidates.filter((c) => c.current)} /></div>
             </details>
           </Panel>
           <Panel className="p-5 lg:col-span-2">
@@ -291,12 +296,12 @@ export default async function DealPage({ params, searchParams }: { params: Promi
                   </select>
                 </label>
                 <label className={LABEL}>วันที่<input type="date" name="occurredAt" defaultValue={bangkokDay()} className="c-input" required /></label>
-                <label className={LABEL}>กับใคร
+                {d.orgId ? <label className={LABEL}>กับใคร
                   <select name="personId" className="c-select" defaultValue="">
                     <option value="">ไม่ระบุคน</option>
                     {candidates.filter((c) => c.current).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
-                </label>
+                </label> : <p className={LABEL}>กับใคร<span className="c-thai py-2 text-[0.9rem] text-[var(--c-text)]">{d.org}</span></p>}
                 <label className={`${LABEL} sm:col-span-3`}>คุยอะไร<textarea name="summary" rows={2} className="c-input" required /></label>
                 <label className={`${LABEL} sm:col-span-3`}>ผล<input name="outcome" className="c-input" /></label>
                 <label className={`${LABEL} sm:col-span-2`}>งานถัดไป (ไม่บังคับ — สร้างเป็นงานให้)<input name="nextTitle" className="c-input" placeholder="เช่น ส่งใบเสนอราคาฉบับแก้" /></label>

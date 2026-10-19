@@ -434,6 +434,25 @@ export const isSignupTenantId = (tenantId: string): boolean => SIGNUP_TENANT_RE.
 export const isB2BTenant = (tenantId: string): boolean =>
   isSignupTenantId(tenantId) || B2B_DEMO_PROFILES.some((p) => p.id === tenantId);
 
+/* ── โหมดลูกค้า (docs/crm-plan.md F1) ──────────────────────────────────────
+   เก็บใน tenants.customer_mode (0026) · ค่าตั้งต้นของหน้าจอ ไม่ใช่กำแพงข้อมูล
+   ทะเบียนนิ่งข้างบนเป็นแค่ค่าสำรองเมื่ออ่านฐานไม่ได้ — ตัวตัดสินจริงคือแถวในฐาน */
+export const CUSTOMER_MODES = ["b2b", "b2c", "hybrid"] as const;
+export type CustomerMode = (typeof CUSTOMER_MODES)[number];
+export const isCustomerMode = (x: unknown): x is CustomerMode => (CUSTOMER_MODES as readonly unknown[]).includes(x);
+export const CUSTOMER_MODE_TH: Record<CustomerMode, { label: string; lead: string }> = {
+  b2b: { label: "ขายให้บริษัท", lead: "ผู้ติดต่อสังกัดบริษัท · ดีล · ไปป์ไลน์" },
+  b2c: { label: "ขายให้บุคคล", lead: "ลูกค้ารายคน · ยอดซื้อ · LINE และรหัสสมาชิก" },
+  hybrid: { label: "ทั้งสองแบบ", lead: "มีทั้งลูกค้าบริษัทและลูกค้าบุคคลในบัญชีเดียว" },
+};
+/** เดโมยุคค้าปลีก — migration 0026 ตั้งเป็น b2c ให้หน้าจอเหมือนเดิม */
+export const RETAIL_DEMO_IDS: readonly string[] = TENANT_PROFILES.map((p) => p.id);
+export const defaultCustomerMode = (tenantId: string): CustomerMode => (isB2BTenant(tenantId) ? "b2b" : "b2c");
+/** มีส่วน B2B (บริษัท · สังกัด · ดีลบริษัท) */
+export const hasB2B = (m: CustomerMode) => m !== "b2c";
+/** มีส่วนลูกค้าบุคคล (ยอดซื้อ · LINE · สมาชิก · หน้ายุคค้าปลีก) */
+export const hasB2C = (m: CustomerMode) => m !== "b2b";
+
 const SIGNUP_PROFILE: TenantProfile = {
   ...SUNLINE_DEMO,
   id: "signup",

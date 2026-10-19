@@ -7,7 +7,8 @@ import { currentUser } from "@/lib/shared/session";
 import { membershipEnforced, resolveTenant, switchableTenants, tenantsForUser } from "@/lib/engine/access";
 import { redirect } from "next/navigation";
 import { enterIdentity } from "@/lib/engine/sql";
-import { isB2BTenant } from "@/lib/shared/tenants";
+import { customerMode } from "@/lib/engine/tenant-mode";
+import type { CustomerMode } from "@/lib/shared/tenants";
 
 /* ── บัญชีที่เปิดอยู่ ประกอบจากสามอย่าง ──────────────────────────
 
@@ -61,6 +62,9 @@ export const myTenants = cache(async (): Promise<string[]> => {
    บัญชี B2B ไม่มีข้อมูลแบบนั้น หน้าจึงขึ้นตัวเลขศูนย์จนดูเหมือนระบบพัง (docs/ux-plan.md P3/P9) — พากลับหน้าแรกแทน */
 export async function retailOnly(): Promise<string> {
   const tenantId = await activeTenantId();
-  if (isB2BTenant(tenantId)) redirect("/app/today");
+  if ((await activeMode()) === "b2b") redirect("/app/today");
   return tenantId;
 }
+
+/** โหมดลูกค้าของบัญชีที่เปิดอยู่ (docs/crm-plan.md F1) — อ่านครั้งเดียวต่อคำขอ */
+export const activeMode = cache(async (): Promise<CustomerMode> => customerMode(await activeTenantId()));

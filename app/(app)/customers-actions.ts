@@ -6,7 +6,8 @@ import { activeTenantId } from "@/app/(app)/tenant";
 import { denied, viewer } from "@/app/(app)/viewer";
 import { affiliateManual, orgByName } from "@/lib/engine/accounts/edit";
 import { similarOrgs, similarPeopleAt } from "@/lib/engine/duplicates";
-import { isB2BTenant } from "@/lib/shared/tenants";
+import { hasB2B } from "@/lib/shared/tenants";
+import { customerMode } from "@/lib/engine/tenant-mode";
 import { currentUser } from "@/lib/shared/session";
 import { membershipEnforced } from "@/lib/engine/access";
 import { get } from "@/lib/engine/sql";
@@ -58,10 +59,11 @@ export async function createCustomerAction(_prev: ActionState, fd: FormData): Pr
   const { tenantId, actor } = await scope(fd);
   const no = denied(await viewer(), "write");
   if (no) return { error: no };
+  const b2b = hasB2B(await customerMode(tenantId));
   /* เฉพาะช่องที่ฟอร์มมีจริง — ข้อความแจ้งเตือนจึงพูดถึงแค่ช่องที่ผู้ใช้เห็น (BUG-16) */
   const contacts = CONTACT_KIND_ORDER.filter((kind) => fd.has(`contact_${kind}`)).map((kind) => ({ kind, value: field(fd, `contact_${kind}`) }));
   /* กันซ้ำตั้งแต่ตอนกรอก (บัญชี B2B) — เตือนก่อนสร้าง · ผู้ใช้ยืนยันว่าไม่ใช่รายเดิมได้ด้วยช่องติ๊ก */
-  if (isB2BTenant(tenantId) && fd.get("confirmDup") !== "1") {
+  if (b2b && fd.get("confirmDup") !== "1") {
     const v = await viewer();
     const who = { id: v.actor, clearance: v.clearance };
     const company = field(fd, "company").trim();
@@ -82,7 +84,7 @@ export async function createCustomerAction(_prev: ActionState, fd: FormData): Pr
   );
   if (!res.ok) return { error: res.error };
   /* บัญชี B2B: ผูกบริษัทและตำแหน่งเป็นสังกัด (ไม่ใช่แค่ช่องในโปรไฟล์) — หน้าคน หน้าบริษัท และแคมเปญจึงเห็น */
-  if (isB2BTenant(tenantId) && (field(fd, "company").trim() || field(fd, "prefillOrgId"))) {
+  if (b2b && (field(fd, "company").trim() || field(fd, "prefillOrgId"))) {
     const prefilled = field(fd, "prefillOrgId") && field(fd, "company").trim() === field(fd, "prefillOrgName") ? field(fd, "prefillOrgId") : undefined;
     const aff = await affiliateManual(tenantId, res.id, {
       orgId: prefilled, company: field(fd, "company"), title: field(fd, "job_title"), email: field(fd, "contact_email"),

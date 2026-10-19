@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { viewer } from "@/app/(app)/viewer";
+import { activeMode } from "@/app/(app)/tenant";
 import {
   assignTargetAction, bulkAssignAction, buildTargetsAction, draftMessageAction, markDraftSentAction, recordOutcomeAction, recordPreferenceAction, updateCriteriaAction,
 } from "@/app/(app)/sales-actions";
@@ -183,7 +184,7 @@ export default async function CampaignPage({ params, searchParams }: { params: P
         <details className="mt-4">
           <summary className="c-btn c-btn-ghost inline-flex cursor-pointer">แก้เกณฑ์</summary>
           <ActionForm action={updateCriteriaAction} fields={{ campaignId: c.id }} label="บันทึกเกณฑ์" pendingLabel="กำลังบันทึก…" className="mt-4 grid gap-3">
-            <CriteriaFields c={c.criteria} />
+            <CriteriaFields c={c.criteria} mode={await activeMode()} />
           </ActionForm>
         </details>
         <p className="c-thai mt-3 text-[0.76rem] text-[var(--c-text-4)]">ไม่เกิน 100 บริษัทต่อแคมเปญ (ขอบเขต pilot) · เป้าหมายที่มอบหมายแล้วไม่ถูกลบเมื่อเกณฑ์เปลี่ยน</p>

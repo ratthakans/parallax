@@ -1,4 +1,5 @@
 import { wipeCustomerData } from "@/lib/engine/tenant-data";
+import { defaultCustomerMode } from "@/lib/shared/tenants";
 import { CONTACT_POINT_COLUMNS, contactPointRow } from "@/lib/engine/pii";
 import { get, insertMany, tx, type Param, type Sql } from "@/lib/engine/sql";
 import { ALL_PLAYS } from "@/lib/shared/plays";
@@ -109,8 +110,8 @@ async function seedTenant(q: Sql, p: TenantProfile, now: Date) {
     `INSERT INTO tenants
        (id, name, cycle_shape, tier, created_at, max_messages_per_week,
         quiet_hours_start, quiet_hours_end, max_discount_pct, message_credits,
-        billing_day)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?)
+        billing_day, customer_mode)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
      ON CONFLICT(id) DO UPDATE SET
        name = excluded.name, cycle_shape = excluded.cycle_shape,
        tier = excluded.tier,
@@ -124,6 +125,8 @@ async function seedTenant(q: Sql, p: TenantProfile, now: Date) {
     p.id, p.name, p.cycleShape, p.tier, iso(openedAt),
     p.limits.weeklyCap, p.limits.quietStart, p.limits.quietEnd,
     p.limits.maxDiscountPct, p.limits.credits, billingDay,
+    /* โหมดตั้งตอนสร้างเท่านั้น (ไม่อยู่ใน DO UPDATE) — เจ้าของเปลี่ยนแล้ว seed ซ้ำไม่ทับ */
+    defaultCustomerMode(p.id),
   );
 
   /* ── ที่มาของยอดเครดิต ──

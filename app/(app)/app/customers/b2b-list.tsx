@@ -2,7 +2,8 @@ import Link from "next/link";
 import { viewer } from "@/app/(app)/viewer";
 import { CONTACT_SORTS, CONTACT_VIEWS, listContacts, type ContactSort, type ContactView } from "@/lib/engine/accounts/contacts-list";
 import { CONTACT_KIND_LABEL } from "@/lib/shared/contact-kinds";
-import { thaiDate } from "@/lib/shared/format";
+import { baht, thaiDate } from "@/lib/shared/format";
+import { hasB2C, type CustomerMode } from "@/lib/shared/tenants";
 import { PageHead, Panel, num } from "@/components/console/ui";
 import { ListViews, Pager, SortTh, type ListState } from "@/components/console/list-view";
 
@@ -20,31 +21,44 @@ const VIEWS: { key: ContactView; label: string }[] = [
   { key: "stopped", label: "ห้ามติดต่อ" },
 ];
 
-export async function B2BContacts({ sp }: { sp: Record<string, string | string[] | undefined> }) {
+/* บัญชีที่มีลูกค้าบุคคลด้วย (docs/crm-plan.md F2) — แยกบริษัท/บุคคลด้วยสังกัดปัจจุบัน · มีคอลัมน์ยอดซื้อ */
+const HYBRID_VIEWS: { key: ContactView; label: string }[] = [
+  { key: "all", label: "ทั้งหมด" },
+  { key: "employed", label: "ลูกค้าบริษัท" },
+  { key: "no_org", label: "ลูกค้าบุคคล" },
+  { key: "buyers", label: "เคยซื้อ" },
+  { key: "touched", label: "เคยติดต่อแล้ว" },
+  { key: "stopped", label: "ห้ามติดต่อ" },
+];
+
+export async function B2BContacts({ sp, mode = "b2b" }: { sp: Record<string, string | string[] | undefined>; mode?: CustomerMode }) {
+  const buy = hasB2C(mode);
   const one = (k: string) => (typeof sp[k] === "string" ? (sp[k] as string) : undefined);
   const v = await viewer();
   const view = (CONTACT_VIEWS as readonly string[]).includes(one("view") ?? "") ? (one("view") as ContactView) : "all";
   const sort = (CONTACT_SORTS as readonly string[]).includes(one("sort") ?? "") ? (one("sort") as ContactSort) : undefined;
   const dir = one("dir") === "asc" || one("dir") === "desc" ? (one("dir") as "asc" | "desc") : undefined;
   const q = one("q")?.slice(0, 120);
-  const list = await listContacts(v.tenantId, { q, view, sort, dir, page: Number(one("page")) || 1 }, { id: v.actor, clearance: v.clearance });
+  const list = await listContacts(v.tenantId, { q, view, sort, dir, page: Number(one("page")) || 1, purchases: buy }, { id: v.actor, clearance: v.clearance });
   const state: ListState = { q, view, sort, dir, page: list.page };
 
   return (
     <>
       <PageHead
         label="ผู้ติดต่อ"
-        title="ผู้ติดต่อ"
+        title={buy ? "ลูกค้าและผู้ติดต่อ" : "ผู้ติดต่อ"}
         actions={<>
           <Link href="/app/customers/new" className="c-btn c-btn-primary">+ ผู้ติดต่อ</Link>
-          <Link href="/app/vault" className="c-btn c-btn-ghost">นำเข้าไฟล์</Link>
+          <Link href="/app/vault" className="c-btn c-btn-ghost">{buy ? "นำเข้ารายชื่อ" : "นำเข้าไฟล์"}</Link>
+          {/* ไฟล์ยอดขาย/ออเดอร์ (F4) — ตัวนำเข้าเดิมจับคนจากเบอร์/อีเมลเดียวกับรายชื่อ ยอดซื้อจึงไปอยู่กับคนเดิม */}
+          {buy && <Link href="/app/import" className="c-btn c-btn-ghost">นำเข้ายอดขาย</Link>}
           <Link href={`/app/exports${q ? `?q=${encodeURIComponent(q)}` : ""}`} className="c-btn c-btn-ghost">ส่งออก CSV</Link>
         </>}
       />
       {one("deleted") === "1" && <p role="status" className="c-msg c-msg-ok mb-4">ลบแล้ว — อีเมลและเบอร์อยู่ในทะเบียนการลบ ไม่ถูกนำเข้าซ้ำ</p>}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <ListViews base={BASE} state={state} views={VIEWS} />
+        <ListViews base={BASE} state={state} views={buy ? HYBRID_VIEWS : VIEWS} />
         <form className="flex min-w-0 flex-1 basis-64 justify-end gap-2" action={BASE}>
           {view !== "all" && <input type="hidden" name="view" value={view} />}
           <input name="q" defaultValue={q ?? ""} className="c-input max-w-xs" placeholder="ชื่อ หรืออีเมล/เบอร์แบบเต็ม" aria-label="ค้นผู้ติดต่อ" />
@@ -65,6 +79,7 @@ export async function B2BContacts({ sp }: { sp: Record<string, string | string[]
                   <th className="font-sans text-[0.75rem] normal-case tracking-normal">ตำแหน่ง</th>
                   <SortTh base={BASE} state={state} col="org" label="บริษัท" />
                   <th className="font-sans text-[0.75rem] normal-case tracking-normal">ช่องทาง</th>
+                  {buy && <SortTh base={BASE} state={state} col="spent" label="ยอดซื้อ" defaultDir="desc" align="right" />}
                   <SortTh base={BASE} state={state} col="last" label="ติดต่อล่าสุด" defaultDir="desc" />
                   <SortTh base={BASE} state={state} col="recent" label="เพิ่มเมื่อ" defaultDir="desc" />
                 </tr>
@@ -83,6 +98,11 @@ export async function B2BContacts({ sp }: { sp: Record<string, string | string[]
                       {r.orgId ? <Link href={`/app/accounts/${r.orgId}`} className="hover:text-[var(--c-accent)]">{r.org}</Link> : (r.org ?? <span className="text-[var(--c-text-4)]">—</span>)}
                     </td>
                     <td className="c-thai text-[0.8rem] text-[var(--c-text-3)]">{r.kinds.length ? r.kinds.map((k) => CONTACT_KIND_LABEL[k as keyof typeof CONTACT_KIND_LABEL] ?? k).join(" · ") : "—"}</td>
+                    {buy && (
+                      <td className="c-mono text-right text-[0.82rem]">
+                        {r.orders ? <>{baht(r.spent ?? 0)} <span className="text-[var(--c-text-4)]">· {num(r.orders)} ครั้ง</span></> : <span className="text-[var(--c-text-4)]">—</span>}
+                      </td>
+                    )}
                     <td className="c-thai text-[0.82rem]">{r.lastAt ? thaiDate(r.lastAt) : <span className="text-[var(--c-text-4)]">ยังไม่เคย</span>}</td>
                     <td className="c-thai text-[0.82rem] text-[var(--c-text-3)]">{thaiDate(r.createdAt)}</td>
                   </tr>
