@@ -167,7 +167,8 @@ export default async function CustomerPage({
   /* บัญชี B2B ได้หน้าระเบียนแบบผู้ติดต่อ (สังกัด · แคมเปญ · กิจกรรม) — บัญชีค้าปลีกเดิมได้ตัวเลขการซื้อตามเดิม */
   const me = await viewer();
   const mode = await activeMode();
-  const b2b = hasB2B(mode) ? await personB2B(tenantId, cid, { id: me.actor, clearance: me.clearance }) : null;
+  /* ส่วน CRM (สังกัด · ดีล · งาน · กิจกรรม · ความยินยอมแบบนโยบาย) ใช้ได้ทุกโหมด — บัญชีขายให้บุคคลก็ขายด้วยดีลและติดตามด้วยงาน (QA รอบ 2 · R2-02) */
+  const b2b = await personB2B(tenantId, cid, { id: me.actor, clearance: me.clearance });
   const purposes = b2b ? (await listBases(tenantId)).map((b) => ({ id: b.purpose_id, name: b.name })) : [];
   const deals = b2b ? await dealsOfPerson(tenantId, await personIdsOf(tenantId, cid), { id: me.actor, clearance: me.clearance }) : [];
   const [personTasks, team] = b2b
@@ -178,10 +179,10 @@ export default async function CustomerPage({
   const s = c.stats;
   /* ทั้งสองแบบ (docs/crm-plan.md F2) — สลับตามระเบียน ไม่ใช่ตามบัญชี:
      ส่วนบริษัทเมื่อคนนี้มีสังกัด · ส่วนการซื้อเมื่อเคยซื้อหรือเป็นลูกค้าบุคคล · ดีล งาน กิจกรรม ความยินยอม ใช้กับทุกคน */
-  const hybrid = mode === "hybrid";
+  const indiv = hasB2C(mode);
   const orgPerson = !!b2b?.jobs.length;
-  const showPurchases = !b2b || (hybrid && (s.orders > 0 || !orgPerson));
-  const showJobs = !hybrid || orgPerson;
+  const showPurchases = indiv && (s.orders > 0 || !orgPerson);
+  const showJobs = !indiv || orgPerson;
   const cycle = s.cycleDays ?? s.modelCycleDays;
   const since = s.lastAt ? Math.floor((Date.now() - Date.parse(s.lastAt)) / 86400000) : null;
   const ratio = cycle && since != null ? since / Math.max(1, cycle) : null;
@@ -209,7 +210,7 @@ export default async function CustomerPage({
     <>
       {sp.created === "1" && (
         <p role="status" className="c-msg c-msg-ok mt-4">
-          เพิ่ม{v.person}แล้ว — ไฟล์ที่นำเข้าทีหลังซึ่งมี{b2b && !hybrid ? "เบอร์หรืออีเมลเดียวกัน" : "เบอร์ อีเมล LINE หรือรหัสสมาชิกเดียวกัน"} จะเติมประวัติให้คนนี้
+          เพิ่ม{v.person}แล้ว — ไฟล์ที่นำเข้าทีหลังซึ่งมี{!indiv ? "เบอร์หรืออีเมลเดียวกัน" : "เบอร์ อีเมล LINE หรือรหัสสมาชิกเดียวกัน"} จะเติมประวัติให้คนนี้
         </p>
       )}
 
@@ -222,11 +223,11 @@ export default async function CustomerPage({
 
       <RecordHeader
         back={{ href: "/app/customers", label: `${v.people}ทั้งหมด` }}
-        kind={b2b ? (hybrid && !orgPerson ? "ลูกค้าบุคคล" : "ผู้ติดต่อ") : v.person}
+        kind={indiv && !orgPerson ? (hasB2B(mode) ? "ลูกค้าบุคคล" : v.person) : "ผู้ติดต่อ"}
         title={c.name}
         badges={<>
           {b2b?.stop && <span className="c-pill c-pill-bad">{PREFERENCE_TH[b2b.stop]}แล้ว</span>}
-          {!b2b && <span className={`c-pill ${c.consent.granted ? "c-pill-good" : ""}`}>{c.consent.granted ? "ยินยอมรับข่าวสาร" : "ยังไม่ยินยอมรับข่าวสาร"}</span>}
+          {mode === "b2c" && <span className={`c-pill ${c.consent.granted ? "c-pill-good" : ""}`}>{c.consent.granted ? "ยินยอมรับข่าวสาร" : "ยังไม่ยินยอมรับข่าวสาร"}</span>}
           {openRequests > 0 && <span className="c-pill c-pill-warn">คำขอสิทธิเปิดอยู่ {openRequests}</span>}
           {p?.nickname && <span className="c-pill">ชื่อเล่น {p.nickname}</span>}
         </>}
@@ -239,10 +240,11 @@ export default async function CustomerPage({
           ...(showPurchases ? [
             { label: "ยอดซื้อรวม", value: s.orders ? `${baht(s.spent)} · ${num(s.orders)} ครั้ง` : "ยังไม่เคยซื้อ" },
             { label: "ซื้อล่าสุด", value: s.lastAt ? daysAgoLabel(s.lastAt) : "—" },
+            ...(s.orders ? [{ label: "รอบปกติ", value: status.text }] : []),
           ] : []),
           { label: "ช่องทาง", value: kinds.length ? kinds.map((k) => CONTACT_KIND_LABEL[k]).join(" · ") : "ไม่มี" },
           { label: "ติดต่อล่าสุด", value: b2b.interactions[0] ? thaiDate(b2b.interactions[0].at) : "ยังไม่เคย" },
-          ...(showJobs && showPurchases ? [] : [{ label: "แคมเปญ", value: num(b2b.campaigns.length) }]),
+          ...(showPurchases ? [] : [{ label: "แคมเปญ", value: num(b2b.campaigns.length) }]),
           { label: "เพิ่มเมื่อ", value: thaiDate(c.createdAt) },
         ] : [
           { label: `${v.spend}รวม`, value: s.orders ? baht(s.spent) : "—" },
@@ -512,7 +514,8 @@ export default async function CustomerPage({
             </Panel>
           )}
           {/* ความยินยอมรับข่าวสารแบบค้าปลีก — บัญชี B2B ใช้แผงด้านบน (บริการนโยบายตัดสินต่อวัตถุประสงค์) ไม่แสดงสองระบบซ้อนกัน (BUG-17) */}
-          {!b2b && <Panel className="p-5">
+          {/* ความยินยอมรับข่าวแบบค้าปลีกเดิม (consents) — ใช้กับแคมเปญส่งข้อความเดิม มีเฉพาะบัญชีขายให้บุคคล */}
+          {mode === "b2c" && <Panel className="p-5">
             <h2 className="c-h2 text-[var(--c-text)]">การรับข่าวสาร</h2>
             <p
               className={`c-thai mt-2 text-[0.9rem] ${c.consent.granted ? "text-[var(--c-good)]" : "text-[var(--c-text-2)]"}`}
