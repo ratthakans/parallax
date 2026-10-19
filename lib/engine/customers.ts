@@ -557,9 +557,9 @@ export async function deleteCustomer(
       )) if (!merged.includes(r.merged_id)) merged.push(r.merged_id);
     }
     await recordErasure(q, tenantId, merged, opts.reason ?? "manual", actor, opts.requestRef ?? null);
-    const ids = await deletePersonData(q, tenantId, id);
+    const { ids, dealIds } = await deletePersonData(q, tenantId, id);
     await q.run("DELETE FROM customers WHERE tenant_id = ? AND id = ?", tenantId, id);
-    await erasePersonHistory(q, tenantId, ids);
+    await erasePersonHistory(q, tenantId, ids, dealIds);
   });
   await logActivity(tenantId, actor, "delete_customer", id);
   return { ok: true, name: c.name };
@@ -616,7 +616,8 @@ export async function findDuplicates(tenantId: string, id: string): Promise<Dupl
    หลังรวม การนำเข้าไฟล์ครั้งถัดไปที่มีเบอร์ของ drop จะเจอ keep ผ่านช่องทางติดต่อ
    (knownCustomers ใน ingest.ts) ไม่สร้าง drop กลับมา */
 /* ตารางที่การรวมแบบเดิมรู้จัก — นอกนั้นคือข้อมูล B2B ที่ต้องรวมด้วย mergePersons */
-const LEGACY_TABLES = new Set([...RETAIL, "consents", "contact_points", "contact_profiles", "customer_features"]);
+/* ดีลลูกค้าบุคคล (F3) ไม่นับเป็นข้อมูล B2B ตอนเลือกทาง — ลูกค้าค้าปลีกที่มีดีลยังรวมทางเดิมได้ และทางเดิมย้ายดีลให้ */
+const LEGACY_TABLES = new Set([...RETAIL, "consents", "contact_points", "contact_profiles", "customer_features", "opportunities"]);
 
 async function hasAny(tenantId: string, ids: string[], links: { table: string; column: string; where?: string }[]): Promise<boolean> {
   for (const l of links) {
@@ -727,6 +728,8 @@ export async function mergeCustomers(
       );
       await q.run(`DELETE FROM ${t} WHERE tenant_id = ? AND customer_id = ?`, tenantId, dropId);
     }
+    /* ดีลลูกค้าบุคคล (F3) ย้ายไปคนที่คงอยู่ — ไม่งั้นดีลชี้ไปคนที่ถูกลบ เปิด/แก้/ลบไม่ได้ และหลุดจากการลบตามคำขอสิทธิ */
+    await q.run("UPDATE opportunities SET customer_id = ? WHERE tenant_id = ? AND org_id IS NULL AND customer_id = ?", keepId, tenantId, dropId);
     await q.run("DELETE FROM customer_features WHERE tenant_id = ? AND customer_id = ?", tenantId, dropId);
     await q.run("DELETE FROM customers WHERE tenant_id = ? AND id = ?", tenantId, dropId);
     return n;
