@@ -83,3 +83,24 @@ export async function reports(tenantId: string, viewer: Viewer, now = new Date()
 function prevDay(day: string): string {
   return new Date(+new Date(`${day}T00:00:00Z`) - 864e5).toISOString().slice(0, 10);
 }
+
+/* ── รายได้ตามกลุ่มลูกค้า (docs/crm-plan.md F6) ─────────────────────────────
+   ไตรมาสนี้: ดีลบริษัทที่ปิดได้ · ดีลลูกค้าบุคคลที่ปิดได้ · ยอดซื้อหน้าร้าน/ออเดอร์ (transactions)
+   ดีลตัดตามสิทธิ์เดียวกับหน้าดีล (listDeals) · ยอดซื้อเป็นผลรวมทั้งบัญชี ไม่เผยรายคน */
+export type SegmentRevenue = { label: string; count: number; unit: string; value: number }[];
+
+export async function revenueBySegment(tenantId: string, viewer: Viewer, now = new Date()): Promise<SegmentRevenue> {
+  const q = new Date(now); q.setUTCMonth(Math.floor(q.getUTCMonth() / 3) * 3, 1); q.setUTCHours(0, 0, 0, 0);
+  const won = await listDeals(tenantId, { view: "won", limit: 20000 }, viewer);
+  const tl = await stageTimelines(tenantId, won);
+  const inQ = won.filter((d) => (closedAt(tl.get(d.id) ?? []) ?? d.updatedAt) >= q.toISOString());
+  const sum = (xs: typeof inQ) => xs.reduce((t, d) => t + (d.value ?? 0), 0);
+  const org = inQ.filter((d) => d.orgId), person = inQ.filter((d) => !d.orgId);
+  const buys = await get<{ n: number | string; total: number | string | null }>(
+    "SELECT COUNT(*) AS n, SUM(total) AS total FROM transactions WHERE tenant_id = ? AND occurred_at >= ?", tenantId, q.toISOString().slice(0, 10));
+  return [
+    { label: "ดีลบริษัทที่ปิดได้", count: org.length, unit: "ดีล", value: sum(org) },
+    { label: "ดีลลูกค้าบุคคลที่ปิดได้", count: person.length, unit: "ดีล", value: sum(person) },
+    { label: "ยอดซื้อ (หน้าร้าน · ออเดอร์)", count: Number(buys?.n ?? 0), unit: "รายการ", value: Number(buys?.total ?? 0) },
+  ];
+}

@@ -183,7 +183,7 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
                   <tr key={d.id}>
                     <td><input type="checkbox" form="bulk-deals" name="ids" value={d.id} aria-label={`เลือก ${d.name}`} className="h-4 w-4" /></td>
                     <td><Link href={`/app/deals/${d.id}`} className="c-thai text-[var(--c-accent)] hover:underline">{d.name}</Link></td>
-                    <td className="c-thai text-[0.84rem]"><Link href={`/app/accounts/${d.orgId}`} className="hover:text-[var(--c-accent)]">{d.org}</Link></td>
+                    <td className="c-thai text-[0.84rem]"><Link href={d.orgId ? `/app/accounts/${d.orgId}` : `/app/customers/${d.customerId}`} className="hover:text-[var(--c-accent)]">{d.org}</Link>{!d.orgId && <span className="c-pill ml-1.5">บุคคล</span>}</td>
                     <td><span className={`c-pill ${d.stage === "won" ? "c-pill-good" : d.stage === "lost" ? "" : "c-pill-reach"}`}>{stageTh(d.stage)}</span></td>
                     <td className="c-mono text-right">{d.value != null ? baht(d.value) : "—"}</td>
                     <td className="c-thai text-[0.82rem]">{d.expectedClose ? thaiDate(d.expectedClose) : "—"}</td>

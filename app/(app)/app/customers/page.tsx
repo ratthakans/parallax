@@ -85,7 +85,8 @@ export default async function CustomersPage({
 
   const tenantId = await activeTenantId();
   /* บัญชี B2B: รายการผู้ติดต่อแบบ CRM (docs/ux-plan.md U3) · บัญชีค้าปลีกใช้หน้าเดิมด้านล่าง */
-  if (hasB2B(await activeMode())) return <B2BContacts sp={sp} />;
+  const mode = await activeMode();
+  if (hasB2B(mode)) return <B2BContacts sp={sp} mode={mode} />;
   const v = profileFor(tenantId).vocab;
   const [list, features] = await Promise.all([
     searchCustomers(tenantId, {

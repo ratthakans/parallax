@@ -170,6 +170,20 @@ export async function orgAccess(
   return { ok: false, error: "แฟ้มนี้อยู่ในระดับความลับที่สูงกว่าสิทธิ์ของคุณ — ขอให้เจ้าของบัญชีหรือผู้ดูแลมอบหมาย" };
 }
 
+/** ด่านของดีล (docs/crm-plan.md F3) — ดีลบริษัท = ด่านบริษัท · ดีลลูกค้าบุคคล = ระดับความลับของคนนั้น หรือเป็นผู้ดูแลข้อมูลของเขา */
+export async function dealPartyAccess(
+  tenantId: string, party: { org_id: string | null; customer_id?: string | null }, viewer: Viewer, intent: "edit" | "claim" = "edit",
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (party.org_id) return orgAccess(tenantId, party.org_id, viewer, intent);
+  if (!party.customer_id) return { ok: false, error: "ดีลนี้ไม่มีลูกค้า" };
+  const c = await get<{ classification: string | null; data_owner_id: string | null }>(
+    "SELECT classification, data_owner_id FROM customers WHERE tenant_id = ? AND id = ?", tenantId, party.customer_id);
+  if (!c) return { ok: false, error: "ไม่พบลูกค้าคนนี้" };
+  if (canSee(viewer.clearance, (c.classification ?? "confidential") as Classification)) return { ok: true };
+  if (intent === "edit" && c.data_owner_id === viewer.id) return { ok: true };
+  return { ok: false, error: "ลูกค้าคนนี้อยู่ในระดับความลับที่สูงกว่าสิทธิ์ของคุณ" };
+}
+
 export async function getDossier(tenantId: string, orgId: string, viewer: Viewer): Promise<Dossier | null> {
   const o = await get<Record<string, string | null>>("SELECT * FROM orgs WHERE tenant_id = ? AND id = ?", tenantId, orgId);
   if (!o) return null;

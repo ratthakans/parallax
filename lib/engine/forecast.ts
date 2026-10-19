@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { all, get, run, tx } from "@/lib/engine/sql";
 import { logActivity } from "@/lib/engine/db";
-import { orgAccess, type Viewer } from "@/lib/engine/accounts";
+import { dealPartyAccess, orgAccess, type Viewer } from "@/lib/engine/accounts";
 import { listDeals } from "@/lib/engine/deals";
 import { closedAt, stageTimelines } from "@/lib/engine/velocity";
 import { effectiveForecast, isForecast, quarterOf, quarterRange, type ForecastCategory } from "@/lib/shared/deals";
@@ -20,9 +20,9 @@ const PERIOD_RE = /^\d{4}-Q[1-4]$/;
 export async function setForecast(tenantId: string, dealId: string, category: string, viewer: Viewer): Promise<Result> {
   const next = category === "" ? null : category;
   if (next !== null && !isForecast(next)) return { ok: false, error: "เลือกหมวดพยากรณ์" };
-  const d = await get<{ org_id: string; forecast_category: string | null }>("SELECT org_id, forecast_category FROM opportunities WHERE tenant_id = ? AND id = ?", tenantId, dealId);
+  const d = await get<{ org_id: string | null; customer_id: string | null; forecast_category: string | null }>("SELECT org_id, customer_id, forecast_category FROM opportunities WHERE tenant_id = ? AND id = ?", tenantId, dealId);
   if (!d) return { ok: false, error: "ไม่พบดีลนี้" };
-  const access = await orgAccess(tenantId, d.org_id, viewer);
+  const access = await dealPartyAccess(tenantId, d, viewer);
   if (!access.ok) return access;
   if ((d.forecast_category ?? null) === next) return { ok: true };
   const at = new Date().toISOString();

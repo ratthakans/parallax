@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { all, get, run, tx } from "@/lib/engine/sql";
 import { logActivity } from "@/lib/engine/db";
-import { orgAccess, type Viewer } from "@/lib/engine/accounts";
+import { dealPartyAccess, type Viewer } from "@/lib/engine/accounts";
 import { canSee } from "@/lib/shared/accounts";
 import { DEAL_STAGE_TH, OPEN_STAGES, isDealRole, isDealStage, reasonsFor, type DealStage } from "@/lib/shared/deals";
 import { stageBlockers } from "@/lib/engine/stage-rules";
@@ -11,22 +11,31 @@ import type { Classification } from "@/lib/shared/vault";
 
    ตาราง opportunities เดิม (B5: แคมเปญสร้างดีลตอนส่งข้อเสนอ) — ตอนนี้มีหน้าของมันเอง: รายการ · ไปป์ไลน์ · หน้าระเบียน
    - ย้ายขั้นเขียนรุ่นใน record_versions (ขั้นเดิม → ใหม่ · ใคร · เมื่อไร) ในธุรกรรมเดียวกับการเปลี่ยน
-   - ดีลของบริษัทที่เกินสิทธิ์: ไม่ขึ้นในรายการ (ไม่เผยชื่อบริษัทหรือจำนวน) และแก้ไม่ได้ — ด่านเดียวกับแฟ้มบริษัท (orgAccess) */
+   - ดีลของบริษัทที่เกินสิทธิ์: ไม่ขึ้นในรายการ (ไม่เผยชื่อบริษัทหรือจำนวน) และแก้ไม่ได้ — ด่านเดียวกับแฟ้มบริษัท (orgAccess)
+   - ดีลลูกค้าบุคคล (docs/crm-plan.md F3 · 0027): org_id ว่าง · customer_id = ลูกค้า · ด่านคือระดับความลับของคนนั้น (dealPartyAccess) */
 
 export type DealRow = {
   id: string; name: string; stage: DealStage | string; value: number | null; expectedClose: string | null;
-  owner: string | null; orgId: string; org: string; campaignId: string | null; campaign: string | null; updatedAt: string; createdAt: string;
+  /** ดีลบริษัทมี orgId · ดีลลูกค้าบุคคลมี customerId (F3) — org คือชื่อคู่ค้าเสมอ (บริษัท หรือชื่อคน) */
+  owner: string | null; orgId: string | null; customerId: string | null; org: string; campaignId: string | null; campaign: string | null; updatedAt: string; createdAt: string;
 };
 export const DEAL_VIEWS = ["open", "mine", "all", "won", "lost"] as const;
 export type DealView = (typeof DEAL_VIEWS)[number];
 export const DEAL_SORTS = ["updated", "name", "value", "close", "org"] as const;
 export type DealSort = (typeof DEAL_SORTS)[number];
 const SORT_SQL: Record<DealSort, string> = {
-  updated: "p.updated_at", name: "p.name", value: "COALESCE(p.value, -1)", close: "COALESCE(p.expected_close, '9999')", org: "o.name",
+  updated: "p.updated_at", name: "p.name", value: "COALESCE(p.value, -1)", close: "COALESCE(p.expected_close, '9999')", org: "COALESCE(o.name, pc.name)",
 };
 type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 
 const lv = (c: string | null) => (c ?? "confidential") as Classification;
+
+/* คู่ค้าของดีล (F3): บริษัท หรือลูกค้าบุคคล — ระดับความลับและผู้ดูแลมาจากฝั่งที่ดีลผูกอยู่ */
+export const PARTY_JOIN = `LEFT JOIN orgs o ON o.id = p.org_id AND o.tenant_id = p.tenant_id
+     LEFT JOIN customers pc ON p.org_id IS NULL AND pc.id = p.customer_id AND pc.tenant_id = p.tenant_id`;
+export const PARTY_COLS = `p.org_id, p.customer_id, COALESCE(o.name, pc.name) AS org,
+       CASE WHEN p.org_id IS NOT NULL THEN o.classification ELSE pc.classification END AS classification,
+       o.account_owner_id AS acc_owner, COALESCE(o.data_owner_id, pc.data_owner_id) AS data_owner`;
 
 /* ตัวกรองที่ผู้ใช้เลือกเอง (docs/crm-plan.md C5) — ค่าเป็นพารามิเตอร์เสมอ */
 export type DealFilters = { owner?: string; minValue?: number; closeFrom?: string; closeTo?: string; package?: string; custom?: { fieldId: string; value: string }[] };
@@ -52,22 +61,21 @@ export async function listDeals(
   if (view === "mine") { where.push("p.owner_id = ?"); params.push(viewer.id); }
   if (view === "won" || view === "lost") { where.push("p.stage = ?"); params.push(view); }
   const q = opts.q?.trim().slice(0, 120);
-  if (q) { where.push("(p.name LIKE ? OR o.name LIKE ?)"); params.push(`%${q}%`, `%${q}%`); }
+  if (q) { where.push("(p.name LIKE ? OR COALESCE(o.name, pc.name) LIKE ?)"); params.push(`%${q}%`, `%${q}%`); }
   const sort = opts.sort && opts.sort in SORT_SQL ? opts.sort : "updated";
   const dir = opts.dir === "asc" ? "ASC" : opts.dir === "desc" ? "DESC" : sort === "name" || sort === "org" || sort === "close" ? "ASC" : "DESC";
   const rows = await all<{ id: string; name: string; stage: string; value: number | string | null; expected_close: string | null; owner_id: string | null;
-    org_id: string; org: string; classification: string | null; acc_owner: string | null; data_owner: string | null;
+    org_id: string | null; customer_id: string | null; org: string; classification: string | null; acc_owner: string | null; data_owner: string | null;
     campaign_id: string | null; campaign: string | null; updated_at: string; created_at: string }>(
-    `SELECT p.id, p.name, p.stage, p.value, p.expected_close, p.owner_id, p.org_id, o.name AS org, o.classification,
-       o.account_owner_id AS acc_owner, o.data_owner_id AS data_owner, p.campaign_id, c.name AS campaign, p.updated_at, p.created_at
-     FROM opportunities p JOIN orgs o ON o.id = p.org_id AND o.tenant_id = p.tenant_id
+    `SELECT ${PARTY_COLS}, p.id, p.name, p.stage, p.value, p.expected_close, p.owner_id, p.campaign_id, c.name AS campaign, p.updated_at, p.created_at
+     FROM opportunities p ${PARTY_JOIN}
      LEFT JOIN sales_campaigns c ON c.id = p.campaign_id AND c.tenant_id = p.tenant_id
      WHERE ${where.join(" AND ")} ORDER BY ${SORT_SQL[sort]} ${dir}, p.id LIMIT ?`, ...params, Math.min(Math.max(opts.limit ?? 500, 1), 20000));
   return rows
     .filter((r) => canSee(viewer.clearance, lv(r.classification)) || [r.acc_owner, r.data_owner].includes(viewer.id))
     .map((r) => ({
       id: r.id, name: r.name, stage: r.stage, value: r.value == null ? null : Number(r.value), expectedClose: r.expected_close,
-      owner: r.owner_id, orgId: r.org_id, org: r.org, campaignId: r.campaign_id, campaign: r.campaign, updatedAt: r.updated_at, createdAt: r.created_at,
+      owner: r.owner_id, orgId: r.org_id, customerId: r.customer_id, org: r.org, campaignId: r.campaign_id, campaign: r.campaign, updatedAt: r.updated_at, createdAt: r.created_at,
     }));
 }
 
@@ -79,11 +87,10 @@ export type DealRecord = DealRow & {
 
 export async function getDeal(tenantId: string, id: string, viewer: Viewer): Promise<DealRecord | "masked" | null> {
   const r = await get<{ id: string; name: string; stage: string; value: number | string | null; expected_close: string | null; owner_id: string | null;
-    org_id: string; org: string; classification: string | null; acc_owner: string | null; data_owner: string | null;
+    org_id: string | null; customer_id: string | null; org: string; classification: string | null; acc_owner: string | null; data_owner: string | null;
     campaign_id: string | null; campaign: string | null; updated_at: string; created_at: string }>(
-    `SELECT p.id, p.name, p.stage, p.value, p.expected_close, p.owner_id, p.org_id, o.name AS org, o.classification,
-       o.account_owner_id AS acc_owner, o.data_owner_id AS data_owner, p.campaign_id, c.name AS campaign, p.updated_at, p.created_at
-     FROM opportunities p JOIN orgs o ON o.id = p.org_id AND o.tenant_id = p.tenant_id
+    `SELECT ${PARTY_COLS}, p.id, p.name, p.stage, p.value, p.expected_close, p.owner_id, p.campaign_id, c.name AS campaign, p.updated_at, p.created_at
+     FROM opportunities p ${PARTY_JOIN}
      LEFT JOIN sales_campaigns c ON c.id = p.campaign_id AND c.tenant_id = p.tenant_id
      WHERE p.tenant_id = ? AND p.id = ?`, tenantId, id);
   if (!r) return null;
@@ -101,7 +108,7 @@ export async function getDeal(tenantId: string, id: string, viewer: Viewer): Pro
   ]);
   return {
     id: r.id, name: r.name, stage: r.stage, value: r.value == null ? null : Number(r.value), expectedClose: r.expected_close, owner: r.owner_id,
-    orgId: r.org_id, org: r.org, campaignId: r.campaign_id, campaign: r.campaign, updatedAt: r.updated_at, createdAt: r.created_at,
+    orgId: r.org_id, customerId: r.customer_id, org: r.org, campaignId: r.campaign_id, campaign: r.campaign, updatedAt: r.updated_at, createdAt: r.created_at,
     people: people.map((p) => ({ id: p.id, name: canSee(viewer.clearance, lv(p.classification)) ? p.name : "บุคคลที่จำกัดการเข้าถึง", role: p.role })),
     history: history.map((h) => ({ field: h.field, oldValue: h.old_value, newValue: h.new_value, by: h.changed_by, at: h.recorded_at, reason: h.reason })),
     interactions: interactions.map((i) => ({
@@ -112,10 +119,13 @@ export async function getDeal(tenantId: string, id: string, viewer: Viewer): Pro
 }
 
 export async function createDeal(
-  tenantId: string, input: { orgId: string; name: string; value?: string | number | null; expectedClose?: string | null; stage?: string },
+  tenantId: string, input: { orgId?: string | null; customerId?: string | null; name: string; value?: string | number | null; expectedClose?: string | null; stage?: string },
   viewer: Viewer,
 ): Promise<Result<{ id: string }>> {
-  const access = await orgAccess(tenantId, input.orgId, viewer);
+  /* บริษัทหรือคนอย่างใดอย่างหนึ่ง (F3) — มีบริษัท = ดีลบริษัทเสมอ */
+  const party = { org_id: input.orgId || null, customer_id: input.orgId ? null : input.customerId || null };
+  if (!party.org_id && !party.customer_id) return { ok: false, error: "เลือกบริษัทหรือลูกค้าของดีล" };
+  const access = await dealPartyAccess(tenantId, party, viewer);
   if (!access.ok) return access;
   const name = input.name.trim().slice(0, 160);
   if (name.length < 2) return { ok: false, error: "ตั้งชื่อดีล เช่น \"สปอนเซอร์ Gold งาน 2027\"" };
@@ -126,22 +136,22 @@ export async function createDeal(
   const id = randomUUID(), at = new Date().toISOString();
   await tx(async (q) => {
     await q.run(
-      `INSERT INTO opportunities (id, tenant_id, org_id, name, offer, stage, owner_id, value, expected_close, created_at, updated_at, campaign_id)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`, id, tenantId, input.orgId, name, null, stage, viewer.id, value, close, at, at, null);
+      `INSERT INTO opportunities (id, tenant_id, org_id, customer_id, name, offer, stage, owner_id, value, expected_close, created_at, updated_at, campaign_id)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`, id, tenantId, party.org_id, party.customer_id, name, null, stage, viewer.id, value, close, at, at, null);
     await q.run(
       "INSERT INTO record_versions (tenant_id, record_kind, record_id, field, old_value, new_value, reason, changed_by, valid_from, recorded_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
       tenantId, "opportunity", id, "stage", null, stage, "สร้างดีล", viewer.id, null, at);
   });
-  await logActivity(tenantId, viewer.id, "deal_create", `${id} · ${input.orgId}`);
+  await logActivity(tenantId, viewer.id, "deal_create", `${id} · ${party.org_id ?? `person ${party.customer_id}`}`);
   return { ok: true, id };
 }
 
 /** ย้ายขั้น (ลากในไปป์ไลน์ หรือกดใน Path) — เขียนรุ่นในธุรกรรมเดียว · ขั้นเดิมซ้ำ = ไม่ทำอะไร */
 export async function moveDeal(tenantId: string, id: string, stage: string, viewer: Viewer): Promise<Result<{ from: string }>> {
   if (!isDealStage(stage)) return { ok: false, error: "ขั้นไม่ถูกต้อง" };
-  const d = await get<{ stage: string; org_id: string }>("SELECT stage, org_id FROM opportunities WHERE tenant_id = ? AND id = ?", tenantId, id);
+  const d = await get<{ stage: string; org_id: string | null; customer_id: string | null }>("SELECT stage, org_id, customer_id FROM opportunities WHERE tenant_id = ? AND id = ?", tenantId, id);
   if (!d) return { ok: false, error: "ไม่พบดีลนี้" };
-  const access = await orgAccess(tenantId, d.org_id, viewer);
+  const access = await dealPartyAccess(tenantId, d, viewer);
   if (!access.ok) return access;
   if (d.stage === stage) return { ok: true, from: d.stage };
   /* กฎขั้น (D4) — บอกทุกข้อที่ขาดในครั้งเดียว */
@@ -162,10 +172,10 @@ export async function moveDeal(tenantId: string, id: string, stage: string, view
 export async function updateDeal(
   tenantId: string, id: string, field: "value" | "expected_close" | "name", raw: string, viewer: Viewer,
 ): Promise<Result> {
-  const d = await get<{ org_id: string; value: number | string | null; expected_close: string | null; name: string }>(
-    "SELECT org_id, value, expected_close, name FROM opportunities WHERE tenant_id = ? AND id = ?", tenantId, id);
+  const d = await get<{ org_id: string | null; customer_id: string | null; value: number | string | null; expected_close: string | null; name: string }>(
+    "SELECT org_id, customer_id, value, expected_close, name FROM opportunities WHERE tenant_id = ? AND id = ?", tenantId, id);
   if (!d) return { ok: false, error: "ไม่พบดีลนี้" };
-  const access = await orgAccess(tenantId, d.org_id, viewer);
+  const access = await dealPartyAccess(tenantId, d, viewer);
   if (!access.ok) return access;
   let next: string | number | null;
   if (field === "value") {
@@ -196,8 +206,14 @@ export async function updateDeal(
    ทุกการเพิ่ม/เปลี่ยนบทบาท/เอาออก เขียนรุ่นใน record_versions ของดีล (field = person) */
 
 export async function dealCandidates(tenantId: string, dealId: string, viewer: Viewer): Promise<{ id: string; name: string; title: string | null; current: boolean }[]> {
-  const d = await get<{ org_id: string }>("SELECT org_id FROM opportunities WHERE tenant_id = ? AND id = ?", tenantId, dealId);
+  const d = await get<{ org_id: string | null; customer_id: string | null }>("SELECT org_id, customer_id FROM opportunities WHERE tenant_id = ? AND id = ?", tenantId, dealId);
   if (!d) return [];
+  /* ดีลลูกค้าบุคคล (F3): คนในดีลคือลูกค้าคนนั้น */
+  if (!d.org_id) {
+    const c = d.customer_id ? await get<{ id: string; name: string; classification: string | null }>(
+      "SELECT id, name, classification FROM customers WHERE tenant_id = ? AND id = ?", tenantId, d.customer_id) : undefined;
+    return c && canSee(viewer.clearance, lv(c.classification)) ? [{ id: c.id, name: c.name, title: null, current: true }] : [];
+  }
   const rows = await all<{ id: string; name: string; title: string | null; valid_to: string | null; classification: string | null }>(
     `SELECT c.id, c.name, a.title, a.valid_to, c.classification FROM affiliations a
      JOIN customers c ON c.id = a.customer_id AND c.tenant_id = a.tenant_id
@@ -211,12 +227,12 @@ export async function dealCandidates(tenantId: string, dealId: string, viewer: V
 
 export async function setDealPerson(tenantId: string, dealId: string, personId: string, role: string, viewer: Viewer): Promise<Result> {
   if (!isDealRole(role)) return { ok: false, error: "เลือกบทบาท" };
-  const d = await get<{ org_id: string }>("SELECT org_id FROM opportunities WHERE tenant_id = ? AND id = ?", tenantId, dealId);
+  const d = await get<{ org_id: string | null; customer_id: string | null }>("SELECT org_id, customer_id FROM opportunities WHERE tenant_id = ? AND id = ?", tenantId, dealId);
   if (!d) return { ok: false, error: "ไม่พบดีลนี้" };
-  const access = await orgAccess(tenantId, d.org_id, viewer);
+  const access = await dealPartyAccess(tenantId, d, viewer);
   if (!access.ok) return access;
   if (!(await dealCandidates(tenantId, dealId, viewer)).some((c) => c.id === personId)) {
-    return { ok: false, error: "เลือกได้เฉพาะคนในบริษัทของดีลนี้" };
+    return { ok: false, error: d.org_id ? "เลือกได้เฉพาะคนในบริษัทของดีลนี้" : "ดีลลูกค้าบุคคลมีได้แค่ลูกค้าคนนั้น" };
   }
   const prev = await get<{ role: string | null }>("SELECT role FROM opportunity_people WHERE tenant_id = ? AND opportunity_id = ? AND customer_id = ?", tenantId, dealId, personId);
   if (prev && prev.role === role) return { ok: true };
@@ -235,9 +251,9 @@ export async function setDealPerson(tenantId: string, dealId: string, personId: 
 }
 
 export async function removeDealPerson(tenantId: string, dealId: string, personId: string, viewer: Viewer): Promise<Result> {
-  const d = await get<{ org_id: string }>("SELECT org_id FROM opportunities WHERE tenant_id = ? AND id = ?", tenantId, dealId);
+  const d = await get<{ org_id: string | null; customer_id: string | null }>("SELECT org_id, customer_id FROM opportunities WHERE tenant_id = ? AND id = ?", tenantId, dealId);
   if (!d) return { ok: false, error: "ไม่พบดีลนี้" };
-  const access = await orgAccess(tenantId, d.org_id, viewer);
+  const access = await dealPartyAccess(tenantId, d, viewer);
   if (!access.ok) return access;
   const prev = await get<{ role: string | null }>("SELECT role FROM opportunity_people WHERE tenant_id = ? AND opportunity_id = ? AND customer_id = ?", tenantId, dealId, personId);
   if (!prev) return { ok: false, error: "คนนี้ไม่ได้อยู่ในดีล" };
@@ -251,17 +267,22 @@ export async function removeDealPerson(tenantId: string, dealId: string, personI
   return { ok: true };
 }
 
-/** ดีลที่คนนี้อยู่ (หน้าผู้ติดต่อ) — ดีลของบริษัทที่เกินสิทธิ์ไม่ขึ้น */
-export async function dealsOfPerson(tenantId: string, personIds: string[], viewer: Viewer): Promise<{ id: string; name: string; stage: string; role: string | null; org: string; value: number | null }[]> {
+/** ดีลที่คนนี้อยู่ (หน้าผู้ติดต่อ) — ทั้งดีลที่เขาเป็นคนในดีล และดีลลูกค้าบุคคลของเขาเอง (F3) · ดีลเกินสิทธิ์ไม่ขึ้น */
+export async function dealsOfPerson(tenantId: string, personIds: string[], viewer: Viewer): Promise<{ id: string; name: string; stage: string; role: string | null; org: string; value: number | null; own: boolean }[]> {
   if (!personIds.length) return [];
-  const rows = await all<{ id: string; name: string; stage: string; role: string | null; org: string; value: number | string | null; classification: string | null; acc_owner: string | null; data_owner: string | null }>(
-    `SELECT p.id, p.name, p.stage, op.role, o.name AS org, p.value, o.classification, o.account_owner_id AS acc_owner, o.data_owner_id AS data_owner
-     FROM opportunity_people op JOIN opportunities p ON p.id = op.opportunity_id AND p.tenant_id = op.tenant_id
-     JOIN orgs o ON o.id = p.org_id AND o.tenant_id = p.tenant_id
-     WHERE op.tenant_id = ? AND op.customer_id IN (${personIds.map(() => "?").join(",")}) ORDER BY p.updated_at DESC`, tenantId, ...personIds);
+  const inList = personIds.map(() => "?").join(",");
+  const rows = await all<{ id: string; name: string; stage: string; role: string | null; org: string; value: number | string | null; classification: string | null;
+    acc_owner: string | null; data_owner: string | null; own: number | string }>(
+    `SELECT ${PARTY_COLS}, p.id, p.name, p.stage, p.value, p.updated_at,
+       (SELECT op.role FROM opportunity_people op WHERE op.tenant_id = p.tenant_id AND op.opportunity_id = p.id AND op.customer_id IN (${inList}) LIMIT 1) AS role,
+       CASE WHEN p.org_id IS NULL AND p.customer_id IN (${inList}) THEN 1 ELSE 0 END AS own
+     FROM opportunities p ${PARTY_JOIN}
+     WHERE p.tenant_id = ? AND ((p.org_id IS NULL AND p.customer_id IN (${inList}))
+       OR EXISTS (SELECT 1 FROM opportunity_people op WHERE op.tenant_id = p.tenant_id AND op.opportunity_id = p.id AND op.customer_id IN (${inList})))
+     ORDER BY p.updated_at DESC`, ...personIds, ...personIds, tenantId, ...personIds, ...personIds);
   return rows
     .filter((r) => canSee(viewer.clearance, lv(r.classification)) || [r.acc_owner, r.data_owner].includes(viewer.id))
-    .map((r) => ({ id: r.id, name: r.name, stage: r.stage, role: r.role, org: r.org, value: r.value == null ? null : Number(r.value) }));
+    .map((r) => ({ id: r.id, name: r.name, stage: r.stage, role: r.role, org: r.org, value: r.value == null ? null : Number(r.value), own: Number(r.own) === 1 }));
 }
 
 /* ── ปิดดีลพร้อมเหตุผล (docs/crm-plan.md E2) ──────────────────────────────
@@ -282,9 +303,9 @@ export async function closeDeal(
 export async function setDealOwner(tenantId: string, id: string, owner: string, viewer: Viewer): Promise<Result> {
   const who = owner.trim().slice(0, 120);
   if (!who) return { ok: false, error: "เลือกเจ้าของ" };
-  const d = await get<{ org_id: string; owner_id: string | null }>("SELECT org_id, owner_id FROM opportunities WHERE tenant_id = ? AND id = ?", tenantId, id);
+  const d = await get<{ org_id: string | null; customer_id: string | null; owner_id: string | null }>("SELECT org_id, customer_id, owner_id FROM opportunities WHERE tenant_id = ? AND id = ?", tenantId, id);
   if (!d) return { ok: false, error: "ไม่พบดีลนี้" };
-  const access = await orgAccess(tenantId, d.org_id, viewer);
+  const access = await dealPartyAccess(tenantId, d, viewer);
   if (!access.ok) return access;
   if (d.owner_id === who) return { ok: true };
   const at = new Date().toISOString();
@@ -307,11 +328,11 @@ export function renewalName(name: string): string {
 }
 
 export async function createRenewal(tenantId: string, id: string, viewer: Viewer): Promise<Result<{ id: string; existed: boolean }>> {
-  const d = await get<{ org_id: string; name: string; stage: string; owner_id: string | null; value: number | string | null; expected_close: string | null; updated_at: string }>(
-    "SELECT org_id, name, stage, owner_id, value, expected_close, updated_at FROM opportunities WHERE tenant_id = ? AND id = ?", tenantId, id);
+  const d = await get<{ org_id: string | null; customer_id: string | null; name: string; stage: string; owner_id: string | null; value: number | string | null; expected_close: string | null; updated_at: string }>(
+    "SELECT org_id, customer_id, name, stage, owner_id, value, expected_close, updated_at FROM opportunities WHERE tenant_id = ? AND id = ?", tenantId, id);
   if (!d) return { ok: false, error: "ไม่พบดีลนี้" };
   if (d.stage !== "won") return { ok: false, error: "ต่อสัญญาได้จากดีลที่ปิดได้แล้วเท่านั้น" };
-  const access = await orgAccess(tenantId, d.org_id, viewer);
+  const access = await dealPartyAccess(tenantId, d, viewer);
   if (!access.ok) return access;
   const existing = await get<{ id: string }>("SELECT id FROM opportunities WHERE tenant_id = ? AND renewed_from = ?", tenantId, id);
   if (existing) return { ok: true, id: existing.id, existed: true };
@@ -320,8 +341,8 @@ export async function createRenewal(tenantId: string, id: string, viewer: Viewer
   const nid = randomUUID(), at = new Date().toISOString();
   await tx(async (q) => {
     await q.run(
-      `INSERT INTO opportunities (id, tenant_id, org_id, name, offer, stage, owner_id, value, expected_close, created_at, updated_at, campaign_id, renewed_from)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`, nid, tenantId, d.org_id, renewalName(d.name), null, "open", d.owner_id ?? viewer.id,
+      `INSERT INTO opportunities (id, tenant_id, org_id, customer_id, name, offer, stage, owner_id, value, expected_close, created_at, updated_at, campaign_id, renewed_from)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, nid, tenantId, d.org_id, d.customer_id, renewalName(d.name), null, "open", d.owner_id ?? viewer.id,
       d.value == null ? null : Number(d.value), close, at, at, null, id);
     await q.run(
       "INSERT INTO record_versions (tenant_id, record_kind, record_id, field, old_value, new_value, reason, changed_by, valid_from, recorded_at) VALUES (?,?,?,?,?,?,?,?,?,?)",

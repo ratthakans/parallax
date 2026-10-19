@@ -281,12 +281,18 @@ async function clearBriefsFor(q: Sql, tenantId: string, ...ends: [string, string
 /* ── ปฏิสัมพันธ์ ── บันทึกหลังพบลูกค้า (plan หัวข้อ 3.3) */
 
 export async function logInteraction(
-  tenantId: string, orgId: string,
+  tenantId: string, orgId: string | null,
   input: { kind: string; occurredAt: string; personId?: string; opportunityId?: string; summary: string; outcome?: string; classification?: string },
   actor: string,
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   if (!(INTERACTION_KINDS as readonly string[]).includes(input.kind)) return { ok: false, error: "เลือกชนิดของการติดต่อ" };
-  if (!(await orgExists(tenantId, orgId))) return { ok: false, error: "ไม่พบบริษัทนี้" };
+  /* ไม่มีบริษัท = กิจกรรมของลูกค้าบุคคล (docs/crm-plan.md F3) — ต้องระบุคน · ดีลต้องเป็นดีลของคนนั้น */
+  if (orgId === null) {
+    if (!input.personId || !(await get("SELECT 1 AS x FROM customers WHERE tenant_id = ? AND id = ?", tenantId, input.personId))) return { ok: false, error: "ไม่พบลูกค้าคนนี้" };
+    if (input.opportunityId && !(await get("SELECT 1 AS x FROM opportunities WHERE tenant_id = ? AND id = ? AND org_id IS NULL AND customer_id = ?", tenantId, input.opportunityId, input.personId))) {
+      return { ok: false, error: "ดีลนี้ไม่ใช่ของลูกค้าคนนี้" };
+    }
+  } else if (!(await orgExists(tenantId, orgId))) return { ok: false, error: "ไม่พบบริษัทนี้" };
   const day = clean(input.occurredAt, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return { ok: false, error: "ระบุวันที่" };
   if (day > new Date(Date.now() + 864e5).toISOString().slice(0, 10)) return { ok: false, error: "บันทึกสิ่งที่เกิดขึ้นแล้ว — งานที่ยังไม่เกิดให้สร้างเป็นงาน" };
@@ -295,12 +301,12 @@ export async function logInteraction(
   const level = (input.classification || "confidential") as Classification;
   if (!(CLASSIFICATIONS as readonly string[]).includes(level)) return { ok: false, error: "ระดับความลับไม่ถูกต้อง" };
   const person = input.personId || null;
-  if (person && !(await get("SELECT 1 AS x FROM affiliations WHERE tenant_id = ? AND org_id = ? AND customer_id = ?", tenantId, orgId, person))) {
+  if (orgId && person && !(await get("SELECT 1 AS x FROM affiliations WHERE tenant_id = ? AND org_id = ? AND customer_id = ?", tenantId, orgId, person))) {
     return { ok: false, error: "คนที่เลือกไม่ได้สังกัดบริษัทนี้" };
   }
   /* ผูกกับดีลได้ (docs/crm-plan.md C1) — ดีลต้องเป็นของบริษัทเดียวกัน · บันทึกเดียวขึ้นทั้งหน้าบริษัท หน้าคน และหน้าดีล */
   const deal = input.opportunityId || null;
-  if (deal && !(await get("SELECT 1 AS x FROM opportunities WHERE tenant_id = ? AND id = ? AND org_id = ?", tenantId, deal, orgId))) {
+  if (orgId && deal && !(await get("SELECT 1 AS x FROM opportunities WHERE tenant_id = ? AND id = ? AND org_id = ?", tenantId, deal, orgId))) {
     return { ok: false, error: "ดีลนี้ไม่ใช่ของบริษัทนี้" };
   }
   const id = randomUUID();
@@ -310,10 +316,10 @@ export async function logInteraction(
        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       id, tenantId, input.kind as InteractionKind, day, orgId, person, deal, summary, clean(input.outcome, 500) || null, actor, null, level, now(),
     );
-    await q.run("DELETE FROM account_briefs WHERE tenant_id = ? AND org_id = ?", tenantId, orgId);
+    if (orgId) await q.run("DELETE FROM account_briefs WHERE tenant_id = ? AND org_id = ?", tenantId, orgId);
     if (deal) await q.run("UPDATE opportunities SET updated_at = ? WHERE tenant_id = ? AND id = ?", now(), tenantId, deal);
   });
-  await logActivity(tenantId, actor, "interaction_log", `${orgId} · ${input.kind}`);
+  await logActivity(tenantId, actor, "interaction_log", `${orgId ?? `person ${person}`} · ${input.kind}`);
   return { ok: true, id };
 }
 

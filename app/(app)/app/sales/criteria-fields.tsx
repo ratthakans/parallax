@@ -1,9 +1,61 @@
 import type { Criteria } from "@/lib/shared/policy";
+import { hasB2B, hasB2C, type CustomerMode } from "@/lib/shared/tenants";
 
 /* ช่องกรอกเกณฑ์เป้าหมาย — ใช้ทั้งตอนสร้างและตอนแก้แคมเปญ · ทุกช่องตรวจกับหลักฐานในฐานได้ ไม่มีคะแนน */
 const LABEL = "c-thai flex min-w-0 flex-col gap-1 text-[0.8rem] text-[var(--c-text-3)]";
 
-export function CriteriaFields({ c = {} }: { c?: Criteria }) {
+/* บัญชีที่มีลูกค้าบุคคล (docs/crm-plan.md F5): เลือกกลุ่มเป้าหมายก่อน · ขายให้บุคคลอย่างเดียว = เกณฑ์ยอดซื้ออย่างเดียว */
+export function CriteriaFields({ c = {}, mode = "b2b" }: { c?: Criteria; mode?: CustomerMode }) {
+  const person = <PersonFields c={c} />;
+  if (!hasB2B(mode)) return <><input type="hidden" name="audience" value="person" />{person}</>;
+  if (!hasB2C(mode)) return <OrgFields c={c} />;
+  return (
+    <div className="grid gap-4">
+      <label className={LABEL}>กลุ่มเป้าหมาย
+        <select name="audience" defaultValue={c.audience ?? "org"} className="c-select max-w-sm">
+          <option value="org">คนที่สังกัดบริษัท</option>
+          <option value="person">ลูกค้าบุคคล</option>
+        </select>
+      </label>
+      <details open={c.audience !== "person"}>
+        <summary className="c-thai cursor-pointer text-[0.84rem] text-[var(--c-accent)]">เกณฑ์ของคนที่สังกัดบริษัท</summary>
+        <div className="mt-3"><OrgFields c={c} /></div>
+      </details>
+      <details open={c.audience === "person"}>
+        <summary className="c-thai cursor-pointer text-[0.84rem] text-[var(--c-accent)]">เกณฑ์ของลูกค้าบุคคล</summary>
+        <div className="mt-3">{person}</div>
+      </details>
+    </div>
+  );
+}
+
+function PersonFields({ c }: { c: Criteria }) {
+  return (
+    <div className="grid gap-3 md:grid-cols-3">
+      <label className={LABEL}>ซื้อล่าสุดภายใน (วัน)
+        <input type="number" name="boughtWithinDays" min={1} max={3650} defaultValue={c.boughtWithinDays ?? ""} className="c-input" placeholder="เช่น 90" />
+      </label>
+      <label className={LABEL}>ไม่ได้ซื้อมาแล้วอย่างน้อย (วัน)
+        <input type="number" name="lapsedForDays" min={1} max={3650} defaultValue={c.lapsedForDays ?? ""} className="c-input" placeholder="เช่น 180 — ดึงลูกค้าที่หายไปกลับมา" />
+      </label>
+      <label className={LABEL}>ซื้ออย่างน้อย (ครั้ง)
+        <input type="number" name="minOrders" min={1} max={1000} defaultValue={c.minOrders ?? ""} className="c-input" />
+      </label>
+      <label className={LABEL}>ยอดซื้อรวมอย่างน้อย (บาท)
+        <input name="minSpent" inputMode="numeric" defaultValue={c.minSpent ?? ""} className="c-input" placeholder="เช่น 20000" />
+      </label>
+      <label className={LABEL}>เคยซื้อสินค้า (หมวดหรือชื่อ)
+        <input name="boughtCategory" defaultValue={c.boughtCategory ?? ""} className="c-input" placeholder="เช่น putter" />
+      </label>
+      <label className="c-thai flex items-center gap-2 self-end text-[0.86rem] text-[var(--c-text-2)]">
+        <input type="checkbox" name="excludeOpenDealsPerson" value="1" defaultChecked={c.audience === "person" && c.excludeOpenOpportunities} className="h-6 w-6" />
+        ไม่รวมลูกค้าที่มีดีลเปิดอยู่แล้ว
+      </label>
+    </div>
+  );
+}
+
+function OrgFields({ c }: { c: Criteria }) {
   return (
     <div className="grid gap-3 md:grid-cols-3">
       <label className={LABEL}>ตำแหน่งมีคำว่า (คั่นด้วยจุลภาค)

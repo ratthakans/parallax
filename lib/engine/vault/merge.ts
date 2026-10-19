@@ -44,6 +44,8 @@ const PERSON_MOVES: { table: string; key: string[]; column: string; where?: stri
   { table: "import_rows", key: ["batch_id", "line"], column: "customer_id" },
   { table: "sample_checks", key: ["id"], column: "customer_id" },
   { table: "opportunity_people", key: ["opportunity_id"], column: "customer_id" },
+  /* ดีลลูกค้าบุคคล (F3) ย้ายตามคน — แยกคืนได้ตรงแถว */
+  { table: "opportunities", key: ["id"], column: "customer_id", where: "org_id IS NULL" },
   { table: "campaign_targets", key: ["id"], column: "customer_id" },
   { table: "relationship_assertions", key: ["id"], column: "from_id", where: "from_kind = 'person'" },
   { table: "relationship_assertions", key: ["id"], column: "to_id", where: "to_kind = 'person'" },
@@ -53,6 +55,7 @@ const PERSON_MOVES: { table: string; key: string[]; column: string; where?: stri
 /* ข้อมูลยุคค้าปลีก — ไม่ย้ายในการรวมของ Data Vault (ใช้หน้าลูกค้าเดิม)
    consents ไม่อยู่ในรายการนี้: ทุกคนที่เพิ่มด้วยมือมีแถว consents เสมอ ถ้าปฏิเสธเพราะมัน คนที่เพิ่มด้วยมือ
    จะรวมแบบย้อนได้ไม่ได้เลย — การรวมด้านล่างรวม consents แบบเดียวกับทางเดิม (ถอนล่าสุดชนะ) และเก็บไว้คืนตอนแยก */
+const GUARDED = new Set(["opportunity_people", "opportunities"]);
 export const RETAIL = ["transactions", "events", "memberships", "campaign_audience", "messages"];
 const RESTRICTION_RANK: Record<string, number> = { none: 0, review: 1, restricted: 2, suppressed: 3 };
 /* ระดับความลับที่สูงกว่าชนะเมื่อรวม — รวมแฟ้มจำกัดสูงเข้ากับแฟ้มทั่วไปต้องไม่ทำให้ข้อมูลจำกัดสูงเปิดให้ทุกคน */
@@ -224,8 +227,9 @@ export async function unmerge(tenantId: string, mergeId: string, actor: string):
     for (const mv of PERSON_MOVES) {
       for (const key of impact.moved[`${mv.table}.${mv.column}`] ?? []) {
         await q.run(
-          `UPDATE ${mv.table} SET ${mv.column} = ? WHERE tenant_id = ? AND ${mv.key.map((k) => `${k} = ?`).join(" AND ")}${mv.table === "opportunity_people" ? ` AND ${mv.column} = ?` : ""}`,
-          dropId, tenantId, ...key, ...(mv.table === "opportunity_people" ? [keepId] : []),
+          /* ย้ายคืนเฉพาะแถวที่ยังเป็นของคนที่คงอยู่ — คนในดีล และดีลลูกค้าบุคคล (F3) อาจถูกเปลี่ยนไปแล้วหลังรวม */
+          `UPDATE ${mv.table} SET ${mv.column} = ? WHERE tenant_id = ? AND ${mv.key.map((k) => `${k} = ?`).join(" AND ")}${GUARDED.has(mv.table) ? ` AND ${mv.column} = ?${mv.where ? ` AND ${mv.where}` : ""}` : ""}`,
+          dropId, tenantId, ...key, ...(GUARDED.has(mv.table) ? [keepId] : []),
         );
       }
     }

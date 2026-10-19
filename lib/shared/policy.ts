@@ -63,9 +63,34 @@ export type Criteria = {
   interactedWithinDays?: number;
   /** บริษัทไม่มีปฏิสัมพันธ์มาแล้วอย่างน้อย N วัน (รวมที่ไม่เคยมี) — ใช้หาบัญชีที่เงียบ */
   quietForDays?: number;
+  /* ── ลูกค้าบุคคล (docs/crm-plan.md F5) ── ใช้เมื่อ audience = "person" · เกณฑ์ฝั่งบริษัทข้างบนไม่ใช้ */
+  /** กลุ่มเป้าหมาย: "org" = คนที่สังกัดบริษัท (ค่าตั้งต้น) · "person" = ลูกค้าบุคคล (ไม่มีสังกัดบริษัทปัจจุบัน) */
+  audience?: "org" | "person";
+  /** ซื้อล่าสุดภายใน N วัน */
+  boughtWithinDays?: number;
+  /** ซื้อครั้งล่าสุดนานกว่า N วันแล้ว (ต้องเคยซื้อ) — ใช้ดึงลูกค้าที่หายไปกลับมา */
+  lapsedForDays?: number;
+  /** ยอดซื้อรวมอย่างน้อย (บาท) */
+  minSpent?: number;
+  /** ซื้ออย่างน้อย N ครั้ง */
+  minOrders?: number;
+  /** เคยซื้อสินค้าที่หมวดหรือชื่อมีคำนี้ */
+  boughtCategory?: string;
 };
 
+export const isPersonAudience = (c: Criteria) => c.audience === "person";
+
 export function describeCriteria(c: Criteria): string[] {
+  if (isPersonAudience(c)) {
+    const out = ["ลูกค้าบุคคล (ไม่มีสังกัดบริษัทปัจจุบัน)"];
+    if (c.boughtWithinDays) out.push(`ซื้อล่าสุดภายใน ${c.boughtWithinDays} วัน`);
+    if (c.lapsedForDays) out.push(`ไม่ได้ซื้อมาแล้วอย่างน้อย ${c.lapsedForDays} วัน (ต้องเคยซื้อ)`);
+    if (c.minOrders) out.push(`ซื้ออย่างน้อย ${c.minOrders} ครั้ง`);
+    if (c.minSpent) out.push(`ยอดซื้อรวมอย่างน้อย ${c.minSpent.toLocaleString("en-US")} บาท`);
+    if (c.boughtCategory) out.push(`เคยซื้อสินค้าที่หมวดหรือชื่อมี “${c.boughtCategory}”`);
+    if (c.excludeOpenOpportunities) out.push("ไม่รวมลูกค้าที่มีดีลเปิดอยู่แล้ว");
+    return out;
+  }
   const out = ["ยังสังกัดบริษัทอยู่ (ไม่มีวันที่ออก)"];
   if (c.titleKeywords?.length) out.push(`ตำแหน่งมีคำว่า ${c.titleKeywords.map((k) => `“${k}”`).join(" หรือ ")}`);
   if (c.program) out.push(`เคยร่วมงานที่ชื่อมี “${c.program}”${c.roles?.length ? ` ในบทบาท ${c.roles.join(" / ")}` : ""}${c.sinceEdition ? ` ตั้งแต่ ${c.sinceEdition}` : ""}`);
