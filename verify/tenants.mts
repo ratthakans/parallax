@@ -77,3 +77,6 @@ ok(prodCross.n === 0, `ไม่มีสินค้าข้ามบัญช
 
 console.log(out.join("\n"));
 console.log("\n" + (out.some(l=>l.startsWith("FAIL")) ? "=== มี FAIL ===" : "=== ผ่านทั้งหมด ==="));
+
+/* ตกจริงเมื่อมี FAIL — เดิมพิมพ์อย่างเดียว CI จึงเขียวแม้มีข้อที่ไม่ผ่าน */
+if (out.some((l) => l.startsWith("FAIL"))) process.exit(1);

@@ -327,3 +327,6 @@ console.log(out.join("\n"));
 console.log(
   out.some((l) => l.startsWith("FAIL")) ? "\n=== มี FAIL ===" : "\n=== ผ่านทั้งหมด ===",
 );
+
+/* ตกจริงเมื่อมี FAIL — เดิมพิมพ์อย่างเดียว CI จึงเขียวแม้มีข้อที่ไม่ผ่าน */
+if (out.some((l) => l.startsWith("FAIL"))) process.exit(1);

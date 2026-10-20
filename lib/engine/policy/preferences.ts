@@ -5,6 +5,7 @@ import { recheckTargetsFor } from "@/lib/engine/campaigns";
 import { personIdsOf } from "@/lib/engine/vault/merge";
 import { CHANNELS } from "@/lib/shared/policy";
 import { PREFERENCE_KINDS, type PreferenceKind } from "@/lib/shared/vault";
+import { mirrorToLegacy } from "@/lib/engine/policy/marketing";
 
 /* ── ความต้องการของเจ้าของข้อมูล (Blueprint บท 5) ─────────────────
 
@@ -39,6 +40,8 @@ export async function recordPreference(
       randomUUID(), tenantId, customerId, purpose, channel, kind, effective, evidenceId, actor, at);
   });
   await logActivity(tenantId, actor, `preference_${kind}`, customerId);
+  /* สำเนาให้ระบบรับข่าวสารเดิม (G2) — ถอน/คัดค้านจากทางนี้ หยุดการส่งแบบเดิมด้วย */
+  await mirrorToLegacy(tenantId, customerId, kind, purpose, effective);
   const { cancelled } = await recheckTargetsFor(tenantId, customerId, actor);
   return { ok: true, cancelled };
 }

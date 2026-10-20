@@ -73,8 +73,29 @@ const reasons = new Set(after.candidates.flatMap(x=>x.filtered.map(f=>f.reason))
 ok([...reasons].some(r=>r.includes("Messaged within")), "F9 ล็อกหน้าต่างตอบสนองทำงานข้าม play");
 ok([...reasons].some(r=>r.includes("control group")), "H1 ล็อกกลุ่มควบคุมไม่ให้ถูกดึงซ้ำ");
 
+// ── G1 ตัวเลขต้องจริง: ผลจำลองเฉพาะบัญชีเดโม — บัญชีลูกค้าที่ไม่มียอดซื้อหลังแคมเปญต้องไม่มีผล ──
+{
+  const { run } = await import("@/lib/engine/sql");
+  const before = await get<{ approved_at: string }>("SELECT approved_at FROM campaigns WHERE id = ?", r.campaignId);
+  /* ย้อนวันอนุมัติไปปีที่ไม่มีการซื้อเลย = ไม่มีข้อมูลจริงในทุกช่วงวัด */
+  await run("UPDATE campaigns SET approved_at = ? WHERE id = ?", "2000-01-01T00:00:00.000Z", r.campaignId);
+  const demo = await measureCampaign(r.campaignId);
+  await run("UPDATE tenant_billing SET is_customer = 1 WHERE tenant_id = ?", T);
+  const real = await measureCampaign(r.campaignId);
+  await run("UPDATE tenant_billing SET is_customer = 0 WHERE tenant_id = ?", T);
+  await run("UPDATE campaigns SET approved_at = ? WHERE id = ?", before!.approved_at, r.campaignId);
+  await measureCampaign(r.campaignId);
+  ok(demo.some((a) => a.matured === 1), "G1 บัญชีเดโมยังเห็นผลจำลอง (ไม่มีธุรกรรมอนาคตในข้อมูลสาธิต)");
+  /* แคมเปญนี้วัดแบบรวมกลุ่ม (pooled) ที่ T+90 — ใช้ยอดซื้อจริงของแคมเปญอื่นใน play เดียวกัน จึงตรวจเฉพาะช่วงที่วัดรายแคมเปญ */
+  const own = real.filter((a) => a.horizon_days !== 90);
+  ok(own.length === 2 && own.every((a) => a.matured === 0 && a.verdict === "insufficient_data" && a.rph_treated === 0), "G1 บัญชีลูกค้าไม่มียอดซื้อ = ยังวัดไม่ได้ ไม่ใช่ผลจำลอง");
+}
+
 const roi = await roiSummary(T);
 out.push(`ROI: campaigns=${roi.campaigns} measured=${roi.measured} verdictMix=${JSON.stringify(roi.verdictMix)}`);
 
 console.log(out.join("\n"));
 console.log(out.some(l=>l.startsWith("FAIL")) ? "\n=== มี FAIL ===" : "\n=== ผ่านทั้งหมด ===");
+
+/* ตกจริงเมื่อมี FAIL — เดิมพิมพ์อย่างเดียว CI จึงเขียวแม้มีข้อที่ไม่ผ่าน */
+if (out.some((l) => l.startsWith("FAIL"))) process.exit(1);

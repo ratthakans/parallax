@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { viewer } from "@/app/(app)/viewer";
-import { adoptTemplateAction, setBasisAction, setRetentionRuleAction } from "@/app/(app)/sales-actions";
+import { adoptTemplateAction, migrateLegacyConsentsAction, setBasisAction, setRetentionRuleAction } from "@/app/(app)/sales-actions";
+import { legacyConsentStatus } from "@/lib/engine/policy/marketing";
+import { num } from "@/lib/shared/format";
 import { RETENTION_TRIGGERS, retentionRules, retentionSummary } from "@/lib/engine/retention";
 import { listBases, RULES_VERSION } from "@/lib/engine/policy";
 import { listTemplates } from "@/lib/engine/policy/templates";
@@ -21,7 +23,7 @@ const LABEL = "c-thai flex min-w-0 flex-col gap-1 text-[0.8rem] text-[var(--c-te
 
 export default async function PurposesPage() {
   const v = await viewer();
-  const [bases, templates, rules, ret] = await Promise.all([listBases(v.tenantId), listTemplates(v.tenantId), retentionRules(v.tenantId), retentionSummary(v.tenantId)]);
+  const [bases, templates, rules, ret, legacy] = await Promise.all([listBases(v.tenantId), listTemplates(v.tenantId), retentionRules(v.tenantId), retentionSummary(v.tenantId), legacyConsentStatus(v.tenantId)]);
   const TRIGGER_TH: Record<string, string> = {
     last_interaction: "ติดต่อล่าสุด", received: "วันที่ได้รับข้อมูล", last_participation: "ร่วมงานล่าสุด", withdrawal: "วันที่ถอนความยินยอม", referred: "ได้รับการแนะนำหรือคุยล่าสุด",
   };
@@ -41,6 +43,30 @@ export default async function PurposesPage() {
           <span className="text-[var(--c-text-4)]"> — ระบบไม่ลบเอง รายการที่ครบอายุขึ้นในหน้า <Link href="/app/today" className="underline">วันนี้</Link></span>
         </p>
       </Panel>
+
+      {/* ── ความยินยอมรับข่าวสารเดิม (docs/crm-plan.md G2) ── มีเฉพาะบัญชีที่มีข้อมูลระบบเดิม */}
+      {(legacy.granted > 0 || legacy.withdrawn > 0) && (
+        <Panel className="mb-6 p-5 md:p-6">
+          <h2 className="c-h2 text-[var(--c-text)]">ความยินยอมรับข่าวสารจากระบบเดิม</h2>
+          <p className="c-thai mt-1 text-[0.84rem] text-[var(--c-text-3)]">
+            ระบบเดิม: ยินยอม {num(legacy.granted)} คน · ถอนแล้ว {num(legacy.withdrawn)} คน —{" "}
+            {!legacy.purposeId
+              ? "ยังแยกจากบริการนโยบาย: ถอนในหน้าความยินยอมใหม่ ระบบเดิมยังไม่รู้ และกลับกัน"
+              : legacy.pending
+                ? <span className="text-[var(--c-warn)]">ย้ายไปบางส่วนแล้ว — เหลืออีก {num(legacy.pending)} คน กดย้ายต่อ (ทีละ 300 คน)</span>
+                : "ย้ายครบแล้ว · บันทึกที่ไหนก็ตรงกันทั้งสองระบบ"}
+          </p>
+          {can(v.role, "policy") ? (
+            <ActionForm action={migrateLegacyConsentsAction} label={!legacy.purposeId ? "ย้ายเข้าบริการนโยบาย" : legacy.pending ? "ย้ายต่อ" : "ตรวจและย้ายส่วนที่ยังไม่ตรงอีกครั้ง"} pendingLabel="กำลังย้าย…" size="sm" className="mt-3 grid max-w-2xl gap-2">
+              {!legacy.purposeId && (
+                <label className={LABEL}>ยืนยันข้อเท็จจริง: มีหลักฐานความยินยอมรายคนจริง (เช่น ช่องติ๊กในแบบฟอร์มสมาชิก · ข้อความตอบรับ) — พิมพ์ว่าได้มาอย่างไร
+                  <input name="confirmation" className="c-input" minLength={10} required placeholder="เช่น ลูกค้าติ๊กรับข่าวสารในใบสมัครสมาชิกหน้าร้าน" />
+                </label>
+              )}
+            </ActionForm>
+          ) : <p className="c-thai mt-3 text-[0.8rem] text-[var(--c-text-4)]">{deniedTh("policy")}</p>}
+        </Panel>
+      )}
 
       {/* ── เริ่มจากแม่แบบ (docs/solo-plan.md S4) ── */}
       <Panel className="mb-6 p-5 md:p-6">
