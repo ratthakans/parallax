@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Mark } from "@/components/brand";
+import type { CustomerMode } from "@/lib/shared/tenants";
 
 /* ── แถบบนของคอนโซล (docs/ux-plan.md U1 · แบบ Salesforce) ─────────────────
 
@@ -109,8 +110,18 @@ function Menu({ label, button, children, wide }: { label: string; button: ReactN
   );
 }
 
+/* เมนูตามโหมดลูกค้า (QA รอบ 2 · R2-01) — ขายให้บุคคลอย่างเดียวไม่มีแท็บบริษัท · มีลูกค้าบุคคล = เรียก "ลูกค้า" */
+function menusFor(mode: CustomerMode) {
+  const people = mode === "b2b" ? "ผู้ติดต่อ" : "ลูกค้า";
+  const keep = (href: string) => mode !== "b2c" || href !== "/app/accounts" && href !== "/app/accounts/new";
+  return {
+    tabs: TABS.filter((t) => keep(t.href)).map((t) => (t.href === "/app/customers" ? { ...t, label: people } : t)),
+    newItems: NEW_ITEMS.filter((i) => keep(i.href)).map((i) => (i.href === "/app/customers/new" ? { ...i, label: people } : i)),
+  };
+}
+
 export function AppBar({
-  tenantId, tenantName, industry, tenants, switchAction, userEmail, signOutAction, theme, setThemeAction,
+  tenantId, tenantName, industry, tenants, switchAction, userEmail, signOutAction, theme, setThemeAction, mode = "b2b",
 }: {
   tenantId: string;
   tenantName: string;
@@ -121,7 +132,9 @@ export function AppBar({
   signOutAction?: () => void | Promise<void>;
   theme: "light" | "dark";
   setThemeAction: (formData: FormData) => void | Promise<void>;
+  mode?: CustomerMode;
 }) {
+  const { tabs, newItems } = menusFor(mode);
   const pathname = usePathname();
   const router = useRouter();
   const params = useSearchParams();
@@ -133,7 +146,7 @@ export function AppBar({
   /* แท็บที่ตรงยาวที่สุดชนะ — /app/sales/weekly ไม่ทำให้ "แคมเปญ" ติดด้วย · หน้าตั้งค่าไม่ทำให้แท็บไหนติด */
   const matches = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
   const inSetup = SETUP_PATHS.some(matches);
-  const isActive = (href: string) => !inSetup && matches(href) && !TABS.some((t) => t.href.length > href.length && t.href.startsWith(href) && matches(t.href));
+  const isActive = (href: string) => !inSetup && matches(href) && !tabs.some((t) => t.href.length > href.length && t.href.startsWith(href) && matches(t.href));
 
   return (
     <header className="c-appbar">
@@ -164,7 +177,7 @@ export function AppBar({
           {(close) => (
             <>
               <p className="c-menu__label">สร้างใหม่</p>
-              {NEW_ITEMS.map((i) => (
+              {newItems.map((i) => (
                 <Link key={i.href} href={i.href} className="c-navlink" role="menuitem" onClick={close}>{i.label}</Link>
               ))}
             </>
@@ -233,7 +246,7 @@ export function AppBar({
       </div>
 
       <nav className="c-tabs" aria-label="เมนูหลัก">
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <Link key={t.href} href={t.href} className="c-tab" data-active={isActive(t.href)} aria-current={isActive(t.href) ? "page" : undefined}>
             {t.label}
           </Link>

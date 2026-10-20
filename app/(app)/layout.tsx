@@ -1,4 +1,4 @@
-import { activeTenantId } from "@/app/(app)/tenant";
+import { activeMode, activeTenantId } from "@/app/(app)/tenant";
 import type { Metadata } from "next";
 import Link from "next/link";
 import "./console.css";
@@ -67,6 +67,7 @@ export default async function ConsoleLayout({
           userEmail={user?.email}
           signOutAction={signOutAction}
           theme={theme}
+          mode={await activeMode()}
           setThemeAction={setThemeAction}
         />
         <main id="console-main" tabIndex={-1} className="c-main">
