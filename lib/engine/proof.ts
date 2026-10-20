@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { logActivity } from "@/lib/engine/db";
 import { playById } from "@/lib/shared/plays";
 import type { Verdict } from "@/lib/shared/types";
+import { hasSyntheticData } from "@/lib/engine/synthetic";
 
 /* ── PROOF ─────────────────────────────────────────────────────
    กลุ่มที่ส่งกับกลุ่มที่กันไว้ คือสองมุมที่ทำให้คำนวณระยะได้
@@ -172,7 +173,16 @@ async function armStatPooled(
 
 /* ชุดข้อมูลตัวอย่างไม่มีธุรกรรมอนาคต จึงจำลองผลลัพธ์แบบ
    deterministic จาก hash ของแคมเปญ เพื่อให้ตัวเลขที่แสดงคงที่
-   และตรวจสอบซ้ำได้ — ในระบบจริงส่วนนี้อ่านจาก transactions ตรง ๆ */
+   และตรวจสอบซ้ำได้ — ในระบบจริงส่วนนี้อ่านจาก transactions ตรง ๆ
+
+   ⚠ ใช้ได้เฉพาะบัญชีเดโมสังเคราะห์ที่ไม่ใช่ลูกค้า (docs/crm-plan.md G1) — เดิมบัญชีไหนก็ตามที่ยังไม่มียอดซื้อหลังแคมเปญ
+   ได้ผลจำลองไปเป็นตัวเลขจริง ลูกค้าจริงจะเห็น "ได้ผล" ทั้งที่ไม่มีข้อมูลเลย */
+export async function simulationAllowed(tenantId: string): Promise<boolean> {
+  if (!(await hasSyntheticData(tenantId))) return false;
+  const bill = await get<{ is_customer: number | string | boolean }>("SELECT is_customer FROM tenant_billing WHERE tenant_id = ?", tenantId);
+  return !!bill && !Number(bill.is_customer);
+}
+
 function simulate(campaignId: string, playId: string, horizonDays: number) {
   const play = playById(playId);
   const aov = play?.expected_order_value ?? 2000;
@@ -250,6 +260,7 @@ export async function measureCampaign(
   const out: Attribution[] = [];
   const nowIso = new Date().toISOString();
   const ageDays = (Date.now() - Date.parse(camp.approved_at)) / 86400000;
+  const allowSim = await simulationAllowed(camp.tenant_id);
 
   const INS = `INSERT INTO attributions
       (tenant_id, campaign_id, horizon_days, rph_treated, rph_holdout, lift_abs, lift_pct,
@@ -283,13 +294,15 @@ export async function measureCampaign(
         };
     const hasRealData = real.t.buyers > 0 || real.h.buyers > 0;
 
+    /* จำลองเฉพาะบัญชีเดโม — บัญชีจริงใช้ข้อมูลจริงเสมอ (ไม่มีคนซื้อ = อัตรา 0 · ยังวัดไม่ได้ ด้านล่าง) */
+    const useSim = !hasRealData && allowSim;
     const sim = simulate(campaignId, camp.play_id, horizon);
 
-    const rateTreated = hasRealData ? real.t.rate : sim.rateTreated;
-    const rateHoldout = hasRealData ? real.h.rate : sim.rateHoldout;
+    const rateTreated = useSim ? sim.rateTreated : real.t.rate;
+    const rateHoldout = useSim ? sim.rateHoldout : real.h.rate;
     // จำนวนคนที่เข้าสมการ — ของ pool คือรวมทุกแคมเปญ ไม่ใช่แคมเปญนี้
-    const nT = hasRealData ? real.t.n : camp.treated_size;
-    const nH = hasRealData ? real.h.n : camp.holdout_size;
+    const nT = useSim ? camp.treated_size : real.t.n;
+    const nH = useSim ? camp.holdout_size : real.h.n;
 
     /* ตัวคูณเป็นเงิน = ค่ากลาง (median) ของยอดต่อคนที่ซื้อ คิดรวมสองกลุ่ม
 
@@ -339,7 +352,9 @@ export async function measureCampaign(
        แยกจาก verdict ที่บอกว่าช่วงความเชื่อมั่นพ้นศูนย์หรือไม่ */
     const longEnough =
       medianCycle == null || horizon >= medianCycle * MIN_HORIZON_CYCLE_RATIO;
+    /* ไม่มีใครซื้อเลยทั้งสองกลุ่ม (และไม่ใช่เดโม) = ยังไม่มีอะไรให้ประเมิน ไม่ใช่ "ไม่ได้ผล" */
     const matured =
+      (hasRealData || useSim) &&
       ageDays >= horizon &&
       nH >= 40 &&
       longEnough &&
@@ -611,15 +626,23 @@ async function countRepeatFromCampaigns(
   campaignIds: string[],
 ): Promise<number> {
   if (!campaignIds.length) return 0;
-  const row = (await get<{ n: number | string }>(
-    `SELECT COUNT(DISTINCT ca.customer_id) AS n
-     FROM campaign_audience ca
-     JOIN attributions a
-       ON a.campaign_id = ca.campaign_id AND a.verdict = 'positive'
-     WHERE ca.campaign_id IN (${campaignIds.map(() => "?").join(",")})
-       AND ca.arm = 'treated'`,
+  /* นับคนจริง (G1): คนในกลุ่มที่ได้รับข้อความของแคมเปญที่ได้ผล ซึ่งซื้อจริงภายใน 90 วันหลังอนุมัติ
+     เดิมคูณจำนวนคนด้วย 0.11 ตายตัว — ตัวเลขที่ดูเหมือนวัดได้ แต่ไม่ได้มาจากข้อมูล */
+  const camps = await all<{ id: string; tenant_id: string; approved_at: string }>(
+    `SELECT c.id, c.tenant_id, c.approved_at FROM campaigns c
+     WHERE c.id IN (${campaignIds.map(() => "?").join(",")})
+       AND EXISTS (SELECT 1 FROM attributions a WHERE a.campaign_id = c.id AND a.verdict = 'positive')`,
     ...campaignIds,
-  ))!;
-  // สัดส่วนที่กลับมาซื้อซ้ำจริงประมาณจากอัตราการตอบสนองของแคมเปญที่ได้ผล
-  return Math.round(Number(row.n) * 0.11);
+  );
+  const buyers = new Set<string>();
+  for (const c of camps) {
+    const end = new Date(Date.parse(c.approved_at) + 90 * 864e5).toISOString();
+    for (const r of await all<{ customer_id: string }>(
+      `SELECT DISTINCT ca.customer_id FROM campaign_audience ca
+       JOIN transactions t ON t.tenant_id = ? AND t.customer_id = ca.customer_id AND t.occurred_at > ? AND t.occurred_at <= ?
+       WHERE ca.campaign_id = ? AND ca.arm = 'treated'`,
+      c.tenant_id, c.approved_at, end, c.id,
+    )) buyers.add(r.customer_id);
+  }
+  return buyers.size;
 }
