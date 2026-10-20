@@ -113,10 +113,18 @@ function Menu({ label, button, children, wide }: { label: string; button: ReactN
 /* เมนูตามโหมดลูกค้า (QA รอบ 2 · R2-01) — ขายให้บุคคลอย่างเดียวไม่มีแท็บบริษัท · มีลูกค้าบุคคล = เรียก "ลูกค้า" */
 function menusFor(mode: CustomerMode) {
   const people = mode === "b2b" ? "ผู้ติดต่อ" : "ลูกค้า";
-  const keep = (href: string) => mode !== "b2c" || href !== "/app/accounts" && href !== "/app/accounts/new";
+  /* ขายให้บุคคลอย่างเดียว: ไม่มีส่วนที่ทำงานกับบริษัท (บริษัท · อัปเดตบริษัทจากไฟล์ · นามบัตร · ทีมและเขตการขายของบริษัท) */
+  const B2B_ONLY = ["/app/accounts", "/app/accounts/new", "/app/data/update", "/app/vault/cards", "/app/settings/teams"];
+  const keep = (href: string) => mode !== "b2c" || !B2B_ONLY.includes(href);
+  /* หน้าระบบค้าปลีกเดิมที่ยังใช้ (docs/crm-plan.md G3) — เฉพาะบัญชีที่มีลูกค้าบุคคล */
+  const extra: Record<string, { href: string; label: string }[]> = mode === "b2b" ? {} : {
+    ข้อมูล: [{ href: "/app/import", label: "นำเข้ายอดขาย" }],
+    ระบบ: [{ href: "/app/billing", label: "แพ็กเกจและเครดิต" }],
+  };
   return {
     tabs: TABS.filter((t) => keep(t.href)).map((t) => (t.href === "/app/customers" ? { ...t, label: people } : t)),
     newItems: NEW_ITEMS.filter((i) => keep(i.href)).map((i) => (i.href === "/app/customers/new" ? { ...i, label: people } : i)),
+    setupGroups: SETUP_GROUPS.map((g) => ({ ...g, links: [...g.links.filter((l) => keep(l.href)), ...(extra[g.title] ?? [])] })),
   };
 }
 
@@ -134,7 +142,7 @@ export function AppBar({
   setThemeAction: (formData: FormData) => void | Promise<void>;
   mode?: CustomerMode;
 }) {
-  const { tabs, newItems } = menusFor(mode);
+  const { tabs, newItems, setupGroups } = menusFor(mode);
   const pathname = usePathname();
   const router = useRouter();
   const params = useSearchParams();
@@ -187,7 +195,7 @@ export function AppBar({
         <Menu label="ตั้งค่า" button={<Gear />} wide>
           {(close) => (
             <>
-              {SETUP_GROUPS.map((g) => (
+              {setupGroups.map((g) => (
                 <div key={g.title}>
                   <p className="c-menu__label">{g.title}</p>
                   {g.links.map((l) => (

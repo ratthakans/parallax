@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { marketingPurposeId } from "@/lib/engine/policy/marketing";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { activeMode, activeTenantId } from "@/app/(app)/tenant";
@@ -180,6 +181,8 @@ export default async function CustomerPage({
   /* ทั้งสองแบบ (docs/crm-plan.md F2) — สลับตามระเบียน ไม่ใช่ตามบัญชี:
      ส่วนบริษัทเมื่อคนนี้มีสังกัด · ส่วนการซื้อเมื่อเคยซื้อหรือเป็นลูกค้าบุคคล · ดีล งาน กิจกรรม ความยินยอม ใช้กับทุกคน */
   const indiv = hasB2C(mode);
+  /* ย้ายความยินยอมเดิมแล้ว (G2) = เหลือแผงความยินยอมเดียว (บริการนโยบาย) — แก้ R2-03 */
+  const legacyMoved = !!(await marketingPurposeId(tenantId));
   const orgPerson = !!b2b?.jobs.length;
   const showPurchases = indiv && (s.orders > 0 || !orgPerson);
   const showJobs = !indiv || orgPerson;
@@ -515,7 +518,7 @@ export default async function CustomerPage({
           )}
           {/* ความยินยอมรับข่าวสารแบบค้าปลีก — บัญชี B2B ใช้แผงด้านบน (บริการนโยบายตัดสินต่อวัตถุประสงค์) ไม่แสดงสองระบบซ้อนกัน (BUG-17) */}
           {/* ความยินยอมรับข่าวแบบค้าปลีกเดิม (consents) — ใช้กับแคมเปญส่งข้อความเดิม มีเฉพาะบัญชีขายให้บุคคล */}
-          {mode === "b2c" && <Panel className="p-5">
+          {mode === "b2c" && !legacyMoved && <Panel className="p-5">
             <h2 className="c-h2 text-[var(--c-text)]">การรับข่าวสาร</h2>
             <p
               className={`c-thai mt-2 text-[0.9rem] ${c.consent.granted ? "text-[var(--c-good)]" : "text-[var(--c-text-2)]"}`}
