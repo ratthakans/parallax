@@ -1,4 +1,5 @@
 import { all, insertMany, tx, type Param, type Sql } from "@/lib/engine/sql";
+import { syncLegacyConsents } from "@/lib/engine/policy/marketing";
 import { logActivity } from "@/lib/engine/db";
 import { createHash } from "node:crypto";
 import { deriveFeatures } from "@/lib/engine/derive";
@@ -777,7 +778,7 @@ export async function commitImport(
 
   const batch = collectImport(tenantId, parsed, read, preview, roleByName, await knownCustomers(tenantId, parsed, read), opts);
 
-  return tx(async (q) => {
+  const result = await tx(async (q) => {
     const newTxns = await writeImport(q, batch);
     await logActivity(
       tenantId,
@@ -806,4 +807,7 @@ export async function commitImport(
       consented: batch.consentYes.length,
     };
   });
+  /* ความยินยอมจากไฟล์ส่งต่อเข้าที่จริง (G2) — นอกธุรกรรมนำเข้า เพราะบันทึกแต่ละคนมีธุรกรรมและหลักฐานของตัวเอง */
+  if (batch.consentYes.length || batch.consentNo.length) await syncLegacyConsents(tenantId, "owner", [...batch.consentYes, ...batch.consentNo]);
+  return result;
 }

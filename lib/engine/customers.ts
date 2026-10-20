@@ -1,4 +1,5 @@
 import { all, get, insertMany, tx, type Param, type Sql } from "@/lib/engine/sql";
+import { syncLegacyConsents } from "@/lib/engine/policy/marketing";
 import { logActivity } from "@/lib/engine/db";
 import { importBlockedReason } from "@/lib/engine/signup/gate";
 import { PERSON_LINKED, deletePersonData, erasePersonHistory } from "@/lib/engine/tenant-data";
@@ -443,6 +444,7 @@ export async function createCustomer(
     );
   });
   await logActivity(tenantId, actor, "create_customer", id);
+  if (input.consent) await syncLegacyConsents(tenantId, actor, [id]);
   return { ok: true, id };
 }
 
@@ -534,6 +536,8 @@ export async function setConsent(tenantId: string, id: string, granted: boolean,
     ),
   );
   await logActivity(tenantId, actor, granted ? "grant_consent" : "revoke_consent", id);
+  /* ส่งต่อเข้าที่จริง (G2) — ถ้าบัญชีย้ายความยินยอมแล้ว */
+  await syncLegacyConsents(tenantId, actor, [id]);
   return { ok: true };
 }
 

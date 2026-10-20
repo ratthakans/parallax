@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { MARKETING_TEMPLATE, marketingPurposeId, syncLegacyConsents } from "@/lib/engine/policy/marketing";
 import { redirect } from "next/navigation";
 import { denied, viewer } from "@/app/(app)/viewer";
 import { assignTarget, buildTargets, createCampaign, recordOutcome, updateCriteria } from "@/lib/engine/campaigns";
@@ -210,4 +211,22 @@ export async function setRetentionRuleAction(_p: ActionState, fd: FormData): Pro
   revalidatePath("/app/sales/purposes");
   revalidatePath("/app/today");
   return { ok: "บันทึกกฎอายุข้อมูลแล้ว — กฎเดิมยังอยู่ในประวัติ" };
+}
+
+/* ── ย้ายความยินยอมรับข่าวสารเดิมเข้าบริการนโยบาย (docs/crm-plan.md G2) ──
+   ยังไม่มีวัตถุประสงค์ "ส่งข่าวสารและข้อเสนอ" = สร้างจากแม่แบบ (ต้องยืนยันข้อเท็จจริงเอง) · กดซ้ำได้ ไม่บันทึกซ้ำ */
+export async function migrateLegacyConsentsAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  const v = await viewer();
+  const no = denied(v, "policy");
+  if (no) return { error: no };
+  if (!(await marketingPurposeId(v.tenantId))) {
+    const made = await adoptTemplate(v.tenantId, MARKETING_TEMPLATE, str(fd, "confirmation"), v.actor);
+    if (!made.ok) return { error: made.error };
+  }
+  const r = await syncLegacyConsents(v.tenantId, v.actor, undefined, 300);
+  revalidatePath("/app/sales/purposes");
+  revalidatePath("/app/customers");
+  return { ok: r.remaining
+    ? `ย้ายชุดนี้แล้ว — ยินยอม ${r.consents} · ถอน ${r.withdrawals} · เหลืออีก ${r.remaining} คน กดอีกครั้งเพื่อย้ายต่อ`
+    : `ย้ายครบแล้ว — ยินยอม ${r.consents} · ถอน ${r.withdrawals} ในรอบนี้ · จากนี้บันทึกที่ไหนก็ตรงกันทั้งสองระบบ` };
 }
