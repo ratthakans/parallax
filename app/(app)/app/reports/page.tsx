@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { viewer } from "@/app/(app)/viewer";
 import { reports, revenueBySegment } from "@/lib/engine/reports";
+import { shopSummary } from "@/lib/engine/exec";
+import { get } from "@/lib/engine/sql";
 import { activeMode } from "@/app/(app)/tenant";
 import { hasB2C } from "@/lib/shared/tenants";
 import { closeReasons, pipelineAsOf, velocity } from "@/lib/engine/velocity";
@@ -44,6 +46,9 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   /* บัญชีที่มีลูกค้าบุคคล (F6) — รายได้ไตรมาสนี้แยกกลุ่ม */
   const seg = hasB2C(await activeMode()) ? await revenueBySegment(v.tenantId, who) : null;
   const segTotal = seg ? seg.reduce((t, s) => t + s.value, 0) : 0;
+  /* สรุปร้าน 90 วัน (จากหน้าผู้บริหารเดิม · G3) · ผลแคมเปญเดิมเปิดได้จากที่นี่ถ้าบัญชีมี */
+  const shop = seg ? await shopSummary(v.tenantId) : null;
+  const oldCampaigns = seg ? Number((await get<{ n: number | string }>("SELECT COUNT(*) AS n FROM campaigns WHERE tenant_id = ?", v.tenantId))?.n ?? 0) : 0;
 
   return (
     <>
@@ -67,6 +72,28 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
                 </li>
               ))}
             </ul>
+          </Panel>
+        )}
+        {shop && (
+          <Panel className="p-5 lg:col-span-2">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 className="c-h2 text-[var(--c-text)]">ร้าน 90 วันล่าสุด</h2>
+              {oldCampaigns > 0 && <Link href="/app/proof" className="c-thai text-[0.84rem] text-[var(--c-accent)] hover:underline">ผลแคมเปญส่งข้อความเดิม ({num(oldCampaigns)}) →</Link>}
+            </div>
+            <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {[
+                ["ยอดซื้อ 90 วัน", baht(shop.revenue90), shop.revenuePrev90 ? `ก่อนหน้า ${baht(shop.revenuePrev90)}` : ""],
+                ["คนที่ซื้อ 90 วัน", num(shop.buyers90), `จาก ${num(shop.customers)} คน`],
+                ["กำลังห่างหาย", num(shop.lapsing), "เลยรอบซื้อปกติ"],
+                ["ยินยอมรับข่าวสาร", `${Math.round(shop.consentShare * 100)}%`, "ของลูกค้าทั้งหมด"],
+              ].map(([label, value, hint]) => (
+                <div key={label}>
+                  <dt className="c-thai text-[0.75rem] text-[var(--c-text-4)]">{label}</dt>
+                  <dd className="c-mono text-[1.15rem] text-[var(--c-text)]">{value}</dd>
+                  {hint && <dd className="c-thai text-[0.72rem] text-[var(--c-text-4)]">{hint}</dd>}
+                </div>
+              ))}
+            </dl>
           </Panel>
         )}
         {/* ── 1 · ไปป์ไลน์ ── */}
