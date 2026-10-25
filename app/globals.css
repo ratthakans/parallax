@@ -312,9 +312,9 @@
 @layer components {
   .specimen {
     background: rgba(255, 255, 255, 0.72);
-    border: 1px solid rgba(158, 230, 255, 0.55);
+    border: 1px solid rgba(244, 244, 245, 0.55);
     box-shadow:
-      0 0 0 1px rgba(3, 7, 17, 0.28),
+      0 0 0 1px rgba(11, 11, 13, 0.12),
       0 0 60px -12px rgba(196, 185, 255, 0.4);
   }
 
@@ -331,7 +331,7 @@
   }
 
   .sysbar--dark {
-    color: rgba(234, 243, 255, 0.5);
+    color: rgba(244, 244, 245, 0.5);
   }
 
   .sysbar__rule {
@@ -346,11 +346,11 @@
     display: inline-flex;
     align-items: center;
     padding: 0.42rem 0.85rem;
-    border: 1px solid rgba(234, 243, 255, 0.22);
+    border: 1px solid rgba(244, 244, 245, 0.22);
     font-family: var(--font-sans);
     font-size: 0.75rem;
     letter-spacing: 0.01em;
-    color: rgba(234, 243, 255, 0.72);
+    color: rgba(244, 244, 245, 0.72);
     transition:
       border-color 0.35s ease,
       color 0.35s ease;
@@ -433,11 +433,11 @@
 
 @layer components {
   .sigcard--dark {
-    border-top-color: rgba(158, 230, 255, 0.2);
+    border-top-color: rgba(244, 244, 245, 0.2);
   }
 
   .sigcard--dark .sigcard__index {
-    color: rgba(234, 243, 255, 0.42);
+    color: rgba(244, 244, 245, 0.42);
   }
 
   .sigcard--dark .sigcard__title {
@@ -445,7 +445,7 @@
   }
 
   .sigcard--dark .sigcard__body {
-    color: rgba(234, 243, 255, 0.62);
+    color: rgba(244, 244, 245, 0.62);
   }
 
   .sigcard--dark .sigcard__status {
@@ -510,15 +510,15 @@
 
   .signal__mesh:nth-of-type(1) {
     background:
-      radial-gradient(circle at 28% 34%, rgba(7, 93, 255, 0.62), transparent 46%),
-      radial-gradient(circle at 72% 62%, rgba(98, 231, 255, 0.42), transparent 44%);
+      radial-gradient(circle at 28% 34%, rgba(106, 92, 255, 0.5), transparent 46%),
+      radial-gradient(circle at 72% 62%, rgba(255, 61, 139, 0.32), transparent 44%);
     animation: mesh-a 22s linear infinite;
   }
 
   .signal__mesh:nth-of-type(2) {
     background:
-      radial-gradient(circle at 64% 28%, rgba(98, 231, 255, 0.34), transparent 42%),
-      radial-gradient(circle at 34% 74%, rgba(7, 93, 255, 0.48), transparent 48%);
+      radial-gradient(circle at 64% 28%, rgba(196, 185, 255, 0.34), transparent 42%),
+      radial-gradient(circle at 34% 74%, rgba(255, 74, 28, 0.32), transparent 48%);
     animation: mesh-b 29s linear infinite;
   }
 }
@@ -553,8 +553,8 @@
     position: absolute;
     inset: -10% 0 -10% 0;
     background-image:
-      linear-gradient(rgba(98, 231, 255, 0.075) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(98, 231, 255, 0.055) 1px, transparent 1px);
+      linear-gradient(rgba(196, 185, 255, 0.075) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(196, 185, 255, 0.055) 1px, transparent 1px);
     background-size: 100% 46px, 46px 100%;
     mask-image: radial-gradient(ellipse at 50% 55%, #000 12%, transparent 78%);
     animation: grid-rise 7s linear infinite;
@@ -1474,7 +1474,7 @@
   }
 
   .more-light > summary {
-    color: rgba(234, 243, 255, 0.5);
+    color: rgba(244, 244, 245, 0.5);
   }
 
   .more-light > summary:hover {
@@ -1482,7 +1482,7 @@
   }
 
   .more-light .more-body {
-    color: rgba(234, 243, 255, 0.62);
+    color: rgba(244, 244, 245, 0.62);
   }
 }
 
@@ -1587,12 +1587,12 @@
   }
 
   .dtable--dark th {
-    color: rgba(234, 243, 255, 0.5);
-    border-bottom-color: rgba(158, 230, 255, 0.2);
+    color: rgba(244, 244, 245, 0.5);
+    border-bottom-color: rgba(244, 244, 245, 0.2);
   }
 
   .dtable--dark td {
-    border-bottom-color: rgba(158, 230, 255, 0.13);
+    border-bottom-color: rgba(244, 244, 245, 0.13);
   }
 
   .scroll-x {
@@ -1612,7 +1612,7 @@
 
 @utility hair-dark {
   height: 1px;
-  background: rgba(158, 230, 255, 0.18);
+  background: rgba(244, 244, 245, 0.18);
   border: 0;
 }
 

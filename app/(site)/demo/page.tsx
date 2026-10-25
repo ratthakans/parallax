@@ -3,6 +3,7 @@ import Link from "next/link";
 import { BriefMock } from "@/components/brief-mock";
 import { CTA, Label, Panel, Section } from "@/components/ui";
 import { Reveal, Stagger } from "@/components/reveal";
+import { Ridge } from "@/components/brand";
 
 export const metadata: Metadata = {
   title: "ดูตัวอย่างระบบ",
@@ -31,24 +32,26 @@ const STEPS = [
 export default function DemoPage() {
   return (
     <>
-      <section className="surface-dark relative overflow-hidden pt-32 pb-20 md:pt-40 md:pb-28">
-        <div className="shell">
+      {/* แผน H: hero พื้นสว่างแบบหน้าแรก — หัวเว็บเป็นตัวหนังสือดำทุกหน้า */}
+      <section className="relative isolate overflow-hidden bg-paper pt-32 pb-40 md:pt-40 md:pb-56">
+        <Ridge className="top-auto h-[16rem] md:h-[22rem]" />
+        <div className="shell relative z-[1]">
           <div className="grid items-start gap-14 lg:grid-cols-[0.72fr_1.28fr] lg:gap-16">
             <div className="hero-in">
               <div>
-                <Label onDark>เดโมสาธารณะ · ไม่ต้องเข้าสู่ระบบ</Label>
-                <h1 className="t-h1 balance mt-8 text-frost">
+                <Label>เดโมสาธารณะ · ไม่ต้องเข้าสู่ระบบ</Label>
+                <h1 className="t-h1 balance mt-8 font-medium tracking-[-0.02em] text-ink">
                   ทุกเช้า เหลือเพียงสามงานที่ควรทำก่อน
                 </h1>
-                <p className="t-lead t-thai pretty mt-7 text-frost/68">
+                <p className="t-lead t-thai pretty mt-7 text-ink-2">
                   ตัวอย่างนี้ใช้ข้อมูลสังเคราะห์ ไม่มีข้อความถูกส่งออกจริง
                   แต่ลำดับการตัดสินใจและวิธีวัดผลเหมือนระบบที่ใช้งานจริง
                 </p>
                 <div className="mt-9 flex flex-wrap gap-3">
-                  <Link href="/contact" className="btn btn-frost">
+                  <Link href="/contact" className="btn btn-primary">
                     ทดลองกับข้อมูลของคุณ
                   </Link>
-                  <Link href="/app" className="btn btn-outline-frost">
+                  <Link href="/app" className="btn btn-ghost bg-paper/70">
                     เข้าสู่ระบบสำหรับลูกค้า
                   </Link>
                 </div>
