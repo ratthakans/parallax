@@ -175,7 +175,7 @@ export async function generateBrief(tenantId: string, orgId: string, viewer: Vie
   await logActivity(tenantId, actor, "account_brief", `${orgId} · ${usedAi ? "ai" : "fallback"} · ${final.kept.length} sentences · ${v.dropped} dropped`);
   return {
     source: res.source, generatedBy: usedAi ? "ai" : "fallback", scope, sentences: final.kept, dropped: v.dropped, createdAt: at,
-    note: res.note ?? (res.source === "ai" && !usedAi ? "AI ตอบแต่ไม่มีประโยคที่มีหลักฐานครบ — ใช้สรุปจากสูตรแทน" : undefined), evidence: pack,
+    note: res.note ?? (res.source === "ai" && !usedAi ? "AI ตอบแต่ไม่มีประโยคที่มีหลักฐานครบ — ใช้สรุปอัตโนมัติแทน" : undefined), evidence: pack,
   };
 }
 

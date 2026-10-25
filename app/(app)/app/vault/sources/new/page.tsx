@@ -24,7 +24,7 @@ export default async function NewSourcePage() {
   return (
     <>
       <Link href="/app/vault" className="c-thai inline-block py-2 text-[0.85rem] text-[var(--c-text-3)] hover:text-[var(--c-text)]">
-        ← แหล่งข้อมูลทั้งหมด
+        ← นำเข้าข้อมูล
       </Link>
       <header className="mt-4 mb-6">
         <h1 className="c-h1 text-[var(--c-text)]">ลงทะเบียนแหล่งข้อมูล</h1>

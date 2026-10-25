@@ -7,10 +7,10 @@ import type { Classification } from "@/lib/shared/vault";
 import { gate, type Capability } from "@/lib/shared/roles";
 import { signupInfo, signupLock } from "@/lib/engine/signup/gate";
 
-/* ── ผู้อ่านของคำขอนี้ ── บัญชี · ผู้กระทำ · ระดับสิทธิ์ · เป็นทีม PARALLAX ไหม
+/* ── ผู้อ่านของคำขอนี้ ── บัญชี · ผู้กระทำ · ระดับสิทธิ์ · เป็นทีม Parallax ไหม
    ระดับสิทธิ์ยังเป็น "ลับ" สำหรับทุกบทบาท (บทบาทแยกสิทธิ์การกระทำ ไม่ใช่ระดับความลับ) — แก้ที่นี่ที่เดียว
    ("จำกัดสูง" เห็นได้เฉพาะเจ้าของรายการ ไม่ว่าระดับจะเป็นอะไร)
-   isStaff: ธง tenant_users.is_staff — กิจกรรมของทีม PARALLAX ไม่นับในหน้าทบทวน (plan หัวข้อ 3.3) */
+   isStaff: ธง tenant_users.is_staff — กิจกรรมของทีม Parallax ไม่นับในหน้าทบทวน (plan หัวข้อ 3.3) */
 /* locked: บัญชีสมัครเองที่ยังตั้งค่าไม่ครบ (รวมยืนยันสองชั้น) หรือทดลองใช้หมดแล้ว (S9) — ทุก action ถูกปฏิเสธ
    นอกจากขั้นตั้งต้นเอง (onboarding-actions.ts ปลด locked ก่อนเรียก denied และให้ engine คุมลำดับขั้นแทน) */
 export type Viewer = { tenantId: string; actor: string; clearance: Classification; isStaff: boolean; role: TenantRole; mfa: Session["mfa"]; locked: string | null };

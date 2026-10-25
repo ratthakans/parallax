@@ -200,7 +200,7 @@ export async function matchCriteria(tenantId: string, raw: Criteria): Promise<{ 
     }
     if (c.industry) reasons.push(`อุตสาหกรรม: ${a.industry}`);
     if (paths.length) {
-      reasons.push(`เส้นทางเข้าถึง: ${paths[0].text}${paths.length > 1 ? ` (และอีก ${paths.length - 1} เส้นทาง)` : ""}`);
+      reasons.push(`ทีมรู้จัก: ${paths[0].text}${paths.length > 1 ? ` (และอีก ${paths.length - 1} คน)` : ""}`);
       rank += paths[0].hops === 1 ? 3 : 1;
     }
     if (touched) reasons.push(`ปฏิสัมพันธ์ล่าสุดกับบริษัท ${touched.slice(0, 10)}`);
@@ -451,7 +451,7 @@ export async function getCampaign(tenantId: string, id: string) {
   };
 }
 
-/* ── ทบทวนรายสัปดาห์ (plan หัวข้อ 3.3) ── นับกิจกรรมที่มีผล ไม่นับ login และไม่นับทีม PARALLAX */
+/* ── ทบทวนรายสัปดาห์ (plan หัวข้อ 3.3) ── นับกิจกรรมที่มีผล ไม่นับ login และไม่นับทีม Parallax */
 /* viewer (หน้าทบทวน) = ตัดดีลที่เกินสิทธิ์ออกแบบเดียวกับหน้าดีล · ไม่ส่ง (สรุปทางอีเมล) = นับอย่างเดียว ไม่มีชื่อออกไป */
 export async function weeklyReview(tenantId: string, since = new Date(Date.now() - 7 * 864e5).toISOString(), viewer?: { id: string; clearance: Classification }) {
   const today = bangkokDay();

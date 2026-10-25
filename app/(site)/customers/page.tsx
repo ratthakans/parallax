@@ -243,7 +243,7 @@ export default function CustomersPage() {
           <Reveal>
             <Note>
               A business with no way to tie an identity to a receipt is not ready for
-              PARALLAX as it stands today — and we say so in the first conversation
+              Parallax as it stands today — and we say so in the first conversation
               rather than selling and disappointing later.
             </Note>
           </Reveal>

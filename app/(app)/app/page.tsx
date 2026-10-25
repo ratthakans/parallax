@@ -29,7 +29,7 @@ export default async function OverviewPage() {
       <PageHead
         label="ข้อมูล"
         title={`ภาพรวม${v.base}`}
-        lead="ตัวเลขทุกตัวในหน้านี้นับจากข้อมูลที่อยู่ในระบบจริง ไม่มีประมาณการหรือคะแนนที่ระบบคิดขึ้น"
+        lead="นับจากข้อมูลจริงในระบบ ไม่มีประมาณการหรือคะแนนที่ระบบคิดขึ้น"
         actions={
           <>
             <Link href="/app/vault" className="c-btn c-btn-primary">แหล่งข้อมูลและนำเข้า</Link>
@@ -66,7 +66,7 @@ export default async function OverviewPage() {
         <Metric label="องค์กร" value={num(o.orgs)} sub="นิติบุคคลละหนึ่งแถว · ในเครือไม่ถูกรวม" tone={o.orgs ? "plain" : "muted"} />
         <Metric label={`${v.people}ที่คนตรวจยืนยันแล้ว`} value={num(o.confirmedPeople)} sub={share(o.confirmedPeople)} tone={o.confirmedPeople ? "plain" : "muted"} />
         <Metric
-          label="รอคนตัดสินในคิวตรวจ"
+          label="รอคนตัดสิน (ตรวจข้อมูลซ้ำ)"
           value={num(o.openPairs + o.openOrgGroups)}
           sub={`${num(o.openPairs)} คู่คน · ${num(o.openOrgGroups)} กลุ่มองค์กร`}
           tone={o.openPairs + o.openOrgGroups ? "plain" : "muted"}

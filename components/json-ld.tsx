@@ -31,7 +31,7 @@ export function OrganizationLd() {
         data={{
           "@context": "https://schema.org",
           "@type": "Organization",
-          name: "PARALLAX",
+          name: "Parallax",
           url,
           description:
             "Everyone measures cost per lead. We measure cost per returning customer — an agentic revenue OS for businesses with a repeat purchase cycle.",
@@ -43,7 +43,7 @@ export function OrganizationLd() {
         data={{
           "@context": "https://schema.org",
           "@type": "WebSite",
-          name: "PARALLAX",
+          name: "Parallax",
           url,
         }}
       />
@@ -66,7 +66,7 @@ export function PricingLd({
       data={{
         "@context": "https://schema.org",
         "@type": "SoftwareApplication",
-        name: "PARALLAX",
+        name: "Parallax",
         applicationCategory: "BusinessApplication",
         operatingSystem: "Web",
         url: `${url}/pricing`,

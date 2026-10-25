@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { BriefMock } from "@/components/brief-mock";
+import { Ridge } from "@/components/brand";
 import { ArrowLink, CTA, Label, Section } from "@/components/ui";
 import { Reveal, Stagger } from "@/components/reveal";
 
@@ -45,40 +46,38 @@ const TRUST = [
 export default function HomePage() {
   return (
     <>
-      <header className="surface-dark relative overflow-hidden pt-28 pb-16 md:pt-36 md:pb-24">
-        <div
-          className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_78%_30%,rgba(7,93,255,0.34),transparent_42%),radial-gradient(circle_at_52%_90%,rgba(98,231,255,0.12),transparent_38%)]"
-          aria-hidden
-        />
-        <div className="shell">
+      {/* แผน H: ท้องฟ้าใสให้ตัวหนังสือ · Ridge ที่ขอบล่างเป็นสีของแบรนด์ */}
+      <header className="relative isolate overflow-hidden bg-paper pt-28 pb-40 md:pt-36 md:pb-56">
+        <Ridge className="top-auto h-[16rem] md:h-[22rem]" />
+        <div className="shell relative z-[1]">
           <div className="grid items-center gap-12 lg:grid-cols-[0.92fr_1.08fr] lg:gap-16">
             <div>
               <div className="hero-in">
-                <p className="t-label text-cyan">ระบบช่วยเพิ่มยอดขายจากลูกค้าเดิม</p>
+                <p className="t-label text-ink-3">ระบบช่วยเพิ่มยอดขายจากลูกค้าเดิม</p>
               </div>
               <div className="hero-in" style={{ animationDelay: "80ms" }}>
-                <h1 className="mt-6 max-w-2xl text-[clamp(2.5rem,4vw,3.6rem)] leading-[1.22] font-normal text-frost">
+                <h1 className="mt-6 max-w-2xl text-[clamp(2.5rem,4vw,3.6rem)] leading-[1.22] font-medium tracking-[-0.02em] text-ink">
                   <span className="block">เปลี่ยนไฟล์ยอดขาย</span>
-                  <span className="block text-cyan">เป็น 3 งานสำคัญ</span>
-                  <span className="block text-cyan">ของวันนี้</span>
+                  <span className="block text-ink-3">เป็น 3 งานสำคัญ</span>
+                  <span className="block text-ink-3">ของวันนี้</span>
                 </h1>
               </div>
               <div className="hero-in" style={{ animationDelay: "150ms" }}>
-                <p className="t-lead pretty mt-7 max-w-xl text-frost/72">
-                  PARALLAX บอกว่าควรดูแลลูกค้ากลุ่มไหน ทำอะไรต่อ
+                <p className="t-lead pretty mt-7 max-w-xl text-ink-2">
+                  Parallax บอกว่าควรดูแลลูกค้ากลุ่มไหน ทำอะไรต่อ
                   และวัดได้ว่ายอดขายเพิ่มขึ้นจากสิ่งที่ทำจริงหรือไม่
                 </p>
               </div>
               <div className="hero-in" style={{ animationDelay: "220ms" }}>
                 <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:items-center">
-                  <Link href="/demo" className="btn btn-frost">
+                  <Link href="/demo" className="btn btn-primary">
                     ดูเดโม ไม่ต้องสมัคร
                   </Link>
-                  <Link href="/contact" className="btn btn-outline-frost">
+                  <Link href="/contact" className="btn btn-ghost bg-paper/70">
                     ทดลองกับข้อมูลจริง
                   </Link>
                 </div>
-                <p className="t-small mt-5 text-frost/52">
+                <p className="t-small mt-5 text-ink-3">
                   เริ่มได้จากไฟล์ยอดขาย 6 เดือน · ไม่ต้องติดตั้งระบบเพิ่ม
                 </p>
               </div>

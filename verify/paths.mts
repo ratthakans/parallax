@@ -96,7 +96,7 @@ let m = await matchCriteria(T, { titleKeywords: ["การตลาด"], warmP
 ok(ids(m).has(chat) && !ids(m).has(kong) && !ids(m).has(jan), "เกณฑ์ \"รู้จักโดยตรง\" ได้เฉพาะคนที่ทีมรู้จักเอง");
 m = await matchCriteria(T, { titleKeywords: ["การตลาด"], warmPath: "any", maxPerOrg: 5 });
 ok(ids(m).has(chat) && ids(m).has(kong) && !ids(m).has(jan), "เกณฑ์ \"ภายในสองทอด\" รวมคนที่เข้าถึงผ่านคนกลาง");
-ok(m.matches.find((x) => x.customerId === kong)?.reasons.some((r) => /^เส้นทางเข้าถึง: /.test(r)) ?? false, "เป้าหมายมีเส้นทางเป็นเหตุผลที่อ่านได้");
+ok(m.matches.find((x) => x.customerId === kong)?.reasons.some((r) => /^ทีมรู้จัก: /.test(r)) ?? false, "เป้าหมายมีเส้นทางเป็นเหตุผลที่อ่านได้");
 const now = new Date().toISOString();
 await run("INSERT INTO interactions (id, tenant_id, kind, occurred_at, org_id, customer_id, summary, owner_id, recorded_at) VALUES (?,?,?,?,?,?,?,?,?)",
   randomUUID(), T, "meeting", now, orgD, chat, "นัดคุย (สมมุติ)", ME.id, now);

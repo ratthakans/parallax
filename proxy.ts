@@ -27,7 +27,7 @@ import { createServerClient } from "@supabase/ssr";
    คอนโซลและหน้าเข้าสู่ระบบ render ตอนขออยู่แล้ว · เว็บการตลาดเป็นหน้าคงที่ ใช้ nonce ไม่ได้ (ได้ CSP พื้นฐานจาก next.config.ts)
    style-src-attr 'unsafe-inline': React ใช้ style={{}} เป็น attribute ซึ่ง nonce คุมไม่ได้ — attribute ไม่รันสคริปต์
    img-src data: — QR ของยืนยันสองชั้นเป็น SVG data URL จาก Supabase */
-function consoleCsp(nonce: string): string {
+function consoleCsp(nonce: string, path: string): string {
   const dev = process.env.NODE_ENV !== "production";
   return [
     "default-src 'self'",
@@ -42,6 +42,11 @@ function consoleCsp(nonce: string): string {
     "base-uri 'self'",
     "form-action 'self'",
     "object-src 'none'",
+    /* อ่านรูปนามบัตรในเครื่อง (docs/brand-plan.md §5.2) — new Worker("/ocr/worker.min.js")
+       ไม่มี worker-src จะตกไปใช้ script-src ซึ่งมี 'strict-dynamic' ที่เมิน 'self' → worker ถูกบล็อก
+       เปิดเฉพาะหน้านี้ · wasm คอมไพล์ใน worker ซึ่งได้ CSP ของไฟล์คงที่ (next.config.ts) ไม่ใช่ของหน้านี้
+       หน้านี้จึงไม่ต้องมี 'wasm-unsafe-eval' */
+    ...(path === "/app/vault/cards" ? ["worker-src 'self'"] : []),
     ...(dev ? [] : ["upgrade-insecure-requests"]),
   ].join("; ");
 }
@@ -51,7 +56,7 @@ export default async function proxy(req: NextRequest) {
   const under = (p: string) => path === p || path.startsWith(`${p}/`);
   /* /signup · /onboarding · /upgrade (S9) เป็นประตูหน้าคอนโซล render ตอนขอ — ได้ CSP เดียวกับคอนโซล */
   const isConsole = under("/app") || under("/login") || under("/signup") || under("/onboarding") || under("/upgrade");
-  const csp = isConsole ? consoleCsp(Buffer.from(crypto.randomUUID()).toString("base64")) : null;
+  const csp = isConsole ? consoleCsp(Buffer.from(crypto.randomUUID()).toString("base64"), path) : null;
   /* header ของคำขอที่ส่งต่อให้ Next — สร้างใหม่ทุกครั้งที่คุกกี้เปลี่ยน (ต่ออายุ session) ไม่ให้ CSP หาย */
   const forward = () => {
     const h = new Headers(req.headers);

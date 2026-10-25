@@ -53,7 +53,7 @@ const esc = (s: string) =>
 export function buildDigest(c: DigestCounts, consoleUrl: string): DigestEmail {
   const base = consoleUrl.replace(/\/$/, "");
   const waiting = QUEUE_SECTIONS.reduce((s, k) => s + c.queue[k], 0);
-  const subject = `PARALLAX · สรุปสัปดาห์ · ${c.tenantName} — ${waiting ? `${waiting} รายการรอคุณ` : "ไม่มีงานค้าง"}`;
+  const subject = `Parallax · สรุปสัปดาห์ · ${c.tenantName} — ${waiting ? `${waiting} รายการรอคุณ` : "ไม่มีงานค้าง"}`;
 
   const groups: { title: string; href: string; rows: [string, number][] }[] = [
     {

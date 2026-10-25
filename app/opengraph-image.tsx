@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "PARALLAX — We measure cost per returning customer";
+export const alt = "Parallax — We measure cost per returning customer";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -32,7 +32,7 @@ export default function OpengraphImage() {
             width: 1200,
             height: 630,
             backgroundImage:
-              "radial-gradient(circle 620px at 88% -6%, #35c8ff 0%, rgba(77,155,255,0.55) 36%, rgba(255,255,255,0) 72%)",
+              "radial-gradient(circle 620px at 88% 110%, #ff3d8b 0%, rgba(106,92,255,0.55) 36%, rgba(255,255,255,0) 72%)",
           }}
         />
         <div
@@ -43,7 +43,7 @@ export default function OpengraphImage() {
             width: 1200,
             height: 630,
             backgroundImage:
-              "radial-gradient(circle 520px at 96% 96%, #0047ff 0%, rgba(0,29,107,0.6) 38%, rgba(255,255,255,0) 74%)",
+              "radial-gradient(circle 520px at 40% 118%, #ff4a1c 0%, rgba(224,53,154,0.55) 38%, rgba(255,255,255,0) 74%)",
           }}
         />
         <div
@@ -59,31 +59,18 @@ export default function OpengraphImage() {
         />
 
         <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
-            <path
-              d="M3 19.5 L12 4.5 L21 19.5"
-              stroke="#0a1633"
-              strokeWidth="1.2"
-              strokeLinecap="round"
-            />
-            <path
-              d="M3 19.5 L21 19.5"
-              stroke="#0a1633"
-              strokeWidth="1.2"
-              strokeLinecap="round"
-              opacity="0.4"
-            />
-            <circle cx="12" cy="4.5" r="2" fill="#0a1633" />
+          <svg width="44" height="44" viewBox="0 0 24 24">
+            <path fill="#0b0b0d" fillRule="evenodd" d="M1.5 20 L8.5 6 L15.5 20 Z M8.5 20 L15.5 6 L22.5 20 Z" />
           </svg>
           <div
             style={{
-              fontSize: 30,
-              letterSpacing: 9,
-              color: "#0a1633",
+              fontSize: 34,
+              letterSpacing: -0.6,
+              color: "#0b0b0d",
               fontWeight: 600,
             }}
           >
-            PARALLAX
+            Parallax
           </div>
         </div>
 
@@ -98,10 +85,10 @@ export default function OpengraphImage() {
               maxWidth: 1000,
             }}
           >
-            <div style={{ color: "#0a1633" }}>
+            <div style={{ color: "#0b0b0d" }}>
               Everyone measures cost per lead.
             </div>
-            <div style={{ color: "#5b6b8c" }}>
+            <div style={{ color: "#56565e" }}>
               We measure cost per repeat customer.
             </div>
           </div>
@@ -110,7 +97,7 @@ export default function OpengraphImage() {
               fontSize: 23,
               letterSpacing: 5,
               textTransform: "uppercase",
-              color: "#0047ff",
+              color: "#2e2e33",
             }}
           >
             We measure cost per returning customer

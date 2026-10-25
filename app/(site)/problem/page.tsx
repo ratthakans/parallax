@@ -211,7 +211,7 @@ export default function ProblemPage() {
                       <td className="text-signal">Nobody</td>
                       <td className="text-right">
                         <span className="t-label rounded-full bg-signal px-3 py-1.5 text-white">
-                          PARALLAX
+                          Parallax
                         </span>
                       </td>
                     </tr>

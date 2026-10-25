@@ -6,7 +6,7 @@ import type { CycleShape, GroupRole } from "@/lib/shared/types";
    เส้นแบ่งเดียวกับคลัง play: โปรไฟล์เป็นข้อมูล ไม่ใช่ตรรกะ
 
    สี่บัญชีนี้ตั้งใจเลือกให้ "รูปทรงวงจรรายได้" ต่างกันทั้งสี่แบบ
-   เพราะข้อความขายของ PARALLAX คือ engine ทำนายจากวงจร ไม่ใช่จาก
+   เพราะข้อความขายของ Parallax คือ engine ทำนายจากวงจร ไม่ใช่จาก
    อุตสาหกรรม ถ้าเดโมมีแต่ร้านค้าปลีก ข้อความนั้นพิสูจน์ไม่ได้
    ───────────────────────────────────────────────────────────── */
 
@@ -150,7 +150,7 @@ const MST_GOLF: TenantProfile = {
   id: "mst-golf",
   name: "MST Golf",
   industry: "Golf equipment retail",
-  source: "Dataset from the PARALLAX playbook",
+  source: "Dataset from the Parallax playbook",
   cycleShape: "considered",
   tier: "growth",
   createdDaysAgo: 400,
@@ -376,7 +376,7 @@ export const TENANT_PROFILES: TenantProfile[] = [
   BRC_GOLF,
 ];
 
-/* บัญชีพรรคการเมืองถูกถอดออก 2026-10-13 (docs/plan.md B0) — PARALLAX เป็น CRM สำหรับ B2B
+/* บัญชีพรรคการเมืองถูกถอดออก 2026-10-13 (docs/plan.md B0) — Parallax เป็น CRM สำหรับ B2B
    และไม่รับงานการเมืองทุกรูปแบบ แถวเก่าในฐานข้อมูลไม่มีผู้ใช้ผูกอยู่ จึงไม่มีใครเปิดได้
    ร้านค้าปลีกสามบัญชีที่เหลือเป็นข้อมูลเดโมชั่วคราว จนตัวสร้างข้อมูล B2B (B1) มาแทน */
 

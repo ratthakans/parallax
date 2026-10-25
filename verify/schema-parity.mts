@@ -28,7 +28,7 @@
 
 import { DatabaseSync } from "node:sqlite";
 import postgres from "postgres";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -95,6 +95,29 @@ const tables = (
 
 const problems: string[] = [];
 
+/* ── ตารางที่ migrations ของเราไม่เคยสร้าง ไม่ใช่ความต่างของสคีมา ──
+
+   ฐาน production ใช้ร่วมกับของอื่นได้ (เคยเจอ content_access · newsletters ·
+   profiles · subscribers · subscriptions โผล่มา) ตารางพวกนั้นไม่มีโค้ดของเรา
+   อ่านหรือเขียน จึงไม่มีทางทำ INSERT ของเราพัง — แต่ทำให้ด่านนี้แดงตลอด
+   และด่านที่แดงตลอดคือด่านที่คนเลิกดู
+
+   พิมพ์รายชื่อทุกครั้งเพื่อให้ยังเห็นว่ามีของแปลกปลอมอยู่ในฐาน
+   ส่วนตารางที่เราสร้างเองแต่ sqlite ไม่มี ยังปรับตกเหมือนเดิม */
+const migDir = "supabase/migrations";
+const owned = new Set(
+  readdirSync(migDir)
+    .filter((f) => f.endsWith(".sql"))
+    .flatMap((f) =>
+      [
+        ...readFileSync(join(migDir, f), "utf8").matchAll(
+          /create\s+table\s+(?:if\s+not\s+exists\s+)?(?:public\.)?"?([a-z_][a-z0-9_]*)/gi,
+        ),
+      ].map((m) => m[1].toLowerCase()),
+    ),
+);
+const foreign: string[] = [];
+
 for (const t of tables) {
   const pgCols = (
     await pg`select column_name, is_nullable, column_default
@@ -108,6 +131,10 @@ for (const t of tables) {
   }));
 
   const lc = liteCols(t);
+  if (!lc.length && !owned.has(t)) {
+    foreign.push(t);
+    continue;
+  }
   if (!lc.length) {
     problems.push(`${t} — ไม่มีในสคีมา sqlite เลย`);
     continue;
@@ -135,6 +162,13 @@ for (const t of tables) {
 await pg.end({ timeout: 2 });
 lite.close();
 
+if (foreign.length) {
+  console.warn(
+    `เตือน — ${foreign.length} ตารางใน Postgres ไม่ได้มาจาก migrations ของเรา: ${foreign.join(" · ")}\n` +
+      "  ไม่นับเป็นความต่าง · ตรวจที่มาและ RLS ใน Supabase",
+  );
+}
+
 if (problems.length) {
   console.error(`สคีมาสองฝั่งไม่ตรงกัน ${problems.length} จุด\n`);
   for (const p of problems) console.error(`  ${p}`);
@@ -144,4 +178,4 @@ if (problems.length) {
   process.exit(1);
 }
 
-console.log(`=== สคีมาตรงกันทั้ง ${tables.length} ตาราง ===`);
+console.log(`=== สคีมาตรงกันทั้ง ${tables.length - foreign.length} ตาราง ===`);

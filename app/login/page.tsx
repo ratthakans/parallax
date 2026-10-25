@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import { LoginForm } from "@/components/console/login-form";
-import { Mark } from "@/components/brand";
+import { Mark, Ridge } from "@/components/brand";
 import Link from "next/link";
 import { signupEnabled } from "@/lib/shared/signup";
 
 export const metadata: Metadata = {
-  title: "เข้าสู่ระบบ · PARALLAX",
+  title: "เข้าสู่ระบบ",
   /* หน้าเข้าสู่ระบบไม่ควรอยู่ในผลค้นหา */
   robots: { index: false, follow: false },
 };
@@ -29,14 +29,16 @@ export default async function LoginPage({
   const signup = signupEnabled();
 
   return (
-    <div className="c-shell flex min-h-dvh items-center justify-center p-6">
-      <div className="w-full max-w-sm">
+    <div className="c-shell relative isolate flex min-h-dvh items-center justify-center overflow-hidden p-6 pb-40">
+      {/* แผน H: ภาพ Ridge ที่ขอบล่าง — ประตูเข้าใช้แบรนด์เดียวกับหน้าเว็บ */}
+      <Ridge className="top-auto h-[11rem] md:h-[14rem]" />
+      <div className="relative z-[1] w-full max-w-sm">
         {/* โลโก้พากลับหน้าเว็บ — คนที่กดปุ่ม "เข้าสู่ระบบ" มาโดยยังไม่มีบัญชี
             เดิมไม่มีทางกลับนอกจากปุ่มย้อนกลับของเบราว์เซอร์ */}
-        <Link href="/" className="flex w-fit items-center gap-2.5 text-[var(--c-text)]" aria-label="กลับหน้าเว็บ PARALLAX">
+        <Link href="/" className="flex w-fit items-center gap-2.5 text-[var(--c-text)]" aria-label="กลับหน้าเว็บ Parallax">
           <Mark className="h-5 w-5" />
-          <span className="text-[0.95rem] font-medium tracking-[0.24em]">
-            PARALLAX
+          <span className="text-[0.95rem] font-semibold tracking-[-0.02em]">
+            Parallax
           </span>
         </Link>
 

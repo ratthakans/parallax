@@ -23,7 +23,7 @@ type Mark =
   | { at: number; type: "event"; label?: string }
   /** ร่องรอยความสนใจ — สัญญาณอ่อน ยังไม่ใช่การซื้อ */
   | { at: number; type: "trace" }
-  /** จุดที่ระบบลงมือ — สิ่งเดียวบนเส้นที่เป็นของ PARALLAX */
+  /** จุดที่ระบบลงมือ — สิ่งเดียวบนเส้นที่เป็นของ Parallax */
   | { at: number; type: "act"; label: string }
   /** เส้นตาย: วันหมดอายุ หรือวันที่มูลค่าหายไปทั้งก้อน */
   | { at: number; type: "deadline"; label: string };

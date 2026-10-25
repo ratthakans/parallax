@@ -175,7 +175,7 @@ export default function ReachPage() {
                   },
                   {
                     t: "The leads belong to the shop",
-                    d: "Not to PARALLAX, and never reused across accounts.",
+                    d: "Not to Parallax, and never reused across accounts.",
                   },
                 ].map((x) => (
                   <div key={x.t} className="bg-abyss p-7">

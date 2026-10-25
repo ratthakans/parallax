@@ -104,13 +104,14 @@ export default async function TodayPage() {
       <PageHead
         label="งานของฉัน"
         title="วันนี้"
-        lead="เรียงตามหมวดที่ตายตัว ไม่ใช่คะแนน: สิ่งที่ต้องหยุดก่อน แล้วงานที่ครบกำหนด เลยกำหนด รอตรวจที่กระทบงาน และบัญชีที่เงียบ — งานติดต่อตรวจนโยบายใหม่ทุกครั้งที่เปิดหน้า"
+        lead="เรียงจากเรื่องที่ด่วนที่สุด"
+        more="เรียงตามหมวดที่ตายตัว ไม่ใช่คะแนน: หยุดติดต่อก่อน แล้วงานที่ครบกำหนด เลยกำหนด รอตรวจที่กระทบงาน และลูกค้าที่ไม่ได้คุยนาน — งานติดต่อตรวจนโยบายใหม่ทุกครั้งที่เปิดหน้า"
       />
 
       {total === 0 && (
         <Panel flat className="mb-6 p-6">
           <p className="c-h2 text-[var(--c-text)]">วันนี้ไม่มีงานค้าง</p>
-          <p className="c-thai mt-2 text-[0.86rem] text-[var(--c-text-3)]">ไม่มีอะไรต้องหยุด ไม่มีงานครบกำหนด และไม่มีรอตรวจที่กระทบงาน</p>
+          <p className="c-thai mt-2 text-[0.86rem] text-[var(--c-text-3)]">ไม่มีใครต้องหยุดติดต่อ ไม่มีงานครบกำหนด และไม่มีรอตรวจที่กระทบงาน</p>
         </Panel>
       )}
 
@@ -164,7 +165,7 @@ export default async function TodayPage() {
       {q.reviewsNotBlocking > 0 && (
         <p className="c-thai mt-6 text-[0.82rem] text-[var(--c-text-3)]">
           รอตรวจอีก {num(q.reviewsNotBlocking)} รายการที่ยังไม่กระทบงาน —{" "}
-          <Link href="/app/vault/review" className="underline">เปิดคิวตรวจตัวตน</Link> เมื่อมีเวลา
+          <Link href="/app/vault/review" className="underline">เปิดรายการรอตรวจ</Link> เมื่อมีเวลา
         </p>
       )}
     </>

@@ -19,7 +19,7 @@ import {
 } from "@/lib/shared/signup";
 import { PURPOSE_TEMPLATES } from "@/lib/shared/purpose-templates";
 
-export const metadata: Metadata = { title: "ตั้งค่าบัญชี · PARALLAX", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: "ตั้งค่าบัญชี", robots: { index: false, follow: false } };
 
 /* ── ขั้นตั้งต้นบังคับของบัญชีสมัครเอง (docs/solo-plan.md S9) ──
    ยังไม่มีบัญชี → ตั้งชื่อบัญชี (สร้างบัญชี) · มีแล้ว → ทำทีละขั้นตามลำดับ จนถึงหน้า "วันนี้"

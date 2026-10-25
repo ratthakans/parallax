@@ -28,7 +28,8 @@ export default async function OrgUpdatePage() {
     <>
       <Link href="/app/data" className="c-thai text-[0.8rem] text-[var(--c-text-3)] hover:text-[var(--c-accent)]">← สุขภาพข้อมูล</Link>
       <PageHead label="ข้อมูล" title="อัปเดตบริษัทจากไฟล์"
-        lead="ไฟล์ Excel/CSV หนึ่งแถวต่อบริษัท — ระบบหาบริษัทจากเลขนิติบุคคล รหัส หรือชื่อ แล้วแสดงทุกช่องที่จะเปลี่ยนก่อนยืนยัน · ช่องว่างไม่ล้างค่าเดิม" />
+        lead="ไฟล์ Excel/CSV หนึ่งแถวต่อบริษัท — ดูทุกช่องที่จะเปลี่ยนก่อนยืนยัน"
+        more="ระบบหาบริษัทจากเลขนิติบุคคล รหัส หรือชื่อ · ช่องว่างไม่ล้างค่าเดิม" />
       <Panel className="mb-5 max-w-4xl p-5">
         {allowed ? <OrgUpdater targets={targets} /> : <p className="c-thai text-[0.88rem] text-[var(--c-text-3)]">อัปเดตจากไฟล์ได้เฉพาะ Data steward หัวหน้าทีม หรือเจ้าของบัญชี</p>}
       </Panel>

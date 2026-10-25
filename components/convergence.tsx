@@ -70,13 +70,13 @@ export function Convergence({ className = "" }: { className?: string }) {
           y2="60"
           gradientUnits="userSpaceOnUse"
         >
-          <stop offset="0%" stopColor="#001d6b" stopOpacity="1" />
-          <stop offset="45%" stopColor="#0047ff" stopOpacity="0.8" />
-          <stop offset="100%" stopColor="#2b6bff" stopOpacity="0.35" />
+          <stop offset="0%" stopColor="#0b0b0d" stopOpacity="1" />
+          <stop offset="45%" stopColor="#6a5cff" stopOpacity="0.8" />
+          <stop offset="100%" stopColor="#ff3d8b" stopOpacity="0.35" />
         </linearGradient>
         <radialGradient id="cv-glow" cx="50%" cy="95%" r="60%">
-          <stop offset="0%" stopColor="#4d9bff" stopOpacity="0.26" />
-          <stop offset="100%" stopColor="#4d9bff" stopOpacity="0" />
+          <stop offset="0%" stopColor="#ff3d8b" stopOpacity="0.18" />
+          <stop offset="100%" stopColor="#ff3d8b" stopOpacity="0" />
         </radialGradient>
       </defs>
 
@@ -89,7 +89,7 @@ export function Convergence({ className = "" }: { className?: string }) {
       </g>
 
       {/* each ray ends on a customer */}
-      <g fill="#0047ff">
+      <g fill="#6a5cff">
         {all.map((r, i) => (
           <circle key={i} cx={r.x2} cy={r.y2} r={r.r} opacity={r.o * 0.95} />
         ))}

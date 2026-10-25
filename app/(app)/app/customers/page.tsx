@@ -131,7 +131,7 @@ export default async function CustomersPage({
       <PageHead
         label={v.th.base}
         title={`${v.th.people}ทั้งหมด`}
-        lead={`ค้นหา เปิดดู แก้ไข หรือเพิ่ม${v.th.person}ทีละคน — ข้อมูลที่นำเข้าจากไฟล์และที่เพิ่มเองอยู่ที่เดียวกัน`}
+        lead={`ค้นหา เปิดดู หรือเพิ่ม${v.th.person} — ทั้งที่นำเข้าจากไฟล์และที่เพิ่มเอง`}
         actions={
           <>
             <Link href="/app/customers/new" className="c-btn c-btn-primary">

@@ -21,7 +21,8 @@ export default async function DataHealthPage() {
   return (
     <>
       <PageHead label="ข้อมูล" title="สุขภาพข้อมูล"
-        lead="สิ่งที่ทำให้ข้อมูลใช้ขายไม่ได้ เรียงจากเสี่ยงที่สุด — กดชื่อเพื่อไปแก้ · นับเฉพาะข้อมูลที่คุณเห็นได้"
+        lead="สิ่งที่ทำให้ข้อมูลใช้ขายไม่ได้ เรียงจากเสี่ยงที่สุด — กดชื่อเพื่อไปแก้"
+        more="นับเฉพาะข้อมูลที่คุณเห็นได้"
         actions={<Link href="/app/data/update" className="c-btn c-btn-ghost">อัปเดตบริษัทจากไฟล์</Link>} />
       <Panel flat className="mb-5 flex flex-wrap gap-x-8 gap-y-3 p-5">
         {checks.map((c) => (

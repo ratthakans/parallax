@@ -14,7 +14,7 @@ export default function NewOrgPage() {
   return (
     <>
       <Link href="/app/accounts" className="c-thai text-[0.8rem] text-[var(--c-text-3)] hover:text-[var(--c-accent)]">← บริษัททั้งหมด</Link>
-      <PageHead label="บริษัท" title="สร้างบริษัท" lead="ชื่ออย่างเดียวก็พอ — ไฟล์ที่นำเข้าทีหลังซึ่งเขียนชื่อบริษัทแบบเดียวกันจะเติมข้อมูลให้แฟ้มนี้" />
+      <PageHead label="บริษัท" title="สร้างบริษัท" lead="ใส่ชื่ออย่างเดียวก็พอ" more="ไฟล์ที่นำเข้าทีหลังซึ่งเขียนชื่อบริษัทแบบเดียวกันจะเติมข้อมูลให้แฟ้มนี้" />
       <Panel className="max-w-2xl p-5 md:p-6">
         <ActionForm action={createOrgAction} label="สร้างบริษัท" pendingLabel="กำลังบันทึก…" variant="primary" className="grid gap-4 sm:grid-cols-2">
           <label className={`${LABEL} sm:col-span-2`}>ชื่อบริษัท *<input name="name" className="c-input" required maxLength={200} placeholder="เช่น บริษัท ตัวอย่าง จำกัด" autoFocus /></label>

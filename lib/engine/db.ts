@@ -1070,7 +1070,7 @@ export async function ensureSchema(): Promise<void> {
   }
 
   /* ข้อมูลกำกับบนระเบียนเดิม (Blueprint บท 3) — ระดับความลับ · เจ้าของ · ที่มา · สถานะตลอดอายุ
-     · ข้อจำกัด · กฎอายุ · เวลาบันทึก/ตรวจล่าสุด และสถานะตรวจของช่องทาง · ธง is_staff ของทีม PARALLAX */
+     · ข้อจำกัด · กฎอายุ · เวลาบันทึก/ตรวจล่าสุด และสถานะตรวจของช่องทาง · ธง is_staff ของทีม Parallax */
   {
     const have = await columnsOf("customers");
     if (!have.has("classification")) await exec("ALTER TABLE customers ADD COLUMN classification TEXT NOT NULL DEFAULT 'confidential'");

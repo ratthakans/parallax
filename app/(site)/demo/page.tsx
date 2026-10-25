@@ -7,7 +7,7 @@ import { Reveal, Stagger } from "@/components/reveal";
 export const metadata: Metadata = {
   title: "ดูตัวอย่างระบบ",
   description:
-    "เปิดดูตัวอย่างบรีฟเช้าของ PARALLAX ได้ทันที ไม่ต้องสมัครหรือเข้าสู่ระบบ",
+    "เปิดดูตัวอย่างบรีฟเช้าของ Parallax ได้ทันที ไม่ต้องสมัครหรือเข้าสู่ระบบ",
 };
 
 const STEPS = [

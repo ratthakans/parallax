@@ -37,7 +37,7 @@ export default function ContactPage() {
     <>
       <PageHero
         label="ติดต่อเรา"
-        title="เล่าวงจรรายได้ของคุณ แล้วเราจะบอกตรงๆ ว่า PARALLAX เหมาะหรือไม่"
+        title="เล่าวงจรรายได้ของคุณ แล้วเราจะบอกตรงๆ ว่า Parallax เหมาะหรือไม่"
         lead="ถ้ายังไม่เหมาะ คุณจะได้รู้ตั้งแต่การคุยครั้งแรก ไม่ใช่หลังตัดสินใจซื้อ"
       />
 
@@ -69,7 +69,7 @@ export default function ContactPage() {
                   </Panel>
                 ))}
                 <Note>
-                  PARALLAX · กรุงเทพฯ ประเทศไทย · ตอบกลับภายใน 2 วันทำการ
+                  Parallax · กรุงเทพฯ ประเทศไทย · ตอบกลับภายใน 2 วันทำการ
                 </Note>
               </div>
             </Reveal>

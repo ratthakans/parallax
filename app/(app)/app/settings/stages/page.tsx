@@ -22,7 +22,8 @@ export default async function StageRulesPage() {
     <>
       <Link href="/app/settings" className="c-thai text-[0.8rem] text-[var(--c-text-3)] hover:text-[var(--c-accent)]">← ตั้งค่า</Link>
       <PageHead label="ตั้งค่า" title="กฎขั้นของดีล"
-        lead="กันข้อมูลขาดตอนดีลเดินหน้า — ย้ายข้ามขั้นต้องผ่านกฎของทุกขั้นที่ข้าม · ถอยหลังและดีลจากแคมเปญไม่ตรวจ" />
+        lead="กันดีลเดินหน้าทั้งที่ข้อมูลยังไม่ครบ"
+        more="ย้ายข้ามขั้นต้องผ่านกฎของทุกขั้นที่ข้าม · ถอยหลังและดีลจากแคมเปญไม่ตรวจ" />
       <Panel className="max-w-4xl p-0">
         <div className="c-scroll px-5 py-3" tabIndex={0} role="region" aria-label="กฎขั้นของดีล">
           <table className="c-table min-w-[40rem]">

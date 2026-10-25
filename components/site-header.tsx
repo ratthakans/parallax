@@ -37,12 +37,6 @@ export function SiteHeader() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const overDark = pathname === "/" && !scrolled && !mobile;
-  const ink = overDark ? "text-frost" : "text-ink";
-  const secondary = overDark
-    ? "text-frost/72 hover:text-frost"
-    : "text-ink-2 hover:text-ink";
-
   return (
     <>
       <header
@@ -53,7 +47,7 @@ export function SiteHeader() {
         }`}
       >
         <div className="shell flex h-16 items-center justify-between gap-8 md:h-[4.5rem]">
-          <Wordmark className={ink} />
+          <Wordmark className="text-ink" />
 
           <nav className="hidden items-center gap-1 lg:flex" aria-label="เมนูหลัก">
             {NAV.map((item) => (
@@ -62,11 +56,7 @@ export function SiteHeader() {
                 href={item.href}
                 aria-current={pathname === item.href ? "page" : undefined}
                 className={`flex min-h-11 items-center rounded-full px-4 text-[0.875rem] transition-colors ${
-                  pathname === item.href
-                    ? overDark
-                      ? "text-cyan"
-                      : "text-signal"
-                    : secondary
+                  pathname === item.href ? "font-medium text-ink" : "text-ink-2 hover:text-ink"
                 }`}
               >
                 {item.title}
@@ -77,13 +67,13 @@ export function SiteHeader() {
           <div className="flex items-center gap-2.5">
             <Link
               href="/app"
-              className={`hidden min-h-11 items-center px-3 text-[0.84rem] font-medium sm:inline-flex ${secondary}`}
+              className={`hidden min-h-11 items-center px-3 text-[0.84rem] font-medium sm:inline-flex text-ink-2 hover:text-ink`}
             >
               เข้าสู่ระบบ
             </Link>
             <Link
               href="/contact"
-              className="hidden min-h-11 items-center rounded-full bg-signal px-5 text-[0.84rem] font-medium text-white transition-colors hover:bg-signal-2 md:inline-flex"
+              className="hidden min-h-11 items-center rounded-lg bg-signal px-5 text-[0.84rem] font-medium text-white transition-colors hover:bg-signal-2 md:inline-flex"
             >
               ทดลองกับข้อมูลจริง
             </Link>
@@ -92,7 +82,7 @@ export function SiteHeader() {
               onClick={() => setMobile((value) => !value)}
               aria-label={mobile ? "ปิดเมนู" : "เปิดเมนู"}
               aria-expanded={mobile}
-              className={`-mr-2 flex h-11 w-11 items-center justify-center lg:hidden ${ink}`}
+              className={`-mr-2 flex h-11 w-11 items-center justify-center lg:hidden text-ink`}
             >
               <span className="relative block h-3 w-5" aria-hidden>
                 <span
