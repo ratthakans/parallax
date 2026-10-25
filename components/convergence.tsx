@@ -101,12 +101,12 @@ export function Convergence({ className = "" }: { className?: string }) {
         y1={BASE_Y}
         x2={RIGHT_X}
         y2={BASE_Y}
-        stroke="#0a1633"
+        stroke="#0b0b0d"
         strokeWidth="1"
         opacity="0.3"
       />
-      <circle cx={LEFT_X} cy={BASE_Y} r="3.5" fill="#0a1633" />
-      <circle cx={RIGHT_X} cy={BASE_Y} r="3.5" fill="#0a1633" />
+      <circle cx={LEFT_X} cy={BASE_Y} r="3.5" fill="#0b0b0d" />
+      <circle cx={RIGHT_X} cy={BASE_Y} r="3.5" fill="#0b0b0d" />
     </svg>
   );
 }
