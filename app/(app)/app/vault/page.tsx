@@ -25,9 +25,10 @@ export default async function VaultPage() {
       <PageHead
         label="ข้อมูล"
         title="นำเข้าข้อมูล"
-        lead="ทุกไฟล์ต้องมาจากแหล่งที่ลงทะเบียนไว้ — บอกวัตถุประสงค์ ที่มาของข้อมูล และเลือกเฉพาะฟิลด์ที่จำเป็น คอลัมน์นอกนั้นไม่ถูกเก็บ"
+        lead="นำเข้าไฟล์รายชื่อ — ระบบตรวจคนซ้ำให้ก่อนรวม"
+        more="ทุกไฟล์ต้องมาจากแหล่งที่ลงทะเบียนไว้ — บอกวัตถุประสงค์ ที่มาของข้อมูล และเลือกเฉพาะฟิลด์ที่จำเป็น คอลัมน์นอกนั้นไม่ถูกเก็บ"
         actions={<>
-          <Link href="/app/vault/cards" className="c-btn c-btn-ghost">กรอกนามบัตร</Link>
+          <Link href="/app/vault/cards" className="c-btn c-btn-ghost">เพิ่มนามบัตร</Link>
           <Link href="/app/vault/sources/new" className="c-btn c-btn-primary">ลงทะเบียนแหล่งข้อมูล</Link>
         </>}
       />

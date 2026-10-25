@@ -154,7 +154,7 @@ export async function generateBriefAction(_p: ActionState, fd: FormData): Promis
   return {
     ok: res.generatedBy === "ai"
       ? `สร้างสรุปแล้ว ${res.sentences.length} ประโยค${res.dropped ? ` · ทิ้ง ${res.dropped} ประโยคที่ไม่มีหลักฐาน` : ""}`
-      : `AI ไม่ได้ใช้ — ${res.note ?? "แสดงสรุปจากสูตร"}`,
+      : `AI ไม่ได้ใช้ — ${res.note ?? "แสดงสรุปอัตโนมัติ"}`,
   };
 }
 
@@ -169,7 +169,7 @@ export async function addMemberLinkAction(_p: ActionState, fd: FormData): Promis
   const res = await addMemberLink(v.tenantId, { personId: str(fd, "personId"), type: str(fd, "type"), context: str(fd, "context"), validFrom: str(fd, "validFrom") }, who(v));
   if (!res.ok) return { error: res.error };
   revalidatePath(`/app/accounts/${orgId}`);
-  return { ok: res.existed ? "บันทึกไว้แล้วก่อนหน้านี้" : "บันทึกแล้ว — คุณเป็นเส้นทางเข้าถึงคนนี้ของทีม" };
+  return { ok: res.existed ? "บันทึกไว้แล้วก่อนหน้านี้" : "บันทึกแล้ว — ทีมจะเห็นว่าคุณรู้จักคนนี้" };
 }
 
 /* ── สังกัดเก่าจากหน้าสุขภาพข้อมูล (docs/crm-plan.md D1) ── ยังอยู่ / ออกแล้ว · ตรวจสิทธิ์บริษัทของสังกัดก่อน */

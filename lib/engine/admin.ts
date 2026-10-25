@@ -4,7 +4,7 @@ import { getTenant } from "@/lib/engine/match";
 import { planById } from "@/lib/shared/plans";
 import { TENANT_PROFILES } from "@/lib/shared/tenants";
 
-/* ── ผู้ดูแลระบบ (ทีม PARALLAX) ──────────────────────────────────
+/* ── ผู้ดูแลระบบ (ทีม Parallax) ──────────────────────────────────
 
    คนละบทบาทกับเจ้าของร้าน: เห็นทุกร้าน ทุกผู้ใช้ และคำขอทดลองใช้ที่เข้ามาจากเว็บ
    ใครเป็นผู้ดูแลกำหนดด้วย ADMIN_EMAILS (คั่นด้วยจุลภาค) บน Postgres

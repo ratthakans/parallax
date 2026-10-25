@@ -15,7 +15,7 @@ const field = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
 
 async function guard(): Promise<ActionState | null> {
   const user = await currentUser();
-  return isAdmin(user?.email) ? null : { error: "เฉพาะทีมผู้ดูแลระบบ PARALLAX" };
+  return isAdmin(user?.email) ? null : { error: "เฉพาะทีมผู้ดูแลระบบ Parallax" };
 }
 
 export async function mockCreateShopAction(_prev: ActionState, fd: FormData): Promise<ActionState> {

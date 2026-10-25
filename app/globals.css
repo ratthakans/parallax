@@ -1,51 +1,52 @@
 @import "tailwindcss";
 
 /* ═══════════════════════════════════════════════════════════
-   PARALLAX — design tokens
-   light-first · เย็นล้วน · ฟ้าเรืองแสงบนพื้นขาว
-   navy เข้มเป็น accent ไม่ใช่พื้นหลัก
+   PARALLAX — design tokens (แผน H · docs/brand-plan.md §3)
+   ขาว-ดำสงบ · สีของแบรนด์อยู่ในภาพศิลป์ Ridge และ field ที่ไล่สีอุ่น
+   ชื่อ token เดิมคงไว้ (signal · abyss · frost …) เพื่อไม่ต้องไล่แก้ทุกหน้า
+   ค่าเปลี่ยน: signal = ดำ (ปุ่มหลัก) · abyss = เทาเข้มกลาง · cyan = ม่วงอ่อนบนพื้นเข้ม
    ═══════════════════════════════════════════════════════════ */
 
 @theme {
-  /* ink & paper — คูลทั้งหมด ไม่มีโทนอุ่น */
-  --color-ink: #0a1633;
-  --color-ink-2: #2c3a5c;
-  --color-ink-3: #5b6b8c;
+  /* ink & paper — เทากลาง ไม่อมฟ้า */
+  --color-ink: #0b0b0d;
+  --color-ink-2: #2e2e33;
+  --color-ink-3: #56565e;
   /* ── ink-4 เข้มขึ้นเพราะของเดิมอ่านไม่ได้ ──
 
      #93a1bd บนกระดาษขาววัดได้ 2.6:1 ต่ำกว่าเกณฑ์ AA ทุกระดับ (ต้อง 4.5:1
      หรือ 3:1 สำหรับตัวใหญ่) และมันคือสีของ t-label ทุกตัวในเว็บ · caption
      ใต้ specimen · หัวตาราง — ข้อความที่มีความหมายทั้งนั้น ไม่ใช่ของตกแต่ง
 
-     #637393 ได้ 4.77:1 บนกระดาษขาว และ 4.51:1 บนพื้น mist (#f5f9ff)
-     ซึ่งเข้มกว่าขาวเล็กน้อย — ต้องผ่านทั้งสองพื้น ไม่ใช่แค่พื้นที่ง่ายกว่า
+     แผน H: #67676f ได้ 5.6:1 บนกระดาษขาว และ 5.2:1 บนพื้น mist (#f6f6f7)
+     — ต้องผ่านทั้งสองพื้น ไม่ใช่แค่พื้นที่ง่ายกว่า
      ค่านี้ใกล้ ink-3 (5.35:1) จนแทบแยกด้วยโทนไม่ออก
      ยอมได้ เพราะลำดับชั้นตรงนี้ไม่ได้พึ่งโทนอยู่แล้ว — ที่ใช้ ink-4 เป็น
      t-label 26 จุด (11px ตัวใหญ่ mono ระยะห่างมาก) กับ t-small 12 จุด
      ขนาดกับสไตล์แยกมันออกจาก ink-3 อยู่ก่อนแล้ว
 
      ขั้นสีที่อ่านไม่ออกไม่ใช่ขั้นสี */
-  --color-ink-4: #637393;
+  --color-ink-4: #67676f;
   --color-paper: #ffffff;
-  --color-paper-2: #f5f9ff;
-  --color-line: #e0e8f6;
-  --color-line-2: #eef3fc;
+  --color-paper-2: #f6f6f7;
+  --color-line: #e4e4e7;
+  --color-line-2: #d4d4d8;
 
-  /* blue axis — อิ่มสี ไม่ใช่ navy หม่น */
-  --color-abyss: #00113d;
-  --color-navy: #001d6b;
-  --color-signal: #0047ff;
-  --color-signal-2: #2b6bff;
-  --color-azure: #4d9bff;
-  --color-sky: #35c8ff;
-  --color-cyan: #9ee6ff;
-  --color-ice: #e2f1ff;
+  /* แกนสี — ชื่อเดิมจากยุคน้ำเงิน ค่าใหม่ตามแผน H */
+  --color-abyss: #0e0e10;
+  --color-navy: #17171a;
+  --color-signal: #0b0b0d;
+  --color-signal-2: #2e2e33;
+  --color-azure: #6a5cff;
+  --color-sky: #ff3d8b;
+  --color-cyan: #c4b9ff;
+  --color-ice: #f1eefe;
 
-  /* คู่ตรงข้ามฝั่งสว่าง — แทน cream เดิมที่อุ่นเกินไป */
-  --color-frost: #eaf3ff;
+  /* ตัวหนังสือบนพื้นเข้ม */
+  --color-frost: #f4f4f5;
 
-  --font-sans: var(--font-plex-thai), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-plex-mono), var(--font-plex-thai), ui-monospace, monospace;
+  --font-sans: var(--font-inter), var(--font-anuphan), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), var(--font-anuphan), ui-monospace, monospace;
 
   --breakpoint-3xl: 100rem;
 }
@@ -247,7 +248,7 @@
 
 /* ── surfaces ────────────────────────────────────────────── */
 
-/* พื้นเข้ม — ใช้เป็น accent เท่านั้น และเป็นน้ำเงินอิ่ม ไม่ใช่ดำ */
+/* พื้นเข้ม — ใช้เป็น accent เท่านั้น · เทาเข้มกลาง (แผน H) */
 @utility surface-dark {
   background: var(--color-abyss);
   color: var(--color-frost);
@@ -294,8 +295,8 @@
     inset: 0;
     pointer-events: none;
     background-image:
-      linear-gradient(rgba(98, 231, 255, 0.06) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(98, 231, 255, 0.045) 1px, transparent 1px);
+      linear-gradient(rgba(244, 244, 245, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(244, 244, 245, 0.035) 1px, transparent 1px);
     background-size: 100% 52px, 52px 100%;
     mask-image: radial-gradient(ellipse at 50% 40%, #000 8%, transparent 72%);
   }
@@ -314,7 +315,7 @@
     border: 1px solid rgba(158, 230, 255, 0.55);
     box-shadow:
       0 0 0 1px rgba(3, 7, 17, 0.28),
-      0 0 60px -12px rgba(98, 231, 255, 0.45);
+      0 0 60px -12px rgba(196, 185, 255, 0.4);
   }
 
   /* ── system atoms (deck language) ────────────────────────── */
@@ -658,11 +659,11 @@
 }
 
 /* ── aurora — พื้นสว่าง สำหรับ hero
-   ขาวฝั่งซ้ายที่วางตัวหนังสือ → ฟ้าอ่อน → ฟ้าอิ่ม → navy ที่มุมขวาล่าง ── */
+   ขาวฝั่งซ้ายที่วางตัวหนังสือ → พีช → ชมพูบานเย็น/ม่วง → ส้มแดงที่มุมขวาล่าง (สีชุด Ridge) ── */
 
 @layer components {
   .field--aurora {
-    background: linear-gradient(160deg, #ffffff 0%, #f4faff 42%, #e6f4ff 100%);
+    background: linear-gradient(160deg, #ffffff 0%, #fbf7f6 42%, #fbe9e4 100%);
   }
 
   .field--aurora .field__blob:nth-child(1) {
@@ -674,9 +675,9 @@
     top: -22%;
     --g: radial-gradient(
       circle at 50% 50%,
-      rgba(53, 200, 255, 0.92) 0%,
-      rgba(77, 155, 255, 0.62) 34%,
-      rgba(226, 241, 255, 0) 70%
+      rgba(255, 61, 139, 0.78) 0%,
+      rgba(106, 92, 255, 0.55) 34%,
+      rgba(251, 233, 228, 0) 70%
     );
     animation: drift-a 28s ease-in-out infinite;
   }
@@ -690,9 +691,9 @@
     bottom: -38%;
     --g: radial-gradient(
       circle at 50% 50%,
-      rgba(0, 71, 255, 0.9) 0%,
-      rgba(0, 29, 107, 0.72) 36%,
-      rgba(0, 17, 61, 0) 72%
+      rgba(255, 74, 28, 0.78) 0%,
+      rgba(224, 53, 154, 0.6) 36%,
+      rgba(14, 14, 16, 0) 72%
     );
     animation: drift-c 34s ease-in-out infinite;
   }
@@ -707,8 +708,8 @@
     --g: radial-gradient(
       circle at 50% 50%,
       rgba(255, 255, 255, 0.96) 0%,
-      rgba(226, 241, 255, 0.5) 42%,
-      rgba(226, 241, 255, 0) 72%
+      rgba(251, 233, 228, 0.5) 42%,
+      rgba(251, 233, 228, 0) 72%
     );
     animation: drift-b 24s ease-in-out infinite;
   }
@@ -738,8 +739,8 @@
     top: -34%;
     --g: radial-gradient(
       circle at 50% 50%,
-      rgba(53, 200, 255, 0.42) 0%,
-      rgba(77, 155, 255, 0.2) 44%,
+      rgba(255, 61, 139, 0.26) 0%,
+      rgba(106, 92, 255, 0.16) 44%,
       rgba(255, 255, 255, 0) 72%
     );
     animation: drift-a 30s ease-in-out infinite;
@@ -754,14 +755,14 @@
     bottom: -32%;
     --g: radial-gradient(
       circle at 50% 50%,
-      rgba(0, 71, 255, 0.22) 0%,
-      rgba(158, 230, 255, 0.24) 46%,
+      rgba(255, 74, 28, 0.18) 0%,
+      rgba(249, 211, 220, 0.3) 46%,
       rgba(255, 255, 255, 0) 74%
     );
     animation: drift-c 36s ease-in-out infinite;
   }
 
-  /* ── deep — accent เข้ม น้ำเงินอิ่ม ไม่ใช่ดำ ── */
+  /* ── deep — พื้นเทาเข้ม มีแสงชมพู-ม่วง-ส้มลอดมุม ── */
 
   .field--deep .field__blob:nth-child(1) {
     width: 76vmax;
@@ -772,9 +773,9 @@
     top: -26%;
     --g: radial-gradient(
       circle at 50% 50%,
-      rgba(53, 200, 255, 0.72) 0%,
-      rgba(0, 71, 255, 0.62) 36%,
-      rgba(0, 17, 61, 0) 72%
+      rgba(255, 61, 139, 0.6) 0%,
+      rgba(106, 92, 255, 0.58) 36%,
+      rgba(14, 14, 16, 0) 72%
     );
     animation: drift-b 30s ease-in-out infinite;
   }
@@ -788,8 +789,8 @@
     bottom: -28%;
     --g: radial-gradient(
       circle at 50% 50%,
-      rgba(0, 71, 255, 0.5) 0%,
-      rgba(0, 29, 107, 0) 68%
+      rgba(255, 74, 28, 0.42) 0%,
+      rgba(14, 14, 16, 0) 68%
     );
     animation: drift-a 38s ease-in-out infinite reverse;
   }
@@ -801,10 +802,10 @@
     inset: 0;
     background: linear-gradient(
       100deg,
-      rgba(0, 17, 61, 0.92) 0%,
-      rgba(0, 17, 61, 0.72) 32%,
-      rgba(0, 17, 61, 0.16) 62%,
-      rgba(0, 17, 61, 0) 82%
+      rgba(14, 14, 16, 0.92) 0%,
+      rgba(14, 14, 16, 0.72) 32%,
+      rgba(14, 14, 16, 0.16) 62%,
+      rgba(14, 14, 16, 0) 82%
     );
   }
 }
@@ -867,6 +868,25 @@
     opacity: 0.34;
     mix-blend-mode: overlay;
   }
+
+  /* ── Ridge (components/brand.tsx) — วางใต้เนื้อหาของพ่อที่ relative + isolate ── */
+  .ridge {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+    /* แถบเตี้ยแต่กว้าง (หน้าเข้าสู่ระบบ) ตัดยอดภูเขาเป็นขอบแข็ง — จางขอบบนให้กลืนกับท้องฟ้าเสมอ */
+    mask-image: linear-gradient(to bottom, transparent 0%, #000 28%);
+  }
+
+  /* เกรนหยาบแบบภาพอ้างอิง — ทับภูเขา ไม่ทำให้ท้องฟ้าหม่น (soft-light ปล่อยสีขาวไว้) */
+  .ridge .grain--ridge {
+    z-index: 1;
+    opacity: 0.7;
+    mix-blend-mode: soft-light;
+    background-size: 160px 160px;
+  }
 }
 
 /* ── components ──────────────────────────────────────────── */
@@ -888,8 +908,8 @@
 
 @utility panel-dark {
   position: relative;
-  border: 1px solid rgba(158, 230, 255, 0.2);
-  background: rgba(226, 241, 255, 0.06);
+  border: 1px solid rgba(244, 244, 245, 0.16);
+  background: rgba(244, 244, 245, 0.05);
   border-radius: 0;
   backdrop-filter: blur(10px);
   transition:
@@ -900,14 +920,14 @@
 
 @layer components {
   .panel:hover {
-    border-color: color-mix(in oklab, var(--color-signal) 38%, transparent);
-    box-shadow: 0 26px 56px -30px rgba(0, 71, 255, 0.46);
+    border-color: var(--color-ink-4);
+    box-shadow: 0 26px 56px -32px rgba(11, 11, 13, 0.28);
     transform: translateY(-3px);
   }
 
   .panel-dark:hover {
-    border-color: rgba(158, 230, 255, 0.38);
-    background: rgba(226, 241, 255, 0.1);
+    border-color: rgba(244, 244, 245, 0.32);
+    background: rgba(244, 244, 245, 0.08);
     transform: translateY(-3px);
   }
 }
@@ -1049,12 +1069,12 @@
 @utility btn-outline-frost {
   background: transparent;
   color: var(--color-frost);
-  border: 1px solid rgba(234, 243, 255, 0.34);
+  border: 1px solid rgba(244, 244, 245, 0.34);
 }
 
 @layer components {
   .btn-outline-frost:hover {
-    border-color: rgba(234, 243, 255, 0.85);
+    border-color: rgba(244, 244, 245, 0.85);
   }
 
   /* ── reveal on scroll ────────────────────────────────────── */

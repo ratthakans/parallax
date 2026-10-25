@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 /* ── ผู้ดูแลระบบ ──────────────────────────────────────────────────
 
-   หน้าของทีม PARALLAX ไม่ใช่ของร้าน: ทุกร้าน ทุกผู้ใช้ และคำขอทดลองใช้จากเว็บ
+   หน้าของทีม Parallax ไม่ใช่ของร้าน: ทุกร้าน ทุกผู้ใช้ และคำขอทดลองใช้จากเว็บ
    (contact_leads) ที่ก่อนหน้านี้อ่านได้จาก Supabase Table Editor เท่านั้น
    สิทธิ์ตรวจใน adminData() — คนที่ไม่ใช่ผู้ดูแลไม่ได้ข้อมูลแม้แต่แถวเดียว */
 
@@ -26,7 +26,7 @@ export default async function AdminPage() {
     return (
       <div className="mx-auto max-w-xl py-16">
         <p className="c-label-th text-[var(--c-warn)]">ไม่มีสิทธิ์</p>
-        <h1 className="c-h1 mt-4 text-[var(--c-text)]">หน้านี้สำหรับทีมผู้ดูแลระบบ PARALLAX</h1>
+        <h1 className="c-h1 mt-4 text-[var(--c-text)]">หน้านี้สำหรับทีมผู้ดูแลระบบ Parallax</h1>
         <p className="c-thai mt-4 text-[0.9rem] leading-relaxed text-[var(--c-text-2)]">
           บัญชี {user?.email ?? "นี้"} ไม่อยู่ในรายชื่อผู้ดูแล — ผู้ดูแลกำหนดด้วยตัวแปร ADMIN_EMAILS บนเซิร์ฟเวอร์
         </p>

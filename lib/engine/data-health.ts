@@ -99,7 +99,7 @@ export async function dataHealth(tenantId: string, viewer: Viewer, now = new Dat
     check("renewal_missing", "ลูกค้าที่ปิดได้ราวหนึ่งปีก่อน แต่ยังไม่มีดีลต่อสัญญา", "รอบถัดไปของลูกค้าเดิมคือดีลที่ปิดง่ายที่สุด — สร้างดีลต่อสัญญาจากหน้าดีลเดิม", "risk",
       unrenewed.filter(seeOrg).map((d) => ({ id: d.id, name: d.name, href: `/app/deals/${d.id}`, detail: `${d.org} · ปิดได้ ${d.updated_at.slice(0, 10)} · ${d.owner_id ?? "ไม่มีเจ้าของ"}` }))),
     check("tax_duplicate", "บริษัทที่เลขนิติบุคคลซ้ำกัน", "เลขเดียวกัน = นิติบุคคลเดียวกัน — ควรรวมเป็นแฟ้มเดียว ไม่งั้นประวัติและดีลกระจายสองที่", "risk", taxDup,
-      { label: "หรือดูคิวตรวจข้อมูลซ้ำ", href: "/app/vault/review" }),
+      { label: "หรือดูรายการตรวจข้อมูลซ้ำ", href: "/app/vault/review" }),
     check("deal_no_value", "ดีลเปิดที่ยังไม่มีมูลค่า", "ไม่ถูกนับในไปป์ไลน์และพยากรณ์", "gap",
       visDeals.filter((d) => d.value == null).map((d) => dealItem(d, d.owner_id ?? "ไม่มีเจ้าของ"))),
     check("deal_no_close", "ดีลเปิดที่ยังไม่มีวันปิดคาด", "ไม่ถูกนับในพยากรณ์รายไตรมาส", "gap",
@@ -117,6 +117,6 @@ export async function dataHealth(tenantId: string, viewer: Viewer, now = new Dat
   ];
   const pending = Number(review[0]?.n ?? 0);
   if (pending) checks.push({ key: "review_queue", title: "รายการรอตรวจข้อมูลซ้ำ", why: "คนหรือบริษัทที่อาจเป็นรายเดียวกัน — ยังไม่รวมจนกว่าจะมีคนตัดสิน", severity: "gap",
-    count: pending, items: [], action: { label: "เปิดคิวตรวจ", href: "/app/vault/review" } });
+    count: pending, items: [], action: { label: "เปิดรายการรอตรวจ", href: "/app/vault/review" } });
   return checks.sort((a, b) => (a.severity === b.severity ? 0 : a.severity === "risk" ? -1 : 1));
 }

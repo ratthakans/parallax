@@ -9,7 +9,7 @@ import { activeTenantId } from "@/app/(app)/tenant";
 import { signOutAction } from "@/app/login/actions";
 import { thaiDate } from "@/lib/shared/format";
 
-export const metadata: Metadata = { title: "อัปเกรด · PARALLAX", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: "อัปเกรด", robots: { index: false, follow: false } };
 
 /* ── อัปเกรดจากช่วงทดลอง (docs/solo-plan.md S9 ข้อ 4–5) ──
    ยังไม่มีระบบรับชำระเงิน (ยังไม่เลือกผู้ให้บริการ) — การชำระนัดกับทีมโดยตรง แล้วทีมเปลี่ยน

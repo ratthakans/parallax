@@ -21,7 +21,7 @@ export async function startMfaEnrollAction(_p: EnrollState): Promise<EnrollState
   /* แอปที่เริ่มเพิ่มแล้วไม่ได้ยืนยัน ค้างอยู่จะทำให้เพิ่มใหม่ไม่ได้ — ลบทิ้งก่อน */
   const { data: list } = await sb.auth.mfa.listFactors();
   for (const f of list?.all ?? []) if (f.status === "unverified") await sb.auth.mfa.unenroll({ factorId: f.id });
-  const { data, error } = await sb.auth.mfa.enroll({ factorType: "totp", friendlyName: `PARALLAX ${new Date().toISOString().slice(0, 10)}` });
+  const { data, error } = await sb.auth.mfa.enroll({ factorType: "totp", friendlyName: `Parallax ${new Date().toISOString().slice(0, 10)}` });
   if (error || !data) return { error: "เริ่มเปิดใช้ไม่สำเร็จ — ลองอีกครั้ง" };
   return { factorId: data.id, qr: data.totp.qr_code, secret: data.totp.secret };
 }

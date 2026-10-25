@@ -31,15 +31,20 @@ export function Panel({
 const HAS_THAI = /[฀-๿]/;
 export const labelClass = (s: string) => (HAS_THAI.test(s) ? "c-label-th" : "c-label");
 
+/* ── หัวหน้า: คำอธิบายบรรทัดเดียว รายละเอียดพับไว้ (แผน H S2) ──
+   lead ≤ 80 ตัวอักษร — บอกว่าหน้านี้ทำอะไร · more = กติกา/เหตุผลยาว ๆ
+   ที่ต้องมีให้อ่านได้ แต่ไม่ควรเป็นสิ่งแรกที่เห็นทุกครั้งที่เปิดหน้า */
 export function PageHead({
   label,
   title,
   lead,
+  more,
   actions,
 }: {
   label: string;
   title: string;
   lead?: ReactNode;
+  more?: ReactNode;
   actions?: ReactNode;
 }) {
   return (
@@ -48,9 +53,15 @@ export function PageHead({
         <p className={labelClass(label)}>{label}</p>
         <h1 className="c-h1 mt-3 text-[var(--c-text)]">{title}</h1>
         {lead && (
-          <p className="c-thai mt-3 max-w-2xl text-[0.9rem] text-[var(--c-text-3)]">
+          <p className="c-thai mt-2 max-w-2xl text-[0.92rem] text-[var(--c-text-3)]">
             {lead}
           </p>
+        )}
+        {more && (
+          <details className="c-more mt-1 max-w-2xl">
+            <summary>ⓘ <span>อ่านเพิ่ม</span></summary>
+            <p className="c-thai mt-1.5 text-[0.85rem] text-[var(--c-text-3)]">{more}</p>
+          </details>
         )}
       </div>
       {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
@@ -170,6 +181,18 @@ export function AiBadge({
       {note && (
         <span className="c-thai text-[0.75rem] text-[var(--c-text-4)]">{note}</span>
       )}
+    </span>
+  );
+}
+
+/* ── ค่าว่างเป็นขีดจาง ไม่ใช่คำ (แผน H S4) ──
+   ตารางที่เต็มไปด้วย "ไม่ทราบ" "ยังไม่เคย" "ยังไม่มี" ทำให้ค่าจริงจมหาย
+   ขีดเดียวพอให้ตาข้ามไป · label อ่านออกเสียงให้ screen reader */
+export function Blank({ label }: { label: string }) {
+  return (
+    <span className="text-[var(--c-text-4)]">
+      <span aria-hidden>—</span>
+      <span className="sr-only">{label}</span>
     </span>
   );
 }

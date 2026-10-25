@@ -17,7 +17,7 @@ import { CLASSIFICATIONS, CLASSIFICATION_TH, LIFECYCLE_TH, type LifecycleState }
 import { thaiDate, thaiDateTime } from "@/lib/shared/format";
 import { ActionForm } from "@/components/console/action-form";
 import { NoteCapture } from "@/components/console/note-capture";
-import { Panel, num } from "@/components/console/ui";
+import { Blank, Panel, num } from "@/components/console/ui";
 import { RecordHeader, RecordTabs, pickTab } from "@/components/console/record";
 import { stageTh } from "@/lib/shared/deals";
 import { orgGroup } from "@/lib/engine/accounts/group";
@@ -47,7 +47,7 @@ export const dynamic = "force-dynamic";
    รายการที่ระดับเกินสิทธิ์ถูกปิดบัง — เห็นว่ามี แต่ไม่เห็นเนื้อหา */
 
 const LABEL = "c-thai flex min-w-0 flex-col gap-1 text-[0.8rem] text-[var(--c-text-3)]";
-const UNKNOWN = <span className="text-[var(--c-text-4)]">ไม่ทราบ</span>;
+const UNKNOWN = <Blank label="ไม่ทราบ" />;
 const today = () => new Date().toISOString().slice(0, 10);
 
 function Evidence({ rows, versions, recorded, verified, label = "ที่มา", children }: {
@@ -205,13 +205,13 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
         badges={<>
           <span className="c-pill">{LIFECYCLE_TH[o.lifecycle as LifecycleState] ?? o.lifecycle}</span>
           <span className="c-pill">{CLASSIFICATION_TH[o.classification]}</span>
-          {o.lastVerifiedAt ? <span className="c-pill c-pill-good">ตรวจแล้ว {thaiDate(o.lastVerifiedAt)}</span> : <span className="c-pill">ยังไม่เคยตรวจ</span>}
+          {o.lastVerifiedAt ? <span className="c-pill c-pill-good">ตรวจแล้ว {thaiDate(o.lastVerifiedAt)}</span> : <span className="c-pill">ยังไม่ได้ตรวจ</span>}
         </>}
         highlights={[
           { label: "อุตสาหกรรม", value: o.industry ?? UNKNOWN },
-          { label: "เจ้าของบัญชี", value: o.accountOwner ?? "ยังไม่มี" },
+          { label: "เจ้าของบัญชี", value: o.accountOwner ?? <Blank label="ยังไม่มีเจ้าของบัญชี" /> },
           { label: "คนปัจจุบัน", value: num(current.length) },
-          { label: "ติดต่อล่าสุด", value: lastTouch ? thaiDate(lastTouch) : "ยังไม่เคย" },
+          { label: "ติดต่อล่าสุด", value: lastTouch ? thaiDate(lastTouch) : <Blank label="ยังไม่เคยติดต่อ" /> },
           { label: "ดีลที่เปิด", value: num(d.opportunities.filter((x) => !["won", "lost"].includes(x.stage)).length) },
           { label: "โดเมน", value: o.primaryDomain ?? UNKNOWN },
         ]}
@@ -273,7 +273,7 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
             )}
             <ActionForm action={generateBriefAction} fields={{ orgId: o.id }} className="mt-4"
               label={brief?.generatedBy === "ai" ? "สร้างสรุปใหม่ด้วย AI" : "สร้างสรุปด้วย AI"} pendingLabel="AI กำลังอ่านหลักฐาน…"
-              note={<p className="c-thai text-[0.76rem] text-[var(--c-text-4)]">ส่งเฉพาะหลักฐานในแฟ้มนี้ ไม่ส่งอีเมล/เบอร์ และไม่ส่งรายการระดับจำกัดสูง · บัญชีที่ยังไม่ชำระได้สรุปจากสูตร</p>} />
+              note={<p className="c-thai text-[0.76rem] text-[var(--c-text-4)]">ส่งเฉพาะหลักฐานในแฟ้มนี้ ไม่ส่งอีเมล/เบอร์ และไม่ส่งรายการระดับจำกัดสูง · บัญชีที่ยังไม่ชำระได้สรุปอัตโนมัติ (ไม่ใช้ AI)</p>} />
           </Panel>
 
           <Panel className="p-5 md:p-6">
@@ -296,7 +296,7 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
           </Panel>
           {/* ── เส้นทางเข้าถึง (docs/solo-plan.md S2) ── */}
           <Panel className="p-5 md:p-6">
-            <h2 className="c-h2 text-[var(--c-text)]">เส้นทางเข้าถึง</h2>
+            <h2 className="c-h2 text-[var(--c-text)]">ใครในทีมรู้จัก</h2>
             <p className="c-thai mt-1 text-[0.82rem] text-[var(--c-text-3)]">ใครในทีมรู้จักคนที่อยู่บริษัทนี้ตอนนี้ — ไม่เกินสองทอด ทุกทอดยืนยันแล้ว ไม่มีคะแนน · ไม่ผ่านคนที่คัดค้านหรือเกินสิทธิ์ของคุณ</p>
             {paths.length ? (
               <ul className="c-thai mt-4 grid gap-2 text-[0.88rem] text-[var(--c-text-2)]">
@@ -582,7 +582,7 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
                 <div><p className="c-thai text-[0.75rem] text-[var(--c-text-4)]">บริษัทในกลุ่ม</p><p className="c-mono text-[1.2rem]">{num(group.totals.orgs)}{group.hidden ? <span className="c-thai text-[0.75rem] text-[var(--c-text-4)]"> +{group.hidden} จำกัดสิทธิ์</span> : null}</p></div>
                 <div><p className="c-thai text-[0.75rem] text-[var(--c-text-4)]">คนปัจจุบันทั้งกลุ่ม</p><p className="c-mono text-[1.2rem]">{num(group.totals.current)}</p></div>
                 <div><p className="c-thai text-[0.75rem] text-[var(--c-text-4)]">ดีลเปิดทั้งกลุ่ม</p><p className="c-mono text-[1.2rem]">{num(group.totals.openDeals)} · {baht(group.totals.openValue)}</p></div>
-                <div><p className="c-thai text-[0.75rem] text-[var(--c-text-4)]">ติดต่อล่าสุดในกลุ่ม</p><p className="c-thai text-[1rem]">{group.totals.lastAt ? thaiDate(group.totals.lastAt) : "ยังไม่เคย"}</p></div>
+                <div><p className="c-thai text-[0.75rem] text-[var(--c-text-4)]">ติดต่อล่าสุดในกลุ่ม</p><p className="c-thai text-[1rem]">{group.totals.lastAt ? thaiDate(group.totals.lastAt) : <Blank label="ยังไม่เคยติดต่อ" />}</p></div>
               </Panel>
               <Panel className="p-0">
                 <div className="c-scroll px-5 pb-2" tabIndex={0} role="region" aria-label="บริษัทในเครือ">

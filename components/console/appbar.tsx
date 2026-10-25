@@ -30,6 +30,24 @@ const Person = () => (
   </svg>
 );
 
+/* ไอคอนของแถบล่างบนมือถือ (แผน H S7) — เส้น 1.8 ชุดเดียวกับ Gear · Person */
+const icon = (d: string) => (
+  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <path d={d} />
+  </svg>
+);
+const TAB_ICON: Record<string, ReactNode> = {
+  "/app/today": icon("M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"),
+  "/app/accounts": icon("M4 21V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v16M15 9h4a1 1 0 0 1 1 1v11M3 21h18M8 8h3M8 12h3M8 16h3"),
+  "/app/customers": icon("M16 19c-.8-2.4-2.2-3.5-4-3.5S8.8 16.6 8 19M12 12.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6M5 21h14"),
+  "/app/deals": icon("M4 5h16M4 5v4h16V5M6 9v10h12V9M10 13h4"),
+  "/app/tasks": icon("M9 11l2 2 4-4M5 4h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1"),
+};
+const MoreIcon = () => icon("M5 12h.01M12 12h.01M19 12h.01");
+
+/* แถบล่างมีที่ 4 ช่อง + "เพิ่มเติม" — เกินนี้ป้ายไทยจะถูกตัดที่ 375px */
+const BOTTOM_TABS = 4;
+
 const TABS = [
   { href: "/app/today", label: "หน้าแรก" },
   { href: "/app/accounts", label: "บริษัท" },
@@ -48,8 +66,8 @@ const NEW_ITEMS = [
   { href: "/app/customers/new", label: "ผู้ติดต่อ" },
   { href: "/app/deals/new", label: "ดีล" },
   { href: "/app/tasks?new=1", label: "งาน" },
-  { href: "/app/sales#new", label: "แคมเปญ" },
-  { href: "/app/vault/cards", label: "นามบัตร" },
+  { href: "/app/sales/new", label: "แคมเปญ" },
+  { href: "/app/vault/cards", label: "นามบัตร (ถ่ายรูป)" },
   { href: "/app/requests", label: "คำขอสิทธิ" },
 ];
 
@@ -156,12 +174,17 @@ export function AppBar({
   const inSetup = SETUP_PATHS.some(matches);
   const isActive = (href: string) => !inSetup && matches(href) && !tabs.some((t) => t.href.length > href.length && t.href.startsWith(href) && matches(t.href));
 
+  const bottom = tabs.slice(0, BOTTOM_TABS);
+  const rest = tabs.slice(BOTTOM_TABS);
+  const restActive = rest.some((t) => isActive(t.href));
+
   return (
+    <>
     <header className="c-appbar">
       <div className="c-appbar__row">
-        <Link href="/app/today" className="flex shrink-0 items-center gap-2 text-[var(--c-text)]" aria-label="PARALLAX หน้าแรก">
-          <Mark className="h-4 w-4 text-[var(--c-accent)]" />
-          <span className="hidden text-[0.8rem] font-semibold tracking-[0.18em] sm:inline">PARALLAX</span>
+        <Link href="/app/today" className="flex shrink-0 items-center gap-2 text-[var(--c-text)]" aria-label="Parallax หน้าแรก">
+          <Mark className="h-5 w-5" />
+          <span className="hidden text-[1rem] font-semibold tracking-[-0.02em] sm:inline">Parallax</span>
         </Link>
 
         <form
@@ -261,5 +284,49 @@ export function AppBar({
         ))}
       </nav>
     </header>
+
+    {/* ── มือถือ: แถบล่างแทนแท็บที่ล้นขวา (แผน H S7) ──
+        อยู่นอก <header> เพราะ backdrop-filter ของแถบบนทำให้ position: fixed
+        ของลูกยึดกับแถบบนแทนจอ */}
+    <nav className="c-bottomnav" aria-label="เมนูหลัก (มือถือ)">
+      {bottom.map((t) => (
+        <Link key={t.href} href={t.href} className="c-bottomnav__item" data-active={isActive(t.href)} aria-current={isActive(t.href) ? "page" : undefined}>
+          {TAB_ICON[t.href]}
+          <span>{t.label}</span>
+        </Link>
+      ))}
+      {rest.length > 0 && (
+        <BottomMore active={restActive}>
+          {(close) => rest.map((t) => (
+            <Link key={t.href} href={t.href} className="c-navlink" role="menuitem" data-active={isActive(t.href)} onClick={close}>{t.label}</Link>
+          ))}
+        </BottomMore>
+      )}
+    </nav>
+    </>
+  );
+}
+
+function BottomMore({ active, children }: { active: boolean; children: (close: () => void) => ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const pathname = usePathname();
+  useEffect(() => setOpen(false), [pathname]);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", away);
+    document.addEventListener("keydown", esc);
+    return () => { document.removeEventListener("mousedown", away); document.removeEventListener("keydown", esc); };
+  }, [open]);
+  return (
+    <div className="c-bottomnav__more" ref={ref}>
+      <button type="button" className="c-bottomnav__item" data-active={active || open} aria-expanded={open} aria-haspopup="menu" onClick={() => setOpen((v) => !v)}>
+        <MoreIcon />
+        <span>เพิ่มเติม</span>
+      </button>
+      {open && <div className="c-bottomnav__sheet" role="menu">{children(() => setOpen(false))}</div>}
+    </div>
   );
 }

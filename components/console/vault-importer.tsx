@@ -91,7 +91,7 @@ export function VaultImporter({ sourceId, allowed }: { sourceId: string; allowed
           </p>
         ) : (
           <p className="c-thai mt-3 text-[0.82rem] text-[var(--c-bad)]">
-            ตรวจตัวตนไม่สำเร็จ{result.resolveError ? ` (${result.resolveError})` : ""} — แถวยังรอตรวจ สั่งตรวจใหม่ได้ที่หน้าคิวตรวจตัวตน
+            ตรวจตัวตนไม่สำเร็จ{result.resolveError ? ` (${result.resolveError})` : ""} — แถวยังรอตรวจ สั่งตรวจใหม่ได้ที่หน้าตรวจข้อมูลซ้ำ
           </p>
         )}
         <p className="c-thai mt-2 text-[0.8rem] text-[var(--c-text-4)]">
@@ -100,7 +100,7 @@ export function VaultImporter({ sourceId, allowed }: { sourceId: string; allowed
         <div className="mt-4 flex flex-wrap gap-2">
           <Link href={`/app/vault/batches/${result.batchId}`} className="c-btn c-btn-primary">ดูรายงานตรวจยอด</Link>
           {result.resolved && result.resolved.personPairs + result.resolved.orgGroups > 0 && (
-            <Link href="/app/vault/review" className="c-btn c-btn-ghost">ไปที่คิวตรวจ</Link>
+            <Link href="/app/vault/review" className="c-btn c-btn-ghost">ไปที่ตรวจข้อมูลซ้ำ</Link>
           )}
           <button type="button" onClick={reset} className="c-btn c-btn-ghost">นำเข้าไฟล์อื่น</button>
         </div>

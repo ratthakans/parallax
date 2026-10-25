@@ -12,7 +12,7 @@ import { ActionForm } from "@/components/console/action-form";
 import { SelectAll, SelectedCount } from "@/components/console/select-all";
 import { CLASSIFICATION_TH, LIFECYCLE_TH, type LifecycleState } from "@/lib/shared/vault";
 import { thaiDate } from "@/lib/shared/format";
-import { PageHead, Panel, num } from "@/components/console/ui";
+import { Blank, PageHead, Panel, num } from "@/components/console/ui";
 import { ListViews, Pager, SortTh, type ListState } from "@/components/console/list-view";
 
 export const metadata = { title: "บริษัท" };
@@ -181,12 +181,12 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
                     <td><input type="checkbox" form="bulk-orgs" name="ids" value={r.id} aria-label={`เลือก ${r.name}`} className="h-4 w-4" /></td>
                     <td>
                       <Link href={`/app/accounts/${r.id}`} className="c-thai inline-block py-1 text-[var(--c-accent)] hover:underline">{r.name}</Link>
-                      <span className="c-mono block text-[0.75rem] text-[var(--c-text-4)]">{r.domain ?? "ไม่ทราบโดเมน"}</span>
+                      {r.domain && <span className="c-mono block text-[0.75rem] text-[var(--c-text-4)]">{r.domain}</span>}
                     </td>
                     <td className="c-mono text-right">{num(r.current)}</td>
                     <td className="c-mono text-right text-[var(--c-text-3)]">{num(r.people - r.current)}</td>
-                    <td className="c-thai text-[0.82rem]">{r.owner ?? <span className="text-[var(--c-text-4)]">ยังไม่มี</span>}</td>
-                    <td className="c-thai text-[0.82rem]">{r.lastInteraction ? thaiDate(r.lastInteraction) : <span className="text-[var(--c-text-4)]">ไม่มีบันทึก</span>}</td>
+                    <td className="c-thai text-[0.82rem]">{r.owner ?? <Blank label="ยังไม่มีเจ้าของบัญชี" />}</td>
+                    <td className="c-thai text-[0.82rem]">{r.lastInteraction ? thaiDate(r.lastInteraction) : <Blank label="ยังไม่มีบันทึกการติดต่อ" />}</td>
                     {shownFields.map((f) => <td key={f.id} className="c-thai text-[0.82rem]">{displayValue(f, cvals.get(r.id)?.get(f.id))}</td>)}
                     <td className="c-thai text-[0.8rem]">
                       {LIFECYCLE_TH[r.lifecycle as LifecycleState] ?? r.lifecycle}

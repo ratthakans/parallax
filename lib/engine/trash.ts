@@ -78,7 +78,7 @@ export async function orgIsEmpty(tenantId: string, orgId: string): Promise<strin
   ];
   for (const [t, why] of checks) {
     if (await get(`SELECT 1 AS x FROM ${t} WHERE tenant_id = ? AND org_id = ? LIMIT 1`, tenantId, orgId)) {
-      return `ลบได้เฉพาะแฟ้มว่าง — บริษัทนี้${why} · ถ้าเป็นบริษัทซ้ำ ให้รวมที่คิวตรวจข้อมูลซ้ำ`;
+      return `ลบได้เฉพาะแฟ้มว่าง — บริษัทนี้${why} · ถ้าเป็นบริษัทซ้ำ ให้รวมที่หน้าตรวจข้อมูลซ้ำ`;
     }
   }
   return null;

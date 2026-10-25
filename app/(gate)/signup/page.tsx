@@ -4,7 +4,7 @@ import { connection } from "next/server";
 import { SignupForm } from "@/components/console/signup-form";
 import { SIGNUP_CLOSED_TH, TRIAL_DAYS, signupEnabled } from "@/lib/shared/signup";
 
-export const metadata: Metadata = { title: "สมัครทดลองใช้ · PARALLAX", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: "สมัครทดลองใช้", robots: { index: false, follow: false } };
 
 /* ── สมัครเอง (docs/solo-plan.md S9) ──
    ปิดโดยปริยาย: ไม่มี SIGNUP_ENABLED=1 = หน้านี้บอกว่ายังไม่เปิดรับ และ action ปฏิเสธ (ไม่ใช่แค่ซ่อนฟอร์ม)

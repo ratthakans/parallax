@@ -12,7 +12,7 @@ import { CONTACT_KIND_LABEL, CONTACT_KIND_ORDER } from "@/lib/shared/contact-kin
 import { FIELD_LABEL } from "@/lib/shared/ingest-types";
 import { notConnectedTh } from "@/lib/shared/plays";
 import { daysAgoLabel, thaiDate } from "@/lib/shared/format";
-import { Panel, baht, num } from "@/components/console/ui";
+import { Blank, Panel, baht, num } from "@/components/console/ui";
 import { RecordHeader, RecordTabs, pickTab } from "@/components/console/record";
 import { NoteCapture } from "@/components/console/note-capture";
 import { viewer } from "@/app/(app)/viewer";
@@ -237,8 +237,8 @@ export default async function CustomerPage({
         actions={b2b ? <a href="#activity" className="c-btn c-btn-ghost c-btn-sm xl:hidden">บันทึกกิจกรรม</a> : undefined}
         highlights={b2b ? [
           ...(showJobs ? [
-            { label: "ตำแหน่ง", value: currentJob?.title ?? "ไม่ทราบ" },
-            { label: "บริษัท", value: currentJob ? (currentJob.visible ? <Link href={`/app/accounts/${currentJob.orgId}`} className="text-[var(--c-accent)] hover:underline">{currentJob.org}</Link> : currentJob.org) : "ไม่ทราบ" },
+            { label: "ตำแหน่ง", value: currentJob?.title ?? <Blank label="ไม่ทราบตำแหน่ง" /> },
+            { label: "บริษัท", value: currentJob ? (currentJob.visible ? <Link href={`/app/accounts/${currentJob.orgId}`} className="text-[var(--c-accent)] hover:underline">{currentJob.org}</Link> : currentJob.org) : <Blank label="ไม่ทราบบริษัท" /> },
           ] : []),
           ...(showPurchases ? [
             { label: "ยอดซื้อรวม", value: s.orders ? `${baht(s.spent)} · ${num(s.orders)} ครั้ง` : "ยังไม่เคยซื้อ" },
@@ -246,7 +246,7 @@ export default async function CustomerPage({
             ...(s.orders ? [{ label: "รอบปกติ", value: status.text }] : []),
           ] : []),
           { label: "ช่องทาง", value: kinds.length ? kinds.map((k) => CONTACT_KIND_LABEL[k]).join(" · ") : "ไม่มี" },
-          { label: "ติดต่อล่าสุด", value: b2b.interactions[0] ? thaiDate(b2b.interactions[0].at) : "ยังไม่เคย" },
+          { label: "ติดต่อล่าสุด", value: b2b.interactions[0] ? thaiDate(b2b.interactions[0].at) : <Blank label="ยังไม่เคยติดต่อ" /> },
           ...(showPurchases ? [] : [{ label: "แคมเปญ", value: num(b2b.campaigns.length) }]),
           { label: "เพิ่มเมื่อ", value: thaiDate(c.createdAt) },
         ] : [

@@ -5,6 +5,7 @@ import { customerIdFor, sealRecord } from "@/lib/engine/pii";
 import { judgeRow, withErasure, type ColumnPlan } from "@/lib/engine/vault/intake";
 import { erasedKeys } from "@/lib/engine/vault/erasure";
 import { resolveTenant, type ResolveStats } from "@/lib/engine/vault/resolve";
+import { importBlockedReason } from "@/lib/engine/signup/gate";
 import { CARD_BATCH_MAX, isDay } from "@/lib/shared/capture";
 import { bangkokDay } from "@/lib/shared/format";
 import { templateOf } from "@/lib/shared/purpose-templates";
@@ -63,6 +64,10 @@ async function cardSource(tenantId: string, purposeId: string, actor: string): P
 export async function captureCards(
   tenantId: string, input: { event: string; date: string; cards: CardInput[] }, actor: string,
 ): Promise<CaptureResult> {
+  /* นามบัตรคือข้อมูลจริง — บัญชีสมัครเองติดด่านเดียวกับเพิ่มคนเอง (customers.ts) และนำเข้าไฟล์
+     ถ่ายรูปได้ทีละหลายสิบใบแล้ว (แผน H §5) ช่องนี้จึงต้องไม่เป็นทางเลี่ยงด่าน */
+  const blocked = await importBlockedReason(tenantId);
+  if (blocked) return { ok: false, error: blocked };
   const purpose = await cardPurpose(tenantId);
   if (!purpose) {
     return { ok: false, error: "ยังไม่มีวัตถุประสงค์สำหรับนามบัตร — ให้เจ้าของบัญชีหรือผู้ดูแลข้อมูลเลือกแม่แบบ \"ติดต่อจากการแลกนามบัตรในงานธุรกิจ\" ที่หน้าวัตถุประสงค์ก่อน" };
@@ -75,7 +80,7 @@ export async function captureCards(
   const cards = (input.cards ?? [])
     .map((c) => ({ name: c.name?.trim() ?? "", title: c.title?.trim() ?? "", company: c.company?.trim() ?? "", email: c.email?.trim() ?? "", phone: c.phone?.trim() ?? "" }))
     .filter((c) => Object.values(c).some(Boolean));
-  if (!cards.length) return { ok: false, error: "กรอกนามบัตรอย่างน้อยหนึ่งใบ" };
+  if (!cards.length) return { ok: false, error: "เพิ่มนามบัตรอย่างน้อยหนึ่งใบ" };
   if (cards.length > CARD_BATCH_MAX) return { ok: false, error: `ชุดหนึ่งไม่เกิน ${CARD_BATCH_MAX} ใบ — แบ่งเป็นหลายชุด` };
 
   /* ลายนิ้วมือของชุด — กดบันทึกซ้ำ/ส่งซ้ำ = ชุดเดิม (ux_batches_sha) ไม่สร้างแถวซ้ำ */

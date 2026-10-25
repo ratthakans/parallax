@@ -16,7 +16,7 @@ import { hasB2B, hasB2C } from "@/lib/shared/tenants";
 import type { Criteria, DraftState } from "@/lib/shared/policy";
 
 /* ── Campaign Workspace (docs/plan.md B5) ─────────────────────────
-   บัญชี ผู้กระทำ และธงทีม PARALLAX มาจากฝั่งเซิร์ฟเวอร์เสมอ (viewer.ts) */
+   บัญชี ผู้กระทำ และธงทีม Parallax มาจากฝั่งเซิร์ฟเวอร์เสมอ (viewer.ts) */
 
 const str = (fd: FormData, k: string) => String(fd.get(k) ?? "");
 const words = (v: string) => v.split(/[,，·\n]/).map((x) => x.trim()).filter(Boolean);
@@ -196,6 +196,8 @@ export async function adoptTemplateAction(_p: ActionState, fd: FormData): Promis
   const res = await adoptTemplate(v.tenantId, str(fd, "code"), str(fd, "confirmation"), v.actor);
   if (!res.ok) return { error: res.error };
   revalidatePath("/app/sales/purposes");
+  /* หน้านามบัตรเปิดใช้แม่แบบนามบัตรได้ในที่ (แผน H S1) */
+  revalidatePath("/app/vault/cards");
   return { ok: res.existed ? "บัญชีนี้ใช้แม่แบบนี้อยู่แล้ว" : "สร้างวัตถุประสงค์และฐานรุ่น 1 จากแม่แบบแล้ว" };
 }
 

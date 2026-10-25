@@ -20,7 +20,7 @@ export default async function TeamsPage() {
   return (
     <>
       <Link href="/app/settings" className="c-thai text-[0.8rem] text-[var(--c-text-3)] hover:text-[var(--c-accent)]">← ตั้งค่า</Link>
-      <PageHead label="ตั้งค่า" title="ทีมและเขตการขาย" lead="ใช้แยกรายงานพยากรณ์และกรองบริษัทตามทีม — ไม่จำกัดว่าใครเห็นอะไร (สิทธิ์ยังเป็นตามบทบาท)" />
+      <PageHead label="ตั้งค่า" title="ทีมและเขตการขาย" lead="ใช้แยกรายงานพยากรณ์และกรองบริษัทตามทีม" more="ไม่จำกัดว่าใครเห็นอะไร — สิทธิ์ยังเป็นตามบทบาท" />
       <datalist id="people-list">{people.map((p) => <option key={p} value={p} />)}</datalist>
       <div className="grid gap-5 lg:grid-cols-2">
         {teams.map((t) => (

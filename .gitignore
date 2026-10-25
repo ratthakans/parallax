@@ -40,3 +40,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .data/
+
+# ไฟล์อ่านนามบัตร — คัดจาก node_modules ตอน dev/build (scripts/copy-ocr.mjs)
+/public/ocr/

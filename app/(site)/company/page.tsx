@@ -118,8 +118,8 @@ export default function CompanyPage() {
                 <Label>Name and category</Label>
                 <div className="mt-9 flex items-center gap-3 text-ink">
                   <Mark className="h-7 w-7 text-signal" />
-                  <span className="t-h3 font-medium tracking-[0.24em]">
-                    PARALLAX
+                  <span className="t-h3 font-semibold tracking-[-0.02em]">
+                    Parallax
                   </span>
                 </div>
                 <p className="t-small t-thai mt-8 max-w-sm text-ink-3">

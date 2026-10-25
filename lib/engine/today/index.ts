@@ -272,7 +272,7 @@ export async function snoozeItem(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!KINDS.includes(kind as QueueItemKind)) return { ok: false, error: "ไม่รู้จักรายการนี้" };
   const k = kind as QueueItemKind;
-  if (k === "preference") return { ok: false, error: "รายการที่ต้องหยุดเลื่อนไม่ได้ — กดรับทราบแทน" };
+  if (k === "preference") return { ok: false, error: "รายการหยุดติดต่อเลื่อนไม่ได้ — กดรับทราบแทน" };
   const today = bangkokDay(now);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(until) || until <= today) return { ok: false, error: "เลือกวันที่หลังวันนี้" };
   if (until > bangkokDay(+now + 30 * 864e5)) return { ok: false, error: "เลื่อนได้ไม่เกิน 30 วัน" };
@@ -291,7 +291,7 @@ export async function snoozeItem(
 export async function acknowledgeItem(
   tenantId: string, userId: string, kind: string, id: string, now = new Date(),
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  if (!ACKABLE.includes(kind as QueueItemKind)) return { ok: false, error: "รับทราบได้เฉพาะรายการที่ต้องหยุดและคนที่ย้ายบริษัท" };
+  if (!ACKABLE.includes(kind as QueueItemKind)) return { ok: false, error: "รับทราบได้เฉพาะรายการหยุดติดต่อและคนที่ย้ายบริษัท" };
   if (!(await itemExists(tenantId, kind as QueueItemKind, id))) return { ok: false, error: "ไม่พบรายการนี้" };
   await run(
     `INSERT INTO queue_marks (tenant_id, user_id, item_kind, item_id, mark, until, count, updated_at) VALUES (?,?,?,?,?,?,?,?)

@@ -112,7 +112,7 @@ export default async function CampaignDetail({
   return (
     <>
       <PageHead
-        label={`campaign · ${camp.play_id}`}
+        label="แคมเปญ"
         title={play?.nameTh ?? play?.name ?? camp.play_id}
         lead={
           camp.dry_run

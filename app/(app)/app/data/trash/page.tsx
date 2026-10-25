@@ -19,7 +19,7 @@ export default async function TrashPage() {
   return (
     <>
       <Link href="/app/data" className="c-thai text-[0.8rem] text-[var(--c-text-3)] hover:text-[var(--c-accent)]">← สุขภาพข้อมูล</Link>
-      <PageHead label="ข้อมูล" title="ถังขยะ" lead={`ดีลและแฟ้มบริษัทว่างที่ถูกลบ กู้คืนได้ภายใน ${TRASH_DAYS} วัน — หลังจากนั้นลบถาวร · ประวัติการเปลี่ยนแปลงยังอยู่เสมอ`} />
+      <PageHead label="ข้อมูล" title="ถังขยะ" lead={`กู้คืนได้ภายใน ${TRASH_DAYS} วัน — หลังจากนั้นลบถาวร`} more="ดีลและแฟ้มบริษัทว่างที่ถูกลบ · ประวัติการเปลี่ยนแปลงยังอยู่เสมอ" />
       <Panel className="max-w-4xl p-5">
         {items.length ? (
           <ul className="divide-y divide-[var(--c-line)]">

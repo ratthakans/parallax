@@ -6,7 +6,9 @@
     "node": "24.x"
   },
   "scripts": {
+    "predev": "node scripts/copy-ocr.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/copy-ocr.mjs",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
@@ -54,6 +56,8 @@
     "verify:modes": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/modes.mts",
     "verify:person-deals": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/person-deals.mts",
     "verify:consents": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/consents.mts",
+    "verify:contrast": "node --no-warnings --experimental-strip-types verify/contrast.mts",
+    "verify:card-parse": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/card-parse.mts",
     "erasures": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs scripts/erasures.mts",
     "pg:test-db": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs scripts/pg-test-db.mts",
     "verify:pg": "node --no-warnings --experimental-strip-types --import ./verify/hook-register.mjs verify/pg-rls.mts"
@@ -62,10 +66,13 @@
     "@anthropic-ai/sdk": "^0.135.0",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.118.0",
+    "@tesseract.js-data/eng": "1.0.0",
+    "@tesseract.js-data/tha": "1.0.0",
     "next": "16.4.2",
     "postgres": "^3.4.9",
     "react": "19.3.1",
     "react-dom": "19.3.1",
+    "tesseract.js": "7.0.0",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {

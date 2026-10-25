@@ -20,7 +20,7 @@ import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/shared/session";
 
 export const metadata: Metadata = {
-  title: { default: "Console", template: "%s · PARALLAX" },
+  title: { default: "Console", template: "%s · Parallax" },
   robots: { index: false, follow: false },
 };
 

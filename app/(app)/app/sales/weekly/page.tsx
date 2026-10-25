@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 /* ── ทบทวนรายสัปดาห์ (docs/plan.md หัวข้อ 3.3) ─────────────────────
    หัวหน้าทีมดูทุกสัปดาห์: บัญชีเป้าหมายอยู่ขั้นไหน · งานเลยกำหนด · โอกาสที่ขยับ · ใครทำงานที่มีผล
-   กิจกรรมนับจากการมอบหมายและการบันทึกผล ไม่ใช่การ login · การกระทำของทีม PARALLAX ไม่นับ */
+   กิจกรรมนับจากการมอบหมายและการบันทึกผล ไม่ใช่การ login · การกระทำของทีม Parallax ไม่นับ */
 
 const TH = "font-sans normal-case tracking-normal text-[0.75rem]";
 const STAGE_TH: Record<string, string> = { proposal: "ส่งข้อเสนอแล้ว", won: "ปิดได้", lost: "ไม่ได้", open: "เปิด" };
@@ -23,7 +23,7 @@ export default async function WeeklyPage() {
   return (
     <>
       <Link href="/app/sales" className="c-thai inline-block py-2 text-[0.85rem] text-[var(--c-text-3)] hover:text-[var(--c-text)]">← แคมเปญขาย</Link>
-      <PageHead label="แคมเปญ" title="รายงานประจำสัปดาห์" lead={`ตั้งแต่ ${thaiDate(r.since)} — นับจากงานที่มอบหมายและผลที่บันทึก ไม่นับการเข้าระบบ และไม่นับทีม PARALLAX`} />
+      <PageHead label="แคมเปญ" title="รายงานประจำสัปดาห์" lead={`ตั้งแต่ ${thaiDate(r.since)}`} more="นับจากงานที่มอบหมายและผลที่บันทึก ไม่นับการเข้าระบบ และไม่นับทีม Parallax" />
 
       <Panel className="mb-6 p-5 md:p-6">
         <h2 className="c-h2 text-[var(--c-text)]">แคมเปญที่ยังเปิด</h2>
@@ -93,7 +93,7 @@ export default async function WeeklyPage() {
             </tbody>
           </table>
         ) : <p className="c-thai mt-3 text-[0.86rem] text-[var(--c-text-3)]">ยังไม่มีกิจกรรมในสัปดาห์นี้</p>}
-        {r.staffActions > 0 && <p className="c-thai mt-3 text-[0.76rem] text-[var(--c-text-4)]">ไม่นับ {num(r.staffActions)} กิจกรรมของทีม PARALLAX</p>}
+        {r.staffActions > 0 && <p className="c-thai mt-3 text-[0.76rem] text-[var(--c-text-4)]">ไม่นับ {num(r.staffActions)} กิจกรรมของทีม Parallax</p>}
       </Panel>
     </>
   );

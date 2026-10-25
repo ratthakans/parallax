@@ -4,7 +4,7 @@ import { CONTACT_SORTS, CONTACT_VIEWS, listContacts, type ContactSort, type Cont
 import { CONTACT_KIND_LABEL } from "@/lib/shared/contact-kinds";
 import { baht, thaiDate } from "@/lib/shared/format";
 import { hasB2C, type CustomerMode } from "@/lib/shared/tenants";
-import { PageHead, Panel, num } from "@/components/console/ui";
+import { Blank, PageHead, Panel, num } from "@/components/console/ui";
 import { ListViews, Pager, SortTh, type ListState } from "@/components/console/list-view";
 
 /* ── รายการผู้ติดต่อของบัญชี B2B (docs/ux-plan.md U3) ──
@@ -103,7 +103,7 @@ export async function B2BContacts({ sp, mode = "b2b" }: { sp: Record<string, str
                         {r.orders ? <>{baht(r.spent ?? 0)} <span className="text-[var(--c-text-4)]">· {num(r.orders)} ครั้ง</span></> : <span className="text-[var(--c-text-4)]">—</span>}
                       </td>
                     )}
-                    <td className="c-thai text-[0.82rem]">{r.lastAt ? thaiDate(r.lastAt) : <span className="text-[var(--c-text-4)]">ยังไม่เคย</span>}</td>
+                    <td className="c-thai text-[0.82rem]">{r.lastAt ? thaiDate(r.lastAt) : <Blank label="ยังไม่เคยติดต่อ" />}</td>
                     <td className="c-thai text-[0.82rem] text-[var(--c-text-3)]">{thaiDate(r.createdAt)}</td>
                   </tr>
                 ))}

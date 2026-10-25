@@ -58,7 +58,7 @@ export async function registerSource(
   if (input.kind === "namecard") {
     /* แหล่งนามบัตรถูกสร้างโดยหน้า "กรอกนามบัตร" (vault/cards.ts) ซึ่งผูกวัตถุประสงค์จากแม่แบบนามบัตรเสมอ
        ลงทะเบียนเองจากฟอร์มนี้ไม่ได้ — ไม่งั้นนามบัตรผูกกับวัตถุประสงค์อื่นได้ · OCR ยังไม่เปิด (solo-plan หัวข้อ 13) */
-    return { ok: false, error: "นามบัตรเพิ่มจากหน้า \"กรอกนามบัตร\" ใน Data Vault — ระบบสร้างแหล่งและผูกวัตถุประสงค์นามบัตรให้เอง" };
+    return { ok: false, error: "นามบัตรเพิ่มจากหน้า \"เพิ่มนามบัตร\" — ระบบสร้างแหล่งและผูกวัตถุประสงค์นามบัตรให้เอง" };
   }
   const acquisition = input.acquisitionNote.trim();
   if (acquisition.length < 10) {
